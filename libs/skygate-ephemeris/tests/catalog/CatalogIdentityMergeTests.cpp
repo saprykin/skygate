@@ -293,6 +293,13 @@ private slots:
     void reorderingBridgeSourcesChangesInheritedMetadata();
     void bridgeAbsorptionUsesSourcePrecedenceAfterReplacements();
     void multiStageBridgesRetainEveryContributorOnce();
+    void bridgePrefersTheNameOfItsActualSupplyingSource();
+    void bridgePrefersTheDeepSkyAxisOfItsActualSupplyingSource();
+    void explicitReplacementValueOutranksAnInheritedValue();
+    void deepSkyValuesResolveIndependentlyBySupplyingSource();
+    void absentAndZeroDeepSkyValuesKeepTheirMeaning();
+    void inheritedAstrometryValuesKeepTheirSupplyingSource();
+    void inheritedFixedCoordinatesFollowTheirSupplyingSource();
     void retainsReplacedCanonicalIdentityAcrossLaterSources();
     void retainsBridgedCanonicalIdentitiesAcrossLaterSources();
     void retainedCanonicalIdentitySurvivesBinaryRoundTripAndRecomposition();
@@ -1837,6 +1844,327 @@ void CatalogIdentityMergeTests::multiStageBridgesRetainEveryContributorOnce()
         result.contributorSourceIds.front(),
         (std::vector<std::string>{"source-4", "source-3", "source-2", "source-1", "source-0"})
     );
+}
+
+void CatalogIdentityMergeTests::bridgePrefersTheNameOfItsActualSupplyingSource()
+{
+    // The HIP 1 object is named by the earliest source, and the record that
+    // replaces it later carries no name of its own, so the name it holds was
+    // supplied by that earliest source. The bridge resolves both objects, and
+    // the HD 2 source is the only higher-precedence source that actually
+    // supplied a name, so its explicit name wins over the inherited one.
+    const auto sourceA =
+        createCatalog({makeStar("a_hip_1", "A inherited", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto sourceB =
+        createCatalog({makeStar("b_hd_2", "B explicit", {CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0)}, {});
+    const auto sourceC =
+        createCatalog({makeStar("c_hip_1", {}, {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto bridge = createCatalog(
+        {makeStar(
+            "d_bridge", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0
+        )},
+        {}
+    );
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get(), sourceC.get(), bridge.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "c_hip_1"), std::size_t{0});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "b_hd_2"), std::size_t{0});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "d_bridge");
+    QVERIFY(survivor != nullptr);
+    QVERIFY(hasIdentifier(*survivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*survivor, "hd", "2"));
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("B explicit"));
+    QCOMPARE(
+        result.contributorSourceIds.front(), (std::vector<std::string>{"source-3", "source-2", "source-1", "source-0"})
+    );
+}
+
+void CatalogIdentityMergeTests::bridgePrefersTheDeepSkyAxisOfItsActualSupplyingSource()
+{
+    // Domain metadata follows the same rule: the NGC object carries a major
+    // axis of 1 arcminute, the IC object 2 arcminutes, and the record that
+    // replaces the NGC survivor supplies no axis of its own. The bridge
+    // resolves both designations, so the axis must come from the IC record,
+    // the highest-precedence source that actually supplied one.
+    const auto sourceA = createCatalog(
+        {}, {makeDeepSkyObject("a_ngc_224", {}, {}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, 1.0)}
+    );
+    const auto sourceB =
+        createCatalog({}, {makeDeepSkyObject("b_ic_1", {}, {}, {CatalogIdentifier::make("ic", "1")}, 1.0, 2.0, 2.0)});
+    const auto sourceC = createCatalog(
+        {}, {makeDeepSkyObject("c_ngc_224", {}, {}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, std::nullopt)}
+    );
+    const auto bridge = createCatalog(
+        {},
+        {makeDeepSkyObject(
+            "d_bridge",
+            {},
+            {},
+            {CatalogIdentifier::make("ngc", "224"), CatalogIdentifier::make("ic", "1")},
+            1.0,
+            2.0,
+            std::nullopt
+        )}
+    );
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get(), sourceC.get(), bridge.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "d_bridge");
+    QVERIFY(survivor != nullptr);
+    QVERIFY(hasIdentifier(*survivor, "ngc", "224"));
+    QVERIFY(hasIdentifier(*survivor, "ic", "1"));
+    const auto* deepSkyInfo = survivor->deepSkyObjectInfo();
+    QVERIFY(deepSkyInfo != nullptr);
+    QVERIFY(deepSkyInfo->majorAxisArcmin.has_value());
+    QCOMPARE(*deepSkyInfo->majorAxisArcmin, 2.0);
+}
+
+void CatalogIdentityMergeTests::explicitReplacementValueOutranksAnInheritedValue()
+{
+    // The record that replaces the NGC survivor supplies its own major axis,
+    // so that explicit value stays authoritative even though the IC object
+    // also supplies an axis and the bridge supplies none.
+    const auto sourceA = createCatalog(
+        {}, {makeDeepSkyObject("a_ngc_224", {}, {}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, 1.0)}
+    );
+    const auto sourceB =
+        createCatalog({}, {makeDeepSkyObject("b_ic_1", {}, {}, {CatalogIdentifier::make("ic", "1")}, 1.0, 2.0, 2.0)});
+    const auto sourceC = createCatalog(
+        {}, {makeDeepSkyObject("c_ngc_224", {}, {}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, 3.0)}
+    );
+    const auto bridge = createCatalog(
+        {},
+        {makeDeepSkyObject(
+            "d_bridge",
+            {},
+            {},
+            {CatalogIdentifier::make("ngc", "224"), CatalogIdentifier::make("ic", "1")},
+            1.0,
+            2.0,
+            std::nullopt
+        )}
+    );
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get(), sourceC.get(), bridge.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "d_bridge");
+    QVERIFY(survivor != nullptr);
+    const auto* deepSkyInfo = survivor->deepSkyObjectInfo();
+    QVERIFY(deepSkyInfo != nullptr);
+    QVERIFY(deepSkyInfo->majorAxisArcmin.has_value());
+    QCOMPARE(*deepSkyInfo->majorAxisArcmin, 3.0);
+}
+
+void CatalogIdentityMergeTests::deepSkyValuesResolveIndependentlyBySupplyingSource()
+{
+    // Two objects carry different deep-sky values for the same body, and both
+    // the record that replaces the NGC survivor and the bridge supply no
+    // deep-sky metadata of their own. Every field then resolves on its own:
+    // the axis and the position angle follow the higher-precedence source,
+    // while the minor axis the IC object alone supplies is kept because no
+    // other source offers a value for it. Reordering the two data sources
+    // swaps the inherited axis and position angle and leaves the minor axis
+    // untouched.
+    DistantCelestialBody ngcObject =
+        makeDeepSkyObject("a_ngc_224", {}, {}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, 30.0);
+    ngcObject.deepSkyObject->positionAngleDeg = 45.0;
+    DistantCelestialBody icObject =
+        makeDeepSkyObject("b_ic_1", {}, {}, {CatalogIdentifier::make("ic", "1")}, 1.0, 2.0, 60.0);
+    icObject.deepSkyObject->positionAngleDeg = 90.0;
+    icObject.deepSkyObject->minorAxisArcmin = 5.0;
+    DistantCelestialBody replacement =
+        makeDeepSkyObject("c_ngc_224", {}, {}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, std::nullopt);
+    replacement.deepSkyObject.reset();
+    DistantCelestialBody bridge = makeDeepSkyObject(
+        "d_bridge",
+        {},
+        {},
+        {CatalogIdentifier::make("ngc", "224"), CatalogIdentifier::make("ic", "1")},
+        1.0,
+        2.0,
+        std::nullopt
+    );
+    bridge.deepSkyObject.reset();
+
+    const auto sourceNgc = createCatalog({}, {ngcObject});
+    const auto sourceIc = createCatalog({}, {icObject});
+    const auto sourceReplacement = createCatalog({}, {replacement});
+    const auto sourceBridge = createCatalog({}, {bridge});
+
+    const CatalogCompositionResult ngcFirst =
+        composeAll({sourceNgc.get(), sourceIc.get(), sourceReplacement.get(), sourceBridge.get()});
+    QVERIFY(ngcFirst.isSuccess());
+    QCOMPARE(ngcFirst.bodyCount, std::size_t{1});
+    const BaseCelestialBody* ngcFirstSurvivor = findBodyById(ngcFirst.catalog->bodies(), "d_bridge");
+    QVERIFY(ngcFirstSurvivor != nullptr);
+    const auto* deepSkyInfo = ngcFirstSurvivor->deepSkyObjectInfo();
+    QVERIFY(deepSkyInfo != nullptr);
+    QVERIFY(deepSkyInfo->majorAxisArcmin.has_value());
+    QCOMPARE(*deepSkyInfo->majorAxisArcmin, 60.0);
+    QVERIFY(deepSkyInfo->positionAngleDeg.has_value());
+    QCOMPARE(*deepSkyInfo->positionAngleDeg, 90.0);
+    QVERIFY(deepSkyInfo->minorAxisArcmin.has_value());
+    QCOMPARE(*deepSkyInfo->minorAxisArcmin, 5.0);
+
+    const CatalogCompositionResult icFirst =
+        composeAll({sourceIc.get(), sourceNgc.get(), sourceReplacement.get(), sourceBridge.get()});
+    QVERIFY(icFirst.isSuccess());
+    QCOMPARE(icFirst.bodyCount, std::size_t{1});
+    const BaseCelestialBody* icFirstSurvivor = findBodyById(icFirst.catalog->bodies(), "d_bridge");
+    QVERIFY(icFirstSurvivor != nullptr);
+    const auto* reorderedDeepSkyInfo = icFirstSurvivor->deepSkyObjectInfo();
+    QVERIFY(reorderedDeepSkyInfo != nullptr);
+    QVERIFY(reorderedDeepSkyInfo->majorAxisArcmin.has_value());
+    QCOMPARE(*reorderedDeepSkyInfo->majorAxisArcmin, 30.0);
+    QVERIFY(reorderedDeepSkyInfo->positionAngleDeg.has_value());
+    QCOMPARE(*reorderedDeepSkyInfo->positionAngleDeg, 45.0);
+    QVERIFY(reorderedDeepSkyInfo->minorAxisArcmin.has_value());
+    QCOMPARE(*reorderedDeepSkyInfo->minorAxisArcmin, 5.0);
+}
+
+void CatalogIdentityMergeTests::absentAndZeroDeepSkyValuesKeepTheirMeaning()
+{
+    // Only the IC object carries a deep-sky measurement, an explicit zero
+    // position angle with an unknown kind. The zero is a value, so the bridge
+    // keeps it, while the fields nobody supplied stay absent instead of being
+    // invented.
+    DistantCelestialBody bareNgc =
+        makeDeepSkyObject("a_ngc_224", {}, {}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, std::nullopt);
+    bareNgc.deepSkyObject.reset();
+    DistantCelestialBody zeroedIc =
+        makeDeepSkyObject("b_ic_1", {}, {}, {CatalogIdentifier::make("ic", "1")}, 1.0, 2.0, std::nullopt);
+    zeroedIc.deepSkyObject->kind = skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown;
+    zeroedIc.deepSkyObject->positionAngleDeg = 0.0;
+    DistantCelestialBody bareBridge = makeDeepSkyObject(
+        "c_bridge",
+        {},
+        {},
+        {CatalogIdentifier::make("ngc", "224"), CatalogIdentifier::make("ic", "1")},
+        1.0,
+        2.0,
+        std::nullopt
+    );
+    bareBridge.deepSkyObject.reset();
+
+    const auto sourceA = createCatalog({}, {bareNgc});
+    const auto sourceB = createCatalog({}, {zeroedIc});
+    const auto sourceBridge = createCatalog({}, {bareBridge});
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get(), sourceBridge.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "c_bridge");
+    QVERIFY(survivor != nullptr);
+    const auto* deepSkyInfo = survivor->deepSkyObjectInfo();
+    QVERIFY(deepSkyInfo != nullptr);
+    QCOMPARE(deepSkyInfo->kind, skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown);
+    QVERIFY(deepSkyInfo->positionAngleDeg.has_value());
+    QCOMPARE(*deepSkyInfo->positionAngleDeg, 0.0);
+    QVERIFY(!deepSkyInfo->majorAxisArcmin.has_value());
+    QVERIFY(!deepSkyInfo->minorAxisArcmin.has_value());
+}
+
+void CatalogIdentityMergeTests::inheritedAstrometryValuesKeepTheirSupplyingSource()
+{
+    // The earliest source supplies the parallax of the HIP 1 object, and the
+    // record that replaces it carries no astrometry of its own, so the model
+    // it holds was supplied by that earliest source. The HD 2 object describes
+    // the same direction and supplies a proper motion and its own parallax, so
+    // both of its values reach the bridge while the surviving reference
+    // position stays the one the winner already describes.
+    OwnGalaxyCelestialBody earlier = makeStar("a_hip_1", {}, {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0);
+    earlier.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *earlier.fixedEquatorial,
+        .stellarParallaxMas = 5.0,
+    };
+    OwnGalaxyCelestialBody later = makeStar("b_hd_2", {}, {CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0);
+    later.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *later.fixedEquatorial,
+        .properMotionRightAscensionMasPerYear = 30.0,
+        .properMotionDeclinationMasPerYear = 0.0,
+        .stellarParallaxMas = 7.0,
+    };
+    const auto sourceA = createCatalog({earlier}, {});
+    const auto sourceB = createCatalog({later}, {});
+    const auto sourceC =
+        createCatalog({makeStar("c_hip_1", {}, {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto bridge = createCatalog(
+        {makeStar(
+            "d_bridge", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0
+        )},
+        {}
+    );
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get(), sourceC.get(), bridge.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "d_bridge");
+    QVERIFY(survivor != nullptr);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& astrometry = *survivor->starAstrometryValue();
+    QCOMPARE(astrometry.referenceEquatorial.rightAscensionHours, 1.0);
+    QCOMPARE(astrometry.referenceEquatorial.declinationDeg, 2.0);
+    QVERIFY(astrometry.stellarParallaxMas.has_value());
+    QCOMPARE(*astrometry.stellarParallaxMas, 7.0);
+    QVERIFY(astrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionRightAscensionMasPerYear, 30.0);
+    QVERIFY(astrometry.properMotionDeclinationMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionDeclinationMasPerYear, 0.0);
+}
+
+void CatalogIdentityMergeTests::inheritedFixedCoordinatesFollowTheirSupplyingSource()
+{
+    // Neither the replacement nor the bridge carries a position of its own,
+    // and the two absorbed objects disagree about where the shared body is.
+    // The position supplied by the higher-precedence source wins, and the
+    // merge diagnoses the override.
+    const auto sourceA =
+        createCatalog({makeStar("a_hip_1", {}, {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto sourceB =
+        createCatalog({makeStar("b_hd_2", {}, {CatalogIdentifier::make("hd", "2")}, {}, 5.0, 6.0)}, {});
+    const auto sourceC = createCatalog(
+        {makeStar("c_hip_1", {}, {CatalogIdentifier::make("hip", "1")}, {}, std::nullopt, std::nullopt)}, {}
+    );
+    const auto bridge = createCatalog(
+        {makeStar(
+            "d_bridge",
+            {},
+            {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")},
+            {},
+            std::nullopt,
+            std::nullopt
+        )},
+        {}
+    );
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of b_hd_2 over conflicting fixed coordinates from d_bridge."
+    );
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get(), sourceC.get(), bridge.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "d_bridge");
+    QVERIFY(survivor != nullptr);
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 5.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 6.0);
 }
 
 void CatalogIdentityMergeTests::retainsReplacedCanonicalIdentityAcrossLaterSources()
