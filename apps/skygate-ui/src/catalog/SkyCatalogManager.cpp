@@ -551,7 +551,13 @@ bool SkyCatalogManager::restoreCatalogCache()
     // therefore remain only when nothing was stored, and an empty collection
     // is installed through the same staged replacement as a populated one, so
     // a rejected composition leaves the previous configuration untouched.
+    // A committed collection that cannot be read is reported the same way: the
+    // active collection stays in place and the failure reaches the status
+    // text instead of the retired legacy cache being migrated over it.
     if (!restoreResult.restored) {
+        if (restoreResult.unusableCommittedCollection) {
+            setStatusText(restoreResult.statusText);
+        }
         return false;
     }
 

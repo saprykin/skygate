@@ -30,6 +30,7 @@ using skygate::ui::internal::SkyCatalogCollectionPersistRequest;
 using skygate::ui::internal::SkyCatalogCollectionRestoreResult;
 using skygate::ui::internal::SkyCatalogSourcePersistEntry;
 using skygate::ui::internal::SkyCatalogSourceRestoreEntry;
+using skygate::ui::tests::catalogCollectionManifestFilePath;
 using skygate::ui::tests::committedCatalogCollectionGeneration;
 using skygate::ui::tests::stagedCatalogSourceSidecarPath;
 
@@ -272,6 +273,9 @@ private slots:
     void clearingPayloadCacheDoesNotReAddLegacySources();
     void failedMigrationCommitKeepsLegacyCacheReadable();
     void failedCollectionWritePreservesPriorData();
+    void missingCommittedManifestRejectsRestoreInsteadOfMigratingLegacy();
+    void truncatedCommittedManifestRejectsRestoreInsteadOfMigratingLegacy();
+    void restoreUsesCommittedGenerationRatherThanStagedNewerGeneration();
     void logsCollectionLifecycleSummariesAtInfoLevel();
 
 private:
@@ -1405,6 +1409,142 @@ void SkyCatalogCacheControllerTests::failedCollectionWritePreservesPriorData()
     QCOMPARE(firstBodyId(*restored.sources[0].record.catalog), QStringLiteral("hip_11"));
     QCOMPARE(restored.sources[1].record.title, QStringLiteral("Old deep sky title (saved)"));
     QCOMPARE(firstBodyId(*restored.sources[1].record.catalog), QStringLiteral("ngc_22"));
+}
+
+void SkyCatalogCacheControllerTests::missingCommittedManifestRejectsRestoreInsteadOfMigratingLegacy()
+{
+    SkySettingsStore store;
+    // The retired pre-generation two-slot cache stays readable on disk for the
+    // whole test, so a restore that fell back to it would return its sources.
+    QVERIFY(store.saveCatalogCache(
+        skygate::ui::tests::sampleCatalogCacheSnapshot(
+            {.sourceLabel = QStringLiteral("Legacy Custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+        )
+    ));
+
+    const SkyCatalogCacheController controller(&store);
+    const QString customUrl = QStringLiteral("https://example.test/legacy-stars.csv");
+
+    // Migrate the legacy slots once and then commit an intentionally empty
+    // collection over them: the current configuration holds no source, while
+    // the legacy data it replaced stays readable.
+    const auto migrated = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(migrated.migratedLegacy);
+    QCOMPARE(migrated.sources.size(), std::size_t{2});
+    controller.persistCollection(persistRequestFromRestoreResult(migrated));
+    controller.persistCollection(SkyCatalogCollectionPersistRequest{});
+    const auto committed = store.loadCatalogCollectionCache();
+    QVERIFY(committed.isLoaded());
+    QVERIFY(committed.snapshot.sources.isEmpty());
+
+    // Only the committed manifest is lost; its records and the commit record
+    // survive, so the committed collection is what stays current.
+    const QString directory = m_settings.filePath(QStringLiteral("collection-cache"));
+    const QString manifestPath = catalogCollectionManifestFilePath(directory);
+    QFile manifestFile(manifestPath);
+    QVERIFY(manifestFile.open(QIODevice::ReadOnly));
+    const QByteArray committedManifest = manifestFile.readAll();
+    manifestFile.close();
+    QVERIFY(QFile::remove(manifestPath));
+
+    const auto unreadable = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(!unreadable.restored);
+    QVERIFY(!unreadable.migratedLegacy);
+    QVERIFY(unreadable.unusableCommittedCollection);
+    QVERIFY(unreadable.sources.empty());
+    QVERIFY(unreadable.statusText.startsWith(QStringLiteral("Catalog: Saved catalog configuration unreadable")));
+    QVERIFY(unreadable.statusText.contains(QStringLiteral("recorded as committed")));
+    QVERIFY(store.loadCatalogCache().has_value());
+
+    // Repeated starts reach the same decision: the rejected restore neither
+    // consumed nor rewrote the stored state.
+    const auto repeated = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(!repeated.restored);
+    QVERIFY(repeated.unusableCommittedCollection);
+    QVERIFY(!repeated.migratedLegacy);
+    QVERIFY(repeated.sources.empty());
+
+    // The committed configuration is still the recovery point, so restoring
+    // its manifest brings back the intentionally empty collection instead of
+    // the legacy sources.
+    QFile restoredManifest(manifestPath);
+    QVERIFY(restoredManifest.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QCOMPARE(restoredManifest.write(committedManifest), qint64(committedManifest.size()));
+    restoredManifest.close();
+    const auto recovered = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(recovered.restored);
+    QVERIFY(!recovered.migratedLegacy);
+    QVERIFY(recovered.sources.empty());
+}
+
+void SkyCatalogCacheControllerTests::truncatedCommittedManifestRejectsRestoreInsteadOfMigratingLegacy()
+{
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCache(
+        skygate::ui::tests::sampleCatalogCacheSnapshot(
+            {.sourceLabel = QStringLiteral("Legacy Custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+        )
+    ));
+    QVERIFY(store.saveCatalogCollectionCache(makeCollectionSnapshot()));
+
+    // The committed manifest exists but is incomplete, so the committed
+    // records cannot be addressed and the stored state is unusable.
+    const QString directory = m_settings.filePath(QStringLiteral("collection-cache"));
+    const QString manifestPath = catalogCollectionManifestFilePath(directory);
+    QFile manifestFile(manifestPath);
+    QVERIFY(manifestFile.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QVERIFY(manifestFile.write("schemaVersion=2\ngeneration=") > 0);
+    manifestFile.close();
+
+    const SkyCatalogCacheController controller(&store);
+    const auto result =
+        controller.restoreCollection(2, 1, QStringLiteral("https://example.test/legacy-stars.csv"), QString());
+    QVERIFY(!result.restored);
+    QVERIFY(!result.migratedLegacy);
+    QVERIFY(result.unusableCommittedCollection);
+    QVERIFY(result.sources.empty());
+    QVERIFY(result.statusText.contains(QStringLiteral("manifest is unreadable")));
+    QVERIFY(store.loadCatalogCache().has_value());
+
+    // The committed configuration is still stored; only its manifest is
+    // incomplete, so a later start reaches the same decision instead of
+    // reading the legacy sources.
+    QCOMPARE(
+        store.loadCatalogCollectionCache().state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable
+    );
+}
+
+void SkyCatalogCacheControllerTests::restoreUsesCommittedGenerationRatherThanStagedNewerGeneration()
+{
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(makeCollectionSnapshot()));
+
+    const QString directory = m_settings.filePath(QStringLiteral("collection-cache"));
+    const quint64 committedGeneration = committedCatalogCollectionGeneration(directory);
+    QVERIFY(committedGeneration > 0U);
+
+    // A later save staged a newer generation whose manifest was never
+    // published: its records exist, but nothing names them as committed.
+    const quint64 stagedGeneration = committedGeneration + 1U;
+    {
+        QSettings settings;
+        settings.setValue(QStringLiteral("catalogSources/%1/recordsStored").arg(stagedGeneration), true);
+        settings.beginGroup(QStringLiteral("catalogSources/%1/catalog-source-staged").arg(stagedGeneration));
+        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("custom:staged"));
+        settings.setValue(QStringLiteral("title"), QStringLiteral("Staged Title"));
+        settings.setValue(QStringLiteral("order"), 0);
+        settings.endGroup();
+        settings.sync();
+    }
+
+    // The committed generation stays the current collection.
+    const SkyCatalogCacheController controller(&store);
+    const auto result = controller.restoreCollection(0, 0, QString(), QString());
+    QVERIFY(result.restored);
+    QVERIFY(!result.migratedLegacy);
+    QCOMPARE(result.sources.size(), std::size_t{2});
+    QCOMPARE(result.sources[0].record.instanceId, QStringLiteral("preset:hyg_v42"));
+    QCOMPARE(result.sources[1].record.instanceId, QStringLiteral("preset:open_ngc"));
 }
 
 void SkyCatalogCacheControllerTests::logsCollectionLifecycleSummariesAtInfoLevel()

@@ -452,8 +452,28 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::restoreCollection(
         return restoreFromRecords(collection.snapshot);
     }
 
-    // Neither an absent nor an unusable stored collection yields sources here,
-    // so the legacy two-slot cache stays the fallback for both outcomes.
+    if (collection.state == SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable) {
+        // A committed configuration that cannot be read still owns the current
+        // collection, so the retired legacy cache must not be migrated over
+        // it. The stored state is left untouched: a later start reaches the
+        // same decision, and a recovered manifest reaches the committed
+        // collection again.
+        SkyCatalogCollectionRestoreResult result;
+        result.unusableCommittedCollection = true;
+        result.statusText = QStringLiteral(
+                                "Catalog: Saved catalog configuration unreadable; the active collection stays in use. "
+                                "Add, update, or reorder a catalog source to rewrite the saved configuration: %1"
+        )
+                                .arg(collection.diagnostic);
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Catalog collection cache unusable; rejecting the restore instead of migrating the legacy cache:"
+            << collection.diagnostic;
+        return result;
+    }
+
+    // The legacy two-slot cache is read only while no collection was ever
+    // committed, which is also the state of a first migration whose commit
+    // never completed, so a genuinely failed migration stays retryable.
     const std::optional<SkySettingsStore::CatalogCacheSnapshot> legacy = m_settingsStore->loadCatalogCache();
     if (!legacy.has_value()) {
         return {};

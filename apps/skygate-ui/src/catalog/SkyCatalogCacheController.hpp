@@ -31,11 +31,18 @@ struct SkyCatalogCollectionRestoreResult final {
     // no collection was ever stored.
     bool restored = false;
     bool migratedLegacy = false;
+    // A committed collection exists but cannot be read, so the restore was
+    // rejected instead of being treated as first use. The caller keeps its
+    // active collection and statusText carries the actionable reason; the
+    // retired legacy cache is deliberately not migrated over it.
+    bool unusableCommittedCollection = false;
     // The persisted records predate the stored parse contract, so they were
     // restored from the defined defaults (no schema hint, no attribution).
     // The manager rewrites them in the current format to cross the boundary
     // once instead of re-deriving options on every start.
     bool requiresRecordUpgrade = false;
+    // Reason for a rejected restore of an unreadable committed collection;
+    // empty for every other outcome.
     QString statusText;
 };
 
@@ -74,9 +81,11 @@ struct SkyCatalogCollectionPersistRequest final {
 // files. A stored snapshot with no sources is a committed, intentionally
 // empty collection, distinct from "no collection was ever stored" (the Absent
 // load state). The legacy two-slot cache is read only to migrate existing
-// installations once, and that data stays readable until the new
-// configuration is committed. Related constellation datasets are restored per
-// owning source before the active related view is composed.
+// installations once, and only while no collection was ever committed; a
+// committed configuration that cannot be read is reported as a rejected
+// restore instead of being replaced by that retired data. Related
+// constellation datasets are restored per owning source before the active
+// related view is composed.
 class SkyCatalogCacheController final {
 public:
     explicit SkyCatalogCacheController(SkySettingsStore* settingsStore);

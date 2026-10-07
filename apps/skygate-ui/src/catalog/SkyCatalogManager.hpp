@@ -156,7 +156,10 @@ public:
     // replaces the runtime collection and the operation/accepted-facts state in
     // one step: work captured for a superseded incarnation is rejected, so a
     // late reply can neither repopulate an omitted source nor mutate a restored
-    // instance that reuses its ID.
+    // instance that reuses its ID. A committed configuration that cannot be
+    // read is rejected: the active collection stays in place and the reason is
+    // published through the status text instead of the retired legacy cache
+    // being migrated over it.
     bool restoreCatalogCache();
 
 signals:

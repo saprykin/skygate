@@ -711,6 +711,7 @@ private slots:
     void crossSourceHipBridgesSurviveBinaryCollectionRestore();
     void collectionLifecycleKeepsSnapshotAndIdentitiesAcrossRestart();
     void legacySourcesStayRetiredAfterMigratedCollectionIsEmptied();
+    void unreadableCommittedCollectionKeepsActiveCollectionAndReportsFailure();
     void missingConfigurationKeepsFirstUseDefaults();
     void removingSoleSourceLeavesEmptyCollection();
     void savedEmptyCollectionRestoresEmptyAcrossRestarts();
@@ -735,6 +736,11 @@ void SkyCatalogManagerTests::initTestCase()
 void SkyCatalogManagerTests::init()
 {
     m_settings.resetSettingsWithCatalogCachePaths();
+    // Clearing the settings does not remove the cache directory, and a
+    // manifest left there would describe a committed collection whose records
+    // the cleared settings no longer hold. Every test starts from the state
+    // its scenario describes: no committed collection.
+    QDir(m_settings.filePath(QStringLiteral("catalog-collection-cache"))).removeRecursively();
 }
 
 SkySettingsStore::CatalogCacheSnapshot SkyCatalogManagerTests::makeCacheSnapshot() const
@@ -5013,6 +5019,81 @@ void SkyCatalogManagerTests::legacySourcesStayRetiredAfterMigratedCollectionIsEm
     QVERIFY(!catalogContainsDisplayName(emptyCollectionManager.starCatalog(), QStringLiteral("Legacy Star")));
     QVERIFY(!emptyCollectionManager.sourceTitles().values().contains(QStringLiteral("Legacy Custom")));
     QVERIFY(!emptyCollectionManager.sourceTitles().values().contains(QStringLiteral("Legacy OpenNGC")));
+    QVERIFY(store.loadCatalogCache().has_value());
+}
+
+void SkyCatalogManagerTests::unreadableCommittedCollectionKeepsActiveCollectionAndReportsFailure()
+{
+    // The retired pre-generation two-slot cache stays readable on disk, so a
+    // restore that fell back to it would visibly resurrect its source.
+    SkySettingsStore::CatalogCacheSnapshot legacy;
+    legacy.sourceLabel = QStringLiteral("Legacy Custom");
+    legacy.catalogPayload = skygate::ui::tests::sampleHygCsvPayload(
+        {.id = 908001, .hip = 908001, .properName = "Legacy Star", .mag = "1.0"}
+    );
+
+    SkySettingsStore::CatalogCollectionCacheSnapshot committed;
+    committed.schemaVersion =
+        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    committed.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
+    SkySettingsStore::CatalogSourceCacheRecord accepted;
+    accepted.instanceId = QStringLiteral("custom:accepted");
+    accepted.title = QStringLiteral("Accepted Source");
+    accepted.urls = QStringList{QStringLiteral("https://example.test/accepted-stars.csv")};
+    accepted.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
+    accepted.enabled = true;
+    accepted.order = 0;
+    accepted.payload = skygate::ui::tests::sampleHygCsvPayload(
+        {.id = 908101, .hip = 908101, .properName = "Accepted Star", .mag = "1.0"}
+    );
+    committed.sources.push_back(std::move(accepted));
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCache(legacy));
+    QVERIFY(store.saveCatalogCollectionCache(committed));
+
+    SkyCatalogManager manager(&store);
+    QVERIFY(manager.restoreCatalogCache());
+    QCOMPARE(manager.sourceInstanceIds(), QStringList{QStringLiteral("custom:accepted")});
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Accepted Star")));
+
+    // The committed manifest is lost while its records and the commit record
+    // survive, so the readable legacy cache must not be migrated over the
+    // committed configuration.
+    const QString collectionCacheDirectory = m_settings.filePath(QStringLiteral("catalog-collection-cache"));
+    QVERIFY(QFile::remove(skygate::ui::tests::catalogCollectionManifestFilePath(collectionCacheDirectory)));
+
+    QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+    const std::size_t bodyCountBefore = manager.bodyCount();
+    const std::uint64_t revisionBefore = manager.catalogRevision();
+
+    QVERIFY(!manager.restoreCatalogCache());
+
+    // The accepted collection stays active: no legacy source returns and no
+    // catalog change is published for the rejected restore.
+    QCOMPARE(manager.sourceInstanceIds(), QStringList{QStringLiteral("custom:accepted")});
+    QCOMPARE(manager.bodyCount(), bodyCountBefore);
+    QCOMPARE(manager.catalogRevision(), revisionBefore);
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Accepted Star")));
+    QVERIFY(!catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Legacy Star")));
+    QCOMPARE(catalogSpy.count(), 0);
+
+    // The failure is reported once through the normal status signal, naming
+    // the unreadable configuration and the recovery action.
+    QCOMPARE(statusSpy.count(), 1);
+    QVERIFY(manager.statusText().startsWith(QStringLiteral("Catalog: Saved catalog configuration unreadable")));
+    QVERIFY(manager.statusText().contains(QStringLiteral("Add, update, or reorder a catalog source")));
+    QVERIFY(manager.statusText().contains(QStringLiteral("recorded as committed")));
+
+    // A later start reaches the same decision: the rejected restore left the
+    // stored state and the readable legacy cache untouched, and neither of
+    // them replaces the first-use default.
+    SkyCatalogManager restarted(&store);
+    QVERIFY(!restarted.restoreCatalogCache());
+    QCOMPARE(restarted.sourceInstanceIds(), QStringList{QStringLiteral("primary")});
+    QVERIFY(!catalogContainsDisplayName(restarted.starCatalog(), QStringLiteral("Legacy Star")));
+    QVERIFY(!store.loadCatalogCollectionCache().isLoaded());
     QVERIFY(store.loadCatalogCache().has_value());
 }
 
