@@ -667,6 +667,9 @@ private slots:
     void failedRelatedReplacementKeepsPublishedStateSynchronized();
     void canceledRelatedReplacementKeepsPublishedStateSynchronized();
     void reloadClearsOnlyOwningRelatedDataset();
+    void updateRemovingRelatedDeclarationRetiresOwnedData();
+    void failedUpdateAttemptingToRemoveRelatedDeclarationKeepsDataset();
+    void lateReplyToRemovedRelatedDeclarationIsRejected();
     void relatedDatasetsRoundTripToTheirOwnSources();
     void disabledOwnerRelatedDataStaysOwnedButInactiveAfterRestart();
     void removedOwnerRelatedDataDoesNotReturnAfterRestart();
@@ -4908,6 +4911,187 @@ void SkyCatalogManagerTests::savedEmptyCollectionRestoresEmptyAcrossRestarts()
         QVERIFY(persisted.has_value());
         QVERIFY(persisted->sources.isEmpty());
     }
+}
+
+void SkyCatalogManagerTests::updateRemovingRelatedDeclarationRetiresOwnedData()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/removed-declaration-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/removed-declaration-lines.json");
+    const QString updateUrl = QStringLiteral("https://example.test/removed-declaration-update.csv");
+    const QByteArray updatePayload =
+        skygate::ui::tests::sampleHygCsvPayload({.hip = 902101, .properName = "No Related Update Star", .mag = "2.0"});
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = orionRelatedDatasetPayload()});
+    networkAccessManager.enqueueResponse(updateUrl, {.payload = updatePayload});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    std::vector<CatalogNotificationState> observations;
+    observeCatalogNotifications(manager, observations);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance source = relatedDatasetInstance(catalogUrl, relatedUrl);
+    const QString instanceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+
+    // The accepted update declares no related dataset anymore. The obsolete
+    // owned data retires in the same accepted transition, before publication.
+    skygate::ui::internal::SkyCatalogSourceInstance updated = source;
+    updated.title = QStringLiteral("No Related Update");
+    updated.version = QStringLiteral("v2");
+    updated.urls = QStringList{updateUrl};
+    updated.relatedDatasetUrls.clear();
+    manager.loadSource(updated, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    QCOMPARE(manager.constellationCount(), std::size_t{0});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") == nullptr);
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("No Related Update Star")));
+    QVERIFY(!observations.empty());
+    QCOMPARE(observations.back().lineRefCount, std::size_t{0});
+    assertObservedStateMatchesRuntime(manager, observations.back());
+
+    // The persisted snapshot carries the accepted declaration and retired
+    // rows together, so a restart cannot resurrect the retired dataset.
+    {
+        const auto snapshot = store.loadCatalogCollectionCache();
+        QVERIFY(snapshot.has_value());
+        const SkySettingsStore::CatalogSourceCacheRecord* record = findCollectionRecord(*snapshot, instanceId);
+        QVERIFY(record != nullptr);
+        QVERIFY(record->relatedDatasetUrls.isEmpty());
+        QVERIFY(record->constellationLineRows.isEmpty());
+        QVERIFY(record->constellationAnchorGroupRows.isEmpty());
+        QCOMPARE(record->payload, updatePayload);
+    }
+    {
+        SkyCatalogManager restoredManager(&store);
+        QVERIFY(restoredManager.restoreCatalogCache());
+        QVERIFY(restoredManager.constellationLineRefs().empty());
+        QVERIFY(restoredManager.constellationAnchorGroups().empty());
+        QCOMPARE(restoredManager.constellationCount(), std::size_t{0});
+        QVERIFY(catalogContainsDisplayName(restoredManager.starCatalog(), QStringLiteral("No Related Update Star")));
+
+        // Disabling and re-enabling cannot resurrect retired owned data: no
+        // related declaration exists to request it from.
+        networkAccessManager.enqueueResponse(updateUrl, {.payload = updatePayload});
+        restoredManager.disableSource(instanceId);
+        restoredManager.enableSource(instanceId);
+        QCoreApplication::processEvents();
+        QVERIFY(restoredManager.constellationLineRefs().empty());
+        QVERIFY(restoredManager.constellationAnchorGroups().empty());
+        QCOMPARE(restoredManager.constellationCount(), std::size_t{0});
+    }
+}
+
+void SkyCatalogManagerTests::failedUpdateAttemptingToRemoveRelatedDeclarationKeepsDataset()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/failed-removal-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/failed-removal-lines.json");
+    const QString updateUrl = QStringLiteral("https://example.test/failed-removal-update.csv");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = orionRelatedDatasetPayload()});
+    networkAccessManager.enqueueResponse(
+        updateUrl,
+        {.error = QNetworkReply::ContentNotFoundError, .errorText = QStringLiteral("Not Found"), .httpStatusCode = 404}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    std::vector<CatalogNotificationState> observations;
+    observeCatalogNotifications(manager, observations);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance source = relatedDatasetInstance(catalogUrl, relatedUrl);
+    const QString instanceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+    const auto starCountBefore = manager.bodyCount();
+
+    // The update that would have removed the declaration is rejected, so the
+    // accepted source and its owned dataset stay coherent and published.
+    skygate::ui::internal::SkyCatalogSourceInstance rejected = source;
+    rejected.title = QStringLiteral("Rejected Removal");
+    rejected.version = QStringLiteral("v2");
+    rejected.urls = QStringList{updateUrl};
+    rejected.relatedDatasetUrls.clear();
+    manager.loadSource(rejected, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+    QCOMPARE(manager.bodyCount(), starCountBefore);
+    QVERIFY(!observations.empty());
+    QCOMPARE(observations.back().lineRefCount, std::size_t{2});
+    assertObservedStateMatchesRuntime(manager, observations.back());
+
+    // Persistence still serializes the accepted declaration and rows.
+    manager.moveSource(instanceId, 0);
+    const auto snapshot = store.loadCatalogCollectionCache();
+    QVERIFY(snapshot.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* record = findCollectionRecord(*snapshot, instanceId);
+    QVERIFY(record != nullptr);
+    QCOMPARE(record->relatedDatasetUrls, QStringList{relatedUrl});
+    QVERIFY(!record->constellationLineRows.isEmpty());
+    QVERIFY(!record->constellationAnchorGroupRows.isEmpty());
+}
+
+void SkyCatalogManagerTests::lateReplyToRemovedRelatedDeclarationIsRejected()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/late-removal-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/late-removal-lines.json");
+    const QString updateUrl = QStringLiteral("https://example.test/late-removal-update.csv");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = orionRelatedDatasetPayload(), .manualFinish = true});
+    networkAccessManager.enqueueResponse(
+        updateUrl,
+        {.payload = skygate::ui::tests::sampleHygCsvPayload({.hip = 902102, .properName = "Late Update Star"})}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance source = relatedDatasetInstance(catalogUrl, relatedUrl);
+    const QString instanceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QVERIFY(findPendingReplyForUrl(networkAccessManager, relatedUrl) != nullptr);
+
+    // The update retires the declaration while the old related reply is still
+    // pending. The accepted transition must not keep the old dataset active.
+    skygate::ui::internal::SkyCatalogSourceInstance updated = source;
+    updated.version = QStringLiteral("v2");
+    updated.urls = QStringList{updateUrl};
+    updated.relatedDatasetUrls.clear();
+    manager.loadSource(updated, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+
+    // The late reply belongs to the superseded revision and cannot attach
+    // data or change the published related view.
+    const int changesBeforeLateReply = catalogSpy.count();
+    skygate::ui::tests::FakeNetworkReply* lateReply = findPendingReplyForUrl(networkAccessManager, relatedUrl);
+    QVERIFY(lateReply != nullptr);
+    lateReply->finishNow();
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+    QCOMPARE(catalogSpy.count(), changesBeforeLateReply);
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") == nullptr);
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Late Update Star")));
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogManagerTests)

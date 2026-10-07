@@ -43,15 +43,15 @@ struct SkyCatalogSourceInstance;
 // persistence and legacy migration live in SkyCatalogCacheController. Only an
 // accepted transition persists state and emits catalogChanged.
 //
-// A successful source (re)load that declares a replacement related dataset
-// publishes its catalog and its accepted related-data state in one step: the
-// owner's previous related dataset is cleared together with the replacement,
-// before any consumer is notified or the reload is persisted, and the
-// replacement dataset becomes owned only when its own download completes
-// successfully. A reload that declares no replacement dataset leaves the
-// prior owned data untouched; retirement of a removed declaration is handled
-// by the accepted source update path. An observer that reads the related
-// view during catalogChanged
+// A successful source (re)load publishes its catalog and its accepted
+// related-data state in one step: the owner's previous related dataset is
+// cleared together with the replacement, before any consumer is notified or
+// the reload is persisted, and the replacement dataset becomes owned only
+// when its own download completes successfully. A successful update whose
+// accepted related declaration is removed retires the owner's obsolete
+// dataset in the same accepted transition, so no declaration means no active
+// owned related data. An observer that reads the related view during
+// catalogChanged
 // therefore sees the state the runtime holds, and no later silent clear moves
 // the runtime away from it.
 class SkyCatalogManager final : public QObject {
