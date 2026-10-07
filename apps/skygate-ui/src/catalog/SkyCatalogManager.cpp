@@ -805,9 +805,15 @@ void SkyCatalogManager::handleSourceImportFinished(
     // related-data state is therefore cleared as part of the same transition,
     // before the reload is published or persisted: while the replacement
     // download is pending the owner holds no dataset, and a replacement
-    // becomes owned only when its own download completes successfully. Other
-    // owners keep their own datasets untouched.
-    if (!relatedDatasetUrls.isEmpty()) {
+    // becomes owned only when its own download completes successfully. The
+    // same transition also retires the owned data when the reload removes the
+    // related declaration instead of replacing it. The accepted declaration is
+    // compared with the requested one, so a rejected attempt that only tried
+    // to remove the declaration never touches the dataset the owner still
+    // holds. Other owners keep their own datasets untouched.
+    const bool relatedDeclarationRemoved = relatedDatasetUrls.isEmpty() && operation->hasAcceptedInstance
+                                           && !operation->acceptedInstance.relatedDatasetUrls.isEmpty();
+    if (!relatedDatasetUrls.isEmpty() || relatedDeclarationRemoved) {
         const SkyCatalogRuntimeResult clearResult = m_runtime->clearSourceConstellationRefs(instanceId);
         runtimeResult.catalogChanged = runtimeResult.catalogChanged || clearResult.catalogChanged;
         runtimeResult.datasetInfoChanged = runtimeResult.datasetInfoChanged || clearResult.datasetInfoChanged;
