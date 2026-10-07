@@ -502,6 +502,26 @@ findCollectionRecord(const SkySettingsStore::CatalogCollectionCacheSnapshot& sna
     return it != snapshot.sources.end() ? &*it : nullptr;
 }
 
+void compareConfiguredSourceFields(
+    const SkySettingsStore::CatalogSourceCacheRecord& actual, const SkySettingsStore::CatalogSourceCacheRecord& expected
+)
+{
+    QCOMPARE(actual.instanceId, expected.instanceId);
+    QCOMPARE(actual.descriptorId, expected.descriptorId);
+    QCOMPARE(actual.title, expected.title);
+    QCOMPARE(actual.version, expected.version);
+    QCOMPARE(actual.url, expected.url);
+    QCOMPARE(actual.urls, expected.urls);
+    QCOMPARE(actual.relatedDatasetUrls, expected.relatedDatasetUrls);
+    QCOMPARE(actual.archiveSelector, expected.archiveSelector);
+    QCOMPARE(actual.schemaHint, expected.schemaHint);
+    QCOMPARE(actual.attribution, expected.attribution);
+    QCOMPARE(actual.policy, expected.policy);
+    QCOMPARE(actual.enabled, expected.enabled);
+    QCOMPARE(actual.bundled, expected.bundled);
+    QCOMPARE(actual.order, expected.order);
+}
+
 std::vector<skygate::ephemeris::ConstellationLineRef>
 relatedLineRefs(const SkySettingsStore::CatalogSourceCacheRecord& record)
 {
@@ -634,7 +654,9 @@ private slots:
     void addSourceUrlAddsSameCategorySourcesWithStableIdentity();
     void addSourcePresetUsesDescriptorPolicy();
     void moveSourceReordersActiveSources();
-    void clearSourceCacheRemovesSingleRecord();
+    void clearSourceCacheKeepsConfiguredRecords();
+    void clearSourceCacheEvictsOwnedRelatedPayload();
+    void relatedReplyAfterCacheEvictionStaysOutOfPersistedRecord();
     void sameDescriptorInstancesCoexistIndependently();
     void sameUrlDifferentVersionsStayDistinct();
     void editingSourceAsUpdatePreservesInstanceId();
@@ -1423,7 +1445,7 @@ void SkyCatalogManagerTests::moveSourceReordersActiveSources()
     QCOMPARE(manager.sourceInstanceIds(), QStringList({QStringLiteral("primary"), bId, aId}));
 }
 
-void SkyCatalogManagerTests::clearSourceCacheRemovesSingleRecord()
+void SkyCatalogManagerTests::clearSourceCacheKeepsConfiguredRecords()
 {
     const QString aPath = m_settings.filePath(QStringLiteral("clear-a.csv"));
     const QString bPath = m_settings.filePath(QStringLiteral("clear-b.csv"));
@@ -1452,15 +1474,222 @@ void SkyCatalogManagerTests::clearSourceCacheRemovesSingleRecord()
     QTRY_VERIFY(!manager.downloadingCatalog());
     const QString bId = manager.sourceInstanceIds().last();
 
+    const auto beforeClear = store.loadCatalogCollectionCache();
+    QVERIFY(beforeClear.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* recordBeforeClear = findCollectionRecord(*beforeClear, aId);
+    QVERIFY(recordBeforeClear != nullptr);
+    QVERIFY(!recordBeforeClear->payload.isEmpty());
+
     QVERIFY(manager.clearSourceCache(aId));
-    const auto cacheAfterClear = store.loadCatalogCollectionCache();
-    QVERIFY(cacheAfterClear.has_value());
-    // The bundled source and the peer downloaded source stay configured; only
-    // the cleared source's record and payload are gone.
-    QCOMPARE(cacheAfterClear->sources.size(), 2);
-    QCOMPARE(cacheAfterClear->sources[0].instanceId, QStringLiteral("primary"));
-    QVERIFY(cacheAfterClear->sources[0].bundled);
-    QCOMPARE(cacheAfterClear->sources[1].instanceId, bId);
+
+    // The accepted in-memory snapshot stays active for the session, so the
+    // cleared source keeps contributing until a reload or restart.
+    QCOMPARE(manager.sourceInstanceIds(), QStringList({QStringLiteral("primary"), aId, bId}));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Clear Star A")));
+
+    // Only the cleared source's disposable payload is evicted; both configured
+    // records stay and the cleared record keeps every configuration field.
+    const auto clearedCache = store.loadCatalogCollectionCache();
+    QVERIFY(clearedCache.has_value());
+    QCOMPARE(clearedCache->sources.size(), 3);
+    const SkySettingsStore::CatalogSourceCacheRecord* clearedRecord = findCollectionRecord(*clearedCache, aId);
+    QVERIFY(clearedRecord != nullptr);
+    compareConfiguredSourceFields(*clearedRecord, *recordBeforeClear);
+    QVERIFY(clearedRecord->payload.isEmpty());
+    QVERIFY(clearedRecord->binaryPayload.isEmpty());
+    QVERIFY(clearedRecord->constellationLineRows.isEmpty());
+    QVERIFY(clearedRecord->constellationAnchorGroupRows.isEmpty());
+    QCOMPARE(clearedRecord->constellationCount, std::size_t{0});
+    const SkySettingsStore::CatalogSourceCacheRecord* peerRecord = findCollectionRecord(*clearedCache, bId);
+    QVERIFY(peerRecord != nullptr);
+    QVERIFY(!peerRecord->payload.isEmpty());
+    QVERIFY(!peerRecord->binaryPayload.isEmpty());
+
+    // A metadata-only persistence of the surviving collection keeps the
+    // eviction instead of re-serializing the retained in-memory payload.
+    manager.moveSource(bId, 1);
+    QCOMPARE(manager.sourceInstanceIds(), QStringList({QStringLiteral("primary"), bId, aId}));
+    const auto reordered = store.loadCatalogCollectionCache();
+    QVERIFY(reordered.has_value());
+    QCOMPARE(reordered->sources.size(), 3);
+    QCOMPARE(reordered->sources[0].instanceId, QStringLiteral("primary"));
+    QCOMPARE(reordered->sources[1].instanceId, bId);
+    QCOMPARE(reordered->sources[2].instanceId, aId);
+    QVERIFY(!reordered->sources[1].payload.isEmpty());
+    const SkySettingsStore::CatalogSourceCacheRecord* reorderedCleared = findCollectionRecord(*reordered, aId);
+    QVERIFY(reorderedCleared != nullptr);
+    SkySettingsStore::CatalogSourceCacheRecord expectedReordered = *recordBeforeClear;
+    expectedReordered.order = 2;
+    compareConfiguredSourceFields(*reorderedCleared, expectedReordered);
+    QVERIFY(reorderedCleared->payload.isEmpty());
+    QVERIFY(reorderedCleared->binaryPayload.isEmpty());
+
+    // Restart: the evicted source stays configured and reports the unavailable
+    // payload and retry state, while the peer restores its payload normally.
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("Saved catalog source cache has no payload")));
+    SkyCatalogManager restarted(&store);
+    QVERIFY(restarted.restoreCatalogCache());
+    QCOMPARE(restarted.sourceInstanceIds(), QStringList({QStringLiteral("primary"), bId, aId}));
+    QVERIFY(catalogContainsDisplayName(restarted.starCatalog(), QStringLiteral("Clear Star B")));
+    QVERIFY(!catalogContainsDisplayName(restarted.starCatalog(), QStringLiteral("Clear Star A")));
+    const QVector<SkyCatalogManager::SourceViewEntry> view = restarted.sourceViewEntries();
+    const auto evictedEntry =
+        std::find_if(view.begin(), view.end(), [&aId](const SkyCatalogManager::SourceViewEntry& entry) {
+            return entry.instanceId == aId;
+        });
+    QVERIFY(evictedEntry != view.end());
+    QVERIFY(evictedEntry->hasError);
+    QVERIFY(!evictedEntry->busy);
+    QCOMPARE(evictedEntry->statusText, QStringLiteral("Payload unavailable"));
+
+    // An explicit successful reload repopulates the payload and restores the
+    // source data; the eviction is not permanent configuration.
+    restarted.retrySource(aId);
+    QTRY_VERIFY(!restarted.downloadingCatalog());
+    QVERIFY(catalogContainsDisplayName(restarted.starCatalog(), QStringLiteral("Clear Star A")));
+    const auto recovered = store.loadCatalogCollectionCache();
+    QVERIFY(recovered.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* recoveredRecord = findCollectionRecord(*recovered, aId);
+    QVERIFY(recoveredRecord != nullptr);
+    QVERIFY(!recoveredRecord->payload.isEmpty());
+
+    // Remove stays the separate configuration-deletion operation.
+    restarted.removeSource(aId);
+    QCOMPARE(restarted.sourceInstanceIds(), QStringList({QStringLiteral("primary"), bId}));
+    const auto afterRemove = store.loadCatalogCollectionCache();
+    QVERIFY(afterRemove.has_value());
+    QCOMPARE(afterRemove->sources.size(), 2);
+    QVERIFY(findCollectionRecord(*afterRemove, aId) == nullptr);
+}
+
+void SkyCatalogManagerTests::clearSourceCacheEvictsOwnedRelatedPayload()
+{
+    const QString sourceUrl = QStringLiteral("https://example.test/clear-related-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/clear-related-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(sourceUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(
+        relatedUrl,
+        {.payload = skygate::ui::tests::stellariumConstellationIndexJsonPayload(
+             {{QStringLiteral("orion"), {27989, 25336, 25930}}}
+         )}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    skygate::ui::internal::SkyCatalogSourceInstance source =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(sourceUrl);
+    source.relatedDatasetUrls = QStringList{relatedUrl};
+    const QString sourceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+
+    const auto withRelated = store.loadCatalogCollectionCache();
+    QVERIFY(withRelated.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* recordWithRelated = findCollectionRecord(*withRelated, sourceId);
+    QVERIFY(recordWithRelated != nullptr);
+    QVERIFY(!recordWithRelated->payload.isEmpty());
+    QVERIFY(!recordWithRelated->constellationLineRows.isEmpty());
+    QVERIFY(!recordWithRelated->constellationAnchorGroupRows.isEmpty());
+
+    QVERIFY(manager.clearSourceCache(sourceId));
+
+    // The accepted snapshot keeps contributing until a reload or restart, but
+    // the owned related dataset is payload of the same source and is evicted
+    // together with its catalog payload.
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    const auto evicted = store.loadCatalogCollectionCache();
+    QVERIFY(evicted.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* evictedRecord = findCollectionRecord(*evicted, sourceId);
+    QVERIFY(evictedRecord != nullptr);
+    QVERIFY(evictedRecord->payload.isEmpty());
+    QVERIFY(evictedRecord->binaryPayload.isEmpty());
+    QVERIFY(evictedRecord->constellationLineRows.isEmpty());
+    QVERIFY(evictedRecord->constellationAnchorGroupRows.isEmpty());
+    QCOMPARE(evictedRecord->constellationCount, std::size_t{0});
+    QCOMPARE(evictedRecord->relatedDatasetUrls, QStringList{relatedUrl});
+
+    // A metadata-only persistence of the collection must not write the still
+    // retained in-memory related dataset back into the evicted record.
+    manager.disableSource(sourceId);
+    manager.enableSource(sourceId);
+    const auto afterToggle = store.loadCatalogCollectionCache();
+    QVERIFY(afterToggle.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* toggledRecord = findCollectionRecord(*afterToggle, sourceId);
+    QVERIFY(toggledRecord != nullptr);
+    QVERIFY(toggledRecord->enabled);
+    QVERIFY(toggledRecord->payload.isEmpty());
+    QVERIFY(toggledRecord->constellationLineRows.isEmpty());
+    QVERIFY(toggledRecord->constellationAnchorGroupRows.isEmpty());
+    QCOMPARE(toggledRecord->constellationCount, std::size_t{0});
+}
+
+void SkyCatalogManagerTests::relatedReplyAfterCacheEvictionStaysOutOfPersistedRecord()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/evict-related-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/evict-related-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = orionRelatedDatasetPayload(), .manualFinish = true});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    const skygate::ui::internal::SkyCatalogSourceInstance source = relatedDatasetInstance(catalogUrl, relatedUrl);
+    const QString instanceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_VERIFY(networkAccessManager.requestedUrls().contains(relatedUrl));
+
+    // The main load is accepted while its related reply is still pending.
+    const auto beforeClear = store.loadCatalogCollectionCache();
+    QVERIFY(beforeClear.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* recordBeforeClear =
+        findCollectionRecord(*beforeClear, instanceId);
+    QVERIFY(recordBeforeClear != nullptr);
+    QVERIFY(!recordBeforeClear->payload.isEmpty());
+
+    QVERIFY(manager.clearSourceCache(instanceId));
+    skygate::ui::tests::FakeNetworkReply* pendingReply = findPendingReplyForUrl(networkAccessManager, relatedUrl);
+    QVERIFY(pendingReply != nullptr);
+    QVERIFY(!pendingReply->isFinished());
+
+    // The related download completes after the eviction. The runtime keeps the
+    // dataset for the session, but persistence must not write it into the
+    // evicted record.
+    pendingReply->finishNow();
+    QCoreApplication::processEvents();
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+
+    const auto afterEviction = store.loadCatalogCollectionCache();
+    QVERIFY(afterEviction.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* evictedRecord = findCollectionRecord(*afterEviction, instanceId);
+    QVERIFY(evictedRecord != nullptr);
+    QVERIFY(evictedRecord->payload.isEmpty());
+    QVERIFY(evictedRecord->constellationLineRows.isEmpty());
+    QVERIFY(evictedRecord->constellationAnchorGroupRows.isEmpty());
+    QCOMPARE(evictedRecord->constellationCount, std::size_t{0});
+
+    // Restart: the source stays configured and reports the unavailable payload
+    // state; the related data that landed after the eviction did not sneak
+    // back into the record.
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("Saved catalog source cache has no payload")));
+    SkyCatalogManager restarted(&store);
+    QVERIFY(restarted.restoreCatalogCache());
+    QCOMPARE(restarted.sourceInstanceIds(), QStringList({QStringLiteral("primary"), instanceId}));
+    const QVector<SkyCatalogManager::SourceViewEntry> view = restarted.sourceViewEntries();
+    QCOMPARE(view.size(), std::size_t{2});
+    const auto evictedEntry =
+        std::find_if(view.begin(), view.end(), [&instanceId](const SkyCatalogManager::SourceViewEntry& entry) {
+            return entry.instanceId == instanceId;
+        });
+    QVERIFY(evictedEntry != view.end());
+    QVERIFY(evictedEntry->hasError);
+    QVERIFY(!evictedEntry->busy);
+    QCOMPARE(evictedEntry->statusText, QStringLiteral("Payload unavailable"));
 }
 
 void SkyCatalogManagerTests::sameDescriptorInstancesCoexistIndependently()

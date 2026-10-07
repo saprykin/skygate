@@ -1053,11 +1053,26 @@ bool SkySettingsStore::clearCatalogSourceCache(const QString& instanceId) const
     appendCachePath(cachePaths, binaryPath);
     const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
 
-    settings.remove(group);
+    // Payload eviction keeps the configured record: identity, order, enabled
+    // state, descriptor, and parse contract stay durable. The disposable
+    // payload references and the owned related dataset they carry are dropped
+    // together, so a restart restores the source as configured with an
+    // unavailable payload instead of deleting its configuration. Only a later
+    // accepted load writes payload references again.
+    settings.remove(group + QStringLiteral("/payloadPath"));
+    settings.remove(group + QStringLiteral("/binaryPayloadPath"));
+    settings.remove(group + QStringLiteral("/constellationLineRows"));
+    settings.remove(group + QStringLiteral("/constellationAnchorGroupRows"));
+    settings.remove(group + QStringLiteral("/constellationLineSchemaVersion"));
+    settings.remove(group + QStringLiteral("/constellationCount"));
     settings.sync();
     if (settings.status() != QSettings::NoError) {
-        qCWarning(skygateCatalogCacheLog) << "Failed to clear catalog source cache settings";
+        qCWarning(skygateCatalogCacheLog) << "Failed to evict catalog source payload; the configured record is kept";
         return false;
+    }
+    if (removedAllCacheFiles) {
+        qCInfo(skygateCatalogCacheLog).noquote()
+            << "Catalog source payload evicted; configured record kept" << instanceId;
     }
     return removedAllCacheFiles;
 }

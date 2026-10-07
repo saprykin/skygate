@@ -1041,10 +1041,26 @@ void SkyCatalogCacheControllerTests::clearSourceCacheVersusClearCollectionCache(
     const SkyCatalogCacheController controller(&store);
     QVERIFY(controller.clearSourceCache(QStringLiteral("preset:hyg_v42")));
 
+    // Evicting one source's payload keeps its configured record and the peer
+    // record unchanged; only the cleared payload references are dropped.
     auto remaining = store.loadCatalogCollectionCache();
     QVERIFY(remaining.has_value());
-    QCOMPARE(remaining->sources.size(), 1);
-    QCOMPARE(remaining->sources[0].instanceId, QString("preset:open_ngc"));
+    QCOMPARE(remaining->sources.size(), 2);
+    QCOMPARE(remaining->sources[0].instanceId, QString("preset:hyg_v42"));
+    QCOMPARE(remaining->sources[0].descriptorId, QString("hyg_v42"));
+    QCOMPARE(remaining->sources[0].title, QString("HYG v4.2"));
+    QCOMPARE(remaining->sources[0].urls, QStringList{QStringLiteral("https://example.test/hyg.csv.gz")});
+    QCOMPARE(remaining->sources[0].relatedDatasetUrls, QStringList{QStringLiteral("https://example.test/lines.json")});
+    QCOMPARE(remaining->sources[0].policy, CatalogCompositionPolicy::Merge);
+    QCOMPARE(remaining->sources[0].enabled, true);
+    QCOMPARE(remaining->sources[0].order, 0);
+    QVERIFY(remaining->sources[0].payload.isEmpty());
+    QVERIFY(remaining->sources[0].binaryPayload.isEmpty());
+    QVERIFY(remaining->sources[0].constellationLineRows.isEmpty());
+    QVERIFY(remaining->sources[0].constellationAnchorGroupRows.isEmpty());
+    QCOMPARE(remaining->sources[0].constellationCount, std::size_t{0});
+    QCOMPARE(remaining->sources[1].instanceId, QString("preset:open_ngc"));
+    QCOMPARE(remaining->sources[1].payload, skygate::ui::tests::sampleCompactOpenNgcCsvPayload());
 
     QVERIFY(controller.clearCollectionCache());
     QVERIFY(!store.loadCatalogCollectionCache().has_value());
@@ -1248,14 +1264,16 @@ void SkyCatalogCacheControllerTests::clearingPayloadCacheDoesNotReAddLegacySourc
     ));
 
     const SkyCatalogCacheController controller(&store);
-    // Clearing each source's payload cache removes its disposable payload and
-    // record. It is not a configuration reset and must not retire the
-    // committed configuration boundary.
+    // Clearing each source's payload evicts its disposable bytes while every
+    // configured record stays. It is not a configuration reset and must not
+    // retire the committed configuration boundary.
     QVERIFY(controller.clearSourceCache(QStringLiteral("preset:hyg_v42")));
     QVERIFY(controller.clearSourceCache(QStringLiteral("preset:open_ngc")));
     const auto afterClear = store.loadCatalogCollectionCache();
     QVERIFY(afterClear.has_value());
-    QVERIFY(afterClear->sources.isEmpty());
+    QCOMPARE(afterClear->sources.size(), 2);
+    QVERIFY(afterClear->sources[0].payload.isEmpty());
+    QVERIFY(afterClear->sources[1].payload.isEmpty());
 
     controller.persistCollection(SkyCatalogCollectionPersistRequest{});
 
