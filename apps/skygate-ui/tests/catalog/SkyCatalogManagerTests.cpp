@@ -687,6 +687,7 @@ private slots:
     void missingConfigurationKeepsFirstUseDefaults();
     void removingSoleSourceLeavesEmptyCollection();
     void savedEmptyCollectionRestoresEmptyAcrossRestarts();
+    void combinedAcceptedFactsSurviveRelatedReplacementRejectionReorderAndRawRestart();
 
 private:
     SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
@@ -5092,6 +5093,222 @@ void SkyCatalogManagerTests::lateReplyToRemovedRelatedDeclarationIsRejected()
     QVERIFY(manager.constellationAnchorGroups().empty());
     QVERIFY(findConstellationAnchorGroup(manager, "Orion") == nullptr);
     QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Late Update Star")));
+}
+
+void SkyCatalogManagerTests::combinedAcceptedFactsSurviveRelatedReplacementRejectionReorderAndRawRestart()
+{
+    const QString cacheDirectory = m_settings.filePath(QStringLiteral("combined-accepted-facts-cache"));
+    QDir(cacheDirectory).removeRecursively();
+    QSettings settings;
+    settings.setValue(QStringLiteral("skyContext/catalogCollectionCachePath"), cacheDirectory);
+
+    const QString acceptedUrl = QStringLiteral("https://example.test/combined-accepted-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/combined-accepted-lines.json");
+    const QString updateUrl = QStringLiteral("https://example.test/combined-update-stars.csv");
+    const QString siblingUrl = QStringLiteral("https://example.test/combined-sibling-stars.csv");
+    const QByteArray acceptedPayload = skygate::ui::tests::sampleHygCsvPayload(
+        {.id = 903001, .hip = 903001, .properName = "Combined Accepted Star", .mag = "2.0"}
+    );
+    const QByteArray siblingPayload = skygate::ui::tests::sampleHygCsvPayload(
+        {.id = 903002, .hip = 903002, .properName = "Combined Sibling Star", .mag = "3.0"}
+    );
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(acceptedUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = orionRelatedDatasetPayload()});
+    networkAccessManager.enqueueResponse(siblingUrl, {.payload = siblingPayload});
+    networkAccessManager.enqueueResponse(acceptedUrl, {.payload = acceptedPayload});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = lyraRelatedDatasetPayload(), .manualFinish = true});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    std::vector<CatalogNotificationState> observations;
+    observeCatalogNotifications(manager, observations);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+
+    // Step 1: the owner loads with a resolvable related dataset. Its published
+    // and persisted state agree.
+    skygate::ui::internal::SkyCatalogSourceInstance accepted = relatedDatasetInstance(acceptedUrl, relatedUrl);
+    accepted.title = QStringLiteral("Combined Accepted Title");
+    accepted.version = QStringLiteral("v1");
+    const QString instanceId = accepted.instanceId;
+    manager.loadSource(accepted, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+    QVERIFY(!observations.empty());
+    QCOMPARE(observations.back().lineRefCount, std::size_t{2});
+    QCOMPARE(observations.back().anchorGroupCount, std::size_t{1});
+    QCOMPARE(observations.back().constellationCount, std::size_t{1});
+    assertObservedStateMatchesRuntime(manager, observations.back());
+    {
+        const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> snapshot =
+            store.loadCatalogCollectionCache();
+        QVERIFY(snapshot.has_value());
+        const SkySettingsStore::CatalogSourceCacheRecord* record = findCollectionRecord(*snapshot, instanceId);
+        QVERIFY(record != nullptr);
+        QCOMPARE(record->payload, skygate::ui::tests::orionHygCsvPayload());
+        QVERIFY(relatedLineRefsContainHip(relatedLineRefs(*record), "hip_27989"));
+    }
+
+    // Step 2: a second configurable source, so the later reorder has two rows.
+    skygate::ui::internal::SkyCatalogSourceInstance sibling =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(siblingUrl, QStringLiteral("v1"));
+    sibling.title = QStringLiteral("Combined Sibling Title");
+    const QString siblingId = sibling.instanceId;
+    manager.loadSource(sibling, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Combined Sibling Star")));
+    QCOMPARE(manager.sourceInstanceIds(), QStringList({QStringLiteral("primary"), instanceId, siblingId}));
+    assertObservedStateMatchesRuntime(manager, observations.back());
+
+    // Step 3: the accepted source reloads while its replacement related reply
+    // stays pending. The cleared dataset the runtime keeps is the state every
+    // notification reports and the state that gets persisted.
+    manager.retrySource(instanceId);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QPointer<skygate::ui::tests::FakeNetworkReply> pendingReplacement =
+        findPendingReplyForUrl(networkAccessManager, relatedUrl);
+    QVERIFY(!pendingReplacement.isNull());
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Combined Accepted Star")));
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") == nullptr);
+    QCOMPARE(observations.back().lineRefCount, std::size_t{0});
+    QCOMPARE(observations.back().anchorGroupCount, std::size_t{0});
+    QCOMPARE(observations.back().constellationCount, std::size_t{0});
+    assertObservedStateMatchesRuntime(manager, observations.back());
+    QCoreApplication::processEvents();
+    assertObservedStateMatchesRuntime(manager, observations.back());
+    {
+        const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> snapshot =
+            store.loadCatalogCollectionCache();
+        QVERIFY(snapshot.has_value());
+        const SkySettingsStore::CatalogSourceCacheRecord* record = findCollectionRecord(*snapshot, instanceId);
+        QVERIFY(record != nullptr);
+        QCOMPARE(record->payload, acceptedPayload);
+        QCOMPARE(record->relatedDatasetUrls, QStringList{relatedUrl});
+        QVERIFY(record->constellationLineRows.isEmpty());
+        QVERIFY(record->constellationAnchorGroupRows.isEmpty());
+    }
+
+    // Step 4: a descriptor update for the same instance is rejected with an
+    // HTTP error. It installs nothing, supersedes the still-pending
+    // replacement, and leaves the published state, the revision, and the
+    // stored accepted facts untouched.
+    const int changesBeforeRejectedUpdate = catalogSpy.count();
+    const std::uint64_t revisionBeforeRejectedUpdate = manager.catalogRevision();
+    networkAccessManager.enqueueResponse(
+        updateUrl,
+        {.error = QNetworkReply::ContentNotFoundError, .errorText = QStringLiteral("Not Found"), .httpStatusCode = 404}
+    );
+    skygate::ui::internal::SkyCatalogSourceInstance rejected = accepted;
+    rejected.title = QStringLiteral("Combined Rejected Title");
+    rejected.version = QStringLiteral("v2");
+    rejected.urls = QStringList{updateUrl};
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        QRegularExpression("Catalog source failed https://example\\.test/combined-update-stars\\.csv .* HTTP 404")
+    );
+    manager.loadSource(rejected, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    const QVector<SkyCatalogManager::SourceViewEntry> failedView = manager.sourceViewEntries();
+    const auto failedEntry = std::find_if(
+        failedView.begin(), failedView.end(), [&instanceId](const SkyCatalogManager::SourceViewEntry& entry) {
+            return entry.instanceId == instanceId;
+        }
+    );
+    QVERIFY(failedEntry != failedView.end());
+    QVERIFY(failedEntry->hasError);
+    QVERIFY(failedEntry->statusText.contains(QStringLiteral("HTTP 404")));
+    QCOMPARE(catalogSpy.count(), changesBeforeRejectedUpdate);
+    QCOMPARE(manager.catalogRevision(), revisionBeforeRejectedUpdate);
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Combined Accepted Star")));
+    assertObservedStateMatchesRuntime(manager, observations.back());
+
+    // The superseded replacement cannot publish its dataset after the failure.
+    QVERIFY(!pendingReplacement.isNull());
+    pendingReplacement->finishNow();
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+    QCOMPARE(catalogSpy.count(), changesBeforeRejectedUpdate);
+    QCOMPARE(manager.catalogRevision(), revisionBeforeRejectedUpdate);
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    QCOMPARE(manager.constellationCount(), std::size_t{0});
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") == nullptr);
+    assertObservedStateMatchesRuntime(manager, observations.back());
+    {
+        const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> snapshot =
+            store.loadCatalogCollectionCache();
+        QVERIFY(snapshot.has_value());
+        const SkySettingsStore::CatalogSourceCacheRecord* record = findCollectionRecord(*snapshot, instanceId);
+        QVERIFY(record != nullptr);
+        QCOMPARE(record->title, QStringLiteral("Combined Accepted Title"));
+        QCOMPARE(record->version, QStringLiteral("v1"));
+        QCOMPARE(record->urls, QStringList{acceptedUrl});
+        QCOMPARE(record->payload, acceptedPayload);
+        QCOMPARE(record->relatedDatasetUrls, QStringList{relatedUrl});
+        QVERIFY(record->constellationLineRows.isEmpty());
+    }
+
+    // Step 5: reordering saves the collection in its new configured order while
+    // every stored fact stays the accepted one.
+    manager.moveSource(siblingId, 0);
+    QCOMPARE(manager.sourceInstanceIds(), QStringList({siblingId, QStringLiteral("primary"), instanceId}));
+    assertObservedStateMatchesRuntime(manager, observations.back());
+    const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> persisted =
+        store.loadCatalogCollectionCache();
+    QVERIFY(persisted.has_value());
+    QStringList persistedInstanceIds;
+    for (const SkySettingsStore::CatalogSourceCacheRecord& record : persisted->sources) {
+        persistedInstanceIds.push_back(record.instanceId);
+    }
+    QCOMPARE(persistedInstanceIds, manager.sourceInstanceIds());
+    const SkySettingsStore::CatalogSourceCacheRecord* persistedRecord = findCollectionRecord(*persisted, instanceId);
+    QVERIFY(persistedRecord != nullptr);
+    QCOMPARE(persistedRecord->title, QStringLiteral("Combined Accepted Title"));
+    QCOMPARE(persistedRecord->version, QStringLiteral("v1"));
+    QCOMPARE(persistedRecord->urls, QStringList{acceptedUrl});
+    QCOMPARE(persistedRecord->payload, acceptedPayload);
+    QCOMPARE(persistedRecord->relatedDatasetUrls, QStringList{relatedUrl});
+    QVERIFY(persistedRecord->constellationLineRows.isEmpty());
+    QVERIFY(persistedRecord->constellationAnchorGroupRows.isEmpty());
+
+    // Step 6: without the binary sidecars the restart reparses the accepted raw
+    // payloads and rebuilds exactly the stored configuration, including the
+    // declared but still empty related dataset.
+    const QString acceptedBinaryPath = catalogSourceSidecarPath(cacheDirectory, instanceId, QStringLiteral(".bin"));
+    const QString siblingBinaryPath = catalogSourceSidecarPath(cacheDirectory, siblingId, QStringLiteral(".bin"));
+    QVERIFY(!acceptedBinaryPath.isEmpty());
+    QVERIFY(!siblingBinaryPath.isEmpty());
+    QVERIFY(QFile::remove(acceptedBinaryPath));
+    QVERIFY(QFile::remove(siblingBinaryPath));
+
+    SkyCatalogManager rawRestart(&store, nullptr, nullptr, &networkAccessManager);
+    QVERIFY(rawRestart.restoreCatalogCache());
+    QCOMPARE(rawRestart.sourceInstanceIds(), persistedInstanceIds);
+    QVERIFY(catalogContainsDisplayName(rawRestart.starCatalog(), QStringLiteral("Combined Accepted Star")));
+    QVERIFY(catalogContainsDisplayName(rawRestart.starCatalog(), QStringLiteral("Combined Sibling Star")));
+    QCOMPARE(durableTitle(rawRestart.sourceTitles().value(instanceId)), QStringLiteral("Combined Accepted Title"));
+    QCOMPARE(durableTitle(rawRestart.sourceTitles().value(siblingId)), QStringLiteral("Combined Sibling Title"));
+    QVERIFY(rawRestart.constellationLineRefs().empty());
+    QVERIFY(rawRestart.constellationAnchorGroups().empty());
+    QCOMPARE(rawRestart.constellationCount(), std::size_t{0});
+    {
+        const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> upgraded =
+            store.loadCatalogCollectionCache();
+        QVERIFY(upgraded.has_value());
+        const SkySettingsStore::CatalogSourceCacheRecord* upgradedRecord = findCollectionRecord(*upgraded, instanceId);
+        QVERIFY(upgradedRecord != nullptr);
+        QCOMPARE(upgradedRecord->title, QStringLiteral("Combined Accepted Title"));
+        QCOMPARE(upgradedRecord->version, QStringLiteral("v1"));
+        QCOMPARE(upgradedRecord->urls, QStringList{acceptedUrl});
+        QCOMPARE(upgradedRecord->payload, acceptedPayload);
+        QCOMPARE(upgradedRecord->relatedDatasetUrls, QStringList{relatedUrl});
+        QVERIFY(upgradedRecord->constellationLineRows.isEmpty());
+    }
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogManagerTests)
