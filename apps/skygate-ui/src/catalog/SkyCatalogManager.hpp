@@ -199,6 +199,22 @@ private:
         skygate::ephemeris::CatalogCompositionPolicy policy
     );
     void applyBundledSource(SourceOperation& operation, skygate::ephemeris::CatalogCompositionPolicy policy);
+    // Applies the accepted related-declaration transition of an activation to
+    // the instance's owned dataset and folds the published changes into the
+    // activation result. A declaration that still selects related data
+    // supersedes the dataset owned by the replaced catalog, because the
+    // replacement becomes owned only when its own download completes; a
+    // declaration that no longer selects related data retires the obsolete
+    // dataset. Only the accepted declarations and the instance's own ownership
+    // decide, so a downloaded and a bundled activation and every composition
+    // policy share one rule, and no other instance's dataset is touched. Called
+    // only after the activation was accepted and before it is persisted or
+    // published, so a rejected update keeps the previously accepted dataset.
+    void applyRelatedDeclarationTransition(
+        const SourceOperation& operation,
+        const QStringList& acceptedRelatedDatasetUrls,
+        skygate::ui::internal::SkyCatalogRuntimeResult& activationResult
+    );
     [[nodiscard]] skygate::ui::internal::SkyCatalogRuntimeResult applySourceResult(
         skygate::ui::internal::SkyCatalogSourceImportResult result, skygate::ephemeris::CatalogCompositionPolicy policy
     );

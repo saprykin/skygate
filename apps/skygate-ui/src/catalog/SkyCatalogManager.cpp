@@ -746,16 +746,7 @@ void SkyCatalogManager::applyBundledSource(
     }
 
     operation.hasError = false;
-    if (policy == skygate::ephemeris::CatalogCompositionPolicy::Merge) {
-        // The bundled replacement drops the related dataset the instance may
-        // still own from its previous catalog. The dataset is cleared only
-        // after the replacement is committed, so a rejected transition keeps
-        // the previous catalog and its owned related data together.
-        static_cast<void>(m_runtime->clearSourceConstellationRefs(operation.instance.instanceId));
-        // The clear is part of the same committed replacement, so the
-        // published summary is re-read instead of keeping the pre-clear counts.
-        result.statusText = m_runtime->statusText();
-    }
+    applyRelatedDeclarationTransition(operation, operation.instance.relatedDatasetUrls, result);
     // A completed load leaves no operation status behind: the settled row state
     // is the collection's own state, so disabling the source afterwards is
     // presented as disabled instead of as the active source it once loaded.
@@ -765,6 +756,26 @@ void SkyCatalogManager::applyBundledSource(
     commitAcceptedSourceFacts(operation, QByteArray());
     persistCatalogCache();
     applyRuntimeResult(result);
+}
+
+void SkyCatalogManager::applyRelatedDeclarationTransition(
+    const SourceOperation& operation,
+    const QStringList& acceptedRelatedDatasetUrls,
+    SkyCatalogRuntimeResult& activationResult
+)
+{
+    const bool relatedDeclarationRemoved = acceptedRelatedDatasetUrls.isEmpty() && operation.hasAcceptedInstance
+                                           && !operation.acceptedInstance.relatedDatasetUrls.isEmpty();
+    if (acceptedRelatedDatasetUrls.isEmpty() && !relatedDeclarationRemoved) {
+        return;
+    }
+
+    const SkyCatalogRuntimeResult clearResult = m_runtime->clearSourceConstellationRefs(operation.instance.instanceId);
+    activationResult.catalogChanged = activationResult.catalogChanged || clearResult.catalogChanged;
+    activationResult.datasetInfoChanged = activationResult.datasetInfoChanged || clearResult.datasetInfoChanged;
+    // The clear is part of the committed replacement, so every published summary
+    // is re-read instead of keeping the pre-clear counts.
+    activationResult.statusText = m_runtime->statusText();
 }
 
 // Applies the parsed result to the runtime. Only a committed transition is
@@ -835,27 +846,7 @@ void SkyCatalogManager::handleSourceImportFinished(
         return;
     }
 
-    // A successful reload supersedes the owner's catalog and the related
-    // dataset that was attached to the replaced catalog. The accepted
-    // related-data state is therefore cleared as part of the same transition,
-    // before the reload is published or persisted: while the replacement
-    // download is pending the owner holds no dataset, and a replacement
-    // becomes owned only when its own download completes successfully. The
-    // same transition also retires the owned data when the reload removes the
-    // related declaration instead of replacing it. The accepted declaration is
-    // compared with the requested one, so a rejected attempt that only tried
-    // to remove the declaration never touches the dataset the owner still
-    // holds. Other owners keep their own datasets untouched.
-    const bool relatedDeclarationRemoved = relatedDatasetUrls.isEmpty() && operation->hasAcceptedInstance
-                                           && !operation->acceptedInstance.relatedDatasetUrls.isEmpty();
-    if (!relatedDatasetUrls.isEmpty() || relatedDeclarationRemoved) {
-        const SkyCatalogRuntimeResult clearResult = m_runtime->clearSourceConstellationRefs(instanceId);
-        runtimeResult.catalogChanged = runtimeResult.catalogChanged || clearResult.catalogChanged;
-        runtimeResult.datasetInfoChanged = runtimeResult.datasetInfoChanged || clearResult.datasetInfoChanged;
-        // The clear is part of the committed replacement, so every published
-        // summary is re-read instead of keeping the pre-clear counts.
-        runtimeResult.statusText = m_runtime->statusText();
-    }
+    applyRelatedDeclarationTransition(*operation, relatedDatasetUrls, runtimeResult);
 
     operation->busy = false;
     operation->hasError = false;
