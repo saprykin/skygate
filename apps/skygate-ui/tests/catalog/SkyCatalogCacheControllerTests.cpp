@@ -276,6 +276,7 @@ private slots:
     void missingCommittedManifestRejectsRestoreInsteadOfMigratingLegacy();
     void truncatedCommittedManifestRejectsRestoreInsteadOfMigratingLegacy();
     void restoreUsesCommittedGenerationRatherThanStagedNewerGeneration();
+    void missingManifestWithLegacyDataAndStagedGenerationRejectsRestore();
     void logsCollectionLifecycleSummariesAtInfoLevel();
 
 private:
@@ -1545,6 +1546,108 @@ void SkyCatalogCacheControllerTests::restoreUsesCommittedGenerationRatherThanSta
     QCOMPARE(result.sources.size(), std::size_t{2});
     QCOMPARE(result.sources[0].record.instanceId, QStringLiteral("preset:hyg_v42"));
     QCOMPARE(result.sources[1].record.instanceId, QStringLiteral("preset:open_ngc"));
+}
+
+void SkyCatalogCacheControllerTests::missingManifestWithLegacyDataAndStagedGenerationRejectsRestore()
+{
+    SkySettingsStore store;
+    // The retired pre-generation two-slot cache stays readable on disk for the
+    // whole test, so a restore that fell back to it would return its sources.
+    QVERIFY(store.saveCatalogCache(
+        skygate::ui::tests::sampleCatalogCacheSnapshot(
+            {.sourceLabel = QStringLiteral("Legacy Custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+        )
+    ));
+
+    const SkyCatalogCacheController controller(&store);
+    const QString customUrl = QStringLiteral("https://example.test/legacy-stars.csv");
+
+    // Migrate the legacy slots once and then commit an intentionally empty
+    // collection over them: the current configuration holds no source, while
+    // the legacy data it replaced stays readable.
+    const auto migrated = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(migrated.migratedLegacy);
+    QCOMPARE(migrated.sources.size(), std::size_t{2});
+    controller.persistCollection(persistRequestFromRestoreResult(migrated));
+    controller.persistCollection(SkyCatalogCollectionPersistRequest{});
+    const auto committed = store.loadCatalogCollectionCache();
+    QVERIFY(committed.isLoaded());
+    QVERIFY(committed.snapshot.sources.isEmpty());
+
+    const QString directory = m_settings.filePath(QStringLiteral("collection-cache"));
+    const QString manifestPath = catalogCollectionManifestFilePath(directory);
+    QFile manifestFile(manifestPath);
+    QVERIFY(manifestFile.open(QIODevice::ReadOnly));
+    const QByteArray committedManifest = manifestFile.readAll();
+    manifestFile.close();
+    const quint64 committedGeneration = committedCatalogCollectionGeneration(directory);
+    QVERIFY(committedGeneration > 0U);
+
+    // A later save staged a newer generation whose manifest was never
+    // published: its settings record and sidecar exist, but nothing names that
+    // generation as committed.
+    const quint64 stagedGeneration = committedGeneration + 1U;
+    {
+        QSettings settings;
+        settings.setValue(QStringLiteral("catalogSources/%1/recordsStored").arg(stagedGeneration), true);
+        settings.beginGroup(QStringLiteral("catalogSources/%1/catalog-source-staged").arg(stagedGeneration));
+        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("custom:staged"));
+        settings.setValue(QStringLiteral("title"), QStringLiteral("Staged Title"));
+        settings.setValue(QStringLiteral("order"), 0);
+        settings.endGroup();
+        settings.sync();
+    }
+    const QString stagedSidecarPath = skygate::ui::tests::stagedCatalogSourceSidecarPath(
+        directory, stagedGeneration, QStringLiteral("custom:staged"), QStringLiteral(".txt")
+    );
+    {
+        QFile stagedSidecar(stagedSidecarPath);
+        QVERIFY(stagedSidecar.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        QCOMPARE(stagedSidecar.write("staged raw payload"), qint64(18));
+    }
+
+    // Only the committed manifest is lost. Neither the readable legacy cache
+    // nor the staged newer generation proves that it is the current
+    // collection, so the committed configuration still owns it.
+    QVERIFY(QFile::remove(manifestPath));
+
+    const auto unreadable = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(!unreadable.restored);
+    QVERIFY(!unreadable.migratedLegacy);
+    QVERIFY(unreadable.unusableCommittedCollection);
+    QVERIFY(unreadable.sources.empty());
+    QVERIFY(unreadable.statusText.startsWith(QStringLiteral("Catalog: Saved catalog configuration unreadable")));
+    QVERIFY(unreadable.statusText.contains(QStringLiteral("recorded as committed")));
+
+    // Repeated starts reach the same decision, and the read paths leave every
+    // discarded candidate untouched: the legacy cache stays readable and the
+    // staged sidecar keeps its bytes.
+    const auto repeated = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(!repeated.restored);
+    QVERIFY(!repeated.migratedLegacy);
+    QVERIFY(repeated.unusableCommittedCollection);
+    QVERIFY(store.loadCatalogCache().has_value());
+    QCOMPARE(
+        store.loadCatalogCollectionCache().state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable
+    );
+    {
+        QFile stagedSidecar(stagedSidecarPath);
+        QVERIFY(stagedSidecar.open(QIODevice::ReadOnly));
+        QCOMPARE(stagedSidecar.readAll(), QByteArray("staged raw payload"));
+    }
+
+    // The committed configuration is still the recovery point, so restoring
+    // its manifest brings back the intentionally empty collection instead of
+    // the staged generation or the readable legacy sources.
+    {
+        QFile restoredManifest(manifestPath);
+        QVERIFY(restoredManifest.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        QCOMPARE(restoredManifest.write(committedManifest), qint64(committedManifest.size()));
+    }
+    const auto recovered = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(recovered.restored);
+    QVERIFY(!recovered.migratedLegacy);
+    QVERIFY(recovered.sources.empty());
 }
 
 void SkyCatalogCacheControllerTests::logsCollectionLifecycleSummariesAtInfoLevel()
