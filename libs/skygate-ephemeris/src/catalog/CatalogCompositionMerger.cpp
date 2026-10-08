@@ -112,6 +112,7 @@ struct ValueOrigin final {
 // identifiers and aliases, carry no origin.
 struct FieldOrigins final {
     std::optional<ValueOrigin> displayName;
+    std::optional<ValueOrigin> visualMagnitude;
     std::optional<ValueOrigin> fixedEquatorial;
     std::optional<ValueOrigin> properMotionRightAscension;
     std::optional<ValueOrigin> properMotionDeclination;
@@ -127,8 +128,8 @@ struct FieldOrigins final {
 // Origins of the values a freshly parsed record supplies: every present field
 // belongs to the source that owns the record, at that record's row order. The
 // absent markers of the value model decide presence: an empty display name is
-// absent, an empty deep-sky kind is absent, and every optional value counts as
-// soon as it has a value.
+// absent, a NaN visual magnitude is absent, an empty deep-sky kind is absent,
+// and every optional value counts as soon as it has a value.
 [[nodiscard]] FieldOrigins
 fieldOriginsOf(const BaseCelestialBody& body, const std::size_t sourceRank, const std::size_t rowOrdinal)
 {
@@ -136,6 +137,9 @@ fieldOriginsOf(const BaseCelestialBody& body, const std::size_t sourceRank, cons
     FieldOrigins origins;
     if (!body.displayName.empty()) {
         origins.displayName = origin;
+    }
+    if (!std::isnan(body.visualMagnitude)) {
+        origins.visualMagnitude = origin;
     }
     if (body.fixedEquatorialValue().has_value()) {
         origins.fixedEquatorial = origin;
@@ -571,6 +575,30 @@ void takeHigherPrecedence(
     winnerOrigin = loserOrigin;
 }
 
+// The visual magnitude has no optional wrapper: NaN is its absent marker,
+// exactly like an empty display name, and a valid zero is a value like any
+// other.
+void takeHigherPrecedence(
+    double& winnerValue,
+    std::optional<ValueOrigin>& winnerOrigin,
+    const double loserValue,
+    const std::optional<ValueOrigin> loserOrigin,
+    const ValuePrecedence precedence
+)
+{
+    if (std::isnan(loserValue)) {
+        return;
+    }
+    Q_ASSERT(std::isnan(winnerValue) || winnerOrigin.has_value());
+    Q_ASSERT(std::isnan(loserValue) || loserOrigin.has_value());
+    if (!std::isnan(winnerValue) && !loserValueWins(*loserOrigin, *winnerOrigin, precedence)) {
+        return;
+    }
+
+    winnerValue = loserValue;
+    winnerOrigin = loserOrigin;
+}
+
 // The deep-sky kind has no optional wrapper: an empty kind is its absent
 // marker, exactly like an empty display name.
 void takeHigherPrecedence(
@@ -732,6 +760,13 @@ void mergeOwnGalaxyInPlace(
     takeHigherPrecedence(
         winner.displayName, winnerOrigins.displayName, loser.displayName, loserOrigins.displayName, precedence
     );
+    takeHigherPrecedence(
+        winner.visualMagnitude,
+        winnerOrigins.visualMagnitude,
+        loser.visualMagnitude,
+        loserOrigins.visualMagnitude,
+        precedence
+    );
 
     mergeFixedEquatorialInPlace(winner, winnerOrigins, loser, loserOrigins, precedence);
     mergeStarAstrometryInPlace(winner, winnerOrigins, loser, loserOrigins, precedence);
@@ -748,6 +783,13 @@ void mergeDistantInPlace(
     mergeIdentityInto(winner.identity, loser.identity);
     takeHigherPrecedence(
         winner.displayName, winnerOrigins.displayName, loser.displayName, loserOrigins.displayName, precedence
+    );
+    takeHigherPrecedence(
+        winner.visualMagnitude,
+        winnerOrigins.visualMagnitude,
+        loser.visualMagnitude,
+        loserOrigins.visualMagnitude,
+        precedence
     );
 
     const skygate::core::EquatorialCoordinate* loserFixed = loser.fixedEquatorialCoordinate();
