@@ -124,7 +124,7 @@ public:
 
     // Saved even when sources are empty: a stored snapshot is a committed
     // configuration, so an intentionally empty collection stays distinct from
-    // "no collection was ever stored" (a nullopt from load).
+    // "no collection was ever committed" (the Absent load state).
     //
     // A save stages a new generation and publishes it only after every payload
     // file and record is durable, so a failed save leaves the previously
