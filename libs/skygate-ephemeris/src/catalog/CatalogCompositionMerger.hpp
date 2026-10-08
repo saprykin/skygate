@@ -100,11 +100,18 @@ namespace skygate::ephemeris {
 // designations that share a common name stay distinct instead of one being
 // dropped.
 //
-// Coordinates are merged as one coherent model per survivor. The astrometry
-// reference position and reference epoch are authoritative, and the fixed
-// position whose value origin outranks the others wins; fixed positions of one
-// source resolve by row order like every other value. A losing
-// fixed position therefore fills a missing winner position and replaces a
+// Coordinates are merged as one coherent model per survivor. The model anchor
+// is the fixed position together with the astrometry reference position and
+// its reference epoch, including an astrometry record that carries no optional
+// motion or parallax fields; the anchor origin is the higher-precedence origin
+// among those components. A losing model whose anchor origin outranks the
+// winner's replaces the winner's whole model before any compatibility check,
+// so copying the record that bridges two objects never preselects a model the
+// earlier supplying row outranks. The replaced model only enriches the selected
+// one with compatible optional astrometry fields; a contradicting replaced
+// position or astrometry is diagnosed instead of being combined with it.
+// Otherwise the winner's model stays authoritative: a losing
+// fixed position fills a missing winner position and replaces a
 // position the winner only inherited from a lower-precedence source, and it
 // does either only when it agrees with the surviving model, because a fixed
 // position carries no reference epoch to convert; a losing astrometry only
