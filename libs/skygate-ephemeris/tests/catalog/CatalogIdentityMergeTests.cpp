@@ -299,6 +299,10 @@ private slots:
     void bridgesWithinOneSourceKeepFirstRowDeepSkyValues();
     void withinSourceBridgeFieldsResolveByEarliestSupplyingRow();
     void secondWithinSourceBridgeKeepsEarliestRowValues();
+    void sameSourcePassKeepsEarliestRowNameAcrossALocalBridge();
+    void sameSourcePassKeepsEarliestRowDeepSkyValues();
+    void sameSourcePassMatchResolvesEachFieldByItsSupplyingRow();
+    void secondBridgeSurvivorKeepsRowOriginsUnderLaterReplacement();
     void withinSourceBridgeSurvivorKeepsRowOrderAcrossCrossSourceBridge();
     void explicitReplacementValueOutranksAnInheritedValue();
     void deepSkyValuesResolveIndependentlyBySupplyingSource();
@@ -2100,6 +2104,252 @@ void CatalogIdentityMergeTests::secondWithinSourceBridgeKeepsEarliestRowValues()
     QVERIFY(hasRetainedCanonicalId(*survivor, "a_hip_1"));
     QVERIFY(hasRetainedCanonicalId(*survivor, "b_hyg_2"));
     QVERIFY(hasRetainedCanonicalId(*survivor, "c_hip_3"));
+}
+
+void CatalogIdentityMergeTests::sameSourcePassKeepsEarliestRowNameAcrossALocalBridge()
+{
+    // Source A links HIP 1 and HYG 2. Source B names the object in its first
+    // row, names HYG 2 in its second row, and bridges HIP 1 with HIP 3 in its
+    // last row. The bridge absorbs the first row and is visited after the
+    // second row replaced A's survivor, so the first row's value arrives out
+    // of encounter order; its recorded row origin still wins.
+    const auto sourceA = createCatalog(
+        {makeStar("a_linked", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hyg", "2")})}, {}
+    );
+    const auto sourceB = createCatalog(
+        {
+            makeStar("b_hip_1", "First", {CatalogIdentifier::make("hip", "1")}, {}, 10.0, 20.0),
+            makeStar("b_hyg_2", "Second", {CatalogIdentifier::make("hyg", "2")}),
+            makeStar("b_hip_3", "Third", {CatalogIdentifier::make("hip", "3")}),
+            makeStar(
+                "b_bridge", "Last bridge", {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hip", "3")}
+            ),
+        },
+        {}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of b_hip_1 over conflicting fixed coordinates from b_bridge."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of b_bridge over conflicting fixed coordinates from b_hip_3."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of b_bridge over conflicting fixed coordinates from b_hyg_2."
+    );
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "b_hyg_2");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("First"));
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 10.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 20.0);
+    QVERIFY(hasIdentifier(*survivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*survivor, "hip", "3"));
+    QVERIFY(hasIdentifier(*survivor, "hyg", "2"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "a_linked"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_bridge"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_hip_1"));
+
+    // The same rows without the local bridge already keep the first name, so
+    // bridging must not change which value wins.
+    const auto controlB = createCatalog(
+        {
+            makeStar("c_hip_1", "First", {CatalogIdentifier::make("hip", "1")}),
+            makeStar("c_hyg_2", "Second", {CatalogIdentifier::make("hyg", "2")}),
+        },
+        {}
+    );
+    QVERIFY(controlB != nullptr);
+
+    const CatalogCompositionResult control = composeAll({sourceA.get(), controlB.get()});
+
+    QVERIFY(control.isSuccess());
+    QCOMPARE(control.bodyCount, std::size_t{1});
+    const BaseCelestialBody* controlSurvivor = findBodyById(control.catalog->bodies(), "c_hip_1");
+    QVERIFY(controlSurvivor != nullptr);
+    QCOMPARE(QString::fromStdString(controlSurvivor->displayName), QStringLiteral("First"));
+}
+
+void CatalogIdentityMergeTests::sameSourcePassKeepsEarliestRowDeepSkyValues()
+{
+    // Source A links NGC 224 with IC 1. Source B measures NGC 224 in its first
+    // row and NGC 225 in its third row; its bridge row joins both, so the
+    // bridge absorbs the first row's name and major axis. The second row's
+    // IC 1 survivor replaces A's object first and the later bridge survivor
+    // matches it, so the first row's name and axis still win.
+    const auto sourceA = createCatalog(
+        {},
+        {makeDeepSkyObject(
+            "a_linked_dso",
+            {},
+            {},
+            {CatalogIdentifier::make("ngc", "224"), CatalogIdentifier::make("ic", "1")},
+            1.0,
+            2.0,
+            std::nullopt
+        )}
+    );
+    const auto sourceB = createCatalog(
+        {},
+        {
+            makeDeepSkyObject("b_ngc_224", "First DSO", {}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, 1.0),
+            makeDeepSkyObject("b_ic_1", "Second DSO", {}, {CatalogIdentifier::make("ic", "1")}, 1.0, 2.0, 2.0),
+            makeDeepSkyObject("b_ngc_225", "Third DSO", {}, {CatalogIdentifier::make("ngc", "225")}, 1.0, 2.0, 3.0),
+            makeDeepSkyObject(
+                "b_bridge_dso",
+                "Bridge DSO",
+                {},
+                {CatalogIdentifier::make("ngc", "224"), CatalogIdentifier::make("ngc", "225")},
+                1.0,
+                2.0,
+                std::nullopt
+            ),
+        }
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(result.deepSkyObjectCount, std::size_t{1});
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "b_ic_1");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("First DSO"));
+    const auto* deepSkyInfo = survivor->deepSkyObjectInfo();
+    QVERIFY(deepSkyInfo != nullptr);
+    QVERIFY(deepSkyInfo->majorAxisArcmin.has_value());
+    QCOMPARE(*deepSkyInfo->majorAxisArcmin, 1.0);
+    QVERIFY(hasIdentifier(*survivor, "ngc", "224"));
+    QVERIFY(hasIdentifier(*survivor, "ic", "1"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "a_linked_dso"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_bridge_dso"));
+}
+
+void CatalogIdentityMergeTests::sameSourcePassMatchResolvesEachFieldByItsSupplyingRow()
+{
+    // The rows are reversed: HYG 2 names the object in the first row, while
+    // HIP 1 supplies its own name and coordinates in the second row, which the
+    // bridge absorbs. The name the first row supplied is kept, and the
+    // coordinates the winner is missing are filled from the second row, so the
+    // same-pass match fills missing fields and each field follows its own
+    // supplying row.
+    const auto sourceA = createCatalog(
+        {makeStar(
+            "a_linked",
+            {},
+            {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hyg", "2")},
+            {},
+            std::nullopt,
+            std::nullopt
+        )},
+        {}
+    );
+    const auto sourceB = createCatalog(
+        {
+            makeStar("b_hyg_2", "Second", {CatalogIdentifier::make("hyg", "2")}, {}, std::nullopt, std::nullopt),
+            makeStar("b_hip_1", "First", {CatalogIdentifier::make("hip", "1")}, {}, 22.0, 2.5),
+            makeStar("b_hip_3", "Third", {CatalogIdentifier::make("hip", "3")}, {}, 23.0, 2.0),
+            makeStar(
+                "b_bridge",
+                "Last bridge",
+                {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hip", "3")},
+                {},
+                std::nullopt,
+                std::nullopt
+            ),
+        },
+        {}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "b_hyg_2");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Second"));
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 22.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 2.5);
+    QVERIFY(hasIdentifier(*survivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*survivor, "hip", "3"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "a_linked"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_bridge"));
+}
+
+void CatalogIdentityMergeTests::secondBridgeSurvivorKeepsRowOriginsUnderLaterReplacement()
+{
+    // Source A links HIP 1 and HYG 2, and source B bridges its own rows twice
+    // inside its dedup pass, the second bridge absorbing the HYG 2 survivor.
+    // Source C then replaces the resulting survivor across sources: the
+    // replacement's own name wins by source precedence, the coordinates it
+    // does not supply stay with the earliest row that supplied them, and the
+    // canonical identities of every bridged and replaced row stay resolvable.
+    const auto sourceA = createCatalog(
+        {makeStar("a_linked", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hyg", "2")})}, {}
+    );
+    const auto sourceB = createCatalog(
+        {
+            makeStar("b_hip_1", "First B", {CatalogIdentifier::make("hip", "1")}, {}, 3.0, 2.0),
+            makeStar("b_hyg_2", "Second B", {CatalogIdentifier::make("hyg", "2")}, {}, 4.0, 2.0),
+            makeStar("b_hip_3", "Third B", {CatalogIdentifier::make("hip", "3")}, {}, 5.0, 2.0),
+            makeStar(
+                "b_bridge_13",
+                "Bridge B",
+                {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hip", "3")},
+                {},
+                6.0,
+                2.0
+            ),
+            makeStar(
+                "b_bridge_all",
+                "Last B",
+                {CatalogIdentifier::make("hyg", "2"), CatalogIdentifier::make("hip", "1")},
+                {},
+                7.0,
+                2.0
+            ),
+        },
+        {}
+    );
+    const auto sourceC = createCatalog(
+        {makeStar("c_replace", "Replacement", {CatalogIdentifier::make("hip", "1")}, {}, std::nullopt, std::nullopt)},
+        {}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+    QVERIFY(sourceC != nullptr);
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get(), sourceC.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "c_replace");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Replacement"));
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 3.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(hasIdentifier(*survivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*survivor, "hyg", "2"));
+    QVERIFY(hasIdentifier(*survivor, "hip", "3"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "a_linked"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_bridge_13"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_bridge_all"));
 }
 
 void CatalogIdentityMergeTests::withinSourceBridgeSurvivorKeepsRowOrderAcrossCrossSourceBridge()
