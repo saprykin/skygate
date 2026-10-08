@@ -768,7 +768,9 @@ void SkySettingsStoreTests::interruptedGenerationStagingKeepsFlatCollectionLoade
         QSettings settings;
         settings.setValue(QStringLiteral("skyContext/catalogCollectionVersion"), 2);
         settings.setValue(QStringLiteral("skyContext/catalogBinarySchemaVersion"), 7);
-        settings.beginGroup(QStringLiteral("catalogSources/catalog-source-flat-first"));
+        // The group names sort opposite to the order values on purpose: only
+        // sorting by the order field yields the configured sequence.
+        settings.beginGroup(QStringLiteral("catalogSources/catalog-source-flat-second"));
         settings.setValue(QStringLiteral("instanceId"), QStringLiteral("flat:first"));
         settings.setValue(QStringLiteral("descriptorId"), QStringLiteral("flat_first"));
         settings.setValue(QStringLiteral("title"), QStringLiteral("Flat First"));
@@ -780,7 +782,7 @@ void SkySettingsStoreTests::interruptedGenerationStagingKeepsFlatCollectionLoade
         settings.setValue(QStringLiteral("order"), 0);
         settings.setValue(QStringLiteral("payloadPath"), firstPayloadPath);
         settings.endGroup();
-        settings.beginGroup(QStringLiteral("catalogSources/catalog-source-flat-second"));
+        settings.beginGroup(QStringLiteral("catalogSources/catalog-source-flat-first"));
         settings.setValue(QStringLiteral("instanceId"), QStringLiteral("flat:second"));
         settings.setValue(QStringLiteral("descriptorId"), QStringLiteral("flat_second"));
         settings.setValue(QStringLiteral("title"), QStringLiteral("Flat Second"));
@@ -802,8 +804,10 @@ void SkySettingsStoreTests::interruptedGenerationStagingKeepsFlatCollectionLoade
     QCOMPARE(flat.snapshot.binarySchemaVersion, 7);
     QCOMPARE(flat.snapshot.sources.size(), 2);
     QCOMPARE(flat.snapshot.sources[0].instanceId, QString("flat:first"));
+    QCOMPARE(flat.snapshot.sources[0].order, 0);
     QCOMPARE(flat.snapshot.sources[0].payload, QByteArray("flat raw first"));
     QCOMPARE(flat.snapshot.sources[1].instanceId, QString("flat:second"));
+    QCOMPARE(flat.snapshot.sources[1].order, 1);
     QCOMPARE(flat.snapshot.sources[1].payload, QByteArray("flat raw second"));
 
     // An interrupted first upgrade staged generation records and a sidecar
@@ -837,10 +841,15 @@ void SkySettingsStoreTests::interruptedGenerationStagingKeepsFlatCollectionLoade
     QCOMPARE(mixed.snapshot.sources[0].urls, QStringList{QStringLiteral("https://example.test/first.csv")});
     QCOMPARE(mixed.snapshot.sources[0].policy, skygate::ephemeris::CatalogCompositionPolicy::Merge);
     QVERIFY(mixed.snapshot.sources[0].enabled);
+    QCOMPARE(mixed.snapshot.sources[0].order, 0);
     QCOMPARE(mixed.snapshot.sources[0].payload, QByteArray("flat raw first"));
     QCOMPARE(mixed.snapshot.sources[1].instanceId, QString("flat:second"));
+    QCOMPARE(mixed.snapshot.sources[1].descriptorId, QString("flat_second"));
+    QCOMPARE(mixed.snapshot.sources[1].title, QString("Flat Second"));
+    QCOMPARE(mixed.snapshot.sources[1].urls, QStringList{QStringLiteral("https://example.test/second.csv")});
     QCOMPARE(mixed.snapshot.sources[1].policy, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
     QVERIFY(!mixed.snapshot.sources[1].enabled);
+    QCOMPARE(mixed.snapshot.sources[1].order, 1);
     QCOMPARE(mixed.snapshot.sources[1].payload, QByteArray("flat raw second"));
     QVERIFY(!mixed.diagnostic.isEmpty());
 
