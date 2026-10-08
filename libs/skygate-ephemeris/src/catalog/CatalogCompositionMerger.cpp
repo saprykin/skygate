@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -84,94 +85,115 @@ private:
     const BaseCelestialBody* m_body = nullptr;
 };
 
-// Source rank of every value field the merge enriches, per survivor. A field
-// keeps the rank of the source that actually supplied its value, so a survivor
-// that inherited a value never promotes it to its own, higher source rank. The
-// absent markers of the value model decide presence, so a rank is present
-// exactly when the survivor carries a value for that field and a valid zero is
-// a value like any other. Unions without precedence, such as identifiers and
-// aliases, carry no rank.
-struct FieldRanks final {
-    std::optional<std::size_t> displayName;
-    std::optional<std::size_t> fixedEquatorial;
-    std::optional<std::size_t> properMotionRightAscension;
-    std::optional<std::size_t> properMotionDeclination;
-    std::optional<std::size_t> stellarParallax;
-    std::optional<std::size_t> radialVelocity;
-    std::optional<std::size_t> astrometryValidityRange;
-    std::optional<std::size_t> deepSkyKind;
-    std::optional<std::size_t> majorAxis;
-    std::optional<std::size_t> minorAxis;
-    std::optional<std::size_t> positionAngle;
+// Origin of one merged value: the rank of the source that supplied it and the
+// row order of the supplying record within that source. A value of a
+// higher-ranked source outranks a lower-ranked one; values that share a source
+// rank resolve by row order, where the first row of a source is authoritative
+// and its later rows only fill missing values.
+struct ValueOrigin final {
+    std::size_t sourceRank = 0;
+    std::size_t rowOrdinal = 0;
 };
 
-// Ranks of the values a freshly parsed record supplies: every present field
-// belongs to the source that owns the record. The absent markers of the value
-// model decide presence: an empty display name is absent, an empty deep-sky
-// kind is absent, and every optional value counts as soon as it has a value.
-[[nodiscard]] FieldRanks fieldRanksOf(const BaseCelestialBody& body, const std::size_t sourceRank)
+[[nodiscard]] bool outranks(const ValueOrigin& candidate, const ValueOrigin& current)
 {
-    FieldRanks ranks;
+    if (candidate.sourceRank != current.sourceRank) {
+        return candidate.sourceRank > current.sourceRank;
+    }
+    return candidate.rowOrdinal < current.rowOrdinal;
+}
+
+// Origin of every value field the merge enriches, per survivor. A field keeps
+// the origin of the source and row that actually supplied its value, so a
+// survivor that inherited a value never promotes it to its own, higher source
+// rank. The absent markers of the value model decide presence, so an origin is
+// present exactly when the survivor carries a value for that field and a valid
+// zero is a value like any other. Unions without precedence, such as
+// identifiers and aliases, carry no origin.
+struct FieldOrigins final {
+    std::optional<ValueOrigin> displayName;
+    std::optional<ValueOrigin> fixedEquatorial;
+    std::optional<ValueOrigin> properMotionRightAscension;
+    std::optional<ValueOrigin> properMotionDeclination;
+    std::optional<ValueOrigin> stellarParallax;
+    std::optional<ValueOrigin> radialVelocity;
+    std::optional<ValueOrigin> astrometryValidityRange;
+    std::optional<ValueOrigin> deepSkyKind;
+    std::optional<ValueOrigin> majorAxis;
+    std::optional<ValueOrigin> minorAxis;
+    std::optional<ValueOrigin> positionAngle;
+};
+
+// Origins of the values a freshly parsed record supplies: every present field
+// belongs to the source that owns the record, at that record's row order. The
+// absent markers of the value model decide presence: an empty display name is
+// absent, an empty deep-sky kind is absent, and every optional value counts as
+// soon as it has a value.
+[[nodiscard]] FieldOrigins
+fieldOriginsOf(const BaseCelestialBody& body, const std::size_t sourceRank, const std::size_t rowOrdinal)
+{
+    const ValueOrigin origin{sourceRank, rowOrdinal};
+    FieldOrigins origins;
     if (!body.displayName.empty()) {
-        ranks.displayName = sourceRank;
+        origins.displayName = origin;
     }
     if (body.fixedEquatorialValue().has_value()) {
-        ranks.fixedEquatorial = sourceRank;
+        origins.fixedEquatorial = origin;
     }
 
     const CatalogStarAstrometry* astrometry = body.catalogStarAstrometry();
     if (astrometry != nullptr) {
         if (astrometry->properMotionRightAscensionMasPerYear.has_value()) {
-            ranks.properMotionRightAscension = sourceRank;
+            origins.properMotionRightAscension = origin;
         }
         if (astrometry->properMotionDeclinationMasPerYear.has_value()) {
-            ranks.properMotionDeclination = sourceRank;
+            origins.properMotionDeclination = origin;
         }
         if (astrometry->stellarParallaxMas.has_value()) {
-            ranks.stellarParallax = sourceRank;
+            origins.stellarParallax = origin;
         }
         if (astrometry->radialVelocityKmPerSecond.has_value()) {
-            ranks.radialVelocity = sourceRank;
+            origins.radialVelocity = origin;
         }
         if (astrometry->validityRange.has_value()) {
-            ranks.astrometryValidityRange = sourceRank;
+            origins.astrometryValidityRange = origin;
         }
     }
 
     const DeepSkyObjectInfo* deepSky = body.deepSkyObjectInfo();
     if (deepSky != nullptr) {
         if (deepSky->kind != DeepSkyObjectInfo::Kind::Unknown) {
-            ranks.deepSkyKind = sourceRank;
+            origins.deepSkyKind = origin;
         }
         if (deepSky->majorAxisArcmin.has_value()) {
-            ranks.majorAxis = sourceRank;
+            origins.majorAxis = origin;
         }
         if (deepSky->minorAxisArcmin.has_value()) {
-            ranks.minorAxis = sourceRank;
+            origins.minorAxis = origin;
         }
         if (deepSky->positionAngleDeg.has_value()) {
-            ranks.positionAngle = sourceRank;
+            origins.positionAngle = origin;
         }
     }
-    return ranks;
+    return origins;
 }
 
 // Accumulates deduplicated bodies of one or more sources while keeping logical
 // positions stable so an identity index can address each survivor by value.
 // A position can be vacated when a later replacing source wins; vacated
-// positions are skipped during final assembly. The field ranks of a survivor
+// positions are skipped during final assembly. The field origins of a survivor
 // are kept beside its body, aligned by position.
 struct MergeAccumulator final {
     std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies;
     std::vector<DistantCelestialBody> distantBodies;
     std::vector<std::string> sourceIds;
     std::vector<std::vector<std::string>> contributorSourceIds;
-    std::vector<FieldRanks> fieldRanks;
+    std::vector<FieldOrigins> fieldOrigins;
     std::vector<bool> isDistant;
     std::vector<std::size_t> domainIndex;
     std::vector<bool> active;
 
-    // Appends a body owned by `sourceId`, together with the ranks of the values
+    // Appends a body owned by `sourceId`, together with the origins of the values
     // it carries. The owning source heads the contributor list, followed by the
     // prior contributors in the descending source precedence order the caller
     // established. Prior ids are deduplicated, so a source absorbed through
@@ -179,7 +201,7 @@ struct MergeAccumulator final {
     [[nodiscard]] std::size_t append(
         const BaseCelestialBody& body,
         std::string sourceId,
-        FieldRanks ranks,
+        FieldOrigins origins,
         std::vector<std::string> priorContributors = {}
     )
     {
@@ -203,7 +225,7 @@ struct MergeAccumulator final {
             }
         }
         contributorSourceIds.push_back(std::move(contributors));
-        fieldRanks.push_back(std::move(ranks));
+        fieldOrigins.push_back(std::move(origins));
         active.push_back(true);
         return sourceIds.size() - 1U;
     }
@@ -470,87 +492,87 @@ void logRejectedFixedCoordinates(const BaseCelestialBody& winner, const BaseCele
 // How a merge treats a value that both the winner and the loser supply. A
 // record of the survivor's own source only completes it, because within one
 // source the first record of an identity is authoritative and its later
-// records fill its missing values. An absorbed survivor of another source
-// offers its values by donor precedence, so a value the winner inherited from
-// a lower-precedence source is replaced by the contributor that actually
-// supplied it.
+// records fill its missing values. An absorbed survivor offers its values by
+// origin precedence: a value the winner inherited from a lower-ranked source,
+// or from a later row of an equal-ranked one, is replaced by the origin that
+// actually supplied it.
 enum class ValuePrecedence {
     KeepWinnerValue,
-    TakeHigherSourceRank
+    TakeHigherOrigin
 };
 
 // Adopts the loser's value when the winner carries none, or when the loser's
-// value was supplied by a higher-precedence source than the value the winner
-// currently carries. Equal precedence keeps the current value, so the earlier
-// row of one source stays authoritative for the values of that source, and an
-// inherited value is never promoted to the rank of the survivor that merely
-// copied it. A merge of records of one source never replaces a value the
-// survivor already carries.
+// value origin outranks the origin the winner currently carries: a
+// higher-precedence source, or the earlier row of the same source, because
+// equal source ranks resolve by row order. A merge of records of one source
+// never replaces a value the survivor already carries.
 template <typename T>
 void takeHigherPrecedence(
     std::optional<T>& winnerValue,
-    std::optional<std::size_t>& winnerRank,
+    std::optional<ValueOrigin>& winnerOrigin,
     const std::optional<T>& loserValue,
-    const std::optional<std::size_t> loserRank,
+    const std::optional<ValueOrigin> loserOrigin,
     const ValuePrecedence precedence
 )
 {
     if (!loserValue.has_value()) {
         return;
     }
-    Q_ASSERT(!winnerValue.has_value() || winnerRank.has_value());
-    Q_ASSERT(!loserValue.has_value() || loserRank.has_value());
-    if (winnerValue.has_value() && (precedence == ValuePrecedence::KeepWinnerValue || *winnerRank >= *loserRank)) {
+    Q_ASSERT(!winnerValue.has_value() || winnerOrigin.has_value());
+    Q_ASSERT(!loserValue.has_value() || loserOrigin.has_value());
+    if (winnerValue.has_value()
+        && (precedence == ValuePrecedence::KeepWinnerValue || !outranks(*loserOrigin, *winnerOrigin))) {
         return;
     }
 
     winnerValue = loserValue;
-    winnerRank = loserRank;
+    winnerOrigin = loserOrigin;
 }
 
 void takeHigherPrecedence(
     std::string& winnerValue,
-    std::optional<std::size_t>& winnerRank,
+    std::optional<ValueOrigin>& winnerOrigin,
     const std::string& loserValue,
-    const std::optional<std::size_t> loserRank,
+    const std::optional<ValueOrigin> loserOrigin,
     const ValuePrecedence precedence
 )
 {
     if (loserValue.empty()) {
         return;
     }
-    Q_ASSERT(winnerValue.empty() || winnerRank.has_value());
-    Q_ASSERT(loserValue.empty() || loserRank.has_value());
-    if (!winnerValue.empty() && (precedence == ValuePrecedence::KeepWinnerValue || *winnerRank >= *loserRank)) {
+    Q_ASSERT(winnerValue.empty() || winnerOrigin.has_value());
+    Q_ASSERT(loserValue.empty() || loserOrigin.has_value());
+    if (!winnerValue.empty()
+        && (precedence == ValuePrecedence::KeepWinnerValue || !outranks(*loserOrigin, *winnerOrigin))) {
         return;
     }
 
     winnerValue = loserValue;
-    winnerRank = loserRank;
+    winnerOrigin = loserOrigin;
 }
 
 // The deep-sky kind has no optional wrapper: an empty kind is its absent
 // marker, exactly like an empty display name.
 void takeHigherPrecedence(
     DeepSkyObjectInfo::Kind& winnerValue,
-    std::optional<std::size_t>& winnerRank,
+    std::optional<ValueOrigin>& winnerOrigin,
     const DeepSkyObjectInfo::Kind loserValue,
-    const std::optional<std::size_t> loserRank,
+    const std::optional<ValueOrigin> loserOrigin,
     const ValuePrecedence precedence
 )
 {
     if (loserValue == DeepSkyObjectInfo::Kind::Unknown) {
         return;
     }
-    Q_ASSERT(winnerValue == DeepSkyObjectInfo::Kind::Unknown || winnerRank.has_value());
-    Q_ASSERT(loserValue == DeepSkyObjectInfo::Kind::Unknown || loserRank.has_value());
+    Q_ASSERT(winnerValue == DeepSkyObjectInfo::Kind::Unknown || winnerOrigin.has_value());
+    Q_ASSERT(loserValue == DeepSkyObjectInfo::Kind::Unknown || loserOrigin.has_value());
     if (winnerValue != DeepSkyObjectInfo::Kind::Unknown
-        && (precedence == ValuePrecedence::KeepWinnerValue || *winnerRank >= *loserRank)) {
+        && (precedence == ValuePrecedence::KeepWinnerValue || !outranks(*loserOrigin, *winnerOrigin))) {
         return;
     }
 
     winnerValue = loserValue;
-    winnerRank = loserRank;
+    winnerOrigin = loserOrigin;
 }
 
 // Merges the losing fixed position into the winning coordinate model. The
@@ -562,9 +584,9 @@ void takeHigherPrecedence(
 // reference position has no epoch conversion to apply.
 void mergeFixedEquatorialInPlace(
     OwnGalaxyCelestialBody& winner,
-    FieldRanks& winnerRanks,
+    FieldOrigins& winnerOrigins,
     const BaseCelestialBody& loser,
-    const FieldRanks& loserRanks,
+    const FieldOrigins& loserOrigins,
     const ValuePrecedence precedence
 )
 {
@@ -576,8 +598,9 @@ void mergeFixedEquatorialInPlace(
     const bool winnerHasFixed = winner.fixedEquatorial.has_value();
     const bool loserOutranks =
         !winnerHasFixed
-        || (precedence == ValuePrecedence::TakeHigherSourceRank && winnerRanks.fixedEquatorial.has_value()
-            && loserRanks.fixedEquatorial.has_value() && *loserRanks.fixedEquatorial > *winnerRanks.fixedEquatorial);
+        || (precedence == ValuePrecedence::TakeHigherOrigin && winnerOrigins.fixedEquatorial.has_value()
+            && loserOrigins.fixedEquatorial.has_value()
+            && outranks(*loserOrigins.fixedEquatorial, *winnerOrigins.fixedEquatorial));
     if (!loserOutranks) {
         if (winnerHasFixed && coordinatesConflict(*winner.fixedEquatorial, *loserFixed)) {
             logFixedCoordinateConflict(winner, loser);
@@ -595,7 +618,7 @@ void mergeFixedEquatorialInPlace(
         logFixedCoordinateConflict(loser, winner);
     }
     winner.fixedEquatorial = *loserFixed;
-    winnerRanks.fixedEquatorial = loserRanks.fixedEquatorial;
+    winnerOrigins.fixedEquatorial = loserOrigins.fixedEquatorial;
 }
 
 // Merges the losing astrometry into the winning coordinate model. The
@@ -610,9 +633,9 @@ void mergeFixedEquatorialInPlace(
 // descriptions.
 void mergeStarAstrometryInPlace(
     OwnGalaxyCelestialBody& winner,
-    FieldRanks& winnerRanks,
+    FieldOrigins& winnerOrigins,
     const BaseCelestialBody& loser,
-    const FieldRanks& loserRanks,
+    const FieldOrigins& loserOrigins,
     const ValuePrecedence precedence
 )
 {
@@ -628,11 +651,11 @@ void mergeStarAstrometryInPlace(
             return;
         }
         winner.starAstrometry = *loserAstrometry;
-        winnerRanks.properMotionRightAscension = loserRanks.properMotionRightAscension;
-        winnerRanks.properMotionDeclination = loserRanks.properMotionDeclination;
-        winnerRanks.stellarParallax = loserRanks.stellarParallax;
-        winnerRanks.radialVelocity = loserRanks.radialVelocity;
-        winnerRanks.astrometryValidityRange = loserRanks.astrometryValidityRange;
+        winnerOrigins.properMotionRightAscension = loserOrigins.properMotionRightAscension;
+        winnerOrigins.properMotionDeclination = loserOrigins.properMotionDeclination;
+        winnerOrigins.stellarParallax = loserOrigins.stellarParallax;
+        winnerOrigins.radialVelocity = loserOrigins.radialVelocity;
+        winnerOrigins.astrometryValidityRange = loserOrigins.astrometryValidityRange;
         return;
     }
 
@@ -644,69 +667,69 @@ void mergeStarAstrometryInPlace(
     CatalogStarAstrometry& merged = *winner.starAstrometry;
     takeHigherPrecedence(
         merged.properMotionRightAscensionMasPerYear,
-        winnerRanks.properMotionRightAscension,
+        winnerOrigins.properMotionRightAscension,
         loserAstrometry->properMotionRightAscensionMasPerYear,
-        loserRanks.properMotionRightAscension,
+        loserOrigins.properMotionRightAscension,
         precedence
     );
     takeHigherPrecedence(
         merged.properMotionDeclinationMasPerYear,
-        winnerRanks.properMotionDeclination,
+        winnerOrigins.properMotionDeclination,
         loserAstrometry->properMotionDeclinationMasPerYear,
-        loserRanks.properMotionDeclination,
+        loserOrigins.properMotionDeclination,
         precedence
     );
     takeHigherPrecedence(
         merged.stellarParallaxMas,
-        winnerRanks.stellarParallax,
+        winnerOrigins.stellarParallax,
         loserAstrometry->stellarParallaxMas,
-        loserRanks.stellarParallax,
+        loserOrigins.stellarParallax,
         precedence
     );
     takeHigherPrecedence(
         merged.radialVelocityKmPerSecond,
-        winnerRanks.radialVelocity,
+        winnerOrigins.radialVelocity,
         loserAstrometry->radialVelocityKmPerSecond,
-        loserRanks.radialVelocity,
+        loserOrigins.radialVelocity,
         precedence
     );
     takeHigherPrecedence(
         merged.validityRange,
-        winnerRanks.astrometryValidityRange,
+        winnerOrigins.astrometryValidityRange,
         loserAstrometry->validityRange,
-        loserRanks.astrometryValidityRange,
+        loserOrigins.astrometryValidityRange,
         precedence
     );
 }
 
 void mergeOwnGalaxyInPlace(
     OwnGalaxyCelestialBody& winner,
-    FieldRanks& winnerRanks,
+    FieldOrigins& winnerOrigins,
     const BaseCelestialBody& loser,
-    const FieldRanks& loserRanks,
+    const FieldOrigins& loserOrigins,
     const ValuePrecedence precedence
 )
 {
     mergeIdentityInto(winner.identity, loser.identity);
     takeHigherPrecedence(
-        winner.displayName, winnerRanks.displayName, loser.displayName, loserRanks.displayName, precedence
+        winner.displayName, winnerOrigins.displayName, loser.displayName, loserOrigins.displayName, precedence
     );
 
-    mergeFixedEquatorialInPlace(winner, winnerRanks, loser, loserRanks, precedence);
-    mergeStarAstrometryInPlace(winner, winnerRanks, loser, loserRanks, precedence);
+    mergeFixedEquatorialInPlace(winner, winnerOrigins, loser, loserOrigins, precedence);
+    mergeStarAstrometryInPlace(winner, winnerOrigins, loser, loserOrigins, precedence);
 }
 
 void mergeDistantInPlace(
     DistantCelestialBody& winner,
-    FieldRanks& winnerRanks,
+    FieldOrigins& winnerOrigins,
     const BaseCelestialBody& loser,
-    const FieldRanks& loserRanks,
+    const FieldOrigins& loserOrigins,
     const ValuePrecedence precedence
 )
 {
     mergeIdentityInto(winner.identity, loser.identity);
     takeHigherPrecedence(
-        winner.displayName, winnerRanks.displayName, loser.displayName, loserRanks.displayName, precedence
+        winner.displayName, winnerOrigins.displayName, loser.displayName, loserOrigins.displayName, precedence
     );
 
     const skygate::core::EquatorialCoordinate* loserFixed = loser.fixedEquatorialCoordinate();
@@ -714,15 +737,15 @@ void mergeDistantInPlace(
         const bool winnerHasFixed = winner.fixedEquatorial.has_value();
         const bool loserOutranks =
             !winnerHasFixed
-            || (precedence == ValuePrecedence::TakeHigherSourceRank && winnerRanks.fixedEquatorial.has_value()
-                && loserRanks.fixedEquatorial.has_value()
-                && *loserRanks.fixedEquatorial > *winnerRanks.fixedEquatorial);
+            || (precedence == ValuePrecedence::TakeHigherOrigin && winnerOrigins.fixedEquatorial.has_value()
+                && loserOrigins.fixedEquatorial.has_value()
+                && outranks(*loserOrigins.fixedEquatorial, *winnerOrigins.fixedEquatorial));
         if (loserOutranks) {
             if (winnerHasFixed && coordinatesConflict(*winner.fixedEquatorial, *loserFixed)) {
                 logFixedCoordinateConflict(loser, winner);
             }
             winner.fixedEquatorial = *loserFixed;
-            winnerRanks.fixedEquatorial = loserRanks.fixedEquatorial;
+            winnerOrigins.fixedEquatorial = loserOrigins.fixedEquatorial;
         } else if (winnerHasFixed && coordinatesConflict(*winner.fixedEquatorial, *loserFixed)) {
             logFixedCoordinateConflict(winner, loser);
         }
@@ -734,26 +757,36 @@ void mergeDistantInPlace(
     }
     if (!winner.deepSkyObject.has_value()) {
         winner.deepSkyObject = *loserDeepSky;
-        winnerRanks.deepSkyKind = loserRanks.deepSkyKind;
-        winnerRanks.majorAxis = loserRanks.majorAxis;
-        winnerRanks.minorAxis = loserRanks.minorAxis;
-        winnerRanks.positionAngle = loserRanks.positionAngle;
+        winnerOrigins.deepSkyKind = loserOrigins.deepSkyKind;
+        winnerOrigins.majorAxis = loserOrigins.majorAxis;
+        winnerOrigins.minorAxis = loserOrigins.minorAxis;
+        winnerOrigins.positionAngle = loserOrigins.positionAngle;
         return;
     }
 
     DeepSkyObjectInfo& merged = *winner.deepSkyObject;
-    takeHigherPrecedence(merged.kind, winnerRanks.deepSkyKind, loserDeepSky->kind, loserRanks.deepSkyKind, precedence);
     takeHigherPrecedence(
-        merged.majorAxisArcmin, winnerRanks.majorAxis, loserDeepSky->majorAxisArcmin, loserRanks.majorAxis, precedence
+        merged.kind, winnerOrigins.deepSkyKind, loserDeepSky->kind, loserOrigins.deepSkyKind, precedence
     );
     takeHigherPrecedence(
-        merged.minorAxisArcmin, winnerRanks.minorAxis, loserDeepSky->minorAxisArcmin, loserRanks.minorAxis, precedence
+        merged.majorAxisArcmin,
+        winnerOrigins.majorAxis,
+        loserDeepSky->majorAxisArcmin,
+        loserOrigins.majorAxis,
+        precedence
+    );
+    takeHigherPrecedence(
+        merged.minorAxisArcmin,
+        winnerOrigins.minorAxis,
+        loserDeepSky->minorAxisArcmin,
+        loserOrigins.minorAxis,
+        precedence
     );
     takeHigherPrecedence(
         merged.positionAngleDeg,
-        winnerRanks.positionAngle,
+        winnerOrigins.positionAngle,
         loserDeepSky->positionAngleDeg,
-        loserRanks.positionAngle,
+        loserOrigins.positionAngle,
         precedence
     );
     mergeAliasesInto(merged.aliases, loserDeepSky->aliases);
@@ -761,18 +794,18 @@ void mergeDistantInPlace(
 
 void mergeSurvivorInPlace(
     BaseCelestialBody& winner,
-    FieldRanks& winnerRanks,
+    FieldOrigins& winnerOrigins,
     const BaseCelestialBody& loser,
-    const FieldRanks& loserRanks,
+    const FieldOrigins& loserOrigins,
     const ValuePrecedence precedence
 )
 {
     retainCanonicalEquivalences(winner.identity, winner.id, loser);
     if (winner.kind == BaseCelestialBody::Kind::DeepSkyObject) {
-        mergeDistantInPlace(static_cast<DistantCelestialBody&>(winner), winnerRanks, loser, loserRanks, precedence);
+        mergeDistantInPlace(static_cast<DistantCelestialBody&>(winner), winnerOrigins, loser, loserOrigins, precedence);
         return;
     }
-    mergeOwnGalaxyInPlace(static_cast<OwnGalaxyCelestialBody&>(winner), winnerRanks, loser, loserRanks, precedence);
+    mergeOwnGalaxyInPlace(static_cast<OwnGalaxyCelestialBody&>(winner), winnerOrigins, loser, loserOrigins, precedence);
 }
 
 void logIncompatibleKind(const BaseCelestialBody& existing, const BaseCelestialBody& incoming)
@@ -826,20 +859,43 @@ std::vector<std::string> collectContributors(
     return contributors;
 }
 
+// Earliest row that supplied any part of a survivor's coordinate model. Model
+// fields of absorbed survivors of one source merge in that row order, so the
+// first row that supplied a model also decides which coherent model survives;
+// a survivor without a model orders after every model a row supplied.
+[[nodiscard]] std::size_t earliestModelRow(const FieldOrigins& origins)
+{
+    std::size_t first = std::numeric_limits<std::size_t>::max();
+    const std::optional<ValueOrigin>* const modelFields[] = {
+        &origins.fixedEquatorial,
+        &origins.properMotionRightAscension,
+        &origins.properMotionDeclination,
+        &origins.stellarParallax,
+        &origins.radialVelocity,
+        &origins.astrometryValidityRange,
+    };
+    for (const std::optional<ValueOrigin>* field : modelFields) {
+        if (field->has_value()) {
+            first = std::min(first, (*field)->rowOrdinal);
+        }
+    }
+    return first;
+}
+
 // Merges every absorbed survivor into `winner` in configured source precedence
-// order, highest precedence first. Each value is filled or replaced by the
-// absorbed survivor that actually supplied it with the highest source rank, so
-// a value a lower-precedence source supplied through an intermediate survivor
-// is not promoted to that survivor's rank. A survivor of the winner's own
-// source only completes the winner, exactly like a later record of that source.
-// Absorbed survivors of one source keep their accumulator order, which is the
-// documented within-source row order: the first row of a source is
-// authoritative and its later rows only fill it. Each merge diagnoses the
-// coordinate or metadata conflicts the winner overrides.
+// order, highest precedence first, and within one source in the order the rows
+// supplied their coordinate models. Each value is filled or replaced by the
+// absorbed survivor whose value origin outranks the origin the winner carries:
+// the source that actually supplied the value with the highest rank, or, when
+// both values belong to one source, the earlier row of that source, because the
+// first row of a source is authoritative and its later rows only fill it. So a
+// value a lower-precedence source supplied through an intermediate survivor is
+// never promoted to that survivor's rank, and a bridge across survivors of one
+// source never outranks the rows that supplied their metadata. Each merge
+// diagnoses the coordinate or metadata conflicts the winner overrides.
 void absorbSurvivors(
     BaseCelestialBody& winner,
-    FieldRanks& winnerRanks,
-    const std::string_view winnerSourceId,
+    FieldOrigins& winnerOrigins,
     const MergeAccumulator& accumulator,
     std::vector<std::size_t> positions,
     const SourcePrecedence& sourcePrecedence
@@ -849,62 +905,70 @@ void absorbSurvivors(
         positions.begin(),
         positions.end(),
         [&accumulator, &sourcePrecedence](const std::size_t lhs, const std::size_t rhs) {
-            return sourcePrecedence.outranks(accumulator.sourceIds[lhs], accumulator.sourceIds[rhs]);
+            if (sourcePrecedence.outranks(accumulator.sourceIds[lhs], accumulator.sourceIds[rhs])) {
+                return true;
+            }
+            if (sourcePrecedence.outranks(accumulator.sourceIds[rhs], accumulator.sourceIds[lhs])) {
+                return false;
+            }
+            return earliestModelRow(accumulator.fieldOrigins[lhs]) < earliestModelRow(accumulator.fieldOrigins[rhs]);
         }
     );
 
     for (const std::size_t position : positions) {
-        const bool sameSource = std::string_view{accumulator.sourceIds[position]} == winnerSourceId;
         mergeSurvivorInPlace(
             winner,
-            winnerRanks,
+            winnerOrigins,
             accumulator.at(position),
-            accumulator.fieldRanks[position],
-            sameSource ? ValuePrecedence::KeepWinnerValue : ValuePrecedence::TakeHigherSourceRank
+            accumulator.fieldOrigins[position],
+            ValuePrecedence::TakeHigherOrigin
         );
     }
 }
 
 // Appends `incoming` as the survivor of every absorbed position. The incoming
-// record wins because it is the later record that establishes the shared
-// authoritative identity or replaces an earlier source's survivor. Absorbed
-// positions are vacated and removed from the index before the winner is
-// registered, so later rows resolve to the winner and never to a vacated body.
-// Absorption retains each absorbed body's canonical id and canonical
-// equivalences on the winner, so the earlier keys keep resolving to the
-// survivor. A value the incoming record does not supply follows the donor
-// precedence of the absorbed survivors that do, and the contributor id order
-// follows configured source precedence rather than accumulator position order.
+// record supplies the public canonical id because it is the later record that
+// establishes the shared authoritative identity or replaces an earlier
+// source's survivor; its values keep their own origins and only supply fields
+// the absorbed survivors do not. Absorbed positions are vacated and removed
+// from the index before the winner is registered, so later rows resolve to the
+// winner and never to a vacated body. Absorption retains each absorbed body's
+// canonical id and canonical equivalences on the winner, so the earlier keys
+// keep resolving to the survivor. A value the incoming record does not supply
+// follows the origin precedence of the absorbed survivors that do, and the
+// contributor id order follows configured source precedence rather than
+// accumulator position order.
 std::size_t absorbSurvivorsAndAppend(
     MergeAccumulator& accumulator,
     CatalogIdentityIndex& index,
     const BaseCelestialBody& incoming,
+    FieldOrigins incomingOrigins,
     const std::vector<std::size_t>& absorbedPositions,
     std::string sourceId,
     const SourcePrecedence& sourcePrecedence
 )
 {
     std::vector<std::string> priorContributors = collectContributors(accumulator, absorbedPositions, sourcePrecedence);
-    FieldRanks winnerRanks = fieldRanksOf(incoming, sourcePrecedence.rankOf(sourceId));
+    FieldOrigins winnerOrigins = std::move(incomingOrigins);
     std::size_t position = 0;
     if (incoming.kind == BaseCelestialBody::Kind::DeepSkyObject) {
         DistantCelestialBody winner = CelestialBodyCatalog::copyDistantBody(incoming);
-        absorbSurvivors(winner, winnerRanks, sourceId, accumulator, absorbedPositions, sourcePrecedence);
+        absorbSurvivors(winner, winnerOrigins, accumulator, absorbedPositions, sourcePrecedence);
         for (const std::size_t absorbed : absorbedPositions) {
             accumulator.vacate(absorbed);
             index.remove(absorbed);
         }
         position =
-            accumulator.append(winner, std::move(sourceId), std::move(winnerRanks), std::move(priorContributors));
+            accumulator.append(winner, std::move(sourceId), std::move(winnerOrigins), std::move(priorContributors));
     } else {
         OwnGalaxyCelestialBody winner = CelestialBodyCatalog::copyOwnGalaxyBody(incoming);
-        absorbSurvivors(winner, winnerRanks, sourceId, accumulator, absorbedPositions, sourcePrecedence);
+        absorbSurvivors(winner, winnerOrigins, accumulator, absorbedPositions, sourcePrecedence);
         for (const std::size_t absorbed : absorbedPositions) {
             accumulator.vacate(absorbed);
             index.remove(absorbed);
         }
         position =
-            accumulator.append(winner, std::move(sourceId), std::move(winnerRanks), std::move(priorContributors));
+            accumulator.append(winner, std::move(sourceId), std::move(winnerOrigins), std::move(priorContributors));
     }
     index.add(accumulator.at(position), position);
     return position;
@@ -962,13 +1026,15 @@ evaluateMatch(const MergeAccumulator& accumulator, const CatalogIdentityIndex& i
 // Appends `body` into `accumulator`, merging into the first matching survivor
 // (earlier-wins) within a single source. Source-local generated ids are
 // qualified with `sourceId` before resolution so equal counters from other
-// sources never match.
+// sources never match. `rowOrdinal` is the position of the record in the
+// source, so every value it supplies keeps its true row origin.
 std::size_t appendDeduped(
     MergeAccumulator& accumulator,
     CatalogIdentityIndex& index,
     const BaseCelestialBody& incoming,
     const std::string_view sourceId,
-    const SourcePrecedence& sourcePrecedence
+    const SourcePrecedence& sourcePrecedence,
+    const std::size_t rowOrdinal
 )
 {
     const SourceScopedBody scoped{incoming, sourceId};
@@ -978,9 +1044,9 @@ std::size_t appendDeduped(
     if (decision.action == MatchDecision::Action::Merge) {
         mergeSurvivorInPlace(
             accumulator.at(decision.matchIndex),
-            accumulator.fieldRanks[decision.matchIndex],
+            accumulator.fieldOrigins[decision.matchIndex],
             body,
-            fieldRanksOf(body, sourceRank),
+            fieldOriginsOf(body, sourceRank, rowOrdinal),
             ValuePrecedence::KeepWinnerValue
         );
         // Registers the merged record's keys as well, so a later record with
@@ -991,11 +1057,18 @@ std::size_t appendDeduped(
 
     if (decision.action == MatchDecision::Action::Bridge) {
         return absorbSurvivorsAndAppend(
-            accumulator, index, body, decision.bridgeCandidates, std::string(sourceId), sourcePrecedence
+            accumulator,
+            index,
+            body,
+            fieldOriginsOf(body, sourceRank, rowOrdinal),
+            decision.bridgeCandidates,
+            std::string(sourceId),
+            sourcePrecedence
         );
     }
 
-    const std::size_t position = accumulator.append(body, std::string(sourceId), fieldRanksOf(body, sourceRank));
+    const std::size_t position =
+        accumulator.append(body, std::string(sourceId), fieldOriginsOf(body, sourceRank, rowOrdinal));
     index.add(body, position);
     return position;
 }
@@ -1035,7 +1108,8 @@ void appendGapFillBody(
     CatalogIdentityIndex& index,
     const BaseCelestialBody& body,
     const std::string_view sourceId,
-    const SourcePrecedence& sourcePrecedence
+    const SourcePrecedence& sourcePrecedence,
+    const std::size_t rowOrdinal
 )
 {
     const MatchDecision decision = evaluateMatch(accumulator, index, body);
@@ -1043,8 +1117,9 @@ void appendGapFillBody(
         return;
     }
 
-    const std::size_t position =
-        accumulator.append(body, std::string(sourceId), fieldRanksOf(body, sourcePrecedence.rankOf(sourceId)));
+    const std::size_t position = accumulator.append(
+        body, std::string(sourceId), fieldOriginsOf(body, sourcePrecedence.rankOf(sourceId), rowOrdinal)
+    );
     index.add(accumulator.at(position), position);
 }
 
@@ -1188,6 +1263,10 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
     bool augmentCoreEnabled = false;
     std::string augmentCoreSourceId;
     bool hasStar = false;
+    // Monotonically increasing position of every processed record. It stays
+    // true across sources, and within one source it is the row order that
+    // resolves equal-rank value origins.
+    std::size_t rowOrdinal = 0;
 
     for (const CatalogCompositionSourceEntry& source : request.sources) {
         if (!source.enabled || source.catalog == nullptr) {
@@ -1216,7 +1295,9 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
                     hasStar = true;
                 }
                 const SourceScopedBody scoped{*body, source.sourceId};
-                appendGapFillBody(accumulator, activeIndex, scoped.body(), source.sourceId, sourcePrecedence);
+                appendGapFillBody(
+                    accumulator, activeIndex, scoped.body(), source.sourceId, sourcePrecedence, rowOrdinal++
+                );
             }
             continue;
         }
@@ -1230,13 +1311,12 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
             if (body->kind == BaseCelestialBody::Kind::Star) {
                 hasStar = true;
             }
-            appendDeduped(sourceBodies, sourceIndex, *body, source.sourceId, sourcePrecedence);
+            appendDeduped(sourceBodies, sourceIndex, *body, source.sourceId, sourcePrecedence, rowOrdinal++);
         }
 
         // Positions from this pass start here, so a match at or above this
         // boundary belongs to the source currently being merged.
         const std::size_t passStartPosition = accumulator.sourceIds.size();
-        const std::size_t sourceRank = sourcePrecedence.rankOf(source.sourceId);
         for (std::size_t position = 0; position < sourceBodies.sourceIds.size(); ++position) {
             if (!sourceBodies.active[position]) {
                 continue;
@@ -1251,9 +1331,9 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
                     // same pass only fill its missing metadata.
                     mergeSurvivorInPlace(
                         accumulator.at(decision.matchIndex),
-                        accumulator.fieldRanks[decision.matchIndex],
+                        accumulator.fieldOrigins[decision.matchIndex],
                         body,
-                        fieldRanksOf(body, sourceRank),
+                        sourceBodies.fieldOrigins[position],
                         ValuePrecedence::KeepWinnerValue
                     );
                     activeIndex.add(body, decision.matchIndex);
@@ -1263,27 +1343,41 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
                 // A later source wins over an earlier source's survivor and
                 // absorbs its non-conflicting identity and metadata.
                 static_cast<void>(absorbSurvivorsAndAppend(
-                    accumulator, activeIndex, body, {decision.matchIndex}, source.sourceId, sourcePrecedence
+                    accumulator,
+                    activeIndex,
+                    body,
+                    sourceBodies.fieldOrigins[position],
+                    {decision.matchIndex},
+                    source.sourceId,
+                    sourcePrecedence
                 ));
                 continue;
             }
 
             if (decision.action == MatchDecision::Action::Bridge) {
                 static_cast<void>(absorbSurvivorsAndAppend(
-                    accumulator, activeIndex, body, decision.bridgeCandidates, source.sourceId, sourcePrecedence
+                    accumulator,
+                    activeIndex,
+                    body,
+                    sourceBodies.fieldOrigins[position],
+                    decision.bridgeCandidates,
+                    source.sourceId,
+                    sourcePrecedence
                 ));
                 continue;
             }
 
             const std::size_t appendedPosition =
-                accumulator.append(body, source.sourceId, fieldRanksOf(body, sourceRank));
+                accumulator.append(body, source.sourceId, sourceBodies.fieldOrigins[position]);
             activeIndex.add(accumulator.at(appendedPosition), appendedPosition);
         }
     }
 
     if (augmentCoreEnabled && !hasStar) {
         for (const OwnGalaxyCelestialBody& brightStar : CoreBodyCatalogAugmenter::bundledBrightStars()) {
-            appendGapFillBody(accumulator, activeIndex, brightStar, augmentCoreSourceId, sourcePrecedence);
+            appendGapFillBody(
+                accumulator, activeIndex, brightStar, augmentCoreSourceId, sourcePrecedence, rowOrdinal++
+            );
         }
     }
 

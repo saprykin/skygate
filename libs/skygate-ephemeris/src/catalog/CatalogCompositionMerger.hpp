@@ -45,29 +45,31 @@ namespace skygate::ephemeris {
 // A record whose authoritative identifiers (external identifiers and
 // recognized deep-sky designations) match several survivors of the same kind
 // bridges them: the bridging record becomes the single survivor and absorbs
-// every matched survivor's identity, metadata, and contributors. Matched
-// survivors of an incompatible kind stay distinct with a diagnostic, as do
-// weak deep-sky alias matches that contradict recognized designations or match
-// several survivors.
+// every matched survivor's identity, metadata, and contributors. The bridging
+// record supplies the public canonical id, while the metadata of the earlier
+// rows stays authoritative: identity bridging decides which records are one
+// object, not which row outranks which. Matched survivors of an incompatible
+// kind stay distinct with a diagnostic, as do weak deep-sky alias matches that
+// contradict recognized designations or match several survivors.
 //
 // Absorption follows configured source precedence, never accumulator
 // insertion order, and it applies per field: every enriched field keeps the
-// source rank of the source that actually supplied its value, so an
+// origin of the source and row that actually supplied its value, so an
 // intermediate survivor never promotes a value it inherited to its own,
 // higher rank. A value is therefore taken from the highest-precedence source
 // that supplied it, whether the winner supplied it itself or absorbed it, and
-// only that value replaces a lower-precedence one. A field of equal
-// precedence keeps the value it already has, absent fields stay absent, and a
-// valid zero is a value like any other. A survivor's contributor source ids
-// are listed in that same descending precedence order: the winner's source
-// first, then each remaining contributor highest first, with every
-// contributing source listed once. Equal source precedence (several absorbed
-// survivors of one source) keeps that source's documented row order, where the
-// first row of a source is authoritative and its later rows only fill it; a
-// record of the currently merged source that resolves to a survivor this same
-// source pass already produced only fills that survivor's missing fields, so
-// the merged source's field origins stay the ones it inherited. Accumulator
-// positions are not source ranks: replacement and bridge absorption vacate
+// only that value replaces a lower-precedence one. Values supplied by one
+// source resolve by row order: the earliest row that supplied a field keeps
+// it, so a bridge across survivors of one source cannot outrank the rows that
+// supplied their metadata and later rows only fill missing fields. Absent
+// fields stay absent and a valid zero is a value like any other. A survivor's
+// contributor source ids are listed in that same descending precedence order:
+// the winner's source first, then each remaining contributor highest first,
+// with every contributing source listed once. A record of the currently
+// merged source that resolves to a survivor this same source pass already
+// produced only fills that survivor's missing fields, so the merged source's
+// field origins stay the ones it inherited. Accumulator positions are not
+// source ranks and not row order: replacement and bridge absorption vacate
 // positions and append the winner at a new one, so position order stops
 // matching precedence after the first replacement.
 //
@@ -96,7 +98,8 @@ namespace skygate::ephemeris {
 //
 // Coordinates are merged as one coherent model per survivor. The astrometry
 // reference position and reference epoch are authoritative, and the fixed
-// position of the highest-precedence source that supplies one wins. A losing
+// position whose value origin outranks the others wins; fixed positions of one
+// source resolve by row order like every other value. A losing
 // fixed position therefore fills a missing winner position and replaces a
 // position the winner only inherited from a lower-precedence source, and it
 // does either only when it agrees with the surviving model, because a fixed
