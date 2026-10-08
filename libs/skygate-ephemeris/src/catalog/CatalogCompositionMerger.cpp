@@ -489,23 +489,45 @@ void logRejectedFixedCoordinates(const BaseCelestialBody& winner, const BaseCele
     qCWarning(skygateCatalogCompositionLog).noquote() << message;
 }
 
-// How a merge treats a value that both the winner and the loser supply. A
-// record of the survivor's own source only completes it, because within one
-// source the first record of an identity is authoritative and its later
-// records fill its missing values. An absorbed survivor offers its values by
-// origin precedence: a value the winner inherited from a lower-ranked source,
-// or from a later row of an equal-ranked one, is replaced by the origin that
-// actually supplied it.
+// How a merge treats a value that both the winner and the loser supply. The
+// per-source dedup pass keeps the winner's value, because it processes rows in
+// input order and can only merge a record into a survivor of an earlier row.
+// An absorbed survivor offers its values by full origin precedence: a value
+// the winner inherited from a lower-ranked source, or from a later row of an
+// equal-ranked one, is replaced by the origin that actually supplied it. A
+// record of the current source that resolves to a survivor this same pass
+// already produced keeps inherited values and resolves a value both records
+// supply from the current source by the earlier supplying row, because bridge
+// absorption can reorder survivors relative to row order.
 enum class ValuePrecedence {
     KeepWinnerValue,
-    TakeHigherOrigin
+    TakeHigherOrigin,
+    TakeEarlierSameSourceRow
 };
 
-// Adopts the loser's value when the winner carries none, or when the loser's
-// value origin outranks the origin the winner currently carries: a
-// higher-precedence source, or the earlier row of the same source, because
-// equal source ranks resolve by row order. A merge of records of one source
-// never replaces a value the survivor already carries.
+// True when a merge adopts the loser's value for a field the winner already
+// supplies. KeepWinnerValue never replaces the winner's value. TakeHigherOrigin
+// adopts the value whose recorded origin outranks the winner's, across sources
+// and rows. TakeEarlierSameSourceRow keeps a value the winner inherited from
+// another source and adopts the value supplied by the earlier row when both
+// values come from the same source, which every source rank identifies
+// uniquely.
+[[nodiscard]] bool
+loserValueWins(const ValueOrigin& loserOrigin, const ValueOrigin& winnerOrigin, const ValuePrecedence precedence)
+{
+    switch (precedence) {
+    case ValuePrecedence::KeepWinnerValue:
+        return false;
+    case ValuePrecedence::TakeHigherOrigin:
+        return outranks(loserOrigin, winnerOrigin);
+    case ValuePrecedence::TakeEarlierSameSourceRow:
+        return loserOrigin.sourceRank == winnerOrigin.sourceRank && outranks(loserOrigin, winnerOrigin);
+    }
+    return false;
+}
+
+// Adopts the loser's value when the winner carries none, or when the active
+// precedence mode lets the loser's recorded origin win.
 template <typename T>
 void takeHigherPrecedence(
     std::optional<T>& winnerValue,
@@ -520,8 +542,7 @@ void takeHigherPrecedence(
     }
     Q_ASSERT(!winnerValue.has_value() || winnerOrigin.has_value());
     Q_ASSERT(!loserValue.has_value() || loserOrigin.has_value());
-    if (winnerValue.has_value()
-        && (precedence == ValuePrecedence::KeepWinnerValue || !outranks(*loserOrigin, *winnerOrigin))) {
+    if (winnerValue.has_value() && !loserValueWins(*loserOrigin, *winnerOrigin, precedence)) {
         return;
     }
 
@@ -542,8 +563,7 @@ void takeHigherPrecedence(
     }
     Q_ASSERT(winnerValue.empty() || winnerOrigin.has_value());
     Q_ASSERT(loserValue.empty() || loserOrigin.has_value());
-    if (!winnerValue.empty()
-        && (precedence == ValuePrecedence::KeepWinnerValue || !outranks(*loserOrigin, *winnerOrigin))) {
+    if (!winnerValue.empty() && !loserValueWins(*loserOrigin, *winnerOrigin, precedence)) {
         return;
     }
 
@@ -566,8 +586,7 @@ void takeHigherPrecedence(
     }
     Q_ASSERT(winnerValue == DeepSkyObjectInfo::Kind::Unknown || winnerOrigin.has_value());
     Q_ASSERT(loserValue == DeepSkyObjectInfo::Kind::Unknown || loserOrigin.has_value());
-    if (winnerValue != DeepSkyObjectInfo::Kind::Unknown
-        && (precedence == ValuePrecedence::KeepWinnerValue || !outranks(*loserOrigin, *winnerOrigin))) {
+    if (winnerValue != DeepSkyObjectInfo::Kind::Unknown && !loserValueWins(*loserOrigin, *winnerOrigin, precedence)) {
         return;
     }
 
@@ -598,9 +617,8 @@ void mergeFixedEquatorialInPlace(
     const bool winnerHasFixed = winner.fixedEquatorial.has_value();
     const bool loserOutranks =
         !winnerHasFixed
-        || (precedence == ValuePrecedence::TakeHigherOrigin && winnerOrigins.fixedEquatorial.has_value()
-            && loserOrigins.fixedEquatorial.has_value()
-            && outranks(*loserOrigins.fixedEquatorial, *winnerOrigins.fixedEquatorial));
+        || (winnerOrigins.fixedEquatorial.has_value() && loserOrigins.fixedEquatorial.has_value()
+            && loserValueWins(*loserOrigins.fixedEquatorial, *winnerOrigins.fixedEquatorial, precedence));
     if (!loserOutranks) {
         if (winnerHasFixed && coordinatesConflict(*winner.fixedEquatorial, *loserFixed)) {
             logFixedCoordinateConflict(winner, loser);
@@ -737,9 +755,8 @@ void mergeDistantInPlace(
         const bool winnerHasFixed = winner.fixedEquatorial.has_value();
         const bool loserOutranks =
             !winnerHasFixed
-            || (precedence == ValuePrecedence::TakeHigherOrigin && winnerOrigins.fixedEquatorial.has_value()
-                && loserOrigins.fixedEquatorial.has_value()
-                && outranks(*loserOrigins.fixedEquatorial, *winnerOrigins.fixedEquatorial));
+            || (winnerOrigins.fixedEquatorial.has_value() && loserOrigins.fixedEquatorial.has_value()
+                && loserValueWins(*loserOrigins.fixedEquatorial, *winnerOrigins.fixedEquatorial, precedence));
         if (loserOutranks) {
             if (winnerHasFixed && coordinatesConflict(*winner.fixedEquatorial, *loserFixed)) {
                 logFixedCoordinateConflict(loser, winner);
@@ -1326,15 +1343,18 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
             const MatchDecision decision = evaluateMatch(accumulator, activeIndex, body);
             if (decision.action == MatchDecision::Action::Merge) {
                 if (decision.matchIndex >= passStartPosition) {
-                    // This pass already produced the survivor: the first record
-                    // of a source is authoritative and later records of the
-                    // same pass only fill its missing metadata.
+                    // Both records belong to the current source: fill the
+                    // survivor's missing values, keep the values it inherited
+                    // from other sources, and resolve a value both records
+                    // supply from this source by the earlier supplying row,
+                    // because a bridge can append a survivor behind rows it
+                    // outranks.
                     mergeSurvivorInPlace(
                         accumulator.at(decision.matchIndex),
                         accumulator.fieldOrigins[decision.matchIndex],
                         body,
                         sourceBodies.fieldOrigins[position],
-                        ValuePrecedence::KeepWinnerValue
+                        ValuePrecedence::TakeEarlierSameSourceRow
                     );
                     activeIndex.add(body, decision.matchIndex);
                     continue;

@@ -14,17 +14,19 @@ namespace skygate::ephemeris {
 // source's survivor and absorbs the earlier body's non-conflicting
 // identifiers, aliases, and metadata. A record of the currently merged source
 // that resolves to a survivor this same source pass already produced fills
-// that survivor's missing metadata instead of replacing it. AugmentCore
-// sources contribute only non-deep-sky bodies as a gap-fill and enable the
-// bundled bright-star fallback when no star is present; DeepSkyFallback
-// sources contribute only deep-sky bodies as a gap-fill. Gap-fill sources
-// never replace an earlier survivor, so a configured source's body always
-// keeps precedence over bundled fallback data. Every policy shares the same
-// identity decision: a gap-fill body is only skipped when its identity
-// resolves to an existing survivor through the same kind, designation, and
-// ambiguity checks as a replacing source, and a contradicted or ambiguous
-// weak alias match keeps the body as an independent object with the normal
-// diagnostic.
+// that survivor's missing fields, keeps the values it inherited from other
+// sources, and resolves a value both records supply from this source by the
+// earlier supplying row, because bridge absorption can move that record behind
+// rows it outranks. AugmentCore sources contribute only non-deep-sky bodies
+// as a gap-fill and enable the bundled bright-star fallback when no star is
+// present; DeepSkyFallback sources contribute only deep-sky bodies as a
+// gap-fill. Gap-fill sources never replace an earlier survivor, so a
+// configured source's body always keeps precedence over bundled fallback
+// data. Every policy shares the same identity decision: a gap-fill body is
+// only skipped when its identity resolves to an existing survivor through the
+// same kind, designation, and ambiguity checks as a replacing source, and a
+// contradicted or ambiguous weak alias match keeps the body as an independent
+// object with the normal diagnostic.
 //
 // The identity-to-survivor index stays current while the collection is merged:
 // a replacement vacates the earlier survivor's index entries and registers the
@@ -67,11 +69,13 @@ namespace skygate::ephemeris {
 // the winner's source first, then each remaining contributor highest first,
 // with every contributing source listed once. A record of the currently
 // merged source that resolves to a survivor this same source pass already
-// produced only fills that survivor's missing fields, so the merged source's
-// field origins stay the ones it inherited. Accumulator positions are not
-// source ranks and not row order: replacement and bridge absorption vacate
-// positions and append the winner at a new one, so position order stops
-// matching precedence after the first replacement.
+// produced follows the same rule: it fills missing fields, keeps values the
+// survivor inherited from other sources, and cannot replace a value supplied
+// by an earlier row of this source, even when a bridge appends that survivor
+// later. Accumulator positions are not source ranks and not row order:
+// replacement and bridge absorption vacate positions and append the winner at
+// a new one, so position order stops matching precedence after the first
+// replacement.
 //
 // Field origins are part of one merge run and are not carried by a body: an
 // already composed snapshot enters a later composition as one source, so every
