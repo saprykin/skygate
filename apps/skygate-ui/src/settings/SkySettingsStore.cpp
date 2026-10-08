@@ -1098,17 +1098,18 @@ SkySettingsStore::CatalogCollectionCacheLoadResult SkySettingsStore::loadCatalog
             }
             return result;
         }
-        if (hasCatalogCollectionGenerationGroups(settings)) {
-            if (hasFlatCatalogCollectionRecords(settings)) {
-                // An interrupted first migration left the flat records
-                // intact, so the collection they describe is still readable;
-                // the staged generation data is ignored and reported.
-                result.diagnostic = QStringLiteral(
-                    "Ignoring generation-format catalog collection data without a committed manifest; the flat "
-                    "records remain readable"
-                );
-                return result;
-            }
+        const bool stagedGenerationGroupsExist = hasCatalogCollectionGenerationGroups(settings);
+        if (stagedGenerationGroupsExist && hasFlatCatalogCollectionRecords(settings)) {
+            // An interrupted first migration staged generation records without
+            // publishing a manifest, but the flat records it would replace are
+            // still intact. Those records already describe a committed
+            // collection, so they stay the readable configuration while the
+            // staged generation data is ignored and reported.
+            result.diagnostic = QStringLiteral(
+                "Ignoring generation-format catalog collection data without a committed manifest; the flat "
+                "records remain readable"
+            );
+        } else if (stagedGenerationGroupsExist) {
             // The marker outlived the migration, but the flat records it
             // describes were replaced by generation records. Reading the flat
             // group would report an empty collection with the stale marker's
@@ -1138,6 +1139,13 @@ SkySettingsStore::CatalogCollectionCacheLoadResult SkySettingsStore::loadCatalog
     settings.beginGroup(recordsGroup);
     const QStringList groups = settings.childGroups();
     for (const QString& group : groups) {
+        bool isGenerationGroup = false;
+        group.toULongLong(&isGenerationGroup);
+        if (isGenerationGroup) {
+            // Staged generation records live in numeric groups; only the flat
+            // sidecar-named groups under the current group are source records.
+            continue;
+        }
         CatalogSourceCacheRecord record = loadCatalogSourceRecord(settings, group, result.unreadablePayloadInstanceIds);
         if (!record.instanceId.isEmpty()) {
             records.push_back(std::move(record));

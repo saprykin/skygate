@@ -168,8 +168,8 @@ public:
         State state = State::Absent;
         Failure failure = Failure::None;
         CatalogCollectionCacheSnapshot snapshot;
-        // Human-readable context for an unusable result, or for uncommitted
-        // generation data ignored as first use; empty for a clean result.
+        // Human-readable context for an unusable result or for uncommitted
+        // generation data that was ignored; empty for a clean result.
         QString diagnostic;
         // Records that reference a payload sidecar which is missing or
         // unreadable. A deliberately evicted payload keeps no reference and is

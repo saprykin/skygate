@@ -712,6 +712,7 @@ private slots:
     void collectionLifecycleKeepsSnapshotAndIdentitiesAcrossRestart();
     void legacySourcesStayRetiredAfterMigratedCollectionIsEmptied();
     void unreadableCommittedCollectionKeepsActiveCollectionAndReportsFailure();
+    void interruptedGenerationUpgradeRestoresFlatSourcesAcrossRestarts();
     void missingConfigurationKeepsFirstUseDefaults();
     void removingSoleSourceLeavesEmptyCollection();
     void savedEmptyCollectionRestoresEmptyAcrossRestarts();
@@ -5019,6 +5020,117 @@ void SkyCatalogManagerTests::legacySourcesStayRetiredAfterMigratedCollectionIsEm
     QVERIFY(!catalogContainsDisplayName(emptyCollectionManager.starCatalog(), QStringLiteral("Legacy Star")));
     QVERIFY(!emptyCollectionManager.sourceTitles().values().contains(QStringLiteral("Legacy Custom")));
     QVERIFY(!emptyCollectionManager.sourceTitles().values().contains(QStringLiteral("Legacy OpenNGC")));
+    QVERIFY(store.loadCatalogCache().has_value());
+}
+
+void SkyCatalogManagerTests::interruptedGenerationUpgradeRestoresFlatSourcesAcrossRestarts()
+{
+    SkySettingsStore store;
+    // The retired two-slot cache stays readable on disk, so a restore that
+    // migrated it instead of the flat collection would return its source.
+    QVERIFY(store.saveCatalogCache(makeCacheSnapshot()));
+
+    const QString directory = m_settings.filePath(QStringLiteral("catalog-collection-cache"));
+    QVERIFY(QDir().mkpath(directory));
+
+    const QString firstPayloadPath = QDir(directory).filePath(QStringLiteral("flat-stars.txt"));
+    const QString secondPayloadPath = QDir(directory).filePath(QStringLiteral("flat-deep-sky.txt"));
+    QVERIFY(writeFile(
+        firstPayloadPath,
+        skygate::ui::tests::sampleHygCsvPayload({.id = 909101, .hip = 909101, .properName = "Flat Star", .mag = "1.0"})
+    ));
+    QVERIFY(writeFile(secondPayloadPath, skygate::ui::tests::sampleCompactOpenNgcCsvPayload()));
+
+    // A flat collection written before generations were published: its
+    // identities, order, and options are the committed configuration.
+    {
+        QSettings settings;
+        settings.setValue(QStringLiteral("skyContext/catalogCollectionVersion"), 2);
+        settings.setValue(QStringLiteral("skyContext/catalogBinarySchemaVersion"), 7);
+        settings.beginGroup(QStringLiteral("catalogSources/catalog-source-flat-stars"));
+        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("flat:stars"));
+        settings.setValue(QStringLiteral("descriptorId"), QStringLiteral("flat_stars"));
+        settings.setValue(QStringLiteral("title"), QStringLiteral("Flat Stars"));
+        settings.setValue(QStringLiteral("version"), QStringLiteral("v1"));
+        settings.setValue(QStringLiteral("urls"), QStringList{QStringLiteral("https://example.test/flat-stars.csv")});
+        settings.setValue(
+            QStringLiteral("policy"), static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::Merge)
+        );
+        settings.setValue(QStringLiteral("enabled"), true);
+        settings.setValue(QStringLiteral("order"), 0);
+        settings.setValue(QStringLiteral("payloadPath"), firstPayloadPath);
+        settings.endGroup();
+        settings.beginGroup(QStringLiteral("catalogSources/catalog-source-flat-dso"));
+        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("flat:dso"));
+        settings.setValue(QStringLiteral("descriptorId"), QStringLiteral("flat_dso"));
+        settings.setValue(QStringLiteral("title"), QStringLiteral("Flat DSO"));
+        settings.setValue(QStringLiteral("version"), QStringLiteral("v1"));
+        settings.setValue(QStringLiteral("urls"), QStringList{QStringLiteral("https://example.test/flat-dso.csv")});
+        settings.setValue(
+            QStringLiteral("policy"), static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly)
+        );
+        settings.setValue(QStringLiteral("enabled"), true);
+        settings.setValue(QStringLiteral("order"), 1);
+        settings.setValue(QStringLiteral("payloadPath"), secondPayloadPath);
+        settings.endGroup();
+        settings.sync();
+    }
+
+    // An interrupted first upgrade staged a generation record without
+    // publishing a manifest.
+    {
+        QSettings settings;
+        settings.setValue(QStringLiteral("catalogSources/4/recordsStored"), true);
+        settings.beginGroup(QStringLiteral("catalogSources/4/catalog-source-staged"));
+        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("staged:source"));
+        settings.setValue(QStringLiteral("title"), QStringLiteral("Staged Source"));
+        settings.setValue(QStringLiteral("order"), 0);
+        settings.endGroup();
+        settings.sync();
+    }
+
+    // The flat records are the committed configuration, so the manager
+    // restores them instead of the readable two-slot cache and upgrades them
+    // to the current format.
+    {
+        SkyCatalogManager manager(&store);
+        QVERIFY(manager.restoreCatalogCache());
+        QCOMPARE(manager.sourceInstanceIds(), QStringList({QStringLiteral("flat:stars"), QStringLiteral("flat:dso")}));
+        QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Flat Star")));
+        QVERIFY(!manager.sourceTitles().values().contains(QStringLiteral("Custom")));
+    }
+
+    // The upgrade committed a generation with the same identities, options,
+    // and order; the staged record is gone rather than promoted.
+    const auto upgraded = store.loadCatalogCollectionCache();
+    QVERIFY(upgraded.isLoaded());
+    QCOMPARE(
+        upgraded.snapshot.schemaVersion,
+        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
+    );
+    QCOMPARE(upgraded.snapshot.sources.size(), 2);
+    QCOMPARE(upgraded.snapshot.sources[0].instanceId, QStringLiteral("flat:stars"));
+    QCOMPARE(upgraded.snapshot.sources[0].descriptorId, QStringLiteral("flat_stars"));
+    QCOMPARE(upgraded.snapshot.sources[0].urls, QStringList{QStringLiteral("https://example.test/flat-stars.csv")});
+    QCOMPARE(upgraded.snapshot.sources[0].policy, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QVERIFY(upgraded.snapshot.sources[0].enabled);
+    QCOMPARE(upgraded.snapshot.sources[0].order, 0);
+    QCOMPARE(upgraded.snapshot.sources[1].instanceId, QStringLiteral("flat:dso"));
+    QCOMPARE(upgraded.snapshot.sources[1].urls, QStringList{QStringLiteral("https://example.test/flat-dso.csv")});
+    QCOMPARE(upgraded.snapshot.sources[1].policy, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
+    QCOMPARE(upgraded.snapshot.sources[1].order, 1);
+
+    // Two restarts restore the upgraded generation with the same identities
+    // and order; the retired two-slot source never returns.
+    for (int restart = 0; restart < 2; ++restart) {
+        SkyCatalogManager restarted(&store);
+        QVERIFY(restarted.restoreCatalogCache());
+        QCOMPARE(
+            restarted.sourceInstanceIds(), QStringList({QStringLiteral("flat:stars"), QStringLiteral("flat:dso")})
+        );
+        QVERIFY(catalogContainsDisplayName(restarted.starCatalog(), QStringLiteral("Flat Star")));
+        QVERIFY(!restarted.sourceTitles().values().contains(QStringLiteral("Custom")));
+    }
     QVERIFY(store.loadCatalogCache().has_value());
 }
 
