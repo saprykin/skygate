@@ -176,6 +176,7 @@ private slots:
     void clearCatalogSourceCacheEvictsPayloadAndKeepsConfiguration();
     void unreadableSourcePayloadIsReportedDistinctlyFromEviction();
     void legacyFlatCollectionRecordsStillLoad();
+    void interruptedGenerationStagingKeepsFlatCollectionLoaded();
     void emptyLegacyCollectionStillLoadsWithoutGenerationArtifacts();
     void missingManifestWithGenerationRecordsDoesNotLoadEmptyCollection();
     void missingManifestWithGenerationSidecarsLogsManifestLoss();
@@ -742,6 +743,112 @@ void SkySettingsStoreTests::legacyFlatCollectionRecordsStillLoad()
     const QString messages = capture.joinedMessages();
     QVERIFY(!messages.contains(QStringLiteral("Catalog collection manifest is missing")));
     QVERIFY(!messages.contains(QStringLiteral("stale catalog collection version marker")));
+}
+
+void SkySettingsStoreTests::interruptedGenerationStagingKeepsFlatCollectionLoaded()
+{
+    const QString directory = prepareCollectionCacheDirectory(m_settings);
+    QVERIFY(QDir().mkpath(directory));
+
+    const QString firstPayloadPath = QDir(directory).filePath(QStringLiteral("flat-first.txt"));
+    const QString secondPayloadPath = QDir(directory).filePath(QStringLiteral("flat-second.txt"));
+    const auto writePayload = [](const QString& path, const QByteArray& payload) {
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            return false;
+        }
+        return file.write(payload) == payload.size();
+    };
+    QVERIFY(writePayload(firstPayloadPath, QByteArray("flat raw first")));
+    QVERIFY(writePayload(secondPayloadPath, QByteArray("flat raw second")));
+
+    // A collection written by an earlier release keeps its version marker and
+    // sidecar-named record groups directly in the settings file.
+    {
+        QSettings settings;
+        settings.setValue(QStringLiteral("skyContext/catalogCollectionVersion"), 2);
+        settings.setValue(QStringLiteral("skyContext/catalogBinarySchemaVersion"), 7);
+        settings.beginGroup(QStringLiteral("catalogSources/catalog-source-flat-first"));
+        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("flat:first"));
+        settings.setValue(QStringLiteral("descriptorId"), QStringLiteral("flat_first"));
+        settings.setValue(QStringLiteral("title"), QStringLiteral("Flat First"));
+        settings.setValue(QStringLiteral("urls"), QStringList{QStringLiteral("https://example.test/first.csv")});
+        settings.setValue(
+            QStringLiteral("policy"), static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::Merge)
+        );
+        settings.setValue(QStringLiteral("enabled"), true);
+        settings.setValue(QStringLiteral("order"), 0);
+        settings.setValue(QStringLiteral("payloadPath"), firstPayloadPath);
+        settings.endGroup();
+        settings.beginGroup(QStringLiteral("catalogSources/catalog-source-flat-second"));
+        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("flat:second"));
+        settings.setValue(QStringLiteral("descriptorId"), QStringLiteral("flat_second"));
+        settings.setValue(QStringLiteral("title"), QStringLiteral("Flat Second"));
+        settings.setValue(QStringLiteral("urls"), QStringList{QStringLiteral("https://example.test/second.csv")});
+        settings.setValue(
+            QStringLiteral("policy"), static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly)
+        );
+        settings.setValue(QStringLiteral("enabled"), false);
+        settings.setValue(QStringLiteral("order"), 1);
+        settings.setValue(QStringLiteral("payloadPath"), secondPayloadPath);
+        settings.endGroup();
+        settings.sync();
+    }
+
+    SkySettingsStore store;
+    const auto flat = store.loadCatalogCollectionCache();
+    QVERIFY(flat.isLoaded());
+    QCOMPARE(flat.snapshot.schemaVersion, 2);
+    QCOMPARE(flat.snapshot.binarySchemaVersion, 7);
+    QCOMPARE(flat.snapshot.sources.size(), 2);
+    QCOMPARE(flat.snapshot.sources[0].instanceId, QString("flat:first"));
+    QCOMPARE(flat.snapshot.sources[0].payload, QByteArray("flat raw first"));
+    QCOMPARE(flat.snapshot.sources[1].instanceId, QString("flat:second"));
+    QCOMPARE(flat.snapshot.sources[1].payload, QByteArray("flat raw second"));
+
+    // An interrupted first upgrade staged generation records and a sidecar
+    // without publishing a manifest. The older flat collection is already
+    // committed configuration, so it stays the loaded collection while the
+    // staged generation is neither promoted nor allowed to outrank it.
+    const QString stagedSidecarPath = skygate::ui::tests::stagedCatalogSourceSidecarPath(
+        directory, 4, QStringLiteral("staged:source"), QStringLiteral(".txt")
+    );
+    QVERIFY(writePayload(stagedSidecarPath, QByteArray("staged raw payload")));
+    {
+        QSettings settings;
+        settings.setValue(QStringLiteral("catalogSources/4/recordsStored"), true);
+        settings.beginGroup(QStringLiteral("catalogSources/4/catalog-source-staged"));
+        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("staged:source"));
+        settings.setValue(QStringLiteral("title"), QStringLiteral("Staged Source"));
+        settings.setValue(QStringLiteral("order"), 0);
+        settings.setValue(QStringLiteral("payloadPath"), stagedSidecarPath);
+        settings.endGroup();
+        settings.sync();
+    }
+
+    const auto mixed = store.loadCatalogCollectionCache();
+    QVERIFY(mixed.isLoaded());
+    QCOMPARE(mixed.snapshot.schemaVersion, 2);
+    QCOMPARE(mixed.snapshot.binarySchemaVersion, 7);
+    QCOMPARE(mixed.snapshot.sources.size(), 2);
+    QCOMPARE(mixed.snapshot.sources[0].instanceId, QString("flat:first"));
+    QCOMPARE(mixed.snapshot.sources[0].descriptorId, QString("flat_first"));
+    QCOMPARE(mixed.snapshot.sources[0].title, QString("Flat First"));
+    QCOMPARE(mixed.snapshot.sources[0].urls, QStringList{QStringLiteral("https://example.test/first.csv")});
+    QCOMPARE(mixed.snapshot.sources[0].policy, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QVERIFY(mixed.snapshot.sources[0].enabled);
+    QCOMPARE(mixed.snapshot.sources[0].payload, QByteArray("flat raw first"));
+    QCOMPARE(mixed.snapshot.sources[1].instanceId, QString("flat:second"));
+    QCOMPARE(mixed.snapshot.sources[1].policy, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
+    QVERIFY(!mixed.snapshot.sources[1].enabled);
+    QCOMPARE(mixed.snapshot.sources[1].payload, QByteArray("flat raw second"));
+    QVERIFY(!mixed.diagnostic.isEmpty());
+
+    // Reading the older collection neither consumes nor rewrites the staged
+    // generation artifacts.
+    QFile stagedSidecar(stagedSidecarPath);
+    QVERIFY(stagedSidecar.open(QIODevice::ReadOnly));
+    QCOMPARE(stagedSidecar.readAll(), QByteArray("staged raw payload"));
 }
 
 void SkySettingsStoreTests::emptyLegacyCollectionStillLoadsWithoutGenerationArtifacts()
