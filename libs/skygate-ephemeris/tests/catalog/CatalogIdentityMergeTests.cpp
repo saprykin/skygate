@@ -198,6 +198,17 @@ CatalogCompositionResult composeAll(const std::vector<const IStarCatalog*>& cata
     };
 }
 
+// Gives a star row a reference position and reference epoch that agree with
+// its fixed position, so both coordinate representations describe one model.
+[[nodiscard]] OwnGalaxyCelestialBody withReferenceModel(OwnGalaxyCelestialBody body)
+{
+    body.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *body.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    return body;
+}
+
 const BaseCelestialBody* findBodyById(const std::span<const BaseCelestialBody* const> bodies, const std::string_view id)
 {
     const auto it = std::find_if(bodies.begin(), bodies.end(), [id](const BaseCelestialBody* body) {
@@ -333,6 +344,9 @@ private slots:
     void laterSourceModelReplacesAnEarlierBridgedModel();
     void secondPassKeepsTheEarliestRowModelAcrossALateLocalBridge();
     void adoptsAContradictoryDonorsFixedPositionWithoutItsAstrometry();
+    void localBridgeAndLaterReplacementKeepNameMagnitudeAndModel();
+    void samePassDuplicateKeepsMagnitudeInheritedFromAnEarlierSource();
+    void repeatedBridgesKeepTheEarliestModelUnderALaterReplacement();
 };
 
 void CatalogIdentityMergeTests::deduplicatesDuplicateHipStars()
@@ -3961,6 +3975,318 @@ void CatalogIdentityMergeTests::adoptsAContradictoryDonorsFixedPositionWithoutIt
     QVERIFY(hasIdentifier(*survivor, "hd", "27"));
     QVERIFY(hasRetainedCanonicalId(*survivor, "hip_17"));
     QVERIFY(hasRetainedCanonicalId(*survivor, "hd_27"));
+}
+
+void CatalogIdentityMergeTests::localBridgeAndLaterReplacementKeepNameMagnitudeAndModel()
+{
+    // Source A only records that HIP 1 and HYG 2 identify one object. Source B
+    // bridges HIP 1 with HIP 3 in its last row, so the row that supplies the
+    // object's negative magnitude and its coherent model reaches the survivor
+    // behind the row that supplies the name. The later replacing source
+    // supplies only a name of its own: the explicit replacement name wins,
+    // while the magnitude and both coordinate representations stay with the
+    // row that supplied them, and every absorbed or replaced canonical id
+    // stays resolvable.
+    const auto sourceA = createCatalog(
+        {makeStar(
+            "a_linked",
+            {},
+            {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hyg", "2")},
+            {},
+            std::nullopt,
+            std::nullopt
+        )},
+        {}
+    );
+    const auto sourceB = createCatalog(
+        {
+            withReferenceModel(makeStar("b_hip_1", {}, {CatalogIdentifier::make("hip", "1")}, {}, 4.5, 2.0, -0.5)),
+            makeStar("b_hyg_2", "Second", {CatalogIdentifier::make("hyg", "2")}, {}, std::nullopt, std::nullopt),
+            makeStar("b_hip_3", {}, {CatalogIdentifier::make("hip", "3")}, {}, std::nullopt, std::nullopt),
+            makeStar(
+                "b_bridge",
+                {},
+                {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hip", "3")},
+                {},
+                std::nullopt,
+                std::nullopt
+            ),
+        },
+        {}
+    );
+    const auto sourceC = createCatalog(
+        {makeStar("c_replace", "Replacement", {CatalogIdentifier::make("hyg", "2")}, {}, std::nullopt, std::nullopt)},
+        {}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+    QVERIFY(sourceC != nullptr);
+
+    const CatalogCompositionResult replaced = composeAll({sourceA.get(), sourceB.get(), sourceC.get()});
+
+    QVERIFY(replaced.isSuccess());
+    QCOMPARE(replaced.bodyCount, std::size_t{1});
+    const BaseCelestialBody* survivor = findBodyById(replaced.catalog->bodies(), "c_replace");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Replacement"));
+    QCOMPARE(survivor->visualMagnitude, -0.5);
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 4.5);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.rightAscensionHours, 4.5);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.declinationDeg, 2.0);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEpoch.julianDatePart1, j2000Epoch().julianDatePart1);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEpoch.julianDatePart2, j2000Epoch().julianDatePart2);
+    QVERIFY(hasIdentifier(*survivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*survivor, "hyg", "2"));
+    QVERIFY(hasIdentifier(*survivor, "hip", "3"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "a_linked"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_hip_1"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_hyg_2"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_hip_3"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_bridge"));
+    QCOMPARE(replaced.sourceIds.front(), std::string("source-2"));
+    QCOMPARE(replaced.contributorSourceIds.front(), (std::vector<std::string>{"source-2", "source-1", "source-0"}));
+
+    // The same shape with the fields spread differently: the name comes from
+    // the row that replaces the earlier source, the zero magnitude from the
+    // first row through the local bridge, and the coherent model from the
+    // third row through the same bridge, while the replacing source supplies
+    // no value of its own.
+    const auto variedA = createCatalog(
+        {makeStar(
+            "d_linked",
+            {},
+            {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hyg", "2")},
+            {},
+            std::nullopt,
+            std::nullopt
+        )},
+        {}
+    );
+    const auto variedB = createCatalog(
+        {
+            makeStar("e_hip_1", {}, {CatalogIdentifier::make("hip", "1")}, {}, std::nullopt, std::nullopt, 0.0),
+            makeStar("e_hyg_2", "Second", {CatalogIdentifier::make("hyg", "2")}, {}, std::nullopt, std::nullopt),
+            withReferenceModel(makeStar("e_hip_3", {}, {CatalogIdentifier::make("hip", "3")}, {}, 6.5, 2.0)),
+            makeStar(
+                "e_bridge",
+                {},
+                {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hip", "3")},
+                {},
+                std::nullopt,
+                std::nullopt
+            ),
+        },
+        {}
+    );
+    const auto variedC = createCatalog(
+        {makeStar("f_replace", {}, {CatalogIdentifier::make("hyg", "2")}, {}, std::nullopt, std::nullopt)}, {}
+    );
+    QVERIFY(variedA != nullptr);
+    QVERIFY(variedB != nullptr);
+    QVERIFY(variedC != nullptr);
+
+    const CatalogCompositionResult varied = composeAll({variedA.get(), variedB.get(), variedC.get()});
+
+    QVERIFY(varied.isSuccess());
+    QCOMPARE(varied.bodyCount, std::size_t{1});
+    const BaseCelestialBody* variedSurvivor = findBodyById(varied.catalog->bodies(), "f_replace");
+    QVERIFY(variedSurvivor != nullptr);
+    QCOMPARE(QString::fromStdString(variedSurvivor->displayName), QStringLiteral("Second"));
+    QCOMPARE(variedSurvivor->visualMagnitude, 0.0);
+    QVERIFY(variedSurvivor->fixedEquatorialValue().has_value());
+    QCOMPARE(variedSurvivor->fixedEquatorialValue()->rightAscensionHours, 6.5);
+    QCOMPARE(variedSurvivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(variedSurvivor->starAstrometryValue().has_value());
+    QCOMPARE(variedSurvivor->starAstrometryValue()->referenceEquatorial.rightAscensionHours, 6.5);
+    QCOMPARE(variedSurvivor->starAstrometryValue()->referenceEquatorial.declinationDeg, 2.0);
+    QVERIFY(hasIdentifier(*variedSurvivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*variedSurvivor, "hyg", "2"));
+    QVERIFY(hasIdentifier(*variedSurvivor, "hip", "3"));
+    QVERIFY(hasRetainedCanonicalId(*variedSurvivor, "d_linked"));
+    QVERIFY(hasRetainedCanonicalId(*variedSurvivor, "e_hip_1"));
+    QVERIFY(hasRetainedCanonicalId(*variedSurvivor, "e_hyg_2"));
+    QVERIFY(hasRetainedCanonicalId(*variedSurvivor, "e_hip_3"));
+    QVERIFY(hasRetainedCanonicalId(*variedSurvivor, "e_bridge"));
+    QCOMPARE(varied.sourceIds.front(), std::string("source-2"));
+    QCOMPARE(varied.contributorSourceIds.front(), (std::vector<std::string>{"source-2", "source-1", "source-0"}));
+}
+
+void CatalogIdentityMergeTests::samePassDuplicateKeepsMagnitudeInheritedFromAnEarlierSource()
+{
+    // Source A links HIP 1 and HYG 2 and measures the object at magnitude 7
+    // with a coherent model. Source B's first row replaces A's survivor
+    // without a magnitude or a model of its own, so it inherits both. Its
+    // second row is a later duplicate of the same source that supplies 9 at a
+    // conflicting position. A later row of the source that inherited a value
+    // never replaces it: the inherited magnitude and model stay authoritative
+    // while the replacing row's explicit name wins.
+    const auto sourceA = createCatalog(
+        {withReferenceModel(makeStar(
+            "a_linked",
+            "Earlier A",
+            {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hyg", "2")},
+            {},
+            3.0,
+            2.0,
+            7.0
+        ))},
+        {}
+    );
+    const auto sourceB = createCatalog(
+        {
+            makeStar("b_hyg_2", "Replacement B", {CatalogIdentifier::make("hyg", "2")}, {}, std::nullopt, std::nullopt),
+            withReferenceModel(makeStar("b_hip_1", {}, {CatalogIdentifier::make("hip", "1")}, {}, 8.0, 2.0, 9.0)),
+        },
+        {}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of b_hyg_2 over conflicting fixed coordinates from b_hip_1."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of b_hyg_2 and rejected the incompatible astrometry of "
+        "b_hip_1."
+    );
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "b_hyg_2");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Replacement B"));
+    QCOMPARE(survivor->visualMagnitude, 7.0);
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 3.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.rightAscensionHours, 3.0);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.declinationDeg, 2.0);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEpoch.julianDatePart1, j2000Epoch().julianDatePart1);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEpoch.julianDatePart2, j2000Epoch().julianDatePart2);
+    QVERIFY(hasIdentifier(*survivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*survivor, "hyg", "2"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "a_linked"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_hip_1"));
+    QCOMPARE(result.sourceIds.front(), std::string("source-1"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-1", "source-0"}));
+}
+
+void CatalogIdentityMergeTests::repeatedBridgesKeepTheEarliestModelUnderALaterReplacement()
+{
+    // Three rows describe the object at RA 1, 5, and 7, and two bridge rows
+    // chain over them with conflicting models of their own. The first row's
+    // coherent model wins through both bridges, so neither bridge's model nor
+    // the later rows' models replace it. A later source then replaces the
+    // bridged survivor with an explicit name and magnitude of its own but no
+    // coordinates: the replacement's values win by source precedence while
+    // the earliest row's model stays authoritative in both representations.
+    const auto sourceA = createCatalog(
+        {
+            withReferenceModel(makeStar("hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0, 1.0)),
+            withReferenceModel(makeStar("hd_27", "Second", {CatalogIdentifier::make("hd", "27")}, {}, 5.0, 2.0, 3.0)),
+            withReferenceModel(makeStar("hip_99", "Third", {CatalogIdentifier::make("hip", "99")}, {}, 7.0, 2.0, 4.0)),
+            withReferenceModel(makeStar(
+                "bridge_one",
+                "Bridge one",
+                {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")},
+                {},
+                9.0,
+                2.0,
+                5.0
+            )),
+            withReferenceModel(makeStar(
+                "bridge_two",
+                "Bridge two",
+                {CatalogIdentifier::make("hip", "99"), CatalogIdentifier::make("hip", "17")},
+                {},
+                11.0,
+                2.0,
+                6.0
+            )),
+        },
+        {}
+    );
+    const auto sourceB = createCatalog(
+        {makeStar(
+            "b_replace", "Replacement", {CatalogIdentifier::make("hip", "17")}, {}, std::nullopt, std::nullopt, 2.0
+        )},
+        {}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of hip_17 over conflicting fixed coordinates from "
+        "bridge_one."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of hip_17 and rejected the incompatible astrometry of "
+        "bridge_one."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of bridge_one over conflicting fixed coordinates from hd_27."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of bridge_one and rejected the incompatible astrometry "
+        "of hd_27."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of bridge_one over conflicting fixed coordinates from "
+        "bridge_two."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of bridge_one and rejected the incompatible astrometry "
+        "of bridge_two."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of bridge_two over conflicting fixed coordinates from hip_99."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of bridge_two and rejected the incompatible astrometry "
+        "of hip_99."
+    );
+
+    const CatalogCompositionResult result = composeInOrder(*sourceA, *sourceB);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "b_replace");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Replacement"));
+    QCOMPARE(survivor->visualMagnitude, 2.0);
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.rightAscensionHours, 1.0);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.declinationDeg, 2.0);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEpoch.julianDatePart1, j2000Epoch().julianDatePart1);
+    QVERIFY(hasIdentifier(*survivor, "hip", "17"));
+    QVERIFY(hasIdentifier(*survivor, "hd", "27"));
+    QVERIFY(hasIdentifier(*survivor, "hip", "99"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "bridge_two"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "bridge_one"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "hip_17"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "hd_27"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "hip_99"));
+    QCOMPARE(result.sourceIds.front(), std::string("second"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"second", "first"}));
 }
 
 QTEST_APPLESS_MAIN(CatalogIdentityMergeTests)
