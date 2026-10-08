@@ -10,7 +10,9 @@
 #include <QtTest/QtTest>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -42,13 +44,15 @@ OwnGalaxyCelestialBody makeStar(
     std::vector<CatalogIdentifier> identifiers = {},
     std::vector<std::string> aliases = {},
     std::optional<double> rightAscensionHours = 1.0,
-    std::optional<double> declinationDeg = 2.0
+    std::optional<double> declinationDeg = 2.0,
+    double visualMagnitude = std::numeric_limits<double>::quiet_NaN()
 )
 {
     OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
     body.kind = BaseCelestialBody::Kind::Star;
+    body.visualMagnitude = visualMagnitude;
     body.identity.externalIdentifiers = std::move(identifiers);
     body.identity.aliases = std::move(aliases);
     if (rightAscensionHours.has_value() && declinationDeg.has_value()) {
@@ -66,13 +70,15 @@ DistantCelestialBody makeDeepSkyObject(
     std::vector<CatalogIdentifier> identifiers = {},
     std::optional<double> rightAscensionHours = 1.0,
     std::optional<double> declinationDeg = 2.0,
-    std::optional<double> majorAxisArcmin = std::nullopt
+    std::optional<double> majorAxisArcmin = std::nullopt,
+    double visualMagnitude = std::numeric_limits<double>::quiet_NaN()
 )
 {
     DistantCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
     body.kind = BaseCelestialBody::Kind::DeepSkyObject;
+    body.visualMagnitude = visualMagnitude;
     body.identity.externalIdentifiers = std::move(identifiers);
     body.identity.aliases = aliases;
     if (rightAscensionHours.has_value() && declinationDeg.has_value()) {
@@ -314,6 +320,10 @@ private slots:
     void retainsBridgedCanonicalIdentitiesAcrossLaterSources();
     void retainedCanonicalIdentitySurvivesBinaryRoundTripAndRecomposition();
     void combinedChainKeepsIdentityMetadataAndProvenanceAcrossSnapshotRecomposition();
+    void bridgesWithinOneSourceResolveMagnitudeBySupplyingRow();
+    void zeroAndNegativeMagnitudesKeepSupplyingRowPrecedence();
+    void bridgedDeepSkyMagnitudesFillOnlyMissingValues();
+    void replacementMagnitudeKeepsSourcePrecedence();
 };
 
 void CatalogIdentityMergeTests::deduplicatesDuplicateHipStars()
@@ -2960,6 +2970,334 @@ void CatalogIdentityMergeTests::combinedChainKeepsIdentityMetadataAndProvenanceA
     QVERIFY(hasIdentifier(*lateSurvivor, "hd", "2"));
     QVERIFY(hasRetainedCanonicalId(*lateSurvivor, "c_bridge"));
     QVERIFY(hasRetainedCanonicalId(*lateSurvivor, "b_hd2"));
+}
+
+void CatalogIdentityMergeTests::bridgesWithinOneSourceResolveMagnitudeBySupplyingRow()
+{
+    // The bridging row carries the largest magnitude of the fixture, but the
+    // magnitude is enriched metadata like every other field: the earliest row
+    // that supplied one keeps it, so the bridge cannot change the composed
+    // value. Identity and name keep their own policies on the same rows.
+    const auto source = createCatalog(
+        {
+            makeStar("a_hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0, 1.0),
+            makeStar("b_hd_27", "Second", {CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0, 2.0),
+            makeStar(
+                "c_bridge",
+                "Last bridge",
+                {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")},
+                {},
+                1.0,
+                2.0,
+                3.0
+            ),
+        },
+        {}
+    );
+    QVERIFY(source != nullptr);
+
+    const CatalogCompositionResult result = composePrimary(*source);
+
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(result.starCount, std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "a_hip_17"), std::size_t{0});
+    QCOMPARE(countBodiesById(bodies, "b_hd_27"), std::size_t{0});
+
+    const BaseCelestialBody* survivor = findBodyById(bodies, "c_bridge");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("First"));
+    QCOMPARE(survivor->visualMagnitude, 1.0);
+    QVERIFY(hasIdentifier(*survivor, "hip", "17"));
+    QVERIFY(hasIdentifier(*survivor, "hd", "27"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "a_hip_17"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_hd_27"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"primary"}));
+}
+
+void CatalogIdentityMergeTests::zeroAndNegativeMagnitudesKeepSupplyingRowPrecedence()
+{
+    // The first row supplies an explicit zero magnitude, the second row a
+    // negative one, and both later bridge rows magnitudes of their own. Zero is
+    // a value, so the earliest row keeps the magnitude through both local
+    // bridges. Giving the two earliest rows the opposite magnitudes moves the
+    // winner with them, so the result follows row precedence instead of a
+    // preference for one sign.
+    const auto zeroFirst = createCatalog(
+        {
+            makeStar("a_hip_1", "First A", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0, 0.0),
+            makeStar("b_hyg_2", "Second B", {CatalogIdentifier::make("hyg", "2")}, {}, 1.0, 2.0, -1.5),
+            makeStar("c_hip_3", "Third C", {CatalogIdentifier::make("hip", "3")}, {}, 1.0, 2.0, 2.0),
+            makeStar(
+                "d_bridge_13",
+                "Bridge D",
+                {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hip", "3")},
+                {},
+                1.0,
+                2.0,
+                -0.5
+            ),
+            makeStar(
+                "e_bridge_all",
+                "Last bridge",
+                {CatalogIdentifier::make("hyg", "2"), CatalogIdentifier::make("hip", "1")},
+                {},
+                1.0,
+                2.0,
+                3.0
+            ),
+        },
+        {}
+    );
+    QVERIFY(zeroFirst != nullptr);
+
+    const CatalogCompositionResult zeroFirstResult = composePrimary(*zeroFirst);
+
+    QVERIFY(zeroFirstResult.isSuccess());
+    QCOMPARE(zeroFirstResult.bodyCount, std::size_t{1});
+    const BaseCelestialBody* zeroFirstSurvivor = findBodyById(zeroFirstResult.catalog->bodies(), "e_bridge_all");
+    QVERIFY(zeroFirstSurvivor != nullptr);
+    QCOMPARE(zeroFirstSurvivor->visualMagnitude, 0.0);
+    QCOMPARE(QString::fromStdString(zeroFirstSurvivor->displayName), QStringLiteral("First A"));
+    QVERIFY(hasIdentifier(*zeroFirstSurvivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*zeroFirstSurvivor, "hip", "3"));
+    QVERIFY(hasIdentifier(*zeroFirstSurvivor, "hyg", "2"));
+    QVERIFY(hasRetainedCanonicalId(*zeroFirstSurvivor, "a_hip_1"));
+    QVERIFY(hasRetainedCanonicalId(*zeroFirstSurvivor, "b_hyg_2"));
+    QVERIFY(hasRetainedCanonicalId(*zeroFirstSurvivor, "c_hip_3"));
+
+    const auto negativeFirst = createCatalog(
+        {
+            makeStar("a_hip_1", "First A", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0, -1.5),
+            makeStar("b_hyg_2", "Second B", {CatalogIdentifier::make("hyg", "2")}, {}, 1.0, 2.0, 0.0),
+            makeStar("c_hip_3", "Third C", {CatalogIdentifier::make("hip", "3")}, {}, 1.0, 2.0, 2.0),
+            makeStar(
+                "d_bridge_13",
+                "Bridge D",
+                {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hip", "3")},
+                {},
+                1.0,
+                2.0,
+                -0.5
+            ),
+            makeStar(
+                "e_bridge_all",
+                "Last bridge",
+                {CatalogIdentifier::make("hyg", "2"), CatalogIdentifier::make("hip", "1")},
+                {},
+                1.0,
+                2.0,
+                3.0
+            ),
+        },
+        {}
+    );
+    QVERIFY(negativeFirst != nullptr);
+
+    const CatalogCompositionResult negativeFirstResult = composePrimary(*negativeFirst);
+
+    QVERIFY(negativeFirstResult.isSuccess());
+    QCOMPARE(negativeFirstResult.bodyCount, std::size_t{1});
+    const BaseCelestialBody* negativeFirstSurvivor =
+        findBodyById(negativeFirstResult.catalog->bodies(), "e_bridge_all");
+    QVERIFY(negativeFirstSurvivor != nullptr);
+    QCOMPARE(negativeFirstSurvivor->visualMagnitude, -1.5);
+    QCOMPARE(QString::fromStdString(negativeFirstSurvivor->displayName), QStringLiteral("First A"));
+    QVERIFY(hasRetainedCanonicalId(*negativeFirstSurvivor, "a_hip_1"));
+    QVERIFY(hasRetainedCanonicalId(*negativeFirstSurvivor, "b_hyg_2"));
+    QVERIFY(hasRetainedCanonicalId(*negativeFirstSurvivor, "c_hip_3"));
+}
+
+void CatalogIdentityMergeTests::bridgedDeepSkyMagnitudesFillOnlyMissingValues()
+{
+    // A deep-sky row the parser could not measure carries a NaN magnitude, so
+    // it supplies no value and the bridge row's own value stays the starting
+    // point. The first row that does supply a magnitude therefore fills the
+    // gap, while a later row never overrides an earlier supplying row.
+    DistantCelestialBody unmeasuredNgc = makeDeepSkyObject(
+        "a_ngc_224", "First DSO", {}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, std::nullopt
+    );
+    DistantCelestialBody measuredIc =
+        makeDeepSkyObject("b_ic_1", "Second DSO", {}, {CatalogIdentifier::make("ic", "1")}, 1.0, 2.0, std::nullopt);
+    measuredIc.visualMagnitude = 4.5;
+    DistantCelestialBody unmeasuredBridge = makeDeepSkyObject(
+        "c_bridge",
+        "Bridge DSO",
+        {},
+        {CatalogIdentifier::make("ngc", "224"), CatalogIdentifier::make("ic", "1")},
+        1.0,
+        2.0,
+        std::nullopt
+    );
+
+    const auto gapFillingSource = createCatalog({}, {unmeasuredNgc, measuredIc, unmeasuredBridge});
+    QVERIFY(gapFillingSource != nullptr);
+
+    const CatalogCompositionResult gapFilling = composePrimary(*gapFillingSource);
+
+    QVERIFY(gapFilling.isSuccess());
+    QCOMPARE(gapFilling.bodyCount, std::size_t{1});
+    QCOMPARE(gapFilling.deepSkyObjectCount, std::size_t{1});
+    const BaseCelestialBody* gapFillingSurvivor = findBodyById(gapFilling.catalog->bodies(), "c_bridge");
+    QVERIFY(gapFillingSurvivor != nullptr);
+    QCOMPARE(gapFillingSurvivor->visualMagnitude, 4.5);
+    QCOMPARE(QString::fromStdString(gapFillingSurvivor->displayName), QStringLiteral("First DSO"));
+    QVERIFY(hasIdentifier(*gapFillingSurvivor, "ngc", "224"));
+    QVERIFY(hasIdentifier(*gapFillingSurvivor, "ic", "1"));
+    QVERIFY(hasRetainedCanonicalId(*gapFillingSurvivor, "a_ngc_224"));
+    QVERIFY(hasRetainedCanonicalId(*gapFillingSurvivor, "b_ic_1"));
+
+    // The earliest row supplies a magnitude of its own and the bridge measures
+    // the same object differently, so the bridge must not override it. The
+    // middle row supplies no magnitude and stays absent instead of becoming a
+    // zero.
+    DistantCelestialBody measuredNgc = makeDeepSkyObject(
+        "d_ngc_224", "Measured DSO", {}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, std::nullopt
+    );
+    measuredNgc.visualMagnitude = 2.5;
+    DistantCelestialBody unmeasuredIc =
+        makeDeepSkyObject("e_ic_1", "Unmeasured DSO", {}, {CatalogIdentifier::make("ic", "1")}, 1.0, 2.0, std::nullopt);
+    DistantCelestialBody measuredBridge = makeDeepSkyObject(
+        "f_bridge",
+        "Bridge DSO",
+        {},
+        {CatalogIdentifier::make("ngc", "224"), CatalogIdentifier::make("ic", "1")},
+        1.0,
+        2.0,
+        std::nullopt
+    );
+    measuredBridge.visualMagnitude = 7.0;
+
+    const auto measuredSource = createCatalog({}, {measuredNgc, unmeasuredIc, measuredBridge});
+    QVERIFY(measuredSource != nullptr);
+
+    const CatalogCompositionResult measured = composePrimary(*measuredSource);
+
+    QVERIFY(measured.isSuccess());
+    QCOMPARE(measured.bodyCount, std::size_t{1});
+    const BaseCelestialBody* measuredSurvivor = findBodyById(measured.catalog->bodies(), "f_bridge");
+    QVERIFY(measuredSurvivor != nullptr);
+    QCOMPARE(measuredSurvivor->visualMagnitude, 2.5);
+    QCOMPARE(QString::fromStdString(measuredSurvivor->displayName), QStringLiteral("Measured DSO"));
+    QVERIFY(hasRetainedCanonicalId(*measuredSurvivor, "d_ngc_224"));
+    QVERIFY(hasRetainedCanonicalId(*measuredSurvivor, "e_ic_1"));
+
+    // No row of the fixture supplies a magnitude, so the survivor carries
+    // none: an unmeasured body never gains a magnitude from a bridge.
+    DistantCelestialBody bareNgc =
+        makeDeepSkyObject("g_ngc_224", "Bare DSO", {}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, std::nullopt);
+    DistantCelestialBody bareIc =
+        makeDeepSkyObject("h_ic_1", "Bare IC", {}, {CatalogIdentifier::make("ic", "1")}, 1.0, 2.0, std::nullopt);
+    DistantCelestialBody bareBridge = makeDeepSkyObject(
+        "i_bridge",
+        "Bare bridge",
+        {},
+        {CatalogIdentifier::make("ngc", "224"), CatalogIdentifier::make("ic", "1")},
+        1.0,
+        2.0,
+        std::nullopt
+    );
+
+    const auto bareSource = createCatalog({}, {bareNgc, bareIc, bareBridge});
+    QVERIFY(bareSource != nullptr);
+
+    const CatalogCompositionResult bare = composePrimary(*bareSource);
+
+    QVERIFY(bare.isSuccess());
+    QCOMPARE(bare.bodyCount, std::size_t{1});
+    const BaseCelestialBody* bareSurvivor = findBodyById(bare.catalog->bodies(), "i_bridge");
+    QVERIFY(bareSurvivor != nullptr);
+    QVERIFY(std::isnan(bareSurvivor->visualMagnitude));
+    QCOMPARE(QString::fromStdString(bareSurvivor->displayName), QStringLiteral("Bare DSO"));
+    QVERIFY(hasIdentifier(*bareSurvivor, "ngc", "224"));
+    QVERIFY(hasIdentifier(*bareSurvivor, "ic", "1"));
+}
+
+void CatalogIdentityMergeTests::replacementMagnitudeKeepsSourcePrecedence()
+{
+    // A replacing source outranks the source it replaces, so its explicit
+    // magnitude wins over the replaced survivor's earlier one, while a
+    // replacement that supplies no magnitude inherits the replaced value
+    // instead of erasing it.
+    const auto sourceA =
+        createCatalog({makeStar("a_hip_1", "First A", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0, 1.0)}, {});
+    const auto explicitReplacement = createCatalog(
+        {makeStar("b_hip_1", "Replacement B", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0, 2.0)}, {}
+    );
+    const auto silentReplacement =
+        createCatalog({makeStar("c_hip_1", "Late C", {CatalogIdentifier::make("hip", "1")})}, {});
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(explicitReplacement != nullptr);
+    QVERIFY(silentReplacement != nullptr);
+
+    const CatalogCompositionResult explicitResult = composeAll({sourceA.get(), explicitReplacement.get()});
+
+    QVERIFY(explicitResult.isSuccess());
+    QCOMPARE(explicitResult.bodyCount, std::size_t{1});
+    const BaseCelestialBody* explicitSurvivor = findBodyById(explicitResult.catalog->bodies(), "b_hip_1");
+    QVERIFY(explicitSurvivor != nullptr);
+    QCOMPARE(explicitSurvivor->visualMagnitude, 2.0);
+    QCOMPARE(QString::fromStdString(explicitSurvivor->displayName), QStringLiteral("Replacement B"));
+    QVERIFY(hasIdentifier(*explicitSurvivor, "hip", "1"));
+    QVERIFY(hasRetainedCanonicalId(*explicitSurvivor, "a_hip_1"));
+
+    const CatalogCompositionResult inheritedResult = composeAll({sourceA.get(), silentReplacement.get()});
+
+    QVERIFY(inheritedResult.isSuccess());
+    QCOMPARE(inheritedResult.bodyCount, std::size_t{1});
+    const BaseCelestialBody* inheritedSurvivor = findBodyById(inheritedResult.catalog->bodies(), "c_hip_1");
+    QVERIFY(inheritedSurvivor != nullptr);
+    QCOMPARE(inheritedSurvivor->visualMagnitude, 1.0);
+    QCOMPARE(QString::fromStdString(inheritedSurvivor->displayName), QStringLiteral("Late C"));
+    QVERIFY(hasIdentifier(*inheritedSurvivor, "hip", "1"));
+    QVERIFY(hasRetainedCanonicalId(*inheritedSurvivor, "a_hip_1"));
+
+    // The same policies hold through a local bridge chain: the bridged source
+    // row that supplied the magnitude first decides its value, and the later
+    // replacing source without a magnitude of its own inherits it instead of
+    // falling back to the lower-ranked source's earlier value. Name, identity,
+    // and magnitude follow their own policies on the same rows.
+    const auto firstSource =
+        createCatalog({makeStar("a_hip_17", "First A", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0, 1.5)}, {});
+    const auto bridgedSource = createCatalog(
+        {
+            makeStar("b_hip_17", "First B", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0, 2.5),
+            makeStar("b_hd_27", "Second B", {CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0, 3.5),
+            makeStar(
+                "b_bridge",
+                "Bridge B",
+                {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")},
+                {},
+                1.0,
+                2.0,
+                9.0
+            ),
+        },
+        {}
+    );
+    const auto replacementWithoutMagnitude =
+        createCatalog({makeStar("c_hip_17", "Replacement C", {CatalogIdentifier::make("hip", "17")})}, {});
+    QVERIFY(firstSource != nullptr);
+    QVERIFY(bridgedSource != nullptr);
+    QVERIFY(replacementWithoutMagnitude != nullptr);
+
+    const CatalogCompositionResult chain =
+        composeAll({firstSource.get(), bridgedSource.get(), replacementWithoutMagnitude.get()});
+
+    QVERIFY(chain.isSuccess());
+    QCOMPARE(chain.bodyCount, std::size_t{1});
+    const BaseCelestialBody* chainSurvivor = findBodyById(chain.catalog->bodies(), "c_hip_17");
+    QVERIFY(chainSurvivor != nullptr);
+    QCOMPARE(QString::fromStdString(chainSurvivor->displayName), QStringLiteral("Replacement C"));
+    QCOMPARE(chainSurvivor->visualMagnitude, 2.5);
+    QVERIFY(hasIdentifier(*chainSurvivor, "hip", "17"));
+    QVERIFY(hasIdentifier(*chainSurvivor, "hd", "27"));
+    QVERIFY(hasRetainedCanonicalId(*chainSurvivor, "a_hip_17"));
+    QVERIFY(hasRetainedCanonicalId(*chainSurvivor, "b_hip_17"));
+    QVERIFY(hasRetainedCanonicalId(*chainSurvivor, "b_hd_27"));
+    QVERIFY(hasRetainedCanonicalId(*chainSurvivor, "b_bridge"));
+    QCOMPARE(chain.contributorSourceIds.front(), (std::vector<std::string>{"source-2", "source-1", "source-0"}));
 }
 
 QTEST_APPLESS_MAIN(CatalogIdentityMergeTests)

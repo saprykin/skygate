@@ -55,27 +55,27 @@ namespace skygate::ephemeris {
 // contradict recognized designations or match several survivors.
 //
 // Absorption follows configured source precedence, never accumulator
-// insertion order, and it applies per field: every enriched field keeps the
-// origin of the source and row that actually supplied its value, so an
-// intermediate survivor never promotes a value it inherited to its own,
-// higher rank. A value is therefore taken from the highest-precedence source
-// that supplied it, whether the winner supplied it itself or absorbed it, and
-// only that value replaces a lower-precedence one. Values supplied by one
-// source resolve by row order: the earliest row that supplied a field keeps
-// it, so a bridge across survivors of one source cannot outrank the rows that
-// supplied their metadata and later rows only fill missing fields. Absent
-// fields stay absent and a valid zero is a value like any other. A survivor's
-// contributor source ids are listed in that same descending precedence order:
-// the winner's source first, then each remaining contributor highest first,
-// with every contributing source listed once. A record of the currently
-// merged source that resolves to a survivor this same source pass already
-// produced follows the same rule: it fills missing fields, keeps values the
-// survivor inherited from other sources, and cannot replace a value supplied
-// by an earlier row of this source, even when a bridge appends that survivor
-// later. Accumulator positions are not source ranks and not row order:
-// replacement and bridge absorption vacate positions and append the winner at
-// a new one, so position order stops matching precedence after the first
-// replacement.
+// insertion order, and it applies per field: every enriched field, including
+// the visual magnitude, keeps the origin of the source and row that actually
+// supplied its value, so an intermediate survivor never promotes a value it
+// inherited to its own, higher rank. A value is therefore taken from the
+// highest-precedence source that supplied it, whether the winner supplied it
+// itself or absorbed it, and only that value replaces a lower-precedence one.
+// Values supplied by one source resolve by row order: the earliest row that
+// supplied a field keeps it, so a bridge across survivors of one source
+// cannot outrank the rows that supplied their metadata and later rows only
+// fill missing fields. Absent fields stay absent and a valid zero is a value
+// like any other. A survivor's contributor source ids are listed in that same
+// descending precedence order: the winner's source first, then each remaining
+// contributor highest first, with every contributing source listed once. A
+// record of the currently merged source that resolves to a survivor this same
+// source pass already produced follows the same rule: it fills missing
+// fields, keeps values the survivor inherited from other sources, and cannot
+// replace a value supplied by an earlier row of this source, even when a
+// bridge appends that survivor later. Accumulator positions are not source
+// ranks and not row order: replacement and bridge absorption vacate positions
+// and append the winner at a new one, so position order stops matching
+// precedence after the first replacement.
 //
 // Field origins are part of one merge run and are not carried by a body: an
 // already composed snapshot enters a later composition as one source, so every
