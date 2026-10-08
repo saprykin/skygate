@@ -324,6 +324,15 @@ private slots:
     void zeroAndNegativeMagnitudesKeepSupplyingRowPrecedence();
     void bridgedDeepSkyMagnitudesFillOnlyMissingValues();
     void replacementMagnitudeKeepsSourcePrecedence();
+    void earliestRowModelWinsAcrossALocalBridge();
+    void ordinaryDuplicateRowsKeepTheFirstRowsCoherentModel();
+    void reversedRowsAndALocalBridgeKeepTheFirstRowsModel();
+    void referenceOnlyAstrometryAnchorsTheEarliestRowModel();
+    void repeatedBridgesKeepTheEarliestRowModel();
+    void epochCompatibilityDecidesTheOptionalFieldsOfTheEarliestModel();
+    void laterSourceModelReplacesAnEarlierBridgedModel();
+    void secondPassKeepsTheEarliestRowModelAcrossALateLocalBridge();
+    void adoptsAContradictoryDonorsFixedPositionWithoutItsAstrometry();
 };
 
 void CatalogIdentityMergeTests::deduplicatesDuplicateHipStars()
@@ -3298,6 +3307,660 @@ void CatalogIdentityMergeTests::replacementMagnitudeKeepsSourcePrecedence()
     QVERIFY(hasRetainedCanonicalId(*chainSurvivor, "b_hd_27"));
     QVERIFY(hasRetainedCanonicalId(*chainSurvivor, "b_bridge"));
     QCOMPARE(chain.contributorSourceIds.front(), (std::vector<std::string>{"source-2", "source-1", "source-0"}));
+}
+
+void CatalogIdentityMergeTests::earliestRowModelWinsAcrossALocalBridge()
+{
+    // HIP 17 and HD 27 each describe the object at RA 1 hour with a matching
+    // reference position at the same epoch, while the bridge describes RA 5
+    // hours in both representations. The first row's coherent model must win
+    // as a whole: the bridge supplies the public canonical id, not the model.
+    OwnGalaxyCelestialBody hipRow = makeStar("hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0);
+    hipRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *hipRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody hdRow = makeStar("hd_27", "Second", {CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0);
+    hdRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *hdRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody bridgeRow = makeStar(
+        "bridge_last",
+        "Last bridge",
+        {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")},
+        {},
+        5.0,
+        2.0
+    );
+    bridgeRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *bridgeRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    const auto source = createCatalog({hipRow, hdRow, bridgeRow}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of hip_17 over conflicting fixed coordinates from "
+        "bridge_last."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of hip_17 and rejected the incompatible astrometry of "
+        "bridge_last."
+    );
+
+    const CatalogCompositionResult result = composePrimary(*source);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "bridge_last");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("First"));
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.rightAscensionHours, 1.0);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.declinationDeg, 2.0);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEpoch.julianDatePart1, j2000Epoch().julianDatePart1);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEpoch.julianDatePart2, j2000Epoch().julianDatePart2);
+}
+
+void CatalogIdentityMergeTests::ordinaryDuplicateRowsKeepTheFirstRowsCoherentModel()
+{
+    // Two rows of one source place the object at RA 1 and RA 5 with internally
+    // consistent models. The first row is authoritative within its source, so
+    // a duplicate never replaces its model.
+    OwnGalaxyCelestialBody firstRow = makeStar("hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0);
+    firstRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *firstRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody duplicateRow =
+        makeStar("hip_17_copy", "Second", {CatalogIdentifier::make("hip", "17")}, {}, 5.0, 2.0);
+    duplicateRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *duplicateRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    const auto source = createCatalog({firstRow, duplicateRow}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of hip_17 over conflicting fixed coordinates from "
+        "hip_17_copy."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of hip_17 and rejected the incompatible astrometry of "
+        "hip_17_copy."
+    );
+
+    const CatalogCompositionResult result = composePrimary(*source);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "hip_17");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("First"));
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.rightAscensionHours, 1.0);
+}
+
+void CatalogIdentityMergeTests::reversedRowsAndALocalBridgeKeepTheFirstRowsModel()
+{
+    // The first row declares RA 5 and the second row RA 1, and the bridge
+    // declares RA 5 while absorbing both. The first row's model still wins as
+    // a whole, so the later row's coherent RA 1 model is not mixed into it.
+    OwnGalaxyCelestialBody firstRow = makeStar("hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, 5.0, 2.0);
+    firstRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *firstRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody secondRow = makeStar("hd_27", "Second", {CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0);
+    secondRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *secondRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody bridgeRow = makeStar(
+        "bridge_last",
+        "Last bridge",
+        {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")},
+        {},
+        5.0,
+        2.0
+    );
+    bridgeRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *bridgeRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    const auto source = createCatalog({firstRow, secondRow, bridgeRow}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of bridge_last over conflicting fixed coordinates from "
+        "hd_27."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of bridge_last and rejected the incompatible astrometry "
+        "of hd_27."
+    );
+
+    const CatalogCompositionResult result = composePrimary(*source);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "bridge_last");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("First"));
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 5.0);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.rightAscensionHours, 5.0);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.declinationDeg, 2.0);
+}
+
+void CatalogIdentityMergeTests::referenceOnlyAstrometryAnchorsTheEarliestRowModel()
+{
+    // The first two rows carry only a reference position and epoch, with no
+    // fixed position and no optional fields, while the bridge carries a full
+    // model at RA 5. The earliest row's reference-only model still anchors the
+    // survivor, so model selection cannot depend on optional-field presence.
+    // The second row agrees and enriches the selected model with its proper
+    // motion and parallax.
+    OwnGalaxyCelestialBody hipRow =
+        makeStar("hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, std::nullopt, std::nullopt);
+    hipRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody hdRow =
+        makeStar("hd_27", "Second", {CatalogIdentifier::make("hd", "27")}, {}, std::nullopt, std::nullopt);
+    hdRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        .referenceEpoch = j2000Epoch(),
+        .properMotionRightAscensionMasPerYear = 30.0,
+        .properMotionDeclinationMasPerYear = -10.0,
+        .stellarParallaxMas = 5.0,
+    };
+    OwnGalaxyCelestialBody bridgeRow = makeStar(
+        "bridge_last",
+        "Last bridge",
+        {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")},
+        {},
+        5.0,
+        2.0
+    );
+    bridgeRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *bridgeRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+        .properMotionRightAscensionMasPerYear = 125.0,
+    };
+    const auto source = createCatalog({hipRow, hdRow, bridgeRow}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of hip_17 and rejected the incompatible fixed coordinates "
+        "of bridge_last."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of hip_17 and rejected the incompatible astrometry of "
+        "bridge_last."
+    );
+
+    const CatalogCompositionResult result = composePrimary(*source);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "bridge_last");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("First"));
+    QVERIFY(!survivor->fixedEquatorialValue().has_value());
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& astrometry = *survivor->starAstrometryValue();
+    QCOMPARE(astrometry.referenceEquatorial.rightAscensionHours, 1.0);
+    QCOMPARE(astrometry.referenceEquatorial.declinationDeg, 2.0);
+    QCOMPARE(astrometry.referenceEpoch.julianDatePart1, j2000Epoch().julianDatePart1);
+    QVERIFY(astrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionRightAscensionMasPerYear, 30.0);
+    QVERIFY(astrometry.properMotionDeclinationMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionDeclinationMasPerYear, -10.0);
+    QVERIFY(astrometry.stellarParallaxMas.has_value());
+    QCOMPARE(*astrometry.stellarParallaxMas, 5.0);
+}
+
+void CatalogIdentityMergeTests::repeatedBridgesKeepTheEarliestRowModel()
+{
+    // Two bridge rows chain over three donors with conflicting models. The
+    // first donor's coherent model wins through both bridges, so neither
+    // bridge's own model nor the later donors' models replace it.
+    OwnGalaxyCelestialBody hipRow = makeStar("hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0);
+    hipRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *hipRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody hdRow = makeStar("hd_27", "Second", {CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0);
+    hdRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *hdRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody thirdRow = makeStar("hip_99", "Third", {CatalogIdentifier::make("hip", "99")}, {}, 3.0, 2.0);
+    thirdRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *thirdRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody firstBridgeRow = makeStar(
+        "bridge_one",
+        "Bridge one",
+        {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")},
+        {},
+        5.0,
+        2.0
+    );
+    firstBridgeRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *firstBridgeRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody secondBridgeRow = makeStar(
+        "bridge_two",
+        "Bridge two",
+        {CatalogIdentifier::make("hip", "99"), CatalogIdentifier::make("hip", "17")},
+        {},
+        7.0,
+        2.0
+    );
+    secondBridgeRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *secondBridgeRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    const auto source = createCatalog({hipRow, hdRow, thirdRow, firstBridgeRow, secondBridgeRow}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of hip_17 over conflicting fixed coordinates from "
+        "bridge_one."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of hip_17 and rejected the incompatible astrometry of "
+        "bridge_one."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of bridge_one over conflicting fixed coordinates from "
+        "bridge_two."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of bridge_one and rejected the incompatible astrometry "
+        "of bridge_two."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of bridge_two over conflicting fixed coordinates from "
+        "hip_99."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of bridge_two and rejected the incompatible astrometry "
+        "of hip_99."
+    );
+
+    const CatalogCompositionResult result = composePrimary(*source);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "bridge_two");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("First"));
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.rightAscensionHours, 1.0);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.declinationDeg, 2.0);
+    QVERIFY(hasRetainedCanonicalId(*survivor, "bridge_one"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "hip_17"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "hip_99"));
+}
+
+void CatalogIdentityMergeTests::epochCompatibilityDecidesTheOptionalFieldsOfTheEarliestModel()
+{
+    // The earliest row anchors the model at RA 1 with a declared epoch, and
+    // the second row declares the same direction 50 years later through its
+    // proper motion, while the bridge supplies RA 5 in both representations.
+    // The earliest row's model is selected as a whole; the second row only
+    // enriches it when the epoch-converted reference positions still agree.
+    constexpr double kEpochGapYears = 50.0;
+    constexpr double kProperMotionRaMasPerYear = 1'000.0;
+    constexpr double kProperMotionDecMasPerYear = -500.0;
+    const double donorRaOffsetHours = kProperMotionRaMasPerYear * kEpochGapYears / 3'600'000.0 / 15.0;
+    const double donorDecOffsetDeg = kProperMotionDecMasPerYear * kEpochGapYears / 3'600'000.0;
+
+    const auto makeEarliestRow = [&] {
+        OwnGalaxyCelestialBody row = makeStar("hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0);
+        row.starAstrometry = CatalogStarAstrometry{
+            .referenceEquatorial = *row.fixedEquatorial,
+            .referenceEpoch = j2000Epoch(),
+            .properMotionRightAscensionMasPerYear = kProperMotionRaMasPerYear,
+        };
+        return row;
+    };
+    const auto makeSecondRow = [&](const double properMotionRaMasPerYear) {
+        OwnGalaxyCelestialBody row = makeStar("hd_27", "Second", {CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0);
+        row.starAstrometry = CatalogStarAstrometry{
+            .referenceEquatorial =
+                EquatorialCoordinate{
+                    .rightAscensionHours = 1.0 + donorRaOffsetHours, .declinationDeg = 2.0 + donorDecOffsetDeg
+                },
+            .referenceEpoch =
+                AstronomicalEpoch{
+                    .julianDatePart1 = j2000Epoch().julianDatePart1,
+                    .julianDatePart2 = kEpochGapYears * 365.25,
+                    .timeScale = TimeScale::Tt,
+                },
+            .properMotionRightAscensionMasPerYear = properMotionRaMasPerYear,
+            .properMotionDeclinationMasPerYear = kProperMotionDecMasPerYear,
+            .stellarParallaxMas = 5.0,
+        };
+        return row;
+    };
+    const auto makeBridgeRow = [&] {
+        OwnGalaxyCelestialBody row = makeStar(
+            "bridge_last",
+            "Last bridge",
+            {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")},
+            {},
+            5.0,
+            2.0
+        );
+        row.starAstrometry = CatalogStarAstrometry{
+            .referenceEquatorial = *row.fixedEquatorial,
+            .referenceEpoch = j2000Epoch(),
+        };
+        return row;
+    };
+
+    const auto compatibleSource =
+        createCatalog({makeEarliestRow(), makeSecondRow(kProperMotionRaMasPerYear), makeBridgeRow()}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of hip_17 over conflicting fixed coordinates from "
+        "bridge_last."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of hip_17 and rejected the incompatible astrometry of "
+        "bridge_last."
+    );
+
+    const CatalogCompositionResult compatible = composePrimary(*compatibleSource);
+
+    QVERIFY(compatible.isSuccess());
+    QCOMPARE(compatible.bodyCount, std::size_t{1});
+    const BaseCelestialBody* compatibleSurvivor = findBodyById(compatible.catalog->bodies(), "bridge_last");
+    QVERIFY(compatibleSurvivor != nullptr);
+    QVERIFY(compatibleSurvivor->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& compatibleAstrometry = *compatibleSurvivor->starAstrometryValue();
+    QCOMPARE(compatibleAstrometry.referenceEquatorial.rightAscensionHours, 1.0);
+    QCOMPARE(compatibleAstrometry.referenceEquatorial.declinationDeg, 2.0);
+    QCOMPARE(compatibleAstrometry.referenceEpoch.julianDatePart1, j2000Epoch().julianDatePart1);
+    QCOMPARE(compatibleAstrometry.referenceEpoch.julianDatePart2, j2000Epoch().julianDatePart2);
+    QVERIFY(compatibleAstrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*compatibleAstrometry.properMotionRightAscensionMasPerYear, kProperMotionRaMasPerYear);
+    QVERIFY(compatibleAstrometry.properMotionDeclinationMasPerYear.has_value());
+    QCOMPARE(*compatibleAstrometry.properMotionDeclinationMasPerYear, kProperMotionDecMasPerYear);
+    QVERIFY(compatibleAstrometry.stellarParallaxMas.has_value());
+    QCOMPARE(*compatibleAstrometry.stellarParallaxMas, 5.0);
+
+    // The same fixture with a proper motion twice the rate the reference
+    // offset implies: the epoch conversion leaves a residual, so the second
+    // row is rejected and the earliest row's model stays the only description.
+    const auto incompatibleSource =
+        createCatalog({makeEarliestRow(), makeSecondRow(2.0 * kProperMotionRaMasPerYear), makeBridgeRow()}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of hip_17 over conflicting fixed coordinates from "
+        "bridge_last."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of hip_17 and rejected the incompatible astrometry of "
+        "bridge_last."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of bridge_last and rejected the incompatible astrometry "
+        "of hd_27."
+    );
+
+    const CatalogCompositionResult incompatible = composePrimary(*incompatibleSource);
+
+    QVERIFY(incompatible.isSuccess());
+    QCOMPARE(incompatible.bodyCount, std::size_t{1});
+    const BaseCelestialBody* incompatibleSurvivor = findBodyById(incompatible.catalog->bodies(), "bridge_last");
+    QVERIFY(incompatibleSurvivor != nullptr);
+    QVERIFY(incompatibleSurvivor->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& incompatibleAstrometry = *incompatibleSurvivor->starAstrometryValue();
+    QCOMPARE(incompatibleAstrometry.referenceEquatorial.rightAscensionHours, 1.0);
+    QCOMPARE(incompatibleAstrometry.referenceEpoch.julianDatePart2, j2000Epoch().julianDatePart2);
+    QVERIFY(incompatibleAstrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*incompatibleAstrometry.properMotionRightAscensionMasPerYear, kProperMotionRaMasPerYear);
+    QVERIFY(!incompatibleAstrometry.properMotionDeclinationMasPerYear.has_value());
+    QVERIFY(!incompatibleAstrometry.stellarParallaxMas.has_value());
+}
+
+void CatalogIdentityMergeTests::laterSourceModelReplacesAnEarlierBridgedModel()
+{
+    // The earlier source deduplicates its two rows into one bridged survivor
+    // at RA 1. The later source's own record describes RA 5 in both
+    // representations, so it replaces the bridged model as a whole and the
+    // incompatible absorbed model is diagnosed.
+    OwnGalaxyCelestialBody earlierHip =
+        makeStar("a_hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0);
+    earlierHip.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *earlierHip.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody earlierHd =
+        makeStar("a_hd_27", "Second", {CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0);
+    earlierHd.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *earlierHd.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody earlierBridge = makeStar(
+        "a_bridge",
+        "Last bridge",
+        {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")},
+        {},
+        1.0,
+        2.0
+    );
+    earlierBridge.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *earlierBridge.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody laterReplacement =
+        makeStar("b_hip_17", "Replacement", {CatalogIdentifier::make("hip", "17")}, {}, 5.0, 2.0);
+    laterReplacement.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *laterReplacement.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    const auto earlierSource = createCatalog({earlierHip, earlierHd, earlierBridge}, {});
+    const auto laterSource = createCatalog({laterReplacement}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of b_hip_17 over conflicting fixed coordinates from "
+        "a_bridge."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of b_hip_17 and rejected the incompatible astrometry of "
+        "a_bridge."
+    );
+
+    const CatalogCompositionResult result = composeInOrder(*earlierSource, *laterSource);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "b_hip_17");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Replacement"));
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 5.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.rightAscensionHours, 5.0);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.declinationDeg, 2.0);
+    QVERIFY(hasRetainedCanonicalId(*survivor, "a_bridge"));
+}
+
+void CatalogIdentityMergeTests::secondPassKeepsTheEarliestRowModelAcrossALateLocalBridge()
+{
+    // Source A links HIP 17 with HYG 2. Source B's first row describes HYG 2
+    // at RA 5; the later local bridge carries the model of its earliest row,
+    // which reaches the survivor produced by the first row out of encounter
+    // order. The shared merge must replace that survivor's model as a whole
+    // with the earlier row's coherent model.
+    OwnGalaxyCelestialBody linked = makeStar(
+        "a_linked", {}, {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hyg", "2")}, {}, 1.0, 2.0
+    );
+    linked.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *linked.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody ninthRow =
+        makeStar("b_hip_99", "Ninth", {CatalogIdentifier::make("hip", "99")}, {}, 9.0, 2.0);
+    ninthRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *ninthRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody secondRow =
+        makeStar("b_hyg_2", "Second", {CatalogIdentifier::make("hyg", "2")}, {}, 5.0, 2.0);
+    secondRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *secondRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody firstRow =
+        makeStar("b_hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, 9.0, 2.0);
+    firstRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *firstRow.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+    };
+    OwnGalaxyCelestialBody localBridge = makeStar(
+        "b_bridge",
+        "Last bridge",
+        {CatalogIdentifier::make("hip", "99"), CatalogIdentifier::make("hip", "17")},
+        {},
+        std::nullopt,
+        std::nullopt
+    );
+    const auto sourceA = createCatalog({linked}, {});
+    const auto sourceB = createCatalog({ninthRow, secondRow, firstRow, localBridge}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of b_hyg_2 over conflicting fixed coordinates from "
+        "a_linked."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of b_hyg_2 and rejected the incompatible astrometry of "
+        "a_linked."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of b_bridge over conflicting fixed coordinates from "
+        "b_hyg_2."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of b_bridge and rejected the incompatible astrometry of "
+        "b_hyg_2."
+    );
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "b_hyg_2");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Ninth"));
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 9.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.rightAscensionHours, 9.0);
+    QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.declinationDeg, 2.0);
+    QVERIFY(hasIdentifier(*survivor, "hip", "17"));
+    QVERIFY(hasIdentifier(*survivor, "hip", "99"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "a_linked"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "b_bridge"));
+}
+
+void CatalogIdentityMergeTests::adoptsAContradictoryDonorsFixedPositionWithoutItsAstrometry()
+{
+    // The donor row fixes the object at RA 1 while its own astrometry anchors
+    // it at RA 5. The bridge row carries no model of its own, so it adopts the
+    // donor's model whole; the donor's fixed position survives and its
+    // self-contradicting astrometry is rejected instead of accompanying it.
+    OwnGalaxyCelestialBody contradictoryDonor =
+        makeStar("hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0);
+    contradictoryDonor.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = EquatorialCoordinate{.rightAscensionHours = 5.0, .declinationDeg = 2.0},
+        .referenceEpoch = j2000Epoch(),
+        .properMotionRightAscensionMasPerYear = 125.0,
+        .properMotionDeclinationMasPerYear = -55.0,
+        .stellarParallaxMas = 7.5,
+    };
+    OwnGalaxyCelestialBody secondDonor =
+        makeStar("hd_27", "Second", {CatalogIdentifier::make("hd", "27")}, {}, std::nullopt, std::nullopt);
+    OwnGalaxyCelestialBody bridgeRow = makeStar(
+        "bridge_last",
+        "Last bridge",
+        {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")},
+        {},
+        std::nullopt,
+        std::nullopt
+    );
+    const auto source = createCatalog({contradictoryDonor, secondDonor, bridgeRow}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of bridge_last and rejected the incompatible astrometry of "
+        "hip_17."
+    );
+
+    const CatalogCompositionResult result = composePrimary(*source);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "bridge_last");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("First"));
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(!survivor->starAstrometryValue().has_value());
+    QVERIFY(hasIdentifier(*survivor, "hip", "17"));
+    QVERIFY(hasIdentifier(*survivor, "hd", "27"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "hip_17"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "hd_27"));
 }
 
 QTEST_APPLESS_MAIN(CatalogIdentityMergeTests)

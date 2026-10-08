@@ -15,7 +15,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -110,10 +109,18 @@ struct ValueOrigin final {
 // present exactly when the survivor carries a value for that field and a valid
 // zero is a value like any other. Unions without precedence, such as
 // identifiers and aliases, carry no origin.
+//
+// The coherent coordinate model has its own origins: `starAstrometry` is the
+// origin of the astrometry reference-position/epoch anchor, present exactly
+// when the survivor carries astrometry regardless of its optional fields, and
+// `coordinateModel` is the origin of the survivor's model anchor, the
+// higher-precedence origin among the present model components.
 struct FieldOrigins final {
     std::optional<ValueOrigin> displayName;
     std::optional<ValueOrigin> visualMagnitude;
     std::optional<ValueOrigin> fixedEquatorial;
+    std::optional<ValueOrigin> starAstrometry;
+    std::optional<ValueOrigin> coordinateModel;
     std::optional<ValueOrigin> properMotionRightAscension;
     std::optional<ValueOrigin> properMotionDeclination;
     std::optional<ValueOrigin> stellarParallax;
@@ -143,10 +150,13 @@ fieldOriginsOf(const BaseCelestialBody& body, const std::size_t sourceRank, cons
     }
     if (body.fixedEquatorialValue().has_value()) {
         origins.fixedEquatorial = origin;
+        origins.coordinateModel = origin;
     }
 
     const CatalogStarAstrometry* astrometry = body.catalogStarAstrometry();
     if (astrometry != nullptr) {
+        origins.starAstrometry = origin;
+        origins.coordinateModel = origin;
         if (astrometry->properMotionRightAscensionMasPerYear.has_value()) {
             origins.properMotionRightAscension = origin;
         }
@@ -180,6 +190,21 @@ fieldOriginsOf(const BaseCelestialBody& body, const std::size_t sourceRank, cons
         }
     }
     return origins;
+}
+
+// Origin of the survivor's coherent coordinate model anchor: the
+// higher-precedence origin among the model components the survivor carries, so
+// replacing or clearing a component never leaves a stale anchor behind.
+void refreshCoordinateModelOrigin(FieldOrigins& origins)
+{
+    std::optional<ValueOrigin> model;
+    if (origins.fixedEquatorial.has_value()) {
+        model = origins.fixedEquatorial;
+    }
+    if (origins.starAstrometry.has_value() && (!model.has_value() || outranks(*origins.starAstrometry, *model))) {
+        model = origins.starAstrometry;
+    }
+    origins.coordinateModel = std::move(model);
 }
 
 // Accumulates deduplicated bodies of one or more sources while keeping logical
@@ -530,6 +555,23 @@ loserValueWins(const ValueOrigin& loserOrigin, const ValueOrigin& winnerOrigin, 
     return false;
 }
 
+// True when the loser's coherent coordinate model outranks the winner's and
+// therefore replaces it whole. The loser needs a model component, and its
+// anchor origin must win under the active precedence; a winner without a model
+// always adopts the loser's.
+[[nodiscard]] bool loserCoordinateModelWins(
+    const FieldOrigins& loserOrigins, const FieldOrigins& winnerOrigins, const ValuePrecedence precedence
+)
+{
+    if (!loserOrigins.coordinateModel.has_value()) {
+        return false;
+    }
+    if (!winnerOrigins.coordinateModel.has_value()) {
+        return true;
+    }
+    return loserValueWins(*loserOrigins.coordinateModel, *winnerOrigins.coordinateModel, precedence);
+}
+
 // Adopts the loser's value when the winner carries none, or when the active
 // precedence mode lets the loser's recorded origin win.
 template <typename T>
@@ -622,8 +664,120 @@ void takeHigherPrecedence(
     winnerOrigin = loserOrigin;
 }
 
-// Merges the losing fixed position into the winning coordinate model. The
-// position supplied by the highest-precedence source wins, so a losing position
+// Replaces the winner's whole coordinate model with the loser's when the
+// loser's model anchor outranks the winner's: the higher-precedence model is
+// selected before any compatibility check, so the model the winner happened to
+// carry first never rejects the model its origin outranks. The selected model
+// keeps its own fixed position, reference position, and reference epoch; the
+// replaced model's compatible astrometry still enriches it field by field,
+// while a replaced position or astrometry that contradicts the selected model
+// is diagnosed instead of being combined with it. A loser whose own fixed
+// position and astrometry contradict each other is adopted as its fixed
+// position alone, because carrying its astrometry onto the winner would
+// publish the same contradiction on the survivor; the astrometry merge then
+// rejects and diagnoses the discarded astrometry.
+void replaceCoordinateModelInPlace(
+    OwnGalaxyCelestialBody& winner,
+    FieldOrigins& winnerOrigins,
+    const BaseCelestialBody& loser,
+    const FieldOrigins& loserOrigins,
+    const ValuePrecedence precedence
+)
+{
+    const std::optional<skygate::core::EquatorialCoordinate> replacedFixed = winner.fixedEquatorial;
+    const std::optional<CatalogStarAstrometry> replacedAstrometry = winner.starAstrometry;
+    const FieldOrigins replacedOrigins = winnerOrigins;
+    const std::optional<skygate::core::EquatorialCoordinate> loserFixed = loser.fixedEquatorialValue();
+    const CatalogStarAstrometry* loserAstrometry = loser.catalogStarAstrometry();
+    const bool replacedFixedConflicts =
+        replacedFixed.has_value() && loserFixed.has_value() && coordinatesConflict(*replacedFixed, *loserFixed);
+    const bool loserAstrometryContradictsFixed =
+        loserFixed.has_value() && loserAstrometry != nullptr
+        && !CatalogCoordinateModel::sameDirection(loserAstrometry->referenceEquatorial, *loserFixed);
+
+    winner.fixedEquatorial = loserFixed;
+    winner.starAstrometry = loser.starAstrometryValue();
+    winnerOrigins.fixedEquatorial = loserOrigins.fixedEquatorial;
+    winnerOrigins.starAstrometry = loserOrigins.starAstrometry;
+    winnerOrigins.properMotionRightAscension = loserOrigins.properMotionRightAscension;
+    winnerOrigins.properMotionDeclination = loserOrigins.properMotionDeclination;
+    winnerOrigins.stellarParallax = loserOrigins.stellarParallax;
+    winnerOrigins.radialVelocity = loserOrigins.radialVelocity;
+    winnerOrigins.astrometryValidityRange = loserOrigins.astrometryValidityRange;
+
+    if (loserAstrometryContradictsFixed) {
+        winner.starAstrometry = std::nullopt;
+        winnerOrigins.starAstrometry = std::nullopt;
+        winnerOrigins.properMotionRightAscension = std::nullopt;
+        winnerOrigins.properMotionDeclination = std::nullopt;
+        winnerOrigins.stellarParallax = std::nullopt;
+        winnerOrigins.radialVelocity = std::nullopt;
+        winnerOrigins.astrometryValidityRange = std::nullopt;
+    }
+
+    if (replacedFixedConflicts) {
+        logFixedCoordinateConflict(loser, winner);
+    } else if (
+        replacedFixed.has_value() && !winner.fixedEquatorial.has_value()
+        && (!winner.starAstrometry.has_value()
+            || !CatalogCoordinateModel::sameDirection(winner.starAstrometry->referenceEquatorial, *replacedFixed))
+    ) {
+        logRejectedFixedCoordinates(loser, winner);
+    }
+
+    if (replacedAstrometry.has_value()) {
+        if (!winner.starAstrometry.has_value()) {
+            logRejectedAstrometry(loser, winner, QStringLiteral("fixed coordinates"));
+        } else if (!CatalogCoordinateModel::sameAstrometry(*winner.starAstrometry, *replacedAstrometry)) {
+            logRejectedAstrometry(loser, winner, QStringLiteral("reference coordinates"));
+        } else {
+            CatalogStarAstrometry& merged = *winner.starAstrometry;
+            takeHigherPrecedence(
+                merged.properMotionRightAscensionMasPerYear,
+                winnerOrigins.properMotionRightAscension,
+                replacedAstrometry->properMotionRightAscensionMasPerYear,
+                replacedOrigins.properMotionRightAscension,
+                precedence
+            );
+            takeHigherPrecedence(
+                merged.properMotionDeclinationMasPerYear,
+                winnerOrigins.properMotionDeclination,
+                replacedAstrometry->properMotionDeclinationMasPerYear,
+                replacedOrigins.properMotionDeclination,
+                precedence
+            );
+            takeHigherPrecedence(
+                merged.stellarParallaxMas,
+                winnerOrigins.stellarParallax,
+                replacedAstrometry->stellarParallaxMas,
+                replacedOrigins.stellarParallax,
+                precedence
+            );
+            takeHigherPrecedence(
+                merged.radialVelocityKmPerSecond,
+                winnerOrigins.radialVelocity,
+                replacedAstrometry->radialVelocityKmPerSecond,
+                replacedOrigins.radialVelocity,
+                precedence
+            );
+            takeHigherPrecedence(
+                merged.validityRange,
+                winnerOrigins.astrometryValidityRange,
+                replacedAstrometry->validityRange,
+                replacedOrigins.astrometryValidityRange,
+                precedence
+            );
+        }
+    }
+
+    refreshCoordinateModelOrigin(winnerOrigins);
+}
+
+// Merges the losing fixed position into the winning coordinate model. A loser
+// whose coherent model anchor outranks the winner's replaces the whole model
+// before this per-component merge, so a position that disagrees with the model
+// whose origin loses never rejects the earlier model. Otherwise the position
+// supplied by the highest-precedence source wins, so a losing position
 // replaces a winning position only when the winning position was itself
 // inherited from a lower-precedence source. A losing position never enters a
 // model whose astrometry already anchors the object at a different direction.
@@ -637,6 +791,11 @@ void mergeFixedEquatorialInPlace(
     const ValuePrecedence precedence
 )
 {
+    if (loserCoordinateModelWins(loserOrigins, winnerOrigins, precedence)) {
+        replaceCoordinateModelInPlace(winner, winnerOrigins, loser, loserOrigins, precedence);
+        return;
+    }
+
     const skygate::core::EquatorialCoordinate* loserFixed = loser.fixedEquatorialCoordinate();
     if (loserFixed == nullptr) {
         return;
@@ -665,11 +824,15 @@ void mergeFixedEquatorialInPlace(
     }
     winner.fixedEquatorial = *loserFixed;
     winnerOrigins.fixedEquatorial = loserOrigins.fixedEquatorial;
+    refreshCoordinateModelOrigin(winnerOrigins);
 }
 
-// Merges the losing astrometry into the winning coordinate model. The
-// winner's reference position and reference epoch are authoritative. A losing
-// astrometry only enters the record when it agrees with the surviving model:
+// Merges the losing astrometry into the winning coordinate model. A loser
+// whose coherent model anchor outranks the winner's replaces the whole model
+// before this per-component merge, exactly like a losing fixed position.
+// Otherwise the winner's reference position and reference epoch are
+// authoritative. A losing astrometry only enters the record when it agrees
+// with the surviving model:
 // directly against a fixed position, or against the winning reference
 // position after the losing proper motion accounts for the reference-epoch
 // difference. Compatible losing astrometry fills the fields the winner is
@@ -685,6 +848,11 @@ void mergeStarAstrometryInPlace(
     const ValuePrecedence precedence
 )
 {
+    if (loserCoordinateModelWins(loserOrigins, winnerOrigins, precedence)) {
+        replaceCoordinateModelInPlace(winner, winnerOrigins, loser, loserOrigins, precedence);
+        return;
+    }
+
     const CatalogStarAstrometry* loserAstrometry = loser.catalogStarAstrometry();
     if (loserAstrometry == nullptr) {
         return;
@@ -697,11 +865,13 @@ void mergeStarAstrometryInPlace(
             return;
         }
         winner.starAstrometry = *loserAstrometry;
+        winnerOrigins.starAstrometry = loserOrigins.starAstrometry;
         winnerOrigins.properMotionRightAscension = loserOrigins.properMotionRightAscension;
         winnerOrigins.properMotionDeclination = loserOrigins.properMotionDeclination;
         winnerOrigins.stellarParallax = loserOrigins.stellarParallax;
         winnerOrigins.radialVelocity = loserOrigins.radialVelocity;
         winnerOrigins.astrometryValidityRange = loserOrigins.astrometryValidityRange;
+        refreshCoordinateModelOrigin(winnerOrigins);
         return;
     }
 
@@ -805,6 +975,7 @@ void mergeDistantInPlace(
             }
             winner.fixedEquatorial = *loserFixed;
             winnerOrigins.fixedEquatorial = loserOrigins.fixedEquatorial;
+            refreshCoordinateModelOrigin(winnerOrigins);
         } else if (winnerHasFixed && coordinatesConflict(*winner.fixedEquatorial, *loserFixed)) {
             logFixedCoordinateConflict(winner, loser);
         }
@@ -918,40 +1089,22 @@ std::vector<std::string> collectContributors(
     return contributors;
 }
 
-// Earliest row that supplied any part of a survivor's coordinate model. Model
-// fields of absorbed survivors of one source merge in that row order, so the
-// first row that supplied a model also decides which coherent model survives;
-// a survivor without a model orders after every model a row supplied.
-[[nodiscard]] std::size_t earliestModelRow(const FieldOrigins& origins)
-{
-    std::size_t first = std::numeric_limits<std::size_t>::max();
-    const std::optional<ValueOrigin>* const modelFields[] = {
-        &origins.fixedEquatorial,
-        &origins.properMotionRightAscension,
-        &origins.properMotionDeclination,
-        &origins.stellarParallax,
-        &origins.radialVelocity,
-        &origins.astrometryValidityRange,
-    };
-    for (const std::optional<ValueOrigin>* field : modelFields) {
-        if (field->has_value()) {
-            first = std::min(first, (*field)->rowOrdinal);
-        }
-    }
-    return first;
-}
-
 // Merges every absorbed survivor into `winner` in configured source precedence
-// order, highest precedence first, and within one source in the order the rows
-// supplied their coordinate models. Each value is filled or replaced by the
+// order, highest precedence first, and within one source in the order their
+// coordinate models take precedence: a survivor without a model orders after
+// every survivor that has one, and the earlier model anchor comes first. The
+// order only decides processing and diagnostic order; which model wins comes
+// from the origin comparisons. Each value is filled or replaced by the
 // absorbed survivor whose value origin outranks the origin the winner carries:
 // the source that actually supplied the value with the highest rank, or, when
 // both values belong to one source, the earlier row of that source, because the
 // first row of a source is authoritative and its later rows only fill it. So a
 // value a lower-precedence source supplied through an intermediate survivor is
 // never promoted to that survivor's rank, and a bridge across survivors of one
-// source never outranks the rows that supplied their metadata. Each merge
-// diagnoses the coordinate or metadata conflicts the winner overrides.
+// source never outranks the rows that supplied their metadata. A loser whose
+// coherent coordinate model anchor outranks the winner's replaces the whole
+// model instead of being merged component by component. Each merge diagnoses
+// the coordinate or metadata conflicts the winner overrides.
 void absorbSurvivors(
     BaseCelestialBody& winner,
     FieldOrigins& winnerOrigins,
@@ -970,7 +1123,12 @@ void absorbSurvivors(
             if (sourcePrecedence.outranks(accumulator.sourceIds[rhs], accumulator.sourceIds[lhs])) {
                 return false;
             }
-            return earliestModelRow(accumulator.fieldOrigins[lhs]) < earliestModelRow(accumulator.fieldOrigins[rhs]);
+            const std::optional<ValueOrigin>& lhsModel = accumulator.fieldOrigins[lhs].coordinateModel;
+            const std::optional<ValueOrigin>& rhsModel = accumulator.fieldOrigins[rhs].coordinateModel;
+            if (lhsModel.has_value() != rhsModel.has_value()) {
+                return lhsModel.has_value();
+            }
+            return lhsModel.has_value() && outranks(*lhsModel, *rhsModel);
         }
     );
 
