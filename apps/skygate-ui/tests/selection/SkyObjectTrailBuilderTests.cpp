@@ -457,7 +457,8 @@ private slots:
     void invalidInputsAppendNoLines();
     void appendsPastDashesFutureSegmentsAndTickLabels();
     void invalidSamplesBreakContinuity();
-    void highPrecisionFixedTargetTrailUsesEquatorialModel();
+    void highPrecisionFixedTargetTrailSamplesThroughEngine();
+    void highPrecisionFixedTargetTrailAlignsPresentSampleToMarker();
     void highPrecisionRequestTrailUsesSparseInterpolatedSamples();
     void thirdIdentityHighPrecisionTraitsTrailUsesSparseInterpolatedSamples();
     void highPrecisionNonFixedTargetTrailUsesGuidanceEngine();
@@ -532,7 +533,7 @@ void SkyObjectTrailBuilderTests::invalidSamplesBreakContinuity()
     QVERIFY(gappedFrame.lines.size() < continuousFrame.lines.size());
 }
 
-void SkyObjectTrailBuilderTests::highPrecisionFixedTargetTrailUsesEquatorialModel()
+void SkyObjectTrailBuilderTests::highPrecisionFixedTargetTrailSamplesThroughEngine()
 {
     const auto projection = makeProjection();
     QVERIFY(projection.has_value());
@@ -544,7 +545,12 @@ void SkyObjectTrailBuilderTests::highPrecisionFixedTargetTrailUsesEquatorialMode
     skygate::ephemeris::EphemerisRequest request;
     request.context = input.skyContext;
     request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
+    request.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::core::TimeScale::Utc
+    };
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::astrometric());
+    request.options.setEnableAtmosphericRefraction(false);
     input.ephemerisRequest = request;
 
     skygate::ephemeris::OwnGalaxyCelestialBody body;
@@ -557,16 +563,70 @@ void SkyObjectTrailBuilderTests::highPrecisionFixedTargetTrailUsesEquatorialMode
     );
     const skygate::ephemeris::CelestialBodyState state{
         .bodyIndex = input.targetBodyIndex,
-        .equatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.75, .declinationDeg = 2.0}
+        .equatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.75, .declinationDeg = 2.0},
+        .horizontal = skygate::core::HorizontalCoordinate{.altitudeDeg = 45.0, .azimuthDeg = 180.0}
     };
     input.targetBody = &bodyCatalog.bodyAt(0U);
     input.targetState = &state;
 
     builder.appendTrail(frame, input);
 
-    QVERIFY(frame.lines.size() > 5U);
-    QCOMPARE(engine.requestBodyStateCalls(), 0);
+    QVERIFY(engine.sawExpectedBodyIndex());
+    QVERIFY(frame.lines.size() > 40U);
+    QCOMPARE(engine.requestBodyStateCalls(), 145);
     QCOMPARE(engine.contextBodyStateCalls(), 0);
+    QVERIFY(containsOffset(engine.requestOffsetMinutes(), -350));
+    QVERIFY(containsOffset(engine.requestOffsetMinutes(), 10));
+    QVERIFY(containsOffset(engine.requestOffsetMinutes(), 1090));
+}
+
+void SkyObjectTrailBuilderTests::highPrecisionFixedTargetTrailAlignsPresentSampleToMarker()
+{
+    const auto projection = makeProjection();
+    QVERIFY(projection.has_value());
+    TrailEngine engine;
+    engine.setHighPrecisionTraits(true);
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+    auto input = makeInput(engine, *projection);
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
+    request.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::core::TimeScale::Utc
+    };
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::astrometric());
+    request.options.setEnableAtmosphericRefraction(false);
+    input.ephemerisRequest = request;
+
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "fixed-star";
+    body.displayName = "Fixed Star";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.75, .declinationDeg = 2.0};
+    const skygate::ephemeris::CelestialBodyCatalog bodyCatalog(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{std::move(body)}
+    );
+    const skygate::ephemeris::CelestialBodyState state{
+        .bodyIndex = input.targetBodyIndex,
+        .equatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.75, .declinationDeg = 2.0},
+        .horizontal = skygate::core::HorizontalCoordinate{.altitudeDeg = 44.0, .azimuthDeg = 182.0}
+    };
+    input.targetBody = &bodyCatalog.bodyAt(0U);
+    input.targetState = &state;
+
+    builder.appendTrail(frame, input);
+
+    const skygate::core::ScreenPoint selectedPoint = projection->project(state.horizontal);
+    QVERIFY(selectedPoint.isVisible);
+    QVERIFY(std::any_of(frame.lines.begin(), frame.lines.end(), [&](const SkyRenderLine& line) {
+        return line.widthPx == 2.0 && line.color.alpha() == 175
+               && lineTouchesPoint(line, selectedPoint.x, selectedPoint.y, 1.0);
+    }));
+    QVERIFY(std::none_of(frame.lines.begin(), frame.lines.end(), [&](const SkyRenderLine& line) {
+        return lineTouchesPoint(line, selectedPoint.x, selectedPoint.y, 1.0) && lineLength(line) > 50.0;
+    }));
 }
 
 void SkyObjectTrailBuilderTests::highPrecisionRequestTrailUsesSparseInterpolatedSamples()
