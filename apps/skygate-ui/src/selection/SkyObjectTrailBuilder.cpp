@@ -1,6 +1,5 @@
 #include "SkyObjectTrailBuilder.hpp"
 #include "CelestialBodyCatalog.hpp"
-#include "CelestialReferenceCalculator.hpp"
 #include "engine/EphemerisComputationPolicy.hpp"
 #include "SkyPerformanceLogging.hpp"
 #include "SkyRenderLabels.hpp"
@@ -290,7 +289,7 @@ equatorialEqual(const skygate::core::EquatorialCoordinate& lhs, const skygate::c
     return samples;
 }
 
-void alignGuidanceTrailToSelectedState(
+void alignTrailToSelectedState(
     std::vector<skygate::ephemeris::BodyTrailSample>& samples, const SkyObjectTrailInput& input
 )
 {
@@ -338,7 +337,7 @@ void alignGuidanceTrailToSelectedState(
 }
 
 [[nodiscard]] skygate::ephemeris::BodyTrailSample
-sampleAdaptiveTrailAtOffset(const SkyObjectTrailInput& input, const int offsetMinutes)
+sampleEngineTrailAtOffset(const SkyObjectTrailInput& input, const int offsetMinutes)
 {
     skygate::ephemeris::EphemerisRequest sampleRequest = *input.ephemerisRequest;
     sampleRequest.context.utcTime += std::chrono::minutes(offsetMinutes);
@@ -394,7 +393,7 @@ void appendAdaptiveTrailAnchors(
         return;
     }
 
-    const skygate::ephemeris::BodyTrailSample midpoint = sampleAdaptiveTrailAtOffset(input, midpointOffsetMinutes);
+    const skygate::ephemeris::BodyTrailSample midpoint = sampleEngineTrailAtOffset(input, midpointOffsetMinutes);
     if (interpolationErrorWithinBounds(previous, midpoint, next)) {
         anchors.push_back(next);
         return;
@@ -453,16 +452,13 @@ void appendAdaptiveTrailAnchors(
     guidanceRequest.options.setEngineKind(guidanceEngine->kind());
     std::vector<skygate::ephemeris::BodyTrailSample> samples =
         trailCalculator.sample(*guidanceEngine, guidanceRequest, 0U, renderOptions);
-    alignGuidanceTrailToSelectedState(samples, input);
+    alignTrailToSelectedState(samples, input);
     return samples;
 }
 
 [[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample>
 sampleFixedEquatorialTrail(const SkyObjectTrailInput& input, const skygate::ephemeris::BodyTrailOptions& renderOptions)
 {
-    const skygate::core::ObservationContext& context =
-        input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
-    const skygate::core::EquatorialCoordinate equatorial = input.targetState->equatorial;
     const int startOffsetMinutes = -renderOptions.pastHours * 60;
     const int endOffsetMinutes = renderOptions.futureHours * 60;
 
@@ -473,17 +469,10 @@ sampleFixedEquatorialTrail(const SkyObjectTrailInput& input, const skygate::ephe
 
     for (int offsetMinutes = startOffsetMinutes; offsetMinutes <= endOffsetMinutes;
          offsetMinutes += renderOptions.sampleStepMinutes) {
-        const skygate::core::UtcTimePoint sampleTime = context.utcTime + std::chrono::minutes(offsetMinutes);
-        samples.push_back(
-            skygate::ephemeris::BodyTrailSample{
-                .offsetMinutes = offsetMinutes,
-                .horizontal = skygate::ephemeris::CelestialReferenceCalculator::equatorialPoint(
-                    equatorial.rightAscensionHours, equatorial.declinationDeg, context.observer, sampleTime
-                )
-            }
-        );
+        samples.push_back(sampleEngineTrailAtOffset(input, offsetMinutes));
     }
 
+    alignTrailToSelectedState(samples, input);
     return samples;
 }
 

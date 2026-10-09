@@ -793,6 +793,10 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
                              .arg(starAstrometryCalculator->singleCallCount() - astrometrySingleCallsBefore)
                              .arg(apparentPlaceCalculator->batchCallCount() - apparentBatchCallsBefore)
                              .arg(apparentPlaceCalculator->singleCallCount() - apparentSingleCallsBefore);
+    // Selecting a fixed star samples its trail through the engine for the
+    // full window at the ten-minute render step. The present sample is served
+    // from the scene snapshot cache, so the remaining samples account for
+    // 144 single-body computations plus the one inspector detail recompute.
     verifyHighPrecisionCounterDeltas(
         *starAstrometryCalculator,
         *apparentPlaceCalculator,
@@ -801,9 +805,9 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
         apparentBatchCallsBefore,
         apparentSingleCallsBefore,
         0,
-        1,
+        145,
         0,
-        1,
+        145,
         "high precision large fixed catalog selection"
     );
 
