@@ -668,11 +668,12 @@ void takeHigherPrecedence(
 // loser's model anchor outranks the winner's: the higher-precedence model is
 // selected before any compatibility check, so the model the winner happened to
 // carry first never rejects the model its origin outranks. The selected model
-// keeps its own fixed position, reference position, and reference epoch; the
+// carries its own fixed position, reference position, and reference epoch; the
 // replaced model's compatible astrometry still enriches it field by field,
 // while a replaced position or astrometry that contradicts the selected model
-// is diagnosed instead of being combined with it. A loser whose own fixed
-// position and astrometry contradict each other is adopted as its fixed
+// is diagnosed instead of being combined with it. A compatible replaced fixed
+// position is dropped with the rest of the replaced model. A loser whose own
+// fixed position and astrometry contradict each other is adopted as its fixed
 // position alone, because carrying its astrometry onto the winner would
 // publish the same contradiction on the survivor; the astrometry merge then
 // rejects and diagnoses the discarded astrometry.
@@ -727,7 +728,12 @@ void replaceCoordinateModelInPlace(
 
     if (replacedAstrometry.has_value()) {
         if (!winner.starAstrometry.has_value()) {
-            logRejectedAstrometry(loser, winner, QStringLiteral("fixed coordinates"));
+            if (!winner.fixedEquatorial.has_value()
+                || !CatalogCoordinateModel::sameDirection(
+                    *winner.fixedEquatorial, replacedAstrometry->referenceEquatorial
+                )) {
+                logRejectedAstrometry(loser, winner, QStringLiteral("fixed coordinates"));
+            }
         } else if (!CatalogCoordinateModel::sameAstrometry(*winner.starAstrometry, *replacedAstrometry)) {
             logRejectedAstrometry(loser, winner, QStringLiteral("reference coordinates"));
         } else {
