@@ -1146,10 +1146,15 @@ void absorbSurvivors(
 // Appends `incoming` as the survivor of every absorbed position. The incoming
 // record supplies the public canonical id because it is the later record that
 // establishes the shared authoritative identity or replaces an earlier
-// source's survivor; its values keep their own origins and only supply fields
-// the absorbed survivors do not. Absorbed positions are vacated and removed
-// from the index before the winner is registered, so later rows resolve to the
-// winner and never to a vacated body. Absorption retains each absorbed body's
+// source's survivor. Its own values keep their origins and compete field by
+// field with the absorbed survivors' values under origin precedence: a value
+// an absorbed survivor supplied outranks the incoming value only when its
+// source rank is higher or its row is earlier within the same source, so a
+// later replacing source's value overrides the survivor it absorbs while a
+// bridge over one source's own survivors never demotes the earlier supplying
+// rows. Absorbed positions are vacated and removed from the index before the
+// winner is registered, so later rows resolve to the winner and never to a
+// vacated body. Absorption retains each absorbed body's
 // canonical id and canonical equivalences on the winner, so the earlier keys
 // keep resolving to the survivor. A value the incoming record does not supply
 // follows the origin precedence of the absorbed survivors that do, and the
