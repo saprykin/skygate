@@ -728,10 +728,20 @@ void replaceCoordinateModelInPlace(
 
     if (replacedAstrometry.has_value()) {
         if (!winner.starAstrometry.has_value()) {
-            if (!winner.fixedEquatorial.has_value()
-                || !CatalogCoordinateModel::sameDirection(
+            if (winner.fixedEquatorial.has_value()
+                && CatalogCoordinateModel::sameDirection(
                     *winner.fixedEquatorial, replacedAstrometry->referenceEquatorial
                 )) {
+                // The replaced astrometry agrees with the selected fixed
+                // position, so its measurements enrich the selected model.
+                winner.starAstrometry = *replacedAstrometry;
+                winnerOrigins.starAstrometry = replacedOrigins.starAstrometry;
+                winnerOrigins.properMotionRightAscension = replacedOrigins.properMotionRightAscension;
+                winnerOrigins.properMotionDeclination = replacedOrigins.properMotionDeclination;
+                winnerOrigins.stellarParallax = replacedOrigins.stellarParallax;
+                winnerOrigins.radialVelocity = replacedOrigins.radialVelocity;
+                winnerOrigins.astrometryValidityRange = replacedOrigins.astrometryValidityRange;
+            } else {
                 logRejectedAstrometry(loser, winner, QStringLiteral("fixed coordinates"));
             }
         } else if (!CatalogCoordinateModel::sameAstrometry(*winner.starAstrometry, *replacedAstrometry)) {
