@@ -12,8 +12,9 @@ dependency direction:
   - UI-independent domain types, projection contracts, projection
     implementations, viewport math, and time abstractions.
 - `libs/skygate-ephemeris`
-  - Star catalog loading/parsing, catalog normalization, constellation data,
-    astronomical coordinate calculation, and snapshot generation.
+  - Star catalog loading/parsing, identity-based composition, catalog
+    normalization, constellation data, astronomical coordinate calculation,
+    and snapshot generation.
 
 Dependency flow is one-way:
 
@@ -33,7 +34,8 @@ ephemeris-data metadata when present, registers the QML/C++ types, and wires
 the UI object graph:
 
 1. `SkyContextController` owns the mutable application state exposed to QML.
-2. `SkyCatalogManager` owns active catalog state, while
+2. `SkyCatalogManager` owns the configured catalog source collection and
+   delegates active composition to `SkyCatalogRuntime`, while
    `SkyEphemerisDataManager` owns bundled/installed high-precision data state.
 3. `SkyContextController` attempts to recreate the selected ephemeris engine
    from the current catalog, engine settings, and active ephemeris data. If a
@@ -141,11 +143,40 @@ scene graph code, while transient UI and chrome stay in QML.
 
 #### Catalog and settings subsystem
 - `SkyCatalogManager`
-  - Owns the active `IStarCatalog`, current catalog source metadata, cached
-    constellation references, and revision counter.
-  - Restores and persists catalog cache through `SkySettingsStore`.
-  - Emits catalog changes that cause `SkyContextController` to rebuild the
-    selected ephemeris engine.
+  - QML-facing owner of the configured catalog source collection and its
+    lifecycle: load, reload, enable/disable, reorder, remove, clear cache, and
+    restore.
+  - Keeps one operation record per source instance with a monotonic operation
+    revision, so a response captured for a superseded incarnation can never
+    apply to its successor while unrelated instances keep their pending work.
+  - Delegates active composition and related-data ownership to
+    `SkyCatalogRuntime` and persistence/migration to
+    `SkyCatalogCacheController`. Only an accepted transition persists state
+    and emits `catalogChanged`, which causes `SkyContextController` to rebuild
+    the selected ephemeris engine.
+- `SkyCatalogRuntime`
+  - Owns the configured source records, the composed active `IStarCatalog`,
+    the counts and provenance that describe it, and the composed related
+    constellation view.
+  - Stages a transition (candidate configuration, composition, counts,
+    provenance, related view, revision) before publishing it. A rejected
+    transition reports the operation error and leaves the last accepted state
+    exactly as it was.
+- `SkyCatalogCacheController`
+  - Persists and restores the collection configuration, per-instance payload
+    and binary sidecars, and per-source related datasets.
+  - Migrates the legacy two-slot cache once, and only for a true first-use
+    outcome (no collection was ever committed); neither an unreadable
+    committed collection nor a readable older flat collection is replaced
+    by retired legacy data.
+- `SkyCatalogImportWorkflow`
+  - Downloads and parses one source instance through `CatalogCoordinator`
+    using that instance's parse options (schema hint and archive member
+    selector).
+- `SkyCatalogPresets`
+  - Static descriptor table for the built-in presets (bundled, HYG v4.2,
+    bundled Messier, OpenNGC): stable source ID, title, version, URLs, schema
+    hint, archive selector, related-dataset URLs, attribution, and category.
 - `SkyEphemerisDataManager`
   - Owns bundled manifest state and installed high-precision data cache state.
   - Reports kernel, Earth-orientation, leap-second, and Delta T status to QML.
@@ -167,11 +198,23 @@ scene graph code, while transient UI and chrome stay in QML.
     coordinates so device/city/custom modes survive relaunch.
   - Persists the selected display timezone as an IANA timezone id; UTC remains
     the internal calculation and storage time basis.
-  - Persists downloaded/imported catalog rows in an app-data cache file and
-    stores related metadata in `QSettings`. The cache keeps a binary
-    serialization of the parsed catalogs alongside the raw payloads, so
-    restores skip the CSV re-parse; legacy caches are upgraded on first
-    restore and unreadable binary payloads fall back to payload parsing.
+  - Persists the catalog collection configuration (instance identity, order,
+    policy, enabled state, parse options, attribution, bundled flag) in
+    `QSettings`, and per-instance payload/binary sidecars in the app-data
+    cache directory. A stored snapshot is written even when the collection is
+    intentionally empty. The legacy two-slot cache keys remain readable for
+    migration only. An older flat collection stays the committed
+    configuration even when an interrupted upgrade staged generation
+    records beside it: the flat records load while the staged records and
+    payloads are ignored with a diagnostic. Loading the collection returns
+    an explicit outcome: no committed collection, a loaded collection (an
+    empty one is valid), or unusable committed configuration with
+    diagnostics.
+- `SkyCatalogSourcePresetModel` / `SkyCatalogSourceCollectionModel`
+  - Read-only `QAbstractListModel` surfaces for the available preset
+    descriptors and the active source collection.
+  - Rows keep the durable instance ID as identity, so equal titles or URLs do
+    not collapse distinct sources.
 - `LocationCatalogModel`
   - Loads a bundled CSV of major cities from Qt resources.
   - Exposes a flat, filterable `QAbstractListModel` with country headers and
@@ -179,6 +222,101 @@ scene graph code, while transient UI and chrome stay in QML.
 - `TimeZoneCatalogModel`
   - Uses Qt's timezone database to expose a searchable IANA timezone list for
     Preferences.
+
+#### Catalog collection lifecycle
+
+- **Preset vs instance identity.** `SkyCatalogSourceDescriptor` is a preset
+  template; `SkyCatalogSourceInstance` is a configured instance. The instance
+  ID is allocated when the instance is added
+  (`SkyCatalogSourceInstance::allocateInstanceId`) and stays fixed through
+  reload, reorder, cache, provenance, and restart. `descriptorId` records the
+  template an instance came from, and version or archive selection never
+  enters the ID, so two instances of one descriptor and two versions or member
+  selections at one URL stay distinct.
+- **First use versus configured emptiness.** The bundled default source is
+  installed only while no saved configuration has been considered yet. Once a
+  configuration is installed, removing the sole source or replacing the
+  collection with an empty one stays empty through every rebuild; no later
+  rebuild silently recreates a configured source.
+- **Atomic activation.** A source mutation or rebuild composes the candidate
+  configuration and every derived value before publishing. Configured
+  sources, active snapshot, counts, provenance, related view, and revision
+  change together, and only for an accepted composition. A rejected
+  transition (null catalog, composition rejection, missing bundled catalog)
+  reports the operation error and keeps the last accepted state; a deliberate
+  empty result is a published state, not a half-applied failure.
+- **Related data ownership.** Constellation lines, anchor groups, and the
+  declared count belong to the source instance whose related download
+  produced them (`SkyCatalogSourceRecord::constellationData`). Disabling a
+  source keeps its data owned but inactive; removing the source removes the
+  data. The active view composes the owned datasets of the enabled sources in
+  visible collection order:
+  - line segments are kept in visible order, and an exact duplicate segment
+    from a later contributor is kept once;
+  - anchor groups are keyed by constellation name, and a later contributor's
+    definition replaces an earlier one, matching later-wins object precedence;
+  - the declared count comes from the last enabled contributor that declares
+    one and is never lower than the number of distinct names in the view.
+
+  References resolve through `ConstellationReferenceResolver` against the
+  active snapshot, so they follow the surviving object identity even when the
+  winning star came from another catalog.
+- **Related-data retirement.** An accepted activation applies the old and new
+  related-data declaration to the instance's own dataset before the
+  transition is persisted or published: a declaration that still selects
+  related data supersedes the dataset owned by the replaced catalog until
+  the replacement's own download completes, and a declaration that no longer
+  selects related data retires the obsolete dataset. Downloaded and bundled
+  activation paths share this rule, independent of composition policy and
+  payload origin, and no other instance's dataset is touched; a rejected
+  update keeps the previously accepted dataset.
+- **Configuration versus payload cache.** Durable configuration and
+  disposable payload data are separate stores. Clearing one source's cache
+  evicts only its disposable payloads (catalog bytes, binary cache, and its
+  owned related payload); the configured record (identity, order, enabled
+  state, descriptor, parse options, and URLs) survives. The accepted
+  in-memory snapshot stays active for the session; after a restart the
+  source is still configured and reports an unavailable payload with retry
+  state, and ordinary persistence never writes the evicted bytes back. Only
+  a later accepted load repopulates payloads, and Remove stays the only
+  configuration-deletion operation. A configured source whose payload is
+  missing or corrupt likewise stays configured and reports its own error
+  without erasing siblings.
+- **Live restore.** A successful restore replaces the runtime collection and
+  the operation/accepted-facts state atomically. Operations omitted from the
+  restored collection are dropped, and outstanding callbacks are superseded
+  by fresh revisions, including when a restored source reuses an existing
+  instance ID: a late reply can neither repopulate an omitted source nor
+  mutate a restored instance. A rejected restore preserves the previous
+  accepted collection and still-valid work.
+- **Migration boundary.** Existing installations migrate the legacy two-slot
+  cache once, and only while no collection has ever been committed. A
+  collection committed in the older flat format counts, even when no
+  generation has committed, so an interrupted first upgrade that staged
+  generation records without a manifest stays on the flat collection
+  instead of migrating. Legacy instance IDs are derived deterministically
+  exactly at that boundary, and a legacy collection-wide related payload
+  establishes an owner only when a single record makes that unambiguous.
+  Migration is acknowledged only after the new configuration is committed,
+  so an interrupted migration keeps the legacy data readable and an
+  intentionally emptied collection does not resurrect migrated sources.
+- **Storage recovery states.** Loading the committed collection distinguishes
+  no committed collection, a loaded collection (an empty one is valid), and
+  unusable committed configuration, with diagnostics and a durable
+  committed-generation record. A collection already committed in the older
+  flat format is Loaded on its own terms: while its version marker and
+  source records are intact, generation groups staged by an interrupted
+  upgrade are ignored with a diagnostic, their records and payloads are
+  never promoted, and the flat records load with their versions, order,
+  IDs, and options. Only when generation records actually replaced the
+  flat records does the stale marker make the committed configuration
+  unusable. Legacy migration runs only for the no-committed-collection
+  state; a missing or truncated manifest or a missing referenced generation
+  reports a rejected restore instead of being treated as first use. A
+  staged-but-uncommitted generation is never chosen as the current
+  collection, and a deliberately evicted per-source payload remains a
+  readable configured record that reports unavailable payload state,
+  distinctly from unreadable committed data.
 
 ### `skygate-core`
 This module provides stable, UI-independent core types and projection logic.
@@ -450,68 +588,226 @@ the lower-fidelity result. The generic rule is that a degraded fallback never
 silently replaces a more capable active engine: the active engine remains in
 effect until a rebuild produces an engine at the requested capability.
 
-#### Catalog ingestion pipeline
-Catalog import supports multiple payload shapes:
+#### Catalog schema and container split
+Catalog ingestion separates payload containers from payload schemas.
 
-- bundled starter rows
-- bundled Messier deep-sky objects derived from OpenNGC
-- saved pipe-row cache format
-- HYG CSV
-- gzip-compressed HYG CSV
-- zip archives containing HYG CSV
-- OpenNGC semicolon CSV for deep-sky objects
+- A schema defines how a decoded plain-text payload maps to catalog bodies.
+  `CatalogSchemaRegistry` is the single source of truth: a
+  `CatalogSchemaDescriptor` records the schema type, diagnostic name,
+  delimiter, exact required columns, and parser factory for each registered
+  schema. Built-in schemas are the bundled starter catalog, HYG CSV
+  (comma-separated, required `ra`/`dec`/`mag`), and OpenNGC CSV
+  (semicolon-separated, required `Name`/`Type`/`RA`/`Dec`). Header detection,
+  parser selection, and parse diagnostics all read the same descriptors.
+- A container is an encoding layer around any schema. `CatalogPayloadParser`
+  decodes at most one gzip or ZIP layer before schema dispatch, then detects
+  the schema of the decoded payload. Nested archives are reported as an
+  unsupported inner schema instead of being decoded recursively. A ZIP member
+  can be selected explicitly through `CatalogParseRequest::memberSelector`;
+  otherwise the unique supported member is chosen deterministically and
+  missing or ambiguous members are explicit errors. Container codecs
+  (`CompressedDataInflater` and the private `io/zip` layers) are shared by
+  every schema rather than owned by one source.
+- Parse options travel as one value. `CatalogParseRequest` carries the
+  payload, an optional archive member selector, and an optional schema hint.
+  Detection stays authoritative: a detected schema that differs from a
+  concrete hint fails with
+  `CatalogLoadResult::ErrorCode::SchemaHintMismatch` instead of silently
+  parsing something else. `CatalogSelectionOptions` can truncate to the
+  brightest N bodies after parsing.
 
-The pipeline is:
+The public catalog API has only narrow front doors:
 
-1. `CatalogPayloadParser` uses the private `CatalogPayloadFormatDetector` to
-   detect payload format.
-2. `CatalogLoader` routes source requests to the correct parser implementation.
-3. HYG/OpenNGC parsers share `DelimitedCatalogReader` for header, row, and
-   limit handling.
-4. Parsed own-galaxy bodies are normalized by `CatalogBodyNormalization`;
-   distant deep-sky bodies keep parser-provided metadata.
-5. Optional selection/truncation can keep only the brightest bodies.
-6. The final catalog is materialized as `InMemoryStarCatalog`.
+- `CatalogPayloadParser` for unknown downloaded/imported payloads (container
+  decoding, detection, and parsing).
+- `CatalogLoader::load(...)` for a known schema plus an already-decoded
+  payload, with diagnostics.
+- `CatalogFactory::createStarCatalogFromBodies(...)` and
+  `createBundledStarCatalog()` for test/UI fixtures, already parsed bodies,
+  and the bundled starter dataset.
+- `CatalogSchemaRegistry::registerSchema(...)` to add a schema.
+- `CatalogComposer::composeCollection(...)` for ordered source collection
+  composition; application composition lives in `SkyCatalogRuntime`.
 
-Constellation catalog bodies are positioned only when the catalog provides a
-representative fixed-equatorial anchor. Unanchored constellation bodies remain
-unresolved instead of falling back to engine-owned representative coordinates.
-
-The public catalog API intentionally has only narrow front doors:
-
-- `CatalogPayloadParser` for unknown downloaded/imported payloads
-- `CatalogLoader::load(...)` for known catalog source types with diagnostics
-- `CatalogFactory::createStarCatalogFromBodies(...)` for test/UI fixtures and
-  already parsed bodies
-- `CatalogFactory::createBundledStarCatalog()` for the bundled starter dataset
-- `CatalogComposer::compose(...)` for active application catalog composition
-
-Deep-sky objects are a fixed-equatorial catalog layer. The UI can use bundled
-Messier data or download/update the OpenNGC preset. Bundled Messier data is
-included only when the active composition request enables the bundled deep-sky
-fallback. `composeActiveCatalog(...)` rebuilds the active `IStarCatalog`
-through private composition policies: `CoreBodyCatalogAugmenter` adds bundled
-Sun, Moon, planets, and bundled bright stars when needed, while
-`DeepSkyCatalogMerger` applies DSO alias replacement and source-kind tracking.
-OpenNGC records are parsed and deduplicated in `libs/skygate-ephemeris`, not in
-QML or scene graph code.
+Parsers implement `ICatalogParser` and return a `CatalogBodyParseResult`;
+schema-specific field mapping stays local (`HygCatalogParser`,
+`OpenNgcObjectMapper`, `BundledCatalogParser`). Parsed own-galaxy bodies are
+normalized by `CatalogBodyNormalization`; distant deep-sky bodies keep
+parser-provided metadata. `CatalogSnapshotValidator` enforces the snapshot
+invariants at construction boundaries, and the final catalog is materialized
+as an `InMemoryStarCatalog`.
 
 Catalog parsing uses private helpers to avoid repeated policy fragments:
 `StringUtilities` centralizes small ASCII normalization helpers,
 `CatalogParsingUtilities` centralizes catalog field parsing, and
 `OpenNgcObjectMapper` owns OpenNGC alias/id/display-name/object-kind mapping.
-Gzip and ZIP import share `CompressedDataInflater`. ZIP handling is split into
-private layers: `ZipDirectoryReader` parses central-directory metadata,
-`CatalogZipEntrySelector` applies the catalog CSV choice policy, and
-`ZipEntryExtractor` validates local headers and inflates entry payloads.
+ZIP handling is split into private layers: `ZipDirectoryReader` parses
+central-directory metadata, `CatalogZipEntrySelector` applies the archive
+member choice policy, and `ZipEntryExtractor` validates local headers and
+inflates entry payloads.
 
 Private catalog implementation files are grouped by responsibility under
 `libs/skygate-ephemeris/src/catalog`: orchestration facades at the catalog root,
-normalization in `normalize/`, active-catalog composition in `composition/`,
+normalization in `normalize/`, identity-based composition in `composition/`,
 source-specific parsers in `bundled/`, `hyg/`, `opengc/`, and `stellarium/`,
 constellation codecs in `constellation/`, and payload/archive IO in `io/` and
 `io/zip/`. Shared string helpers live directly under
 `libs/skygate-ephemeris/src`.
+
+#### Object identity and merge precedence
+Identity and display metadata stay separate:
+
+- `BaseCelestialBody::id` is the canonical object identity used by rendering,
+  search, ephemeris, and references. It comes from the highest-priority
+  source identifier at parse time (for example `hip_<n>`, `hyg_<n>`,
+  `ngc_<n>`, `messier_<nnn>`), never from a display name or sky position.
+- `CatalogObjectIdentity` preserves the source facts separately: the raw
+  source record key (`sourceRecordId`), namespaced cross-identifiers
+  (`CatalogIdentifier` with per-namespace normalization), display aliases,
+  and the scope of the canonical ID.
+- `IdScope::Global` marks a recognized astronomical designation or domain
+  identity (including planet IDs such as `mercury`). `IdScope::SourceLocal`
+  marks a parser-generated record key such as `hyg_auto_<n>` for a row
+  without any recognized designation. Composition qualifies a source-local ID
+  with its owning instance ID (`hyg_auto_1@<sourceId>`), so equal counters
+  from unrelated sources never match while a reload of the same instance
+  keeps the same object key.
+
+`CatalogIdentityIndex` resolves canonical IDs, external identifiers, and
+deep-sky aliases against the current survivors while the merge proceeds. It
+prefers authoritative keys (canonical ID, external identifier) over aliases
+and reports ambiguous matches explicitly.
+
+`CatalogCompositionMerger` is the single merge implementation:
+
+- A collection composes in order. Within one source, the first record for an
+  identity is authoritative and later duplicates fill its missing metadata.
+  Across replacing sources, a later source has higher precedence: its matching
+  record replaces the earlier survivor and absorbs the earlier body's
+  non-conflicting identifiers, aliases, and metadata. The winner's own present
+  values stay authoritative; a value it is missing is taken from the
+  highest-precedence source that actually supplied it, even when that source
+  reached the survivor through an intermediate survivor. The absorbed body's
+  canonical id, and every canonical id it already retained, stay on the
+  survivor as retained canonical ids: later rows, later compositions,
+  restored snapshots, and a snapshot fed back as a composition input still
+  resolve the earlier identity to the single survivor. The public canonical
+  id stays the surviving record's own id: the replacing record's for a
+  replacement, the bridging record's for a bridge. That choice never
+  changes which row's metadata outranks which.
+- Enriched fields resolve per field from the source that actually supplied
+  the value. A field inherited through an intermediate survivor keeps the
+  rank of its supplying source instead of being promoted to the survivor's
+  rank, so an explicit higher-precedence value stays authoritative while an
+  absent field and a valid zero value keep their meaning, and separate
+  optional fields resolve independently. Within one source, each field keeps
+  the earliest row that supplied it, so a bridge across a source's own
+  survivors fills only missing fields and never demotes values the earlier
+  rows supplied. When the collection pass resolves a record of the source
+  being merged to a survivor its own earlier rows produced, it fills missing
+  values, keeps values the survivor inherited from other sources, and
+  resolves a value both records supply from this source by the earlier
+  supplying row, even when bridge absorption moved the survivor away from
+  its original row order.
+- Field origins are per merge run and are not carried by a body. An
+  already-materialized snapshot supplied as one new source counts every
+  value it holds as supplied by that source, so no cross-snapshot field
+  history is promised or recovered.
+- The identity-to-survivor index stays current: a replacement vacates the
+  earlier survivor's keys, and identifiers acquired by a metadata union are
+  registered before the next record resolves. Later records can therefore
+  match identifiers an earlier record acquired in the same source pass, and a
+  record that bridges several survivors of one kind collapses them into a
+  single survivor with complete contributors. Identity bridging decides
+  which records are one object, not which row's metadata wins, so the
+  earlier rows keep their precedence under the within-source row order.
+  Matched survivors of an incompatible kind stay distinct with a diagnostic.
+- Weak deep-sky alias matches merge only when neither record carries a
+  conflicting authoritative designation; two distinct recognized
+  designations that share a common display name stay distinct.
+- Coordinates merge as one coherent model per survivor, selected before any
+  compatibility check. The model anchor is the fixed position together with
+  the astrometry reference position and reference epoch; astrometry without
+  motion or parallax fields still anchors a model. The anchor origin is the
+  higher-precedence origin among the model components the survivor carries.
+  A losing model whose anchor origin outranks the winner's replaces the
+  winner's whole model, so copying the record that bridges two objects never
+  preselects a model the earlier supplying row outranks. The replaced
+  model's compatible astrometry still enriches the selected model field by
+  field, including when a fixed-only model replaces a bridge's astrometry:
+  the selected fixed position stays the model's anchor and the adopted
+  fields keep the origins of the records that supplied them instead of
+  moving to the selected anchor's row. A contradicting replaced position or
+  astrometry is diagnosed, never combined with it, and a compatible
+  replaced fixed position is dropped with the rest of the replaced model.
+  A donor whose own fixed position contradicts its own astrometry
+  contributes only its fixed position, and the discarded astrometry is
+  rejected with a diagnostic. With the winner's model
+  selected, a losing fixed position fills a missing winner position or
+  replaces one when the losing position's origin outranks the winner's — a
+  higher source rank, or an earlier supplying row within the same source —
+  and never replaces a value the winner carries from a higher-precedence
+  source. It never enters a model whose astrometry anchors the object at a
+  different direction, because a fixed position carries no reference epoch
+  to convert; a conflicting position the winner carries is diagnosed and
+  replaced. A compatible losing astrometry enters only when it agrees
+  with the surviving model, either directly against a fixed position or
+  against the winning reference
+  position after its own proper motion accounts for the reference-epoch
+  difference; it fills missing proper motion, parallax, radial velocity, and
+  validity fields, and it replaces a field when the losing value's origin
+  outranks the winner's — a higher source rank, or an earlier supplying row
+  within the same source — and never replaces a value the winner carries
+  from a higher-precedence source. Contradictory losing coordinates are
+  rejected with a diagnostic that names the kept model.
+- After the merge, an authoritative identity shared by two active survivors
+  of the same kind is an internal merge error; a shared identity across
+  incompatible kinds is a deliberate, already diagnosed conflict.
+
+`CatalogCompositionResult` reports provenance for the composition: `sourceIds`
+is parallel to the composed snapshot and names the winning source instance per
+body, and `contributorSourceIds` lists every contributing source in descending
+source precedence: the winner's source first, then each remaining contributor
+highest precedence first, every contributing source once. Accumulator
+insertion positions after a replacement or bridge carry no precedence; within
+one source, the first row is authoritative and later rows only fill it.
+`CatalogCompositionRequest` (`sourceId`, `enabled`, catalog,
+`CatalogCompositionPolicy`) rejects empty or duplicate source identities with
+an explicit diagnostic instead of conflating provenance.
+
+#### Composition policy and fallback
+Policy is part of the configuration, not a hidden merge step:
+
+- `CatalogCompositionPolicy::Merge` and `DeepSkyOnly` are replacing sources:
+  later sources win and absorb non-conflicting metadata.
+- Every policy shares one identity decision. A gap-fill body is skipped only
+  when its identity resolves to an existing survivor through the same kind,
+  designation, and ambiguity checks `Merge` uses; a contradicted or ambiguous
+  weak alias match keeps the body as an independent object with the normal
+  diagnostic, and a fallback row that matches a configured survivor preserves
+  the configured winner's values.
+- `AugmentCore` contributes only non-deep-sky bodies as a gap-fill; it also
+  enables the bundled bright-star fallback when no source supplies a star.
+  The runtime always adds it as a derived contribution so Sun, Moon, and
+  planet bodies exist; it is not a configured collection source.
+- `DeepSkyFallback` contributes only deep-sky identities that no configured
+  source supplies. It never replaces a configured source's body or its
+  visible collection position, so configured values always win over bundled
+  fallback data.
+- Bundled augmentation and fallback carry their own provenance
+  (`bundled-core`, `bundled-deep-sky`) instead of being attributed to another
+  source.
+
+`SkyCatalogRuntimeBuildOptions::BundledDeepSkyParticipation` makes bundled
+deep-sky participation an explicit configuration choice (`Disabled` or
+`Fallback`); legacy preset controls delegate to the same configuration. The
+bundled fallback cannot alter an explicit source's values (the R9
+counterexample: a configured M31 with magnitude 0 keeps that magnitude).
+
+Deep-sky objects remain a fixed-equatorial catalog layer. The UI can use
+bundled Messier data or download/update the OpenNGC preset. OpenNGC records
+are parsed and deduplicated in `libs/skygate-ephemeris`, not in QML or scene
+graph code.
 
 #### Constellation data
 Constellation lines and label anchors have one persisted/imported source:
@@ -519,10 +815,14 @@ Constellation lines and label anchors have one persisted/imported source:
 - optional downloaded Stellarium skyculture data parsed by
   `StellariumConstellationParser`
 
-`SkyCatalogManager` prefers downloaded constellation data when available and
-persists it with the catalog cache. When Stellarium constellation data is not
-available or cannot be parsed, the app keeps constellation refs empty rather
-than rendering hand-authored bundled outlines.
+`SkyCatalogManager` keeps the dataset produced by a source instance's related
+download owned by that instance and persists it with the instance. When
+Stellarium constellation data is not available or cannot be parsed, the app
+keeps constellation refs empty rather than rendering hand-authored bundled
+outlines. The active view is composed from the owned datasets of the enabled
+sources by `SkyCatalogRuntime`, and `ConstellationReferenceResolver` maps the
+dataset's HIP-based references onto the surviving objects of the active
+snapshot.
 
 `StellariumConstellationParser` is a small orchestration entrypoint over
 private helpers: `StellariumHipParser`, `StellariumLineRefExtractor`, and
@@ -637,14 +937,50 @@ the render path.
 
 ### Large-catalog star decimation
 `SkyRenderFrameBuilder` performs screen-space star decimation for dense star
-catalogs. For large HYG-driven datasets and wider fields of view, only the most
+catalogs. For large star catalogs and wider fields of view, only the most
 relevant star per screen cell is kept, favoring brighter stars and then
 proximity to the cell center.
 
 ### Persistent cache
-Downloaded/imported catalogs are serialized into a pipe-row cache file and
-accompanying `QSettings` metadata. This allows the last imported dataset to be
-restored on the next launch without a network round trip.
+Catalog persistence separates durable configuration from disposable payload
+data:
+
+- The source collection configuration (instance identity, order, policy,
+  enabled state, parse options, attribution, bundled flag) is stored in
+  `QSettings` as a versioned snapshot. An empty snapshot is still written, so
+  an intentionally empty collection stays distinct from "never configured".
+- A collection save stages a complete new generation before committing it:
+  generation-qualified per-instance raw and versioned `CatalogBinaryCodec`
+  sidecar files in the app-data cache directory, plus a generation-scoped
+  record set in `QSettings`. A small manifest, written last, names the
+  committed generation. Until that manifest is published the previous
+  generation stays active, so a failure while staging any payload file, while
+  storing records, or while publishing the manifest leaves the last committed
+  collection loadable instead of pairing old records with new payloads.
+  Removing the superseded generation afterwards is best effort because the
+  manifest alone decides which generation is committed.
+- Restores read the manifest-named generation, prefer each source's binary
+  snapshot, and fall back to parsing the raw payload with the stored parse
+  options; an unreadable or outdated sidecar degrades one source instead of
+  failing the collection. A named generation whose records are absent is not
+  treated as an empty collection.
+- Loading the collection reports one of three explicit states: no committed
+  collection, a loaded collection (an empty one is valid), or unusable
+  committed configuration (missing or truncated manifest, or a missing
+  referenced generation) with diagnostics. A durable committed-generation
+  record proves a collection was committed even when the manifest is gone,
+  and a staged-but-uncommitted generation is never chosen as the current
+  collection. An intact older flat collection is itself committed
+  configuration: generation groups staged beside it without a published
+  manifest are ignored and reported, and the flat records load with their
+  versions, order, IDs, and options.
+- Related constellation datasets are stored per owning source and restored
+  before the active related view is composed.
+
+Clearing a source's payload cache evicts only its disposable payloads and
+keeps its configured record readable, and the legacy two-slot cache is read
+only for the one-time migration, which runs only while no collection was
+ever committed.
 
 ## Concurrency and Threading
 The concurrency model is intentionally narrow:
@@ -684,7 +1020,8 @@ The current codebase consistently uses a small set of practical patterns.
   results instead of mixing rendering logic into the controller.
 
 ### Coordinator + service split
-- `SkyCatalogManager` owns long-lived catalog state.
+- `SkyCatalogManager` owns the configured source collection and its
+  lifecycle; `SkyCatalogRuntime` owns the active composed state.
 - `CatalogCoordinator` orchestrates operations.
 - download and parsing are delegated to focused services.
 
@@ -696,8 +1033,9 @@ The current codebase consistently uses a small set of practical patterns.
 - `SkyRenderFrameBuilder` transforms snapshots into render primitives.
 - `ProjectionAlgorithms` centralizes shared projection formulas, while
   `ProjectionPipeline` centralizes projection result/status mapping.
-- catalog parsing flows through format detection, parser selection,
-  normalization, and catalog construction.
+- catalog parsing flows through container decoding, schema detection, parser
+  selection, normalization, and catalog construction; composition flows
+  through identity resolution and the shared merge policy.
 
 ### Cache-oriented view model
 - cache keys are explicit and local to `SkySceneModel`
@@ -716,14 +1054,75 @@ Update:
 - internal `ProjectionAlgorithms` frame setup and project formula
 - projection-specific tests
 
-### Adding a new catalog payload format
-Update:
+### Adding a catalog source that uses an existing schema
+A source with a registered schema needs no new parser, renderer branch, or
+scene-graph change.
 
-- `CatalogPayloadFormatDetector`
-- `CatalogSourceType`
-- `CatalogLoader` routing
-- parser implementation in `libs/skygate-ephemeris/src/catalog`
-- parser tests
+1. Add a `SkyCatalogSourceDescriptor` entry in
+   `apps/skygate-ui/src/catalog/SkyCatalogPresets.cpp`: a stable `sourceId`,
+   title, optional version, one or more URLs, the `schemaHint`, optional
+   `archiveSelector`, optional `relatedDatasetUrls`, attribution, category,
+   and, for bundled data, the bundled flag.
+   `SkyCatalogSourcePresetModel` exposes the descriptor to QML automatically.
+2. A bundled source reconstructs its objects through `CatalogFactory` instead
+   of URLs; a downloaded source needs no factory change when its schema
+   already exists.
+3. Keep schema-specific field mapping inside the existing schema mapper and
+   declare any new cross-identifiers through `CatalogIdentifier`. A source
+   whose payload describes the same objects as an existing schema does not
+   need a new identity namespace.
+4. Update `apps/skygate-ui/tests/catalog/SkyCatalogSourceDescriptorTests.cpp`
+   for descriptor identity and metadata, and add a deterministic
+   fake-download scenario in `SkyCatalogManagerTests.cpp` (or
+   `SkyCatalogImportWorkflowTests.cpp` for parse-option transport). Use the
+   existing fake network manager and local fixtures.
+
+Consumers stay generic: rendering, search, inspector, ephemeris, and
+constellation resolution read `IStarCatalog::bodies()`, common body-kind
+metadata, `SkyCatalogManager::sourceIds()`, and
+`contributorSourceIds()`; they must not branch on the source's schema or
+title. Body kind alone supplies neither motion nor shape: those come from
+the shared optional domain metadata (star astrometry, deep-sky axes and
+classification), which consumers read uniformly instead of special-casing a
+schema.
+
+### Adding a schema
+A new schema needs a payload mapper and one registry registration.
+
+1. Add the schema value to
+   `libs/skygate-ephemeris/src/catalog/CatalogSourceType.hpp`.
+2. Implement `ICatalogParser`
+   (`libs/skygate-ephemeris/src/catalog/ICatalogParser.hpp`) in a focused
+   directory under `libs/skygate-ephemeris/src/catalog` (for example
+   `bundled/`, `hyg/`, or `opengc/`), returning a `CatalogBodyParseResult`.
+   Reuse `DelimitedCatalogReader` and `CatalogParsingUtilities` for delimited
+   data, and declare cross-identifiers through `CatalogIdentifier`.
+3. Register a `CatalogSchemaDescriptor` in
+   `CatalogSchemaRegistry.cpp`: delimiter, exact required columns, diagnostic
+   name, and parser factory. Detection, `CatalogLoader`, and parse
+   diagnostics pick it up from there. `CatalogSchemaRegistry::registerSchema`
+   is for test adapters and later registrations.
+4. Reuse the shared container codecs (`CatalogPayloadParser`,
+   `CompressedDataInflater`, and the private `io/zip` layers) instead of
+   adding an archive decoder.
+5. Add tests through the per-module CMake helper in
+   `libs/skygate-ephemeris/tests/CMakeLists.txt`:
+   `CatalogSchemaRegistryTests.cpp` for detection and parser selection, a
+   parser test for field mapping, `CatalogContainerDecodingTests.cpp` for
+   gzip/ZIP variants of the same payload, and the
+   `CatalogSemanticFixtureAdapter` corpus in
+   `CatalogInterchangeabilityTests.cpp` so equivalent objects stay equivalent
+   across schemas.
+
+### Catalog extension limits
+- Catalogs are eager, immutable snapshots (`IStarCatalog`). Lazy, paged, or
+  remote storage that cannot materialize the complete snapshot is outside the
+  current contract; such a source needs a new provider contract, not another
+  schema.
+- A new object kind or motion model is domain and engine work. A catalog can
+  supply the data, but rendering and ephemeris consume the shared
+  kind/metadata interfaces, so those consumers need to understand the kind as
+  well.
 
 ### Replacing or adding an ephemeris engine
 Provide another `IEphemerisEngine` implementation and register it in the
@@ -780,16 +1179,19 @@ The repository keeps tests close to each module:
   - angle/projection math, viewport math, type validation, projection factory
     behavior, prepared projections, and concrete projection strategies.
 - `libs/skygate-ephemeris/tests`
-  - catalog payload detection, catalog parsing helpers, HYG/OpenNGC parser edge
-    cases, gzip/zip archive handling, constellation parsing, catalog
-    factory/composer behavior, celestial reference calculations, engine
+  - catalog schema registration and detection, payload parsing helpers,
+    HYG/OpenNGC parser edge cases, container (gzip/ZIP) decoding and member
+    selection, identity resolution, composition merging and fallback
+    precedence, constellation parsing, catalog factory behavior, binary codec
+    round trips, celestial reference calculations, engine
     baselines/fallbacks, and fixed-date ephemeris regression checks.
 - `apps/skygate-ui/tests`
   - grouped by matching UI responsibility folders plus shared `support`
     fixtures: scene-model behavior, controller/search/location/theme/overlay
-    models, settings persistence, active catalog building, catalog cache
-    restore/persist behavior, fake-network catalog download/coordinator
-    workflows, and QML load/interaction/rendering smoke coverage.
+    models, settings persistence, catalog collection lifecycle and atomic
+    activation, source-owned related data, collection cache migration,
+    fake-network catalog download/coordinator workflows, and QML
+    load/interaction/rendering smoke coverage.
 
 This mirrors the architectural split and keeps rendering-independent logic
 testable without a running UI. Network-facing catalog tests use deterministic
