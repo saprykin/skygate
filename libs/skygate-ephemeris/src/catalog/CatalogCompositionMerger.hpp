@@ -110,6 +110,8 @@ namespace skygate::ephemeris {
 // earlier supplying row outranks. The replaced model only enriches the selected
 // one with compatible optional astrometry fields; a contradicting replaced
 // position or astrometry is diagnosed instead of being combined with it. A
+// compatible replaced fixed position is dropped with the rest of the replaced
+// model. A
 // donor whose own fixed position contradicts its own astrometry contributes
 // only its fixed position; the discarded astrometry is rejected with a
 // diagnostic. Otherwise the winner's model stays authoritative: a losing
