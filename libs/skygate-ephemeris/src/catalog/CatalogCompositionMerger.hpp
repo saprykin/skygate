@@ -109,22 +109,27 @@ namespace skygate::ephemeris {
 // so copying the record that bridges two objects never preselects a model the
 // earlier supplying row outranks. The replaced model only enriches the selected
 // one with compatible optional astrometry fields; a contradicting replaced
-// position or astrometry is diagnosed instead of being combined with it.
-// Otherwise the winner's model stays authoritative: a losing
-// fixed position fills a missing winner position and replaces a
-// position the winner only inherited from a lower-precedence source, and it
-// does either only when it agrees with the surviving model, because a fixed
-// position carries no reference epoch to convert; a losing astrometry only
-// enters the record when its reference position agrees with the surviving
-// model, either directly against a fixed position or against the winning
-// reference position after the losing proper motion accounts for the
-// reference-epoch difference. Compatible losing astrometry fills missing
-// proper motion, parallax, radial velocity, and validity fields and replaces a
-// field the winner only inherited from a lower-precedence source, while
-// a value the winner carries from a higher-precedence source than the
-// absorbed contributor is never overwritten. Incompatible losing coordinates are rejected with a diagnostic that
-// names the kept model, so a survivor never combines contradictory coordinate
-// descriptions.
+// position or astrometry is diagnosed instead of being combined with it. A
+// donor whose own fixed position contradicts its own astrometry contributes
+// only its fixed position; the discarded astrometry is rejected with a
+// diagnostic. Otherwise the winner's model stays authoritative: a losing
+// fixed position fills a missing winner position or replaces one when the
+// losing position's origin outranks the winner's, a higher source rank or an
+// earlier supplying row within the same source, and never replaces a value
+// the winner carries from a higher-precedence source. It never enters a
+// model whose astrometry anchors the object at a different direction,
+// because a fixed position carries no reference epoch to convert; a
+// conflicting position the winner carries is diagnosed and replaced. A
+// losing astrometry only enters the record when its reference position
+// agrees with the surviving model, either directly against a fixed position
+// or against the winning reference position after the losing proper motion
+// accounts for the reference-epoch difference. Compatible losing astrometry
+// fills missing proper motion, parallax, radial velocity, and validity
+// fields and replaces a field when the losing value's origin outranks the
+// winner's, and never replaces a value the winner carries from a
+// higher-precedence source than the absorbed contributor. Incompatible
+// losing coordinates are rejected with a diagnostic that names the kept
+// model, so a survivor never combines contradictory coordinate descriptions.
 class CatalogCompositionMerger final {
 public:
     [[nodiscard]] static CatalogCompositionMergeResult mergeCollection(const CatalogCompositionRequest& request);
