@@ -351,6 +351,8 @@ private slots:
     void duplicateBridgesKeepTheEarliestRowsModelAndMeasurements();
     void adoptedAstrometrySurvivesWithoutAnIndependentModel();
     void earliestFixedRowRejectsTheBridgesConflictingAstrometry();
+    void repairedBridgeKeepsItsAstrometryUnderALaterReplacement();
+    void repairedBridgeAstrometryKeepsItsSupplyingRowsAcrossALaterBridge();
 };
 
 void CatalogIdentityMergeTests::deduplicatesDuplicateHipStars()
@@ -4548,6 +4550,260 @@ void CatalogIdentityMergeTests::earliestFixedRowRejectsTheBridgesConflictingAstr
     QVERIFY(hasIdentifier(*survivor, "hd", "27"));
     QVERIFY(hasRetainedCanonicalId(*survivor, "hip_17"));
     QVERIFY(hasRetainedCanonicalId(*survivor, "hd_27"));
+}
+
+void CatalogIdentityMergeTests::repairedBridgeKeepsItsAstrometryUnderALaterReplacement()
+{
+    // The earliest row fixes the object at RA 1 and carries its name and
+    // magnitude, while the bridge row measures proper motion, parallax, and
+    // radial velocity at the same direction. Selecting the earliest row's
+    // fixed-only model keeps the bridge's compatible measurements. The later
+    // replacing source then supplies a name, a magnitude, and one measured
+    // field of its own: the explicit replacement values win by source
+    // precedence, while every measured field the replacement leaves open stays
+    // with the earlier row that supplied it.
+    OwnGalaxyCelestialBody donor =
+        makeStar("a_hip_17", "Donor", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0, 3.0);
+    OwnGalaxyCelestialBody secondIdentifier =
+        makeStar("a_hd_27", {}, {CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0);
+    OwnGalaxyCelestialBody bridgeRow = makeStar(
+        "a_bridge", {}, {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0
+    );
+    bridgeRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *bridgeRow.fixedEquatorial,
+        .properMotionRightAscensionMasPerYear = 25.0,
+        .stellarParallaxMas = 5.0,
+        .radialVelocityKmPerSecond = -5.5,
+    };
+    OwnGalaxyCelestialBody replacement = makeStar(
+        "b_replace", "Replacement", {CatalogIdentifier::make("hip", "17")}, {}, std::nullopt, std::nullopt, 2.0
+    );
+    replacement.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        .stellarParallaxMas = 9.0,
+    };
+    const auto sourceA = createCatalog({donor, secondIdentifier, bridgeRow}, {});
+    const auto sourceB = createCatalog({replacement}, {});
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "b_replace");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Replacement"));
+    QCOMPARE(survivor->visualMagnitude, 2.0);
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& astrometry = *survivor->starAstrometryValue();
+    QCOMPARE(astrometry.referenceEquatorial.rightAscensionHours, 1.0);
+    QCOMPARE(astrometry.referenceEquatorial.declinationDeg, 2.0);
+    QVERIFY(astrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionRightAscensionMasPerYear, 25.0);
+    QVERIFY(astrometry.stellarParallaxMas.has_value());
+    QCOMPARE(*astrometry.stellarParallaxMas, 9.0);
+    QVERIFY(astrometry.radialVelocityKmPerSecond.has_value());
+    QCOMPARE(*astrometry.radialVelocityKmPerSecond, -5.5);
+    QVERIFY(hasIdentifier(*survivor, "hip", "17"));
+    QVERIFY(hasIdentifier(*survivor, "hd", "27"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "a_hip_17"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "a_hd_27"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "a_bridge"));
+    QCOMPARE(result.sourceIds.front(), std::string("source-1"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-1", "source-0"}));
+
+    // The same values with the optional fields assigned to different rows: the
+    // bridge row carries the name, the earliest row carries the magnitude, and
+    // the later replacement supplies proper motion instead of parallax. The
+    // replacement still wins where it supplies a value, and the measured
+    // fields it leaves open stay with the bridge row.
+    OwnGalaxyCelestialBody variedDonor =
+        makeStar("c_hip_17", {}, {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0, 3.0);
+    OwnGalaxyCelestialBody variedSecondIdentifier =
+        makeStar("c_hd_27", {}, {CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0);
+    OwnGalaxyCelestialBody variedBridgeRow = makeStar(
+        "c_bridge", "Bridge", {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0
+    );
+    variedBridgeRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *variedBridgeRow.fixedEquatorial,
+        .properMotionRightAscensionMasPerYear = 25.0,
+        .stellarParallaxMas = 5.0,
+        .radialVelocityKmPerSecond = -5.5,
+    };
+    OwnGalaxyCelestialBody variedReplacement =
+        makeStar("d_replace", {}, {CatalogIdentifier::make("hip", "17")}, {}, std::nullopt, std::nullopt, 2.0);
+    variedReplacement.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        .properMotionRightAscensionMasPerYear = 9.0,
+    };
+    const auto variedSourceA = createCatalog({variedDonor, variedSecondIdentifier, variedBridgeRow}, {});
+    const auto variedSourceB = createCatalog({variedReplacement}, {});
+    QVERIFY(variedSourceA != nullptr);
+    QVERIFY(variedSourceB != nullptr);
+
+    const CatalogCompositionResult varied = composeAll({variedSourceA.get(), variedSourceB.get()});
+
+    QVERIFY(varied.isSuccess());
+    QCOMPARE(varied.bodyCount, std::size_t{1});
+    const BaseCelestialBody* variedSurvivor = findBodyById(varied.catalog->bodies(), "d_replace");
+    QVERIFY(variedSurvivor != nullptr);
+    QCOMPARE(QString::fromStdString(variedSurvivor->displayName), QStringLiteral("Bridge"));
+    QCOMPARE(variedSurvivor->visualMagnitude, 2.0);
+    QVERIFY(variedSurvivor->fixedEquatorialValue().has_value());
+    QCOMPARE(variedSurvivor->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(variedSurvivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(variedSurvivor->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& variedAstrometry = *variedSurvivor->starAstrometryValue();
+    QVERIFY(variedAstrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*variedAstrometry.properMotionRightAscensionMasPerYear, 9.0);
+    QVERIFY(variedAstrometry.stellarParallaxMas.has_value());
+    QCOMPARE(*variedAstrometry.stellarParallaxMas, 5.0);
+    QVERIFY(variedAstrometry.radialVelocityKmPerSecond.has_value());
+    QCOMPARE(*variedAstrometry.radialVelocityKmPerSecond, -5.5);
+    QVERIFY(hasIdentifier(*variedSurvivor, "hip", "17"));
+    QVERIFY(hasIdentifier(*variedSurvivor, "hd", "27"));
+    QVERIFY(hasRetainedCanonicalId(*variedSurvivor, "c_hip_17"));
+    QVERIFY(hasRetainedCanonicalId(*variedSurvivor, "c_hd_27"));
+    QVERIFY(hasRetainedCanonicalId(*variedSurvivor, "c_bridge"));
+    QCOMPARE(varied.sourceIds.front(), std::string("source-1"));
+    QCOMPARE(varied.contributorSourceIds.front(), (std::vector<std::string>{"source-1", "source-0"}));
+}
+
+void CatalogIdentityMergeTests::repairedBridgeAstrometryKeepsItsSupplyingRowsAcrossALaterBridge()
+{
+    // The repaired bridge keeps each measured field with the row that supplied
+    // it, so a later bridge row that absorbs it together with another measured
+    // row of the same source resolves every field by its true origin: the
+    // earlier supplying row wins, while the later bridge's own explicit field
+    // still outranks both by source precedence.
+    OwnGalaxyCelestialBody fixedRow =
+        makeStar("e_hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0);
+    OwnGalaxyCelestialBody measuredRow =
+        makeStar("e_hip_99", {}, {CatalogIdentifier::make("hip", "99")}, {}, std::nullopt, std::nullopt);
+    measuredRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        .properMotionRightAscensionMasPerYear = 10.0,
+        .stellarParallaxMas = 2.0,
+        .radialVelocityKmPerSecond = 12.0,
+    };
+    OwnGalaxyCelestialBody secondFixedRow =
+        makeStar("e_hd_27", {}, {CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0);
+    OwnGalaxyCelestialBody bridgeRow = makeStar(
+        "e_bridge", {}, {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0
+    );
+    bridgeRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *bridgeRow.fixedEquatorial,
+        .properMotionRightAscensionMasPerYear = 25.0,
+        .stellarParallaxMas = 5.0,
+    };
+    OwnGalaxyCelestialBody laterBridgeRow = makeStar(
+        "f_later_bridge", {}, {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hip", "99")}, {}, 1.0, 2.0
+    );
+    laterBridgeRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *laterBridgeRow.fixedEquatorial,
+        .properMotionRightAscensionMasPerYear = 9.0,
+    };
+    const auto sourceA = createCatalog({fixedRow, measuredRow, secondFixedRow, bridgeRow}, {});
+    const auto sourceB = createCatalog({laterBridgeRow}, {});
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "f_later_bridge");
+    QVERIFY(survivor != nullptr);
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("First"));
+    QVERIFY(survivor->fixedEquatorialValue().has_value());
+    QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& astrometry = *survivor->starAstrometryValue();
+    QVERIFY(astrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionRightAscensionMasPerYear, 9.0);
+    QVERIFY(astrometry.stellarParallaxMas.has_value());
+    QCOMPARE(*astrometry.stellarParallaxMas, 2.0);
+    QVERIFY(astrometry.radialVelocityKmPerSecond.has_value());
+    QCOMPARE(*astrometry.radialVelocityKmPerSecond, 12.0);
+    QVERIFY(hasIdentifier(*survivor, "hip", "17"));
+    QVERIFY(hasIdentifier(*survivor, "hip", "99"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "e_bridge"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "e_hip_17"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "e_hd_27"));
+    QVERIFY(hasRetainedCanonicalId(*survivor, "e_hip_99"));
+    QCOMPARE(result.sourceIds.front(), std::string("source-1"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-1", "source-0"}));
+
+    // The same values with the row order reversed and the later bridge
+    // supplying parallax instead of proper motion: the repaired bridge's row
+    // is now the earlier one, so its measured fields win against the other
+    // measured row, and the explicit later parallax still replaces the
+    // inherited one.
+    OwnGalaxyCelestialBody variedFixedRow =
+        makeStar("h_hip_17", "First", {CatalogIdentifier::make("hip", "17")}, {}, 1.0, 2.0);
+    OwnGalaxyCelestialBody variedSecondFixedRow =
+        makeStar("h_hd_27", {}, {CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0);
+    OwnGalaxyCelestialBody variedBridgeRow = makeStar(
+        "h_bridge", {}, {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hd", "27")}, {}, 1.0, 2.0
+    );
+    variedBridgeRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *variedBridgeRow.fixedEquatorial,
+        .properMotionRightAscensionMasPerYear = 25.0,
+        .stellarParallaxMas = 5.0,
+        .radialVelocityKmPerSecond = -5.5,
+    };
+    OwnGalaxyCelestialBody variedMeasuredRow =
+        makeStar("h_hip_99", {}, {CatalogIdentifier::make("hip", "99")}, {}, std::nullopt, std::nullopt);
+    variedMeasuredRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        .properMotionRightAscensionMasPerYear = 10.0,
+        .stellarParallaxMas = 2.0,
+        .radialVelocityKmPerSecond = 12.0,
+    };
+    OwnGalaxyCelestialBody variedLaterBridgeRow = makeStar(
+        "i_later_bridge", {}, {CatalogIdentifier::make("hip", "17"), CatalogIdentifier::make("hip", "99")}, {}, 1.0, 2.0
+    );
+    variedLaterBridgeRow.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *variedLaterBridgeRow.fixedEquatorial,
+        .stellarParallaxMas = 9.0,
+    };
+    const auto variedSourceA =
+        createCatalog({variedFixedRow, variedSecondFixedRow, variedBridgeRow, variedMeasuredRow}, {});
+    const auto variedSourceB = createCatalog({variedLaterBridgeRow}, {});
+    QVERIFY(variedSourceA != nullptr);
+    QVERIFY(variedSourceB != nullptr);
+
+    const CatalogCompositionResult varied = composeAll({variedSourceA.get(), variedSourceB.get()});
+
+    QVERIFY(varied.isSuccess());
+    QCOMPARE(varied.bodyCount, std::size_t{1});
+    const BaseCelestialBody* variedSurvivor = findBodyById(varied.catalog->bodies(), "i_later_bridge");
+    QVERIFY(variedSurvivor != nullptr);
+    QCOMPARE(QString::fromStdString(variedSurvivor->displayName), QStringLiteral("First"));
+    QVERIFY(variedSurvivor->fixedEquatorialValue().has_value());
+    QCOMPARE(variedSurvivor->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(variedSurvivor->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(variedSurvivor->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& variedAstrometry = *variedSurvivor->starAstrometryValue();
+    QVERIFY(variedAstrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*variedAstrometry.properMotionRightAscensionMasPerYear, 25.0);
+    QVERIFY(variedAstrometry.stellarParallaxMas.has_value());
+    QCOMPARE(*variedAstrometry.stellarParallaxMas, 9.0);
+    QVERIFY(variedAstrometry.radialVelocityKmPerSecond.has_value());
+    QCOMPARE(*variedAstrometry.radialVelocityKmPerSecond, -5.5);
+    QVERIFY(hasIdentifier(*variedSurvivor, "hip", "17"));
+    QVERIFY(hasIdentifier(*variedSurvivor, "hip", "99"));
+    QVERIFY(hasRetainedCanonicalId(*variedSurvivor, "h_bridge"));
+    QVERIFY(hasRetainedCanonicalId(*variedSurvivor, "h_hip_17"));
+    QVERIFY(hasRetainedCanonicalId(*variedSurvivor, "h_hd_27"));
+    QVERIFY(hasRetainedCanonicalId(*variedSurvivor, "h_hip_99"));
+    QCOMPARE(varied.sourceIds.front(), std::string("source-1"));
+    QCOMPARE(varied.contributorSourceIds.front(), (std::vector<std::string>{"source-1", "source-0"}));
 }
 
 QTEST_APPLESS_MAIN(CatalogIdentityMergeTests)
