@@ -429,6 +429,13 @@ add_skygate_ui_qtest(
     ENVIRONMENT ${skygateQmlTestEnvironment}
 )
 add_skygate_ui_qtest(
+    skygate-ui-qml-preferences-ephemeris-tests
+    qml/QmlPreferencesEphemerisTests.cpp
+    LABELS qml integration slow
+    TIMEOUT 120
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
     skygate-ui-qml-preferences-draft-tests
     qml/QmlPreferencesDraftTests.cpp
     LABELS qml integration slow
@@ -520,6 +527,7 @@ foreach(qml_test_target IN ITEMS
     skygate-ui-qml-main-window-tests
     skygate-ui-qml-night-conditions-popup-tests
     skygate-ui-qml-preferences-catalog-tests
+    skygate-ui-qml-preferences-ephemeris-tests
     skygate-ui-qml-preferences-draft-tests
     skygate-ui-qml-preferences-appearance-tests
     skygate-ui-qml-preferences-location-time-tests
