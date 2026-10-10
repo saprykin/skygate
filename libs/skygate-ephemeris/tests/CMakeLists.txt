@@ -2,6 +2,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 
 add_library(skygate-ephemeris-test-support STATIC
     support/EphemerisEngineTestDoubles.cpp
+    support/CatalogMergeTestSupport.cpp
     support/CatalogSemanticFixtureAdapter.cpp
     support/CatalogSemanticFixtureCorpus.cpp
     support/StaticCalcephKernelProvider.cpp
@@ -470,8 +471,32 @@ add_skygate_ephemeris_qtest(
     catalog/CatalogIdentityIndexTests.cpp
 )
 add_skygate_ephemeris_qtest(
-    skygate-ephemeris-catalog-identity-merge-tests
-    catalog/CatalogIdentityMergeTests.cpp
+    skygate-ephemeris-catalog-identity-match-tests
+    catalog/CatalogIdentityMatchTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-bridge-retention-tests
+    catalog/CatalogBridgeRetentionTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-field-precedence-tests
+    catalog/CatalogFieldPrecedenceTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-model-selection-tests
+    catalog/CatalogModelSelectionTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-model-replacement-tests
+    catalog/CatalogModelReplacementTests.cpp
     LABELS integration
     TIMEOUT 45
 )

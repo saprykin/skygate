@@ -1,3 +1,7 @@
+#include "BaseCelestialBody.hpp"
+#include "CatalogMergeTestSupport.hpp"
+#include "DistantCelestialBody.hpp"
+#include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogPayloadParser.hpp"
 #include "catalog/io/zip/ZipCodec.hpp"
 #include "skygate/testsupport/PerformanceBudget.hpp"
@@ -7,10 +11,16 @@
 #include <QElapsedTimer>
 
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
+
+using skygate::ephemeris::BaseCelestialBody;
+using skygate::ephemeris::CatalogIdentifier;
+using skygate::ephemeris::DistantCelestialBody;
+using skygate::ephemeris::tests::CatalogMergeTestSupport;
 
 class CatalogPerformanceGuardTests final : public QObject {
     Q_OBJECT
@@ -19,6 +29,7 @@ private slots:
     void parsesModeratelyLargeHygCatalogWithinGuardrail();
     void parsesModeratelyLargeOpenNgcCatalogWithinGuardrail();
     void scansZipWithManyEntriesWithinGuardrail();
+    void mergesLargeFixtureWithoutAllPairsScan();
     void wallClockBudgetsAreAdvisoryByDefault();
 };
 
@@ -238,6 +249,58 @@ void CatalogPerformanceGuardTests::scansZipWithManyEntriesWithinGuardrail()
     QVERIFY(extracted.has_value());
     QVERIFY(extracted->find("Target") != std::string::npos);
     verifyElapsedBelow(elapsedMs, kZipScanBudgetMs, "large ZIP entry scan");
+}
+
+void CatalogPerformanceGuardTests::mergesLargeFixtureWithoutAllPairsScan()
+{
+    constexpr std::size_t kFixtureSize = 6000;
+
+    std::vector<DistantCelestialBody> primaryDso;
+    std::vector<DistantCelestialBody> deepSkyDso;
+    primaryDso.reserve(kFixtureSize);
+    deepSkyDso.reserve(kFixtureSize);
+
+    for (std::size_t index = 0; index < kFixtureSize; ++index) {
+        const std::string ngc = std::to_string(100000 + index);
+        primaryDso.push_back(
+            CatalogMergeTestSupport::makeDeepSkyObject(
+                "primary_" + ngc, "Primary " + ngc, {"NGC " + ngc}, {CatalogIdentifier::make("ngc", ngc)}, 1.0, 2.0
+            )
+        );
+        deepSkyDso.push_back(
+            CatalogMergeTestSupport::makeDeepSkyObject(
+                "secondary_" + ngc,
+                "Secondary " + ngc,
+                {"NGC " + ngc},
+                {CatalogIdentifier::make("ngc", ngc), CatalogIdentifier::make("ic", ngc)},
+                1.0,
+                2.0
+            )
+        );
+    }
+
+    const auto primary = CatalogMergeTestSupport::createCatalog({}, std::move(primaryDso));
+    const auto deepSky = CatalogMergeTestSupport::createCatalog({}, std::move(deepSkyDso));
+    QVERIFY(primary != nullptr);
+    QVERIFY(deepSky != nullptr);
+
+    const auto result = CatalogMergeTestSupport::composePrimaryWithDeepSky(*primary, *deepSky);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.deepSkyObjectCount, kFixtureSize);
+
+    const BaseCelestialBody* first =
+        CatalogMergeTestSupport::findBodyById(result.catalog->bodies(), "secondary_100000");
+    QVERIFY(first != nullptr);
+    QVERIFY(CatalogMergeTestSupport::hasIdentifier(*first, "ngc", "100000"));
+    QVERIFY(CatalogMergeTestSupport::hasIdentifier(*first, "ic", "100000"));
+
+    const BaseCelestialBody* last = CatalogMergeTestSupport::findBodyById(result.catalog->bodies(), "secondary_105999");
+    QVERIFY(last != nullptr);
+    QVERIFY(CatalogMergeTestSupport::hasIdentifier(*last, "ngc", "105999"));
+    QVERIFY(CatalogMergeTestSupport::hasIdentifier(*last, "ic", "105999"));
+
+    QCOMPARE(CatalogMergeTestSupport::countBodiesById(result.catalog->bodies(), "primary_100000"), std::size_t{0});
 }
 
 void CatalogPerformanceGuardTests::wallClockBudgetsAreAdvisoryByDefault()
