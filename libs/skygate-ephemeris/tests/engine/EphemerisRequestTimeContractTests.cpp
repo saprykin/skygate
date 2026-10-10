@@ -12,6 +12,7 @@
 #include "engine/EphemerisEngineOptions.hpp"
 #include "engine/EphemerisEngineQueryStatus.hpp"
 #include "engine/EphemerisEngineWarning.hpp"
+#include "time/EpochCodec.hpp"
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"

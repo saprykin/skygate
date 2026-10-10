@@ -7,9 +7,9 @@
 #include "SkyContextController.hpp"
 #include "SkySceneModel.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
 #include "skygate/testsupport/PerformanceBudget.hpp"
 
 #include <QElapsedTimer>
