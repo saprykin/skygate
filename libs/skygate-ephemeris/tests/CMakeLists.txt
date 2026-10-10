@@ -245,6 +245,10 @@ add_skygate_ephemeris_qtest(
     engine/EphemerisEngineFactoryBehaviorTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-factory-model-tests
+    engine/EphemerisEngineFactoryModelTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-time-scale-provider-loader-tests
     engine/TimeScaleProviderLoaderTests.cpp
 )
