@@ -1,5 +1,31 @@
 find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 
+add_library(skygate-ui-test-support STATIC
+    support/CatalogArchiveFixture.cpp
+    support/CatalogBodyQuery.cpp
+    support/CatalogNotificationRecorder.cpp
+    support/CatalogSourceFactsQuery.cpp
+    support/CatalogTestPayloadFile.cpp
+    support/ConstellationAnchorGroupLookup.cpp
+    support/FakeReplyQuery.cpp
+    support/RelatedDatasetFixture.cpp
+)
+add_library(skygate::ui-test-support ALIAS skygate-ui-test-support)
+
+target_link_libraries(skygate-ui-test-support
+    PUBLIC
+        Qt6::Test
+        skygate::ephemeris-test-support
+        skygate::uiapp
+)
+
+target_include_directories(skygate-ui-test-support
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+)
+
+target_compile_features(skygate-ui-test-support PUBLIC cxx_std_20)
+
 function(add_skygate_ui_qtest target_name source_file)
     cmake_parse_arguments(
         TEST
@@ -18,7 +44,7 @@ function(add_skygate_ui_qtest target_name source_file)
     target_link_libraries(${target_name}
         PRIVATE
             Qt6::Test
-            skygate::ephemeris-test-support
+            skygate::ui-test-support
             skygate::uiapp
             skygate::test-support
     )
@@ -241,8 +267,32 @@ add_skygate_ui_qtest(
     TIMEOUT 45
 )
 add_skygate_ui_qtest(
-    skygate-ui-sky-catalog-manager-tests
-    catalog/SkyCatalogManagerTests.cpp
+    skygate-ui-sky-catalog-manager-source-tests
+    catalog/SkyCatalogManagerSourceTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-manager-import-tests
+    catalog/SkyCatalogManagerImportTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-manager-related-data-tests
+    catalog/SkyCatalogManagerRelatedDataTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-manager-persistence-tests
+    catalog/SkyCatalogManagerPersistenceTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-manager-composition-tests
+    catalog/SkyCatalogManagerCompositionTests.cpp
     LABELS integration
     TIMEOUT 60
 )
