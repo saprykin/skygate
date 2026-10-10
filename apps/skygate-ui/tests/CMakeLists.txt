@@ -14,6 +14,9 @@ add_library(skygate-ui-test-support STATIC
     support/FakeReplyQuery.cpp
     support/RelatedDatasetFixture.cpp
     support/StagedEphemerisAssetFixture.cpp
+    support/TrailBuilderTestEngine.cpp
+    support/TrailBuilderTestScenario.cpp
+    support/TrailRenderQuery.cpp
 )
 add_library(skygate::ui-test-support ALIAS skygate-ui-test-support)
 
@@ -367,7 +370,8 @@ add_skygate_ui_qtest(
     catalog/SkyCatalogRuntimePresentationTests.cpp
 )
 add_skygate_ui_qtest(skygate-ui-sky-hit-target-index-tests selection/SkyHitTargetIndexTests.cpp)
-add_skygate_ui_qtest(skygate-ui-sky-object-trail-builder-tests selection/SkyObjectTrailBuilderTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-object-trail-geometry-tests selection/SkyObjectTrailGeometryTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-object-trail-guidance-tests selection/SkyObjectTrailGuidanceTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-render-builders-tests render/SkyRenderBuildersTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-catalog-internals-tests catalog/SkyCatalogInternalsTests.cpp)
 add_skygate_ui_qtest(
