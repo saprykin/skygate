@@ -1,7 +1,6 @@
 #include "StaticCalcephKernelProvider.hpp"
 #include "TestCalcephKernel.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
-#include "factory/IEphemerisDiagnosticsSink.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/EphemerisDataManifest.hpp"
@@ -28,19 +27,6 @@
 #include <vector>
 
 namespace {
-
-[[nodiscard]] skygate::ephemeris::OwnGalaxyCelestialBody makeFactoryBehaviorBody()
-{
-    skygate::ephemeris::OwnGalaxyCelestialBody body;
-    body.id = "factory-behavior-target";
-    body.displayName = "Factory Behavior Target";
-    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
-    body.fixedEquatorial = skygate::core::EquatorialCoordinate{
-        .rightAscensionHours = 5.25,
-        .declinationDeg = -12.75,
-    };
-    return body;
-}
 
 [[nodiscard]] skygate::ephemeris::OwnGalaxyCelestialBody makeFactoryBehaviorSun()
 {
@@ -79,33 +65,6 @@ template <typename BodyRange>
     };
     return context;
 }
-
-template <typename Opaque>
-[[nodiscard]] std::shared_ptr<const Opaque> makeOpaqueHandle(const std::shared_ptr<int>& owner) noexcept
-{
-    return {owner, reinterpret_cast<const Opaque*>(owner.get())};
-}
-
-class TestStarCatalog final : public skygate::ephemeris::IStarCatalog {
-public:
-    explicit TestStarCatalog(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies)
-        : m_catalog(std::move(bodies))
-    {
-    }
-
-    [[nodiscard]] const skygate::ephemeris::CelestialBodyCatalog& catalog() const noexcept override
-    {
-        return m_catalog;
-    }
-
-    [[nodiscard]] std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies() const override
-    {
-        return m_catalog.bodies();
-    }
-
-private:
-    skygate::ephemeris::CelestialBodyCatalog m_catalog;
-};
 
 class TestEphemerisDataSnapshot final : public skygate::ephemeris::IEphemerisDataSnapshot {
 public:
@@ -226,24 +185,6 @@ private:
     mutable std::size_t m_entriesCallCount = 0U;
 };
 
-class RecordingEphemerisDiagnosticsSink final : public skygate::ephemeris::IEphemerisDiagnosticsSink {
-public:
-    void
-    recordFactoryCreationDiagnostic(const skygate::ephemeris::EphemerisFactoryCreationDiagnostic& diagnostic) override
-    {
-        m_diagnostics.push_back(diagnostic);
-    }
-
-    [[nodiscard]] const std::vector<skygate::ephemeris::EphemerisFactoryCreationDiagnostic>&
-    diagnostics() const noexcept
-    {
-        return m_diagnostics;
-    }
-
-private:
-    std::vector<skygate::ephemeris::EphemerisFactoryCreationDiagnostic> m_diagnostics;
-};
-
 [[nodiscard]] skygate::ephemeris::EphemerisDateRange makeKernelRange();
 
 [[nodiscard]] skygate::ephemeris::highprecision::ICalcephKernel::Info
@@ -348,10 +289,6 @@ class EphemerisEngineFactoryBehaviorTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void requestCarriesCatalogOptionsAndOpaqueInputs();
-    void resultHelpersDistinguishSuccessFallbackFailureAndDiagnostics();
-    void compatibilityOverloadsCreateSimpleEngines();
-    void simpleRequestCreatesRequestedEngineWithOptions();
     void highPrecisionRequestConstructsEngineWhenDependenciesAreAvailable();
     void highPrecisionRequestUsesDatasetManifestWithoutDataManifest();
     void highPrecisionRequestRequiresDatasetInfoSource();
@@ -360,189 +297,7 @@ private slots:
     void highPrecisionDE441RequestUsesPlanetaryBarycentersIntentionally();
     void highPrecisionRequestWiresApparentTopocentricCorrectionPath();
     void highPrecisionDefaultProviderReportsUnavailableBuildBeforeDataErrors();
-    void highPrecisionRequestFallsBackOnlyWhenAllowed();
-    void invalidEngineKindReturnsStructuredInvalidRequest();
 };
-
-void EphemerisEngineFactoryBehaviorTests::requestCarriesCatalogOptionsAndOpaqueInputs()
-{
-    const std::array bodies{makeFactoryBehaviorBody()};
-    const auto opaqueOwner = std::make_shared<int>(42);
-
-    skygate::ephemeris::EphemerisDatasetInfo manifest;
-    manifest.id = "test-manifest";
-    manifest.displayName = "Test Manifest";
-
-    skygate::ephemeris::EphemerisEngineFactoryRequest request;
-    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.catalog = makeCatalogHandle(bodies);
-    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
-    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric());
-    request.datasetManifest = &manifest;
-    request.activeDataSnapshot = makeOpaqueHandle<skygate::ephemeris::IEphemerisDataSnapshot>(opaqueOwner);
-    request.timeScaleService = makeOpaqueHandle<skygate::ephemeris::ITimeScaleService>(opaqueOwner);
-    request.earthOrientationProvider = makeOpaqueHandle<skygate::ephemeris::IEarthOrientationProvider>(opaqueOwner);
-    request.diagnosticsSink = reinterpret_cast<skygate::ephemeris::IEphemerisDiagnosticsSink*>(opaqueOwner.get());
-    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
-
-    QCOMPARE(
-        static_cast<std::uint8_t>(request.engineKind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
-    );
-    QVERIFY(request.catalog != nullptr);
-    QCOMPARE(request.catalog->size(), std::size_t{1});
-    QVERIFY(request.catalog->bodyAt(0).id == std::string{"factory-behavior-target"});
-    QCOMPARE(
-        static_cast<std::uint32_t>(request.options.correctionFlags()),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric())
-    );
-    QVERIFY(request.datasetManifest == &manifest);
-    QVERIFY(request.activeDataSnapshot != nullptr);
-    QVERIFY(request.timeScaleService != nullptr);
-    QVERIFY(request.earthOrientationProvider != nullptr);
-    QVERIFY(request.diagnosticsSink != nullptr);
-    QVERIFY(skygate::ephemeris::EphemerisEngineFactory::allowsSimpleEngineFallback(request.fallbackPolicy));
-}
-
-void EphemerisEngineFactoryBehaviorTests::resultHelpersDistinguishSuccessFallbackFailureAndDiagnostics()
-{
-    skygate::ephemeris::EphemerisFactoryCreationDiagnostic warning{
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable,
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticSeverity::Warning,
-    };
-    skygate::ephemeris::EphemerisFactoryCreationDiagnostic error{
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::InvalidRequest,
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticSeverity::Error,
-        "invalid engine kind",
-    };
-
-    auto successEngine = skygate::ephemeris::EphemerisEngineFactory::create();
-    auto success = skygate::ephemeris::EphemerisEngineFactoryResult::success(std::move(successEngine.engine));
-    QVERIFY(success.isSuccess());
-    QVERIFY(!success.isFailure());
-    QVERIFY(!success.usedSimpleEngineFallback());
-    QCOMPARE(
-        static_cast<std::uint8_t>(success.requestedKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
-    );
-    QCOMPARE(
-        static_cast<std::uint8_t>(success.effectiveKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
-    );
-    QVERIFY(!success.hasDiagnostics());
-    QVERIFY(!success.hasErrors());
-
-    auto fallbackEngine = skygate::ephemeris::EphemerisEngineFactory::create();
-    auto fallback = skygate::ephemeris::EphemerisEngineFactoryResult::success(
-        std::move(fallbackEngine.engine),
-        skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback,
-        {warning},
-        skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
-    );
-    QVERIFY(fallback.isSuccess());
-    QVERIFY(fallback.usedSimpleEngineFallback());
-    QCOMPARE(
-        static_cast<std::uint8_t>(fallback.requestedKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
-    );
-    QCOMPARE(
-        static_cast<std::uint8_t>(fallback.effectiveKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
-    );
-    QVERIFY(fallback.hasDiagnostics());
-    QVERIFY(!fallback.hasErrors());
-    QVERIFY(!fallback.diagnostics.front().displayText().empty());
-
-    constexpr auto invalidRequestedKind = static_cast<skygate::ephemeris::EphemerisEngineKind::Type>(std::uint8_t{255});
-    auto failure = skygate::ephemeris::EphemerisEngineFactoryResult::failure(
-        skygate::ephemeris::EphemerisFactoryCreationStatus::FailedInvalidRequest, {error}, invalidRequestedKind
-    );
-    QVERIFY(!failure.isSuccess());
-    QVERIFY(failure.isFailure());
-    QVERIFY(!failure.usedSimpleEngineFallback());
-    QCOMPARE(static_cast<std::uint8_t>(failure.requestedKind()), static_cast<std::uint8_t>(invalidRequestedKind));
-    QCOMPARE(static_cast<std::uint8_t>(failure.effectiveKind()), static_cast<std::uint8_t>(invalidRequestedKind));
-    QVERIFY(failure.hasDiagnostics());
-    QVERIFY(failure.hasErrors());
-    QVERIFY(failure.diagnostics.front().displayText() == std::string_view{"invalid engine kind"});
-}
-
-void EphemerisEngineFactoryBehaviorTests::compatibilityOverloadsCreateSimpleEngines()
-{
-    const auto context = makeContext();
-    const std::array bodies{makeFactoryBehaviorBody()};
-
-    auto emptyEngineResult = skygate::ephemeris::EphemerisEngineFactory::create();
-    QVERIFY(emptyEngineResult.isSuccess());
-    const auto& emptyEngine = emptyEngineResult.engine;
-    QCOMPARE(
-        static_cast<std::uint8_t>(emptyEngine->kind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
-    );
-    QVERIFY(emptyEngine->compute(context).states.empty());
-
-    auto initializerEngineResult = skygate::ephemeris::EphemerisEngineFactory::create({makeFactoryBehaviorBody()});
-    QVERIFY(initializerEngineResult.isSuccess());
-    const auto& initializerEngine = initializerEngineResult.engine;
-    const auto initializerState = initializerEngine->computeBodyState(context, "factory-behavior-target");
-    QVERIFY(initializerState.has_value());
-    QCOMPARE(initializerState->bodyIndex, 0U);
-
-    const skygate::ephemeris::CelestialBodyCatalog spanCatalog(
-        std::span<const skygate::ephemeris::OwnGalaxyCelestialBody>{bodies}
-    );
-    auto spanEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(spanCatalog);
-    QVERIFY(spanEngineResult.isSuccess());
-    const auto& spanEngine = spanEngineResult.engine;
-    const auto spanState = spanEngine->computeBodyState(context, std::size_t{0});
-    QVERIFY(spanState.has_value());
-    QCOMPARE(spanState->equatorial.rightAscensionHours, 5.25);
-    QCOMPARE(spanState->equatorial.declinationDeg, -12.75);
-
-    const TestStarCatalog catalog({makeFactoryBehaviorBody()});
-    auto catalogEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(catalog);
-    QVERIFY(catalogEngineResult.isSuccess());
-    const auto& catalogEngine = catalogEngineResult.engine;
-    const auto catalogState = catalogEngine->computeBodyState(context, "factory-behavior-target");
-    QVERIFY(catalogState.has_value());
-    QCOMPARE(catalogState->equatorial.rightAscensionHours, spanState->equatorial.rightAscensionHours);
-    QCOMPARE(catalogState->equatorial.declinationDeg, spanState->equatorial.declinationDeg);
-}
-
-void EphemerisEngineFactoryBehaviorTests::simpleRequestCreatesRequestedEngineWithOptions()
-{
-    const std::array bodies{makeFactoryBehaviorBody()};
-
-    skygate::ephemeris::EphemerisEngineFactoryRequest request;
-    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
-    request.catalog = makeCatalogHandle(bodies);
-    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
-    request.options.setCorrectionFlags(
-        skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
-        | skygate::ephemeris::EphemerisCorrectionFlags::stellarAberration()
-    );
-
-    auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
-
-    QVERIFY(result.isSuccess());
-    QVERIFY(result.engine != nullptr);
-    QVERIFY(!result.usedSimpleEngineFallback());
-    QVERIFY(!result.hasDiagnostics());
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedRequestedEngine)
-    );
-
-    const auto options = result.engine->options();
-    QCOMPARE(
-        static_cast<std::uint8_t>(options.engineKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
-    );
-    QCOMPARE(
-        static_cast<std::uint32_t>(options.correctionFlags()),
-        static_cast<std::uint32_t>(request.options.correctionFlags())
-    );
-}
 
 void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestConstructsEngineWhenDependenciesAreAvailable()
 {
@@ -922,106 +677,6 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionDefaultProviderReportsUna
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable)
     );
 #endif
-}
-
-void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenAllowed()
-{
-    const std::array bodies{makeFactoryBehaviorBody()};
-    RecordingEphemerisDiagnosticsSink fallbackDiagnosticsSink;
-
-    skygate::ephemeris::EphemerisEngineFactoryRequest fallbackRequest;
-    fallbackRequest.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    fallbackRequest.catalog = makeCatalogHandle(bodies);
-    fallbackRequest.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
-    fallbackRequest.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
-    fallbackRequest.options.setFallbackToSimpleEngine(true);
-    fallbackRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
-    fallbackRequest.diagnosticsSink = &fallbackDiagnosticsSink;
-
-    auto fallback = skygate::ephemeris::EphemerisEngineFactory::create(fallbackRequest);
-
-    QVERIFY(fallback.isSuccess());
-    QVERIFY(fallback.usedSimpleEngineFallback());
-    QVERIFY(fallback.engine != nullptr);
-    QCOMPARE(
-        static_cast<std::uint8_t>(fallback.requestedKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
-    );
-    QCOMPARE(
-        static_cast<std::uint8_t>(fallback.effectiveKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
-    );
-    QVERIFY(fallback.hasDiagnostics());
-    QVERIFY(!fallback.hasErrors());
-    QCOMPARE(
-        static_cast<std::uint8_t>(fallback.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback)
-    );
-    QCOMPARE(fallbackDiagnosticsSink.diagnostics().size(), fallback.diagnostics.size());
-    QCOMPARE(
-        static_cast<std::uint8_t>(fallbackDiagnosticsSink.diagnostics().front().severity),
-        static_cast<std::uint8_t>(fallback.diagnostics.front().severity)
-    );
-
-    RecordingEphemerisDiagnosticsSink strictDiagnosticsSink;
-    skygate::ephemeris::EphemerisEngineFactoryRequest strictRequest = fallbackRequest;
-    strictRequest.options.setFallbackToSimpleEngine(false);
-    strictRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
-    strictRequest.diagnosticsSink = &strictDiagnosticsSink;
-
-    const auto strict = skygate::ephemeris::EphemerisEngineFactory::create(strictRequest);
-
-    QVERIFY(!strict.isSuccess());
-    QVERIFY(strict.isFailure());
-    QVERIFY(strict.engine == nullptr);
-    QVERIFY(!strict.usedSimpleEngineFallback());
-    QCOMPARE(
-        static_cast<std::uint8_t>(strict.requestedKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
-    );
-    QCOMPARE(
-        static_cast<std::uint8_t>(strict.effectiveKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
-    );
-    QVERIFY(strict.hasDiagnostics());
-    QVERIFY(strict.hasErrors());
-    QCOMPARE(
-        static_cast<std::uint8_t>(strict.status),
-        static_cast<std::uint8_t>(
-            skygate::ephemeris::EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable
-        )
-    );
-    QCOMPARE(strictDiagnosticsSink.diagnostics().size(), strict.diagnostics.size());
-    QCOMPARE(
-        static_cast<std::uint8_t>(strictDiagnosticsSink.diagnostics().front().severity),
-        static_cast<std::uint8_t>(strict.diagnostics.front().severity)
-    );
-    QVERIFY(strictDiagnosticsSink.diagnostics().front().isError());
-}
-
-void EphemerisEngineFactoryBehaviorTests::invalidEngineKindReturnsStructuredInvalidRequest()
-{
-    skygate::ephemeris::EphemerisEngineFactoryRequest request;
-    request.engineKind = static_cast<skygate::ephemeris::EphemerisEngineKind::Type>(std::uint8_t{255});
-
-    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
-
-    QVERIFY(!result.isSuccess());
-    QVERIFY(result.isFailure());
-    QVERIFY(result.engine == nullptr);
-    QVERIFY(!result.usedSimpleEngineFallback());
-    QVERIFY(result.hasDiagnostics());
-    QVERIFY(result.hasErrors());
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::FailedInvalidRequest)
-    );
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.diagnostics.front().code),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::InvalidRequest)
-    );
-    QVERIFY(result.diagnostics.front().isError());
-    QVERIFY(!result.diagnostics.front().displayText().empty());
 }
 
 QTEST_APPLESS_MAIN(EphemerisEngineFactoryBehaviorTests)

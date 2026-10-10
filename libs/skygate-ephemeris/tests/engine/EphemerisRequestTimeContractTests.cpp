@@ -6,6 +6,7 @@
 #include "ObservationContext.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "TestHelpers.hpp"
+#include "UtcTimeCodec.hpp"
 #include "engine/EphemerisCorrectionFlags.hpp"
 #include "engine/EphemerisEngineKind.hpp"
 #include "engine/EphemerisEngineOptions.hpp"
@@ -26,6 +27,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <memory>
 #include <span>
@@ -154,6 +156,8 @@ private slots:
     void highPrecisionEngineConvenienceOverloadBuildsUtcEpoch();
     void highPrecisionEngineRejectsNonExplicitEpoch();
 #endif
+    void constructsRequestsWithFactory();
+    void shiftsNonUtcBaseRequestsAtUtcTime();
 };
 
 void EphemerisRequestTimeContractTests::simpleEngineRejectsExplicitNonUtcEpoch()
@@ -499,6 +503,88 @@ void EphemerisRequestTimeContractTests::highPrecisionEngineRejectsNonExplicitEpo
 }
 
 #endif
+
+void EphemerisRequestTimeContractTests::constructsRequestsWithFactory()
+{
+    skygate::core::ObservationContext context;
+    context.observer = {.latitudeDeg = 47.3769, .longitudeDeg = 8.5417, .elevationMeters = 408.0};
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+
+    skygate::ephemeris::EphemerisEngineOptions options;
+    options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
+
+    const skygate::ephemeris::EphemerisRequest request =
+        skygate::ephemeris::EphemerisRequestFactory::requestFromContext(context, options);
+    QVERIFY(request.epoch.hasExplicit());
+    QCOMPARE(
+        static_cast<std::uint8_t>(request.options.engineKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+    QCOMPARE(
+        skygate::core::UtcTimeCodec::toEpochMicros(
+            skygate::ephemeris::EphemerisRequestFactory::contextFromRequest(request).utcTime
+        ),
+        1'704'067'200'000'000LL
+    );
+
+    const auto microsShiftedUtc = context.utcTime + std::chrono::microseconds(123'456);
+    const skygate::ephemeris::EphemerisRequest microsShiftedRequest =
+        skygate::ephemeris::EphemerisRequestFactory::atUtcTime(request, microsShiftedUtc);
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(microsShiftedRequest.context.utcTime), 1'704'067'200'123'456LL);
+    const qint64 microsRoundTrip = skygate::core::UtcTimeCodec::toEpochMicros(
+        skygate::ephemeris::EphemerisRequestFactory::contextFromRequest(microsShiftedRequest).utcTime
+    );
+    QVERIFY(microsRoundTrip != 1'704'067'200'000'000LL);
+    QVERIFY(std::llabs(microsRoundTrip - 1'704'067'200'123'456LL) <= 100);
+
+    const auto shiftedUtc = context.utcTime + std::chrono::seconds(90);
+    const skygate::ephemeris::EphemerisRequest shiftedRequest =
+        skygate::ephemeris::EphemerisRequestFactory::atUtcTime(request, shiftedUtc);
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(shiftedRequest.context.utcTime), 1'704'067'290'000'000LL);
+    const qint64 shiftedRoundTrip = skygate::core::UtcTimeCodec::toEpochMicros(
+        skygate::ephemeris::EphemerisRequestFactory::contextFromRequest(shiftedRequest).utcTime
+    );
+    QVERIFY(std::llabs(shiftedRoundTrip - 1'704'067'290'000'000LL) <= 100);
+    QCOMPARE(
+        static_cast<std::uint32_t>(shiftedRequest.options.correctionFlags()),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::apparent())
+    );
+}
+
+void EphemerisRequestTimeContractTests::shiftsNonUtcBaseRequestsAtUtcTime()
+{
+    skygate::core::ObservationContext context;
+    context.observer = {.latitudeDeg = 47.3769, .longitudeDeg = 8.5417, .elevationMeters = 408.0};
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+
+    skygate::ephemeris::EphemerisEngineOptions options;
+    options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+
+    for (const skygate::core::TimeScale timeScale :
+         {skygate::core::TimeScale::Tt, skygate::core::TimeScale::Tdb, skygate::core::TimeScale::Ut1}) {
+        skygate::ephemeris::EphemerisRequest baseRequest;
+        baseRequest.context = context;
+        baseRequest.options = options;
+        baseRequest.epoch = skygate::core::AstronomicalEpoch{
+            .julianDatePart1 = 2'460'000.0, .julianDatePart2 = 0.25, .timeScale = timeScale
+        };
+
+        const skygate::core::UtcTimePoint shiftedUtc = context.utcTime + std::chrono::seconds(90);
+        const skygate::ephemeris::EphemerisRequest shiftedRequest =
+            skygate::ephemeris::EphemerisRequestFactory::atUtcTime(baseRequest, shiftedUtc);
+
+        QCOMPARE(
+            static_cast<std::uint8_t>(shiftedRequest.epoch.timeScale),
+            static_cast<std::uint8_t>(skygate::core::TimeScale::Utc)
+        );
+        QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(shiftedRequest.context.utcTime), 1'704'067'290'000'000LL);
+        const qint64 shiftedRoundTrip = skygate::core::UtcTimeCodec::toEpochMicros(
+            skygate::ephemeris::EphemerisRequestFactory::contextFromRequest(shiftedRequest).utcTime
+        );
+        QVERIFY(std::llabs(shiftedRoundTrip - 1'704'067'290'000'000LL) <= 100);
+    }
+}
 
 QTEST_APPLESS_MAIN(EphemerisRequestTimeContractTests)
 
