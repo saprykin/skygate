@@ -7,6 +7,8 @@ add_library(skygate-ephemeris-test-support STATIC
     support/CatalogSemanticFixtureAdapter.cpp
     support/CatalogSemanticFixtureCorpus.cpp
     support/HighPrecisionEngineFixture.cpp
+    support/MarkerGuidanceEngine.cpp
+    support/MarkerGuidanceStrategy.cpp
     support/PassThroughApparentPlaceCalculator.cpp
     support/PassThroughFrameTransformer.cpp
     support/RecordingFrameTransformer.cpp
@@ -576,8 +578,16 @@ add_skygate_ephemeris_qtest(
     engine/EphemerisComputationPolicyTests.cpp
 )
 add_skygate_ephemeris_qtest(
-    skygate-ephemeris-observation-event-calculator-tests
-    events/ObservationEventCalculatorTests.cpp
+    skygate-ephemeris-observation-event-direct-search-tests
+    events/ObservationEventDirectSearchTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-observation-event-guidance-tests
+    events/ObservationEventGuidanceTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-observation-event-primary-engine-tests
+    events/ObservationEventPrimaryEngineTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-moon-phase-calculator-tests
