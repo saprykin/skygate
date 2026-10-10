@@ -12,14 +12,14 @@
 #include "catalog/CatalogFactory.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "engine/ITimeScaleService.hpp"
+#include "math/ViewportMath.hpp"
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
-#include "math/ViewportMath.hpp"
 #include "skygate/testsupport/PerformanceBudget.hpp"
-#include "time/CalendarTime.hpp"
 
 #include <QColor>
 #include <QElapsedTimer>

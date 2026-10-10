@@ -2,11 +2,11 @@
 #include "CelestialBodyState.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "UtcTimeCodec.hpp"
-#include "engine/highprecision/CelestialFrameTransformResult.hpp"
-#include "engine/highprecision/CelestialReferenceFrame.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/CalendarTime.hpp"
+#include "engine/highprecision/CelestialFrameTransformResult.hpp"
+#include "engine/highprecision/CelestialReferenceFrame.hpp"
 
 #include <QtTest/QtTest>
 
