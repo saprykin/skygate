@@ -1,14 +1,19 @@
 find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 
 add_library(skygate-ephemeris-test-support STATIC
+    support/ApparentPlaceTestFixture.cpp
     support/EphemerisEngineTestDoubles.cpp
     support/CatalogMergeTestSupport.cpp
     support/CatalogSemanticFixtureAdapter.cpp
     support/CatalogSemanticFixtureCorpus.cpp
     support/HighPrecisionEngineFixture.cpp
     support/PassThroughApparentPlaceCalculator.cpp
+    support/PassThroughFrameTransformer.cpp
+    support/RecordingFrameTransformer.cpp
+    support/ShortBatchFrameTransformer.cpp
     support/StaticCalcephKernelProvider.cpp
     support/TestCalcephKernel.cpp
+    support/ValidUtcTimeScaleService.cpp
 )
 add_library(skygate::ephemeris-test-support ALIAS skygate-ephemeris-test-support)
 
@@ -285,9 +290,19 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
         LABELS "unit;highprecision"
     )
     add_skygate_ephemeris_qtest(
-        skygate-ephemeris-apparent-place-calculator-tests
-        highprecision/ApparentPlaceCalculatorTests.cpp
-        LABELS "unit;highprecision;validation;apparent;topocentric;corrections"
+        skygate-ephemeris-apparent-place-correction-routing-tests
+        highprecision/ApparentPlaceCorrectionRoutingTests.cpp
+        LABELS "unit;highprecision;apparent;corrections"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-apparent-place-topocentric-tests
+        highprecision/ApparentPlaceTopocentricTests.cpp
+        LABELS "unit;highprecision;apparent;topocentric;corrections"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-apparent-place-horizons-validation-tests
+        highprecision/ApparentPlaceHorizonsValidationTests.cpp
+        LABELS "unit;highprecision;validation;apparent;topocentric"
     )
     add_skygate_ephemeris_qtest(
         skygate-ephemeris-atmospheric-refraction-calculator-tests
