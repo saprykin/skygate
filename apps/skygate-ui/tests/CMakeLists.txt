@@ -6,6 +6,7 @@ add_library(skygate-ui-test-support STATIC
     support/CatalogCacheFixture.cpp
     support/CatalogCollectionCacheFixture.cpp
     support/CatalogNotificationRecorder.cpp
+    support/CatalogRuntimeFixture.cpp
     support/CatalogSourceFactsQuery.cpp
     support/CatalogTestPayloadFile.cpp
     support/ConstellationAnchorGroupLookup.cpp
@@ -333,7 +334,18 @@ target_compile_definitions(skygate-ui-sky-ephemeris-data-manager-tests
     PRIVATE
         SKYGATE_UI_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/.."
 )
-add_skygate_ui_qtest(skygate-ui-sky-catalog-runtime-tests catalog/SkyCatalogRuntimeTests.cpp)
+add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-runtime-transition-tests
+    catalog/SkyCatalogRuntimeTransitionTests.cpp
+)
+add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-runtime-related-data-tests
+    catalog/SkyCatalogRuntimeRelatedDataTests.cpp
+)
+add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-runtime-presentation-tests
+    catalog/SkyCatalogRuntimePresentationTests.cpp
+)
 add_skygate_ui_qtest(skygate-ui-sky-hit-target-index-tests selection/SkyHitTargetIndexTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-object-trail-builder-tests selection/SkyObjectTrailBuilderTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-render-builders-tests render/SkyRenderBuildersTests.cpp)
