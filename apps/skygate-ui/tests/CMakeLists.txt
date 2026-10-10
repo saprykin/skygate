@@ -4,6 +4,7 @@ add_library(skygate-ui-test-support STATIC
     support/CatalogArchiveFixture.cpp
     support/CatalogBodyQuery.cpp
     support/CatalogCacheFixture.cpp
+    support/CatalogCollectionCacheFixture.cpp
     support/CatalogNotificationRecorder.cpp
     support/CatalogSourceFactsQuery.cpp
     support/CatalogTestPayloadFile.cpp
@@ -215,6 +216,24 @@ add_skygate_ui_qtest(
 add_skygate_ui_qtest(
     skygate-ui-settings-store-tests
     settings/SkySettingsStoreTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-catalog-cache-settings-tests
+    settings/SkyCatalogCacheSettingsTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-collection-generation-tests
+    settings/SkyCollectionGenerationTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-ephemeris-cache-settings-tests
+    settings/SkyEphemerisCacheSettingsTests.cpp
     LABELS integration
     TIMEOUT 45
 )
