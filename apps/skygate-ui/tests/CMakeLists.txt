@@ -12,6 +12,10 @@ add_library(skygate-ui-test-support STATIC
     support/ConstellationAnchorGroupLookup.cpp
     support/EphemerisDataCacheSnapshotFixture.cpp
     support/FakeReplyQuery.cpp
+    support/GuardApparentPlaceCalculator.cpp
+    support/GuardBatchStarAstrometryCalculator.cpp
+    support/PerformanceGuardChecks.cpp
+    support/PerformanceGuardScenario.cpp
     support/RelatedDatasetFixture.cpp
     support/StagedEphemerisAssetFixture.cpp
     support/TrailBuilderTestEngine.cpp
@@ -24,6 +28,7 @@ target_link_libraries(skygate-ui-test-support
     PUBLIC
         Qt6::Test
         skygate::ephemeris-test-support
+        skygate::test-support
         skygate::uiapp
 )
 
@@ -293,8 +298,14 @@ add_skygate_ui_qtest(
 )
 add_skygate_ui_qtest(skygate-ui-catalog-payload-parse-service-tests catalog/CatalogPayloadParseServiceTests.cpp)
 add_skygate_ui_qtest(
-    skygate-ui-performance-guard-tests
-    diagnostics/PerformanceGuardTests.cpp
+    skygate-ui-performance-scene-profile-tests
+    diagnostics/PerformanceSceneProfileTests.cpp
+    LABELS integration perf platform slow advisory
+    TIMEOUT 120
+)
+add_skygate_ui_qtest(
+    skygate-ui-performance-search-guard-tests
+    diagnostics/PerformanceSearchGuardTests.cpp
     LABELS integration perf platform slow advisory
     TIMEOUT 120
 )
