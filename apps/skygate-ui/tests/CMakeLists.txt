@@ -3,6 +3,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 add_library(skygate-ui-test-support STATIC
     support/CatalogArchiveFixture.cpp
     support/CatalogBodyQuery.cpp
+    support/CatalogCacheFixture.cpp
     support/CatalogNotificationRecorder.cpp
     support/CatalogSourceFactsQuery.cpp
     support/CatalogTestPayloadFile.cpp
@@ -230,8 +231,20 @@ add_skygate_ui_qtest(
 )
 add_skygate_ui_qtest(skygate-ui-overlay-layer-settings-tests theme/SkyOverlayLayerSettingsTests.cpp)
 add_skygate_ui_qtest(
-    skygate-ui-catalog-cache-controller-tests
-    catalog/SkyCatalogCacheControllerTests.cpp
+    skygate-ui-catalog-cache-restore-tests
+    catalog/SkyCatalogCacheRestoreTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-catalog-cache-related-data-tests
+    catalog/SkyCatalogCacheRelatedDataTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-catalog-cache-migration-tests
+    catalog/SkyCatalogCacheMigrationTests.cpp
     LABELS integration
     TIMEOUT 45
 )
