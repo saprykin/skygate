@@ -5,6 +5,8 @@ add_library(skygate-ephemeris-test-support STATIC
     support/CatalogMergeTestSupport.cpp
     support/CatalogSemanticFixtureAdapter.cpp
     support/CatalogSemanticFixtureCorpus.cpp
+    support/HighPrecisionEngineFixture.cpp
+    support/PassThroughApparentPlaceCalculator.cpp
     support/StaticCalcephKernelProvider.cpp
     support/TestCalcephKernel.cpp
 )
@@ -258,8 +260,18 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     )
 
     add_skygate_ephemeris_qtest(
-        skygate-ephemeris-highprecision-engine-tests
-        highprecision/HighPrecisionEphemerisEngineTests.cpp
+        skygate-ephemeris-highprecision-engine-dispatch-tests
+        highprecision/HighPrecisionEngineDispatchTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-highprecision-engine-cache-tests
+        highprecision/HighPrecisionEngineCacheTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-highprecision-result-builder-tests
+        highprecision/HighPrecisionResultBuilderTests.cpp
         LABELS "unit;highprecision"
     )
     add_skygate_ephemeris_qtest(
