@@ -3,6 +3,7 @@
 #include "engine/EphemerisDataActivation.hpp"
 #include "engine/EphemerisDataFileUtilities.hpp"
 #include "engine/EphemerisStagedUpdateVerification.hpp"
+#include "settings/SkySettingsStore.hpp"
 
 #include <QLoggingCategory>
 #include <QStringList>
@@ -18,7 +19,7 @@ namespace {
 
 Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
 
-using EphemerisDataCacheSnapshot = SkySettingsStore::EphemerisDataCacheSnapshot;
+using EphemerisDataCacheSnapshot = SkyEphemerisDataCacheSnapshot;
 using StagedUpdateActivationRequest = SkyEphemerisCacheController::StagedUpdateActivationRequest;
 using StagedUpdateActivationResult = SkyEphemerisCacheController::StagedUpdateActivationResult;
 using StagedUpdateActivationStatus = SkyEphemerisCacheController::StagedUpdateActivationStatus;

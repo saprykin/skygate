@@ -320,11 +320,11 @@ void SkyContextControllerNightCatalogTests::restoresCachedCatalogConstellationCo
     settings.setValue("skyContext/catalogCachePath", m_settings.filePath(QStringLiteral("cached-hyg-catalog.csv")));
 
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot stateSnapshot;
+    SkyPersistedStateSnapshot stateSnapshot;
     stateSnapshot.catalogPresetIndex = 1;
     QVERIFY(store.saveState(stateSnapshot));
 
-    SkySettingsStore::CatalogCacheSnapshot cacheSnapshot;
+    SkyCatalogLegacyCacheSnapshot cacheSnapshot;
     cacheSnapshot.sourceLabel = "HYG v4.2";
     cacheSnapshot.catalogPayload = "id,hip,proper,ra,dec,mag\n"
                                    "1,42,Demo Star,6.7525,-16.7161,-1.46\n";

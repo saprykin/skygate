@@ -214,7 +214,7 @@ void SkyEphemerisDataStatusTests::legacyShortRangeProfileIdRestoresAsDe440sProfi
     const QString kernelPath = m_settings.filePath(QStringLiteral("legacy-de440s.bsp"));
     QVERIFY(writeFile(kernelPath, QByteArrayLiteral("kernel placeholder")));
 
-    SkySettingsStore::EphemerisDataCacheSnapshot snapshot =
+    SkyEphemerisDataCacheSnapshot snapshot =
         EphemerisDataCacheSnapshotFixture::installedSnapshot(kernelPath, QString());
     snapshot.installedKernelProfileId = QStringLiteral("modern");
 

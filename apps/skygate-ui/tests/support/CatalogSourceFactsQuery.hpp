@@ -1,6 +1,7 @@
 #pragma once
 
-#include "SkySettingsStore.hpp"
+#include "catalog/SkyCatalogCollectionCacheSnapshot.hpp"
+#include "catalog/SkyCatalogSourceCacheRecord.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QString>
@@ -15,14 +16,14 @@ namespace skygate::ui::tests {
 class CatalogSourceFactsQuery final {
 public:
     [[nodiscard]] static bool
-    containsInstanceId(const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot, const QString& instanceId);
-    [[nodiscard]] static const SkySettingsStore::CatalogSourceCacheRecord*
-    findRecord(const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot, const QString& instanceId);
+    containsInstanceId(const SkyCatalogCollectionCacheSnapshot& snapshot, const QString& instanceId);
+    [[nodiscard]] static const SkyCatalogSourceCacheRecord*
+    findRecord(const SkyCatalogCollectionCacheSnapshot& snapshot, const QString& instanceId);
     [[nodiscard]] static QString
     sidecarPath(const QString& directory, const QString& instanceId, const QString& extension);
     [[nodiscard]] static QString durableTitle(const QString& title);
     [[nodiscard]] static std::vector<skygate::ephemeris::ConstellationLineRef>
-    relatedLineRefs(const SkySettingsStore::CatalogSourceCacheRecord& record);
+    relatedLineRefs(const SkyCatalogSourceCacheRecord& record);
     [[nodiscard]] static bool relatedLineRefsContainHip(
         const std::vector<skygate::ephemeris::ConstellationLineRef>& lineRefs, const std::string& hipId
     );

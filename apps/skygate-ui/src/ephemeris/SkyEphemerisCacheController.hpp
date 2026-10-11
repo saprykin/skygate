@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SkySettingsStore.hpp"
+#include "SkyEphemerisDataCacheSnapshot.hpp"
 #include "engine/EphemerisDataActivationStatus.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "engine/EphemerisStagedUpdateVerificationRequest.hpp"
@@ -12,6 +12,8 @@
 #include <functional>
 #include <string>
 #include <vector>
+
+class SkySettingsStore;
 
 class SkyEphemerisCacheController final {
 public:
@@ -45,7 +47,7 @@ public:
             skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::InvalidRequest;
         skygate::ephemeris::EphemerisDataActivationStatus activationStatus =
             skygate::ephemeris::EphemerisDataActivationStatus::InvalidRequest;
-        SkySettingsStore::EphemerisDataCacheSnapshot cacheSnapshot;
+        SkyEphemerisDataCacheSnapshot cacheSnapshot;
         std::vector<QString> diagnostics;
         std::vector<QString> activatedAssetIds;
 
@@ -57,7 +59,7 @@ public:
 
     [[nodiscard]] StagedUpdateActivationResult activate(
         const StagedUpdateActivationRequest& request,
-        const SkySettingsStore::EphemerisDataCacheSnapshot& activeSnapshot,
+        const SkyEphemerisDataCacheSnapshot& activeSnapshot,
         SkySettingsStore* settingsStore
     ) const;
 };

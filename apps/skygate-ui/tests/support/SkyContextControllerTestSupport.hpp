@@ -6,7 +6,6 @@
 #include "SkyContextController.hpp"
 #include "SkyLogging.hpp"
 #include "SkyOverlayLayerSettings.hpp"
-#include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"

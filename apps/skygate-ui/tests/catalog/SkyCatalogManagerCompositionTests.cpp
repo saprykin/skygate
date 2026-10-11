@@ -721,11 +721,11 @@ void SkyCatalogManagerCompositionTests::crossSourceHipBridgesSurviveBinaryRestor
     QVERIFY(establishingCatalog != nullptr);
     QVERIFY(bridgingCatalog != nullptr);
 
-    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    SkyCatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
 
-    SkySettingsStore::CatalogSourceCacheRecord establishing;
+    SkyCatalogSourceCacheRecord establishing;
     establishing.instanceId = QStringLiteral("bridge-a");
     establishing.title = QStringLiteral("Establishing Source");
     establishing.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
@@ -735,7 +735,7 @@ void SkyCatalogManagerCompositionTests::crossSourceHipBridgesSurviveBinaryRestor
     QVERIFY(!establishing.binaryPayload.isEmpty());
     snapshot.sources.push_back(std::move(establishing));
 
-    SkySettingsStore::CatalogSourceCacheRecord bridging;
+    SkyCatalogSourceCacheRecord bridging;
     bridging.instanceId = QStringLiteral("bridge-b");
     bridging.title = QStringLiteral("Bridging Source");
     bridging.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
@@ -995,10 +995,9 @@ void SkyCatalogManagerCompositionTests::combinedFactsSurviveRejectionReorderRawR
     QCOMPARE(observations.back().constellationCount, std::size_t{1});
     CatalogNotificationRecorder::assertMatchesRuntime(manager, observations.back());
     {
-        const SkySettingsStore::CatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
+        const SkyCatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
         QVERIFY(snapshot.isLoaded());
-        const SkySettingsStore::CatalogSourceCacheRecord* record =
-            CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
+        const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
         QVERIFY(record != nullptr);
         QCOMPARE(record->payload, skygate::ui::tests::orionHygCsvPayload());
         QVERIFY(
@@ -1038,10 +1037,9 @@ void SkyCatalogManagerCompositionTests::combinedFactsSurviveRejectionReorderRawR
     QCoreApplication::processEvents();
     CatalogNotificationRecorder::assertMatchesRuntime(manager, observations.back());
     {
-        const SkySettingsStore::CatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
+        const SkyCatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
         QVERIFY(snapshot.isLoaded());
-        const SkySettingsStore::CatalogSourceCacheRecord* record =
-            CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
+        const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
         QVERIFY(record != nullptr);
         QCOMPARE(record->payload, acceptedPayload);
         QCOMPARE(record->relatedDatasetUrls, QStringList{relatedUrl});
@@ -1097,10 +1095,9 @@ void SkyCatalogManagerCompositionTests::combinedFactsSurviveRejectionReorderRawR
     QVERIFY(ConstellationAnchorGroupLookup::find(manager, "Lyra") == nullptr);
     CatalogNotificationRecorder::assertMatchesRuntime(manager, observations.back());
     {
-        const SkySettingsStore::CatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
+        const SkyCatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
         QVERIFY(snapshot.isLoaded());
-        const SkySettingsStore::CatalogSourceCacheRecord* record =
-            CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
+        const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
         QVERIFY(record != nullptr);
         QCOMPARE(record->title, QStringLiteral("Combined Accepted Title"));
         QCOMPARE(record->version, QStringLiteral("v1"));
@@ -1115,14 +1112,14 @@ void SkyCatalogManagerCompositionTests::combinedFactsSurviveRejectionReorderRawR
     manager.moveSource(siblingId, 0);
     QCOMPARE(manager.sourceInstanceIds(), QStringList({siblingId, QStringLiteral("primary"), instanceId}));
     CatalogNotificationRecorder::assertMatchesRuntime(manager, observations.back());
-    const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
     QVERIFY(persisted.isLoaded());
     QStringList persistedInstanceIds;
-    for (const SkySettingsStore::CatalogSourceCacheRecord& record : persisted.snapshot.sources) {
+    for (const SkyCatalogSourceCacheRecord& record : persisted.snapshot.sources) {
         persistedInstanceIds.push_back(record.instanceId);
     }
     QCOMPARE(persistedInstanceIds, manager.sourceInstanceIds());
-    const SkySettingsStore::CatalogSourceCacheRecord* persistedRecord =
+    const SkyCatalogSourceCacheRecord* persistedRecord =
         CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
     QVERIFY(persistedRecord != nullptr);
     QCOMPARE(persistedRecord->title, QStringLiteral("Combined Accepted Title"));
@@ -1162,9 +1159,9 @@ void SkyCatalogManagerCompositionTests::combinedFactsSurviveRejectionReorderRawR
     QVERIFY(rawRestart.constellationAnchorGroups().empty());
     QCOMPARE(rawRestart.constellationCount(), std::size_t{0});
     {
-        const SkySettingsStore::CatalogCollectionCacheLoadResult upgraded = store.loadCatalogCollectionCache();
+        const SkyCatalogCollectionCacheLoadResult upgraded = store.loadCatalogCollectionCache();
         QVERIFY(upgraded.isLoaded());
-        const SkySettingsStore::CatalogSourceCacheRecord* upgradedRecord =
+        const SkyCatalogSourceCacheRecord* upgradedRecord =
             CatalogSourceFactsQuery::findRecord(upgraded.snapshot, instanceId);
         QVERIFY(upgradedRecord != nullptr);
         QCOMPARE(upgradedRecord->title, QStringLiteral("Combined Accepted Title"));

@@ -44,13 +44,13 @@ const QString kDeepSkyMember = QStringLiteral("catalog/ngc.csv");
 
 // A persisted source whose raw payload is a multi-member archive, with one
 // member named by the descriptor's archive selection.
-SkySettingsStore::CatalogCollectionCacheSnapshot makeArchiveCollectionSnapshot()
+SkyCatalogCollectionCacheSnapshot makeArchiveCollectionSnapshot()
 {
-    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    SkyCatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = kCurrentCollectionSchemaVersion;
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
 
-    SkySettingsStore::CatalogSourceCacheRecord archive;
+    SkyCatalogSourceCacheRecord archive;
     archive.instanceId = QStringLiteral("custom:archive");
     archive.descriptorId = QStringLiteral("archive_demo");
     archive.title = QStringLiteral("Archive Catalog");
@@ -68,9 +68,9 @@ SkySettingsStore::CatalogCollectionCacheSnapshot makeArchiveCollectionSnapshot()
     return snapshot;
 }
 
-SkySettingsStore::CatalogSourceCacheRecord makeArchiveSourceRecord(const QString& instanceId)
+SkyCatalogSourceCacheRecord makeArchiveSourceRecord(const QString& instanceId)
 {
-    SkySettingsStore::CatalogSourceCacheRecord record;
+    SkyCatalogSourceCacheRecord record;
     record.instanceId = instanceId;
     record.descriptorId = QStringLiteral("archive_demo");
     record.title = QStringLiteral("Archive Catalog");
@@ -342,26 +342,24 @@ void SkyCatalogCacheRestoreTests::restoresSelectedArchiveMemberWhenCacheCorrupt(
 
 void SkyCatalogCacheRestoreTests::optionFailuresKeepDamagedRecordsAsConfiguration()
 {
-    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    SkyCatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = kCurrentCollectionSchemaVersion;
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
 
-    SkySettingsStore::CatalogSourceCacheRecord missingMember =
-        makeArchiveSourceRecord(QStringLiteral("custom:missing"));
+    SkyCatalogSourceCacheRecord missingMember = makeArchiveSourceRecord(QStringLiteral("custom:missing"));
     missingMember.archiveSelector = QStringLiteral("catalog/missing.csv");
     missingMember.schemaHint = CatalogSourceType::OpenNgcCsv;
     missingMember.order = 0;
     snapshot.sources.push_back(std::move(missingMember));
 
-    SkySettingsStore::CatalogSourceCacheRecord hintMismatch =
-        makeArchiveSourceRecord(QStringLiteral("custom:hint-mismatch"));
+    SkyCatalogSourceCacheRecord hintMismatch = makeArchiveSourceRecord(QStringLiteral("custom:hint-mismatch"));
     hintMismatch.schemaHint = CatalogSourceType::OpenNgcCsv;
     hintMismatch.urls = QStringList{QStringLiteral("https://example.test/stars.csv")};
     hintMismatch.payload = skygate::ui::tests::sampleHygCsvPayload();
     hintMismatch.order = 1;
     snapshot.sources.push_back(std::move(hintMismatch));
 
-    SkySettingsStore::CatalogSourceCacheRecord valid = makeArchiveSourceRecord(QStringLiteral("custom:valid"));
+    SkyCatalogSourceCacheRecord valid = makeArchiveSourceRecord(QStringLiteral("custom:valid"));
     valid.archiveSelector = kStarsMember;
     valid.schemaHint = CatalogSourceType::HygCsv;
     valid.order = 2;
@@ -565,9 +563,9 @@ void SkyCatalogCacheRestoreTests::persistsAndRestoresBundledRecordsFromFactory()
 
     // A configured record without any payload stays in the collection with its
     // identity, order, policy, and enabled state instead of being dropped.
-    SkySettingsStore::CatalogCollectionCacheSnapshot noPayload;
+    SkyCatalogCollectionCacheSnapshot noPayload;
     noPayload.schemaVersion = kCurrentCollectionSchemaVersion;
-    SkySettingsStore::CatalogSourceCacheRecord noPayloadRecord;
+    SkyCatalogSourceCacheRecord noPayloadRecord;
     noPayloadRecord.instanceId = QStringLiteral("custom:missing-payload");
     noPayloadRecord.title = QStringLiteral("Missing payload");
     noPayloadRecord.urls = QStringList{QStringLiteral("https://example.test/missing.csv")};
@@ -592,7 +590,7 @@ void SkyCatalogCacheRestoreTests::persistsAndRestoresBundledRecordsFromFactory()
 
 void SkyCatalogCacheRestoreTests::olderRecordFormatRestoresDefinedDefaults()
 {
-    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    SkyCatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = kCurrentCollectionSchemaVersion - 1;
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
 
@@ -600,13 +598,13 @@ void SkyCatalogCacheRestoreTests::olderRecordFormatRestoresDefinedDefaults()
     // descriptor identity matches the OpenNGC preset while the selected member
     // is the HYG member, so resolving the current descriptor for this record
     // would contradict the cached payload.
-    SkySettingsStore::CatalogSourceCacheRecord selected = makeArchiveSourceRecord(QStringLiteral("custom:selected"));
+    SkyCatalogSourceCacheRecord selected = makeArchiveSourceRecord(QStringLiteral("custom:selected"));
     selected.descriptorId = QStringLiteral("open_ngc");
     selected.archiveSelector = kStarsMember;
     selected.order = 0;
     snapshot.sources.push_back(std::move(selected));
 
-    SkySettingsStore::CatalogSourceCacheRecord ambiguous = makeArchiveSourceRecord(QStringLiteral("custom:ambiguous"));
+    SkyCatalogSourceCacheRecord ambiguous = makeArchiveSourceRecord(QStringLiteral("custom:ambiguous"));
     ambiguous.descriptorId = QStringLiteral("open_ngc");
     ambiguous.order = 1;
     snapshot.sources.push_back(std::move(ambiguous));

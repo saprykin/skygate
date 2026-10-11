@@ -76,7 +76,7 @@ stellariumConstellationIndexJsonPayload(const QList<QPair<QString, QList<int>>>&
     const std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs = orionLineRefs();
     const std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups = orionAnchorGroups();
 
-    SkySettingsStore::CatalogCacheSnapshot snapshot;
+    SkyCatalogLegacyCacheSnapshot snapshot;
     snapshot.sourceLabel = QStringLiteral("Test HYG");
     snapshot.catalogPayload = orionHygCsvPayload();
     snapshot.constellationLineRows =
@@ -87,7 +87,7 @@ stellariumConstellationIndexJsonPayload(const QList<QPair<QString, QList<int>>>&
         skygate::ui::internal::SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
     snapshot.constellationCount = 1U;
 
-    SkySettingsStore::StateSnapshot stateSnapshot;
+    SkyPersistedStateSnapshot stateSnapshot;
     stateSnapshot.catalogPresetIndex = 2;
 
     const SkySettingsStore settingsStore;

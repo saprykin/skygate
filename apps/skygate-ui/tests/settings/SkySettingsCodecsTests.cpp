@@ -82,7 +82,7 @@ void SkySettingsCodecsTests::primitiveReadersFallBackForMissingInvalidValues()
 
 void SkySettingsCodecsTests::splitAndMergeStateSnapshotPreservesTypedDomains()
 {
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.live = false;
     snapshot.timelineToolbarCollapsed = true;
     snapshot.searchToolbarCollapsed = true;
@@ -207,7 +207,7 @@ void SkySettingsCodecsTests::savingBlankLogPathStoresDefaultPath()
     QVERIFY(dir.isValid());
     QSettings settings = makeSettings(dir);
 
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.logToTerminal = false;
     snapshot.logToFile = true;
     snapshot.logFilePath = "  ";
@@ -231,7 +231,7 @@ void SkySettingsCodecsTests::ephemerisEngineKindRoundTripsBothStableIds()
     QVERIFY(dir.isValid());
     QSettings settings = makeSettings(dir);
 
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
     skygate::ui::internal::saveStateSnapshot(settings, snapshot);
     auto loaded = skygate::ui::internal::loadStateSnapshot(settings);

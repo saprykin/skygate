@@ -49,7 +49,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     settings.clear();
 
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot savedSnapshot;
+    SkyPersistedStateSnapshot savedSnapshot;
     savedSnapshot.live = false;
     savedSnapshot.timelineToolbarCollapsed = true;
     savedSnapshot.searchToolbarCollapsed = true;
@@ -153,7 +153,7 @@ void SkySettingsStoreTests::savesAndLoadsNegativeUtcEpochMicros()
     settings.clear();
 
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot savedSnapshot;
+    SkyPersistedStateSnapshot savedSnapshot;
     savedSnapshot.utcEpochMicros = -63'555'595'200'123'000LL;
 
     QVERIFY(store.saveState(savedSnapshot));
@@ -298,7 +298,7 @@ void SkySettingsStoreTests::malformedEphemerisUserSettingsFallBackToDefaults()
     ignoreSkySettingsFallbackWarnings(8);
     const auto loadedSnapshot = store.loadState();
     QVERIFY(loadedSnapshot.has_value());
-    const SkySettingsStore::EphemerisUserSettingsSnapshot defaults;
+    const SkyEphemerisUserSettingsSnapshot defaults;
     QCOMPARE(
         static_cast<std::uint8_t>(loadedSnapshot->ephemeris.engineKind), static_cast<std::uint8_t>(defaults.engineKind)
     );
@@ -326,7 +326,7 @@ void SkySettingsStoreTests::savesLoadsAndDefaultsLoggingPreferences()
     settings.clear();
 
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.logToTerminal = false;
     snapshot.logToFile = true;
     snapshot.logFilePath = m_settings.filePath(QStringLiteral("custom-skygate.log"));

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "SkySettingsStore.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
+#include "catalog/SkyCatalogCollectionCacheSnapshot.hpp"
 
 #include <QString>
 
@@ -19,7 +19,7 @@ public:
 
     // A persisted collection in the current record format: two sources whose
     // raw payloads must be reparsed because they carry no binary sidecars.
-    [[nodiscard]] static SkySettingsStore::CatalogCollectionCacheSnapshot makeCollectionSnapshot();
+    [[nodiscard]] static SkyCatalogCollectionCacheSnapshot makeCollectionSnapshot();
 
     [[nodiscard]] static QString firstBodyId(const skygate::ephemeris::IStarCatalog& catalog);
 

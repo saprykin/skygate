@@ -39,7 +39,7 @@ void SkyContextControllerAppearanceSettingsTests::defaultsThemeToBundledDefault(
 void SkyContextControllerAppearanceSettingsTests::restoresSavedThemeId()
 {
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.themeId = "night-vision";
     QVERIFY(store.saveState(snapshot));
 
@@ -51,7 +51,7 @@ void SkyContextControllerAppearanceSettingsTests::restoresSavedThemeId()
 void SkyContextControllerAppearanceSettingsTests::invalidSavedThemeFallsBackToDefault()
 {
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.themeId = "missing-theme";
     QVERIFY(store.saveState(snapshot));
 
@@ -111,7 +111,7 @@ void SkyContextControllerAppearanceSettingsTests::loggingSettingsApplyAndPersist
 void SkyContextControllerAppearanceSettingsTests::invalidSavedTimeZoneFallsBackToUtc()
 {
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.displayTimeZoneId = QStringLiteral("Skygate/InvalidZone");
     QVERIFY(store.saveState(snapshot));
 
@@ -123,7 +123,7 @@ void SkyContextControllerAppearanceSettingsTests::invalidSavedTimeZoneFallsBackT
 void SkyContextControllerAppearanceSettingsTests::restoresSavedOverlayLayerVisibility()
 {
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.overlayLayers.horizon = false;
     snapshot.overlayLayers.altAzGrid = false;
     snapshot.overlayLayers.constellationLines = false;

@@ -53,7 +53,7 @@ void SkyCatalogCacheSettingsTests::savesLoadsAndClearsCatalogCachesIndependently
     );
 
     SkySettingsStore store;
-    const SkySettingsStore::CatalogCacheSnapshot savedSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot(
+    const SkyCatalogLegacyCacheSnapshot savedSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot(
         {.constellationLineRows = "a|b\n",
          .constellationAnchorGroupRows = "Orion|hip1,hip2\n",
          .constellationCount = 42}
@@ -99,7 +99,7 @@ void SkyCatalogCacheSettingsTests::savesLoadsAndClearsCatalogCollectionCache()
     const auto savedSnapshot = CatalogCollectionCacheFixture::sampleCollectionSnapshot();
     QVERIFY(store.saveCatalogCollectionCache(savedSnapshot));
 
-    const SkySettingsStore::CatalogCollectionCacheLoadResult loaded = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult loaded = store.loadCatalogCollectionCache();
     QVERIFY(loaded.isLoaded());
     const auto& loadedSnapshot = loaded.snapshot;
     QCOMPARE(loadedSnapshot.schemaVersion, savedSnapshot.schemaVersion);
@@ -123,7 +123,7 @@ void SkyCatalogCacheSettingsTests::savesLoadsAndClearsCatalogCollectionCache()
 
     QVERIFY(store.clearCatalogCollectionCache());
     const auto afterClear = store.loadCatalogCollectionCache();
-    QCOMPARE(afterClear.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
+    QCOMPARE(afterClear.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
 }
 
 void SkyCatalogCacheSettingsTests::clearSourceCacheEvictsPayloadKeepsConfiguration()
@@ -222,14 +222,14 @@ void SkyCatalogCacheSettingsTests::partialCacheSavePreservesConfiguredPeerPath()
     QSettings settings;
 
     SkySettingsStore store;
-    SkySettingsStore::CatalogCacheSnapshot starSnapshot;
+    SkyCatalogLegacyCacheSnapshot starSnapshot;
     starSnapshot.sourceLabel = "Saved";
     starSnapshot.catalogPayload = skygate::ui::tests::sampleHygCsvPayload();
     QVERIFY(store.saveCatalogCache(starSnapshot));
     QCOMPARE(settings.value("skyContext/catalogCachePath").toString(), starCachePath);
     QCOMPARE(settings.value("skyContext/deepSkyCatalogCachePath").toString(), deepSkyCachePath);
 
-    SkySettingsStore::CatalogCacheSnapshot deepSkySnapshot;
+    SkyCatalogLegacyCacheSnapshot deepSkySnapshot;
     deepSkySnapshot.deepSkySourceLabel = "Saved OpenNGC";
     deepSkySnapshot.deepSkyCatalogPayload = skygate::ui::tests::sampleCompactOpenNgcCsvPayload();
     QVERIFY(store.saveCatalogCache(deepSkySnapshot));

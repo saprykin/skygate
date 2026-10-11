@@ -508,7 +508,7 @@ void SkyCatalogManagerSourceTests::sameUrlDifferentVersionsStayDistinct()
     QCOMPARE(firstEntry->version, QStringLiteral("v1"));
     QCOMPARE(secondEntry->version, QStringLiteral("v2"));
 
-    const SkySettingsStore::CatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
     QVERIFY(snapshot.isLoaded());
     QCOMPARE(snapshot.snapshot.sources.size(), 3);
     QCOMPARE(snapshot.snapshot.sources[0].instanceId, QStringLiteral("primary"));
@@ -585,7 +585,7 @@ void SkyCatalogManagerSourceTests::editingSourceAsUpdatePreservesInstanceId()
     QCOMPARE(entry->title, QStringLiteral("Updated Title"));
     QCOMPARE(entry->version, QStringLiteral("v2"));
 
-    const SkySettingsStore::CatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
     QVERIFY(snapshot.isLoaded());
     QCOMPARE(snapshot.snapshot.sources.size(), 2);
     QCOMPARE(snapshot.snapshot.sources[0].instanceId, QStringLiteral("primary"));
@@ -671,7 +671,7 @@ void SkyCatalogManagerSourceTests::removingSoleSourceLeavesEmptyCollection()
 
     // Removing the last source commits the empty collection instead of
     // clearing the configuration back to first use.
-    const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
     QVERIFY(persisted.isLoaded());
     QVERIFY(persisted.snapshot.sources.isEmpty());
 }

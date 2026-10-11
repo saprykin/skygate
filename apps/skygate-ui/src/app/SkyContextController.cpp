@@ -901,7 +901,7 @@ SkyContextController::ephemerisRequestContextFor(const skygate::core::Observatio
     inputs.ephemerisDataRevision = ephemerisDataRevision();
     inputs.catalogRevision = catalogRevision();
     if (m_ephemerisDataManager != nullptr) {
-        const SkySettingsStore::EphemerisDataCacheSnapshot activeCache = m_ephemerisDataManager->activeCacheSnapshot();
+        const SkyEphemerisDataCacheSnapshot activeCache = m_ephemerisDataManager->activeCacheSnapshot();
         inputs.installedEarthOrientationVersion = activeCache.installedEarthOrientationVersion;
         inputs.installedLeapSecondTableVersion = activeCache.installedLeapSecondTableVersion;
         inputs.installedDeltaTDataVersion = activeCache.installedDeltaTDataVersion;
@@ -1100,7 +1100,7 @@ void SkyContextController::setLogFilePath(const QString& logFilePath)
     emit loggingChanged();
 }
 
-void SkyContextController::applyEphemerisUserSettings(const SkySettingsStore::EphemerisUserSettingsSnapshot& settings)
+void SkyContextController::applyEphemerisUserSettings(const SkyEphemerisUserSettingsSnapshot& settings)
 {
     skygate::ephemeris::EphemerisEngineOptions nextOptions = m_ephemerisSession->engineOptions();
     nextOptions.setEngineKind(settings.engineKind);

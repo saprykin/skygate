@@ -1,8 +1,10 @@
 #pragma once
 
+#include "SkyCatalogCollectionCacheSnapshot.hpp"
+#include "SkyCatalogLegacyCacheSnapshot.hpp"
+#include "SkyCatalogSourceCacheRecord.hpp"
 #include "SkyCatalogSourceInstance.hpp"
 #include "SkyCatalogSourceRecord.hpp"
-#include "SkySettingsStore.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/CatalogSourceType.hpp"
 #include "catalog/IStarCatalog.hpp"
@@ -14,6 +16,8 @@
 #include <cstddef>
 #include <memory>
 #include <vector>
+
+class SkySettingsStore;
 
 namespace skygate::ui::internal {
 
@@ -122,24 +126,23 @@ private:
     };
 
     [[nodiscard]] DecodedCatalog
-    decodeSourceCatalog(const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord, int binarySchemaVersion) const;
+    decodeSourceCatalog(const SkyCatalogSourceCacheRecord& sourceRecord, int binarySchemaVersion) const;
     void appendRestoredSource(
-        const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord,
+        const SkyCatalogSourceCacheRecord& sourceRecord,
         DecodedCatalog decoded,
         RelatedDataOwnership relatedDataOwnership,
         SkyCatalogCollectionRestoreResult& result
     ) const;
     // Decides whether a stored snapshot's related payloads identify their
     // records as owners or may hold copies of the collection-wide view.
-    [[nodiscard]] static RelatedDataOwnership
-    relatedDataOwnership(const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot);
+    [[nodiscard]] static RelatedDataOwnership relatedDataOwnership(const SkyCatalogCollectionCacheSnapshot& snapshot);
     [[nodiscard]] SkyCatalogCollectionRestoreResult
-    restoreFromRecords(const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot) const;
+    restoreFromRecords(const SkyCatalogCollectionCacheSnapshot& snapshot) const;
     // Converts the legacy two-slot cache into source records. Retained so
     // existing installations keep their saved catalog data; the collection
     // format is authoritative for new writes.
     [[nodiscard]] SkyCatalogCollectionRestoreResult migrateLegacy(
-        const SkySettingsStore::CatalogCacheSnapshot& legacy,
+        const SkyCatalogLegacyCacheSnapshot& legacy,
         int catalogPresetIndex,
         int deepSkyCatalogPresetIndex,
         const QString& catalogUrlText,

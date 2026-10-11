@@ -226,7 +226,7 @@ readCorrectionFlags(QSettings& settings, const QString& key, const EphemerisCorr
     return static_cast<EphemerisCorrectionFlags>(static_cast<std::uint32_t>(rawFlags));
 }
 
-void saveEphemerisUserSettings(QSettings& settings, const SkySettingsStore::EphemerisUserSettingsSnapshot& snapshot)
+void saveEphemerisUserSettings(QSettings& settings, const SkyEphemerisUserSettingsSnapshot& snapshot)
 {
     settings.setValue(settingsKey("ephemeris/engineKind"), ephemerisEngineKindToString(snapshot.engineKind));
     settings.setValue(
@@ -246,9 +246,9 @@ void saveEphemerisUserSettings(QSettings& settings, const SkySettingsStore::Ephe
     settings.setValue(settingsKey("ephemeris/updateManifestUrl"), snapshot.updateManifestUrl);
 }
 
-SkySettingsStore::EphemerisUserSettingsSnapshot loadEphemerisUserSettings(QSettings& settings)
+SkyEphemerisUserSettingsSnapshot loadEphemerisUserSettings(QSettings& settings)
 {
-    SkySettingsStore::EphemerisUserSettingsSnapshot snapshot;
+    SkyEphemerisUserSettingsSnapshot snapshot;
     snapshot.engineKind = ephemerisEngineKindFromString(
         settings.value(settingsKey("ephemeris/engineKind"), ephemerisEngineKindToString(snapshot.engineKind)).toString()
     );
@@ -303,7 +303,7 @@ SkySettingsStore::EphemerisUserSettingsSnapshot loadEphemerisUserSettings(QSetti
 
 }  // namespace
 
-SkyStateSettingsSnapshot splitStateSnapshot(const SkySettingsStore::StateSnapshot& snapshot)
+SkyStateSettingsSnapshot splitStateSnapshot(const SkyPersistedStateSnapshot& snapshot)
 {
     SkyStateSettingsSnapshot domains;
     domains.timeline.live = snapshot.live;
@@ -337,9 +337,9 @@ SkyStateSettingsSnapshot splitStateSnapshot(const SkySettingsStore::StateSnapsho
     return domains;
 }
 
-SkySettingsStore::StateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapshot& domains)
+SkyPersistedStateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapshot& domains)
 {
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.live = domains.timeline.live;
     snapshot.timelineToolbarCollapsed = domains.timeline.toolbarCollapsed;
     snapshot.searchToolbarCollapsed = domains.search.toolbarCollapsed;
@@ -371,7 +371,7 @@ SkySettingsStore::StateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapsho
     return snapshot;
 }
 
-void saveStateSnapshot(QSettings& settings, const SkySettingsStore::StateSnapshot& snapshot)
+void saveStateSnapshot(QSettings& settings, const SkyPersistedStateSnapshot& snapshot)
 {
     const SkyStateSettingsSnapshot domains = splitStateSnapshot(snapshot);
     settings.setValue(settingsKey("version"), SkyContextControllerConstants::kSettingsVersion);
@@ -385,7 +385,7 @@ void saveStateSnapshot(QSettings& settings, const SkySettingsStore::StateSnapsho
     saveEphemerisUserSettings(settings, domains.ephemeris);
 }
 
-std::optional<SkySettingsStore::StateSnapshot> loadStateSnapshot(QSettings& settings)
+std::optional<SkyPersistedStateSnapshot> loadStateSnapshot(QSettings& settings)
 {
     if (!settings.contains(settingsKey("version"))) {
         return std::nullopt;

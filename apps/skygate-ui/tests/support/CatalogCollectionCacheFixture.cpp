@@ -12,13 +12,13 @@
 
 namespace skygate::ui::tests {
 
-SkySettingsStore::CatalogCollectionCacheSnapshot CatalogCollectionCacheFixture::sampleCollectionSnapshot()
+SkyCatalogCollectionCacheSnapshot CatalogCollectionCacheFixture::sampleCollectionSnapshot()
 {
-    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    SkyCatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = 1;
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
 
-    SkySettingsStore::CatalogSourceCacheRecord star;
+    SkyCatalogSourceCacheRecord star;
     star.instanceId = QStringLiteral("preset:hyg_v42");
     star.descriptorId = QStringLiteral("hyg_v42");
     star.title = QStringLiteral("HYG v4.2");
@@ -36,7 +36,7 @@ SkySettingsStore::CatalogCollectionCacheSnapshot CatalogCollectionCacheFixture::
     star.constellationCount = 1;
     snapshot.sources.push_back(std::move(star));
 
-    SkySettingsStore::CatalogSourceCacheRecord deepSky;
+    SkyCatalogSourceCacheRecord deepSky;
     deepSky.instanceId = QStringLiteral("preset:open_ngc");
     deepSky.descriptorId = QStringLiteral("open_ngc");
     deepSky.title = QStringLiteral("OpenNGC");

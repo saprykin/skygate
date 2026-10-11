@@ -1,7 +1,8 @@
 #pragma once
 
+#include "SkyEphemerisUserSettingsSnapshot.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
-#include "SkySettingsStore.hpp"
+#include "SkyPersistedStateSnapshot.hpp"
 
 #include <QString>
 #include <QtGlobal>
@@ -63,13 +64,13 @@ struct SkyStateSettingsSnapshot final {
     SkyOverlayLayerVisibility overlayLayers;
     SkyCatalogSourceSettingsSnapshot catalogSources;
     SkyLoggingSettingsSnapshot logging;
-    SkySettingsStore::EphemerisUserSettingsSnapshot ephemeris;
+    SkyEphemerisUserSettingsSnapshot ephemeris;
     bool ephemerisSettingsPresent = false;
 };
 
-[[nodiscard]] SkyStateSettingsSnapshot splitStateSnapshot(const SkySettingsStore::StateSnapshot& snapshot);
-[[nodiscard]] SkySettingsStore::StateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapshot& snapshot);
-void saveStateSnapshot(QSettings& settings, const SkySettingsStore::StateSnapshot& snapshot);
-[[nodiscard]] std::optional<SkySettingsStore::StateSnapshot> loadStateSnapshot(QSettings& settings);
+[[nodiscard]] SkyStateSettingsSnapshot splitStateSnapshot(const SkyPersistedStateSnapshot& snapshot);
+[[nodiscard]] SkyPersistedStateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapshot& snapshot);
+void saveStateSnapshot(QSettings& settings, const SkyPersistedStateSnapshot& snapshot);
+[[nodiscard]] std::optional<SkyPersistedStateSnapshot> loadStateSnapshot(QSettings& settings);
 
 }  // namespace skygate::ui::internal

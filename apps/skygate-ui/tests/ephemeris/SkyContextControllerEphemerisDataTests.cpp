@@ -276,7 +276,7 @@ void SkyContextControllerEphemerisDataTests::updateRefreshesRemoteManifestAndRep
     const QString freshKernelUrl = QUrl::fromLocalFile(freshKernelPath).toString();
     QVERIFY(writeFile(remoteManifestPath, singleAssetManifestJson(freshKernelUrl, QStringLiteral("fresh")).toUtf8()));
 
-    SkySettingsStore::StateSnapshot savedSettings;
+    SkyPersistedStateSnapshot savedSettings;
     savedSettings.ephemerisSettingsPresent = true;
     savedSettings.ephemeris.updateManifestUrl = QUrl::fromLocalFile(remoteManifestPath).toString();
     SkySettingsStore settingsStore;
@@ -323,7 +323,7 @@ void SkyContextControllerEphemerisDataTests::updateEmitsStatusSequenceInOrder()
         singleAssetManifestJson(QUrl::fromLocalFile(freshKernelPath).toString(), QStringLiteral("fresh")).toUtf8()
     ));
 
-    SkySettingsStore::StateSnapshot savedSettings;
+    SkyPersistedStateSnapshot savedSettings;
     savedSettings.ephemerisSettingsPresent = true;
     savedSettings.ephemeris.updateManifestUrl = QUrl::fromLocalFile(remoteManifestPath).toString();
     SkySettingsStore settingsStore;
@@ -378,7 +378,7 @@ void SkyContextControllerEphemerisDataTests::updatePersistsPreferredDataProfile(
         singleAssetManifestJson(QUrl::fromLocalFile(freshKernelPath).toString(), QStringLiteral("fresh")).toUtf8()
     ));
 
-    SkySettingsStore::StateSnapshot savedSettings;
+    SkyPersistedStateSnapshot savedSettings;
     savedSettings.ephemerisSettingsPresent = true;
     savedSettings.ephemeris.updateManifestUrl = QUrl::fromLocalFile(remoteManifestPath).toString();
     savedSettings.ephemeris.preferredDataProfileId = QStringLiteral("previous-profile");
@@ -400,7 +400,7 @@ void SkyContextControllerEphemerisDataTests::updatePersistsPreferredDataProfile(
     QVERIFY(controller.saveSettings());
 
     SkySettingsStore reloadedStore;
-    const std::optional<SkySettingsStore::StateSnapshot> reloaded = reloadedStore.loadState();
+    const std::optional<SkyPersistedStateSnapshot> reloaded = reloadedStore.loadState();
     QVERIFY(reloaded.has_value());
     QCOMPARE(reloaded->ephemeris.preferredDataProfileId, QString("de440s-short-range"));
 }
@@ -411,7 +411,7 @@ void SkyContextControllerEphemerisDataTests::manifestFailureReportsUpdateStatus(
     const QString missingManifestPath = m_settings.filePath(QStringLiteral("failure-missing-manifest.json"));
     QVERIFY(writeFile(initialKernelPath, QByteArray{}));
 
-    SkySettingsStore::StateSnapshot savedSettings;
+    SkyPersistedStateSnapshot savedSettings;
     savedSettings.ephemerisSettingsPresent = true;
     savedSettings.ephemeris.updateManifestUrl = QUrl::fromLocalFile(missingManifestPath).toString();
     SkySettingsStore settingsStore;

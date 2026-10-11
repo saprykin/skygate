@@ -18,7 +18,7 @@ bool SkyContextController::saveSettings() const
         return false;
     }
 
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.live = m_timeline.live();
     snapshot.timelineToolbarCollapsed = m_timeline.toolbarCollapsed();
     snapshot.searchToolbarCollapsed = m_search.toolbarCollapsed();
@@ -62,7 +62,7 @@ bool SkyContextController::saveSettings() const
 bool SkyContextController::loadSettings()
 {
     const auto stateSnapshot =
-        m_settingsStore != nullptr ? m_settingsStore->loadState() : std::optional<SkySettingsStore::StateSnapshot>{};
+        m_settingsStore != nullptr ? m_settingsStore->loadState() : std::optional<SkyPersistedStateSnapshot>{};
     if (stateSnapshot.has_value()) {
         setTimelineToolbarCollapsed(stateSnapshot->timelineToolbarCollapsed);
         setSearchToolbarCollapsed(stateSnapshot->searchToolbarCollapsed);

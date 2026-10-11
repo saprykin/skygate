@@ -121,7 +121,7 @@ void SkyCatalogManagerRelatedReplacementTests::reloadClearsOwnerRelatedDataBefor
     {
         const auto pendingSnapshot = store.loadCatalogCollectionCache();
         QVERIFY(pendingSnapshot.isLoaded());
-        const SkySettingsStore::CatalogSourceCacheRecord* record =
+        const SkyCatalogSourceCacheRecord* record =
             CatalogSourceFactsQuery::findRecord(pendingSnapshot.snapshot, instanceId);
         QVERIFY(record != nullptr);
         QCOMPARE(record->relatedDatasetUrls, QStringList{relatedUrl});
@@ -230,8 +230,7 @@ void SkyCatalogManagerRelatedReplacementTests::failedReplacementKeepsPublishedSt
     // Persistence carries the same cleared state.
     const auto snapshot = store.loadCatalogCollectionCache();
     QVERIFY(snapshot.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* record =
-        CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
+    const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
     QVERIFY(record != nullptr);
     QVERIFY(record->constellationLineRows.isEmpty());
     QVERIFY(record->constellationAnchorGroupRows.isEmpty());
@@ -407,8 +406,7 @@ void SkyCatalogManagerRelatedReplacementTests::updateRemovingRelatedDeclarationR
     {
         const auto snapshot = store.loadCatalogCollectionCache();
         QVERIFY(snapshot.isLoaded());
-        const SkySettingsStore::CatalogSourceCacheRecord* record =
-            CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
+        const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
         QVERIFY(record != nullptr);
         QVERIFY(record->relatedDatasetUrls.isEmpty());
         QVERIFY(record->constellationLineRows.isEmpty());
@@ -488,8 +486,7 @@ void SkyCatalogManagerRelatedReplacementTests::failedUpdateRemovingDeclarationKe
     manager.moveSource(instanceId, 0);
     const auto snapshot = store.loadCatalogCollectionCache();
     QVERIFY(snapshot.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* record =
-        CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
+    const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
     QVERIFY(record != nullptr);
     QCOMPARE(record->relatedDatasetUrls, QStringList{relatedUrl});
     QVERIFY(!record->constellationLineRows.isEmpty());
@@ -578,11 +575,11 @@ void SkyCatalogManagerRelatedReplacementTests::bundledUpdateRetiresOwnedDataEver
 
     // The accepted declaration and the retired dataset are persisted together,
     // and the sibling record keeps its own payload.
-    const SkySettingsStore::CatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
     QVERIFY(snapshot.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* updatedRecord =
+    const SkyCatalogSourceCacheRecord* updatedRecord =
         CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
-    const SkySettingsStore::CatalogSourceCacheRecord* siblingRecord =
+    const SkyCatalogSourceCacheRecord* siblingRecord =
         CatalogSourceFactsQuery::findRecord(snapshot.snapshot, sibling.instanceId);
     QVERIFY(updatedRecord != nullptr);
     QVERIFY(siblingRecord != nullptr);
@@ -655,10 +652,9 @@ void SkyCatalogManagerRelatedReplacementTests::payloadOriginSwitchesFollowAccept
     QCOMPARE(observations.back().constellationCount, std::size_t{0});
     CatalogNotificationRecorder::assertMatchesRuntime(manager, observations.back());
 
-    const SkySettingsStore::CatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
     QVERIFY(snapshot.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* record =
-        CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
+    const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
     QVERIFY(record != nullptr);
     QVERIFY(record->relatedDatasetUrls.isEmpty());
     QVERIFY(record->constellationLineRows.isEmpty());
@@ -731,10 +727,9 @@ void SkyCatalogManagerRelatedReplacementTests::rejectedBundledUpdateKeepsOwnedRe
     // the persisted record.
     manager.setDeepSkyCatalogPresetIndex(1);
     manager.moveSource(instanceId, 0);
-    const SkySettingsStore::CatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult snapshot = store.loadCatalogCollectionCache();
     QVERIFY(snapshot.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* record =
-        CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
+    const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(snapshot.snapshot, instanceId);
     QVERIFY(record != nullptr);
     QCOMPARE(record->relatedDatasetUrls, QStringList{relatedUrl});
     QVERIFY(!record->constellationLineRows.isEmpty());

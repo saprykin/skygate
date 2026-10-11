@@ -1,8 +1,8 @@
 #pragma once
 
 #include "SkyEphemerisCacheController.hpp"
+#include "SkyEphemerisDataCacheSnapshot.hpp"
 #include "SkyEphemerisDownloadService.hpp"
-#include "SkySettingsStore.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
 
@@ -48,7 +48,7 @@ public:
     [[nodiscard]] QString dataRevisionToken() const;
     [[nodiscard]] bool usingInstalledData() const noexcept;
     [[nodiscard]] std::uint64_t dataRevision() const noexcept;
-    [[nodiscard]] SkySettingsStore::EphemerisDataCacheSnapshot activeCacheSnapshot() const;
+    [[nodiscard]] SkyEphemerisDataCacheSnapshot activeCacheSnapshot() const;
     [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot() const noexcept;
 
     void setBundledFallbackData(
@@ -82,17 +82,14 @@ private:
     };
 
     void applyCacheSnapshot(
-        SkySettingsStore::EphemerisDataCacheSnapshot cacheSnapshot,
-        ActiveSource source,
-        QString statusText,
-        bool emitSignals
+        SkyEphemerisDataCacheSnapshot cacheSnapshot, ActiveSource source, QString statusText, bool emitSignals
     );
 
 private:
     SkySettingsStore* m_settingsStore = nullptr;
     std::unique_ptr<SkyEphemerisDownloadService> m_downloadService;
     SkyEphemerisCacheController m_cacheController;
-    SkySettingsStore::EphemerisDataCacheSnapshot m_activeCacheSnapshot;
+    SkyEphemerisDataCacheSnapshot m_activeCacheSnapshot;
     std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> m_activeDataSnapshot;
     const skygate::ephemeris::EphemerisDataManifest* m_bundledFallbackManifest = nullptr;
     QString m_bundledFallbackResourceRoot;
