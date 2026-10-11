@@ -1,5 +1,6 @@
 #include "CatalogArchiveTestSupport.hpp"
 
+#include "catalog/CatalogLoadResult.hpp"
 #include "catalog/io/CatalogZipEntrySelector.hpp"
 
 #include <QtTest/QtTest>
@@ -19,6 +20,7 @@ constexpr std::string_view kOpenNgcCsv = "Name;Type;RA;Dec\n"
 constexpr std::string_view kUnrelatedCsv = "foo,bar,baz\n"
                                            "1,2,3\n";
 
+using skygate::ephemeris::CatalogLoadResult;
 using skygate::ephemeris::CatalogZipEntrySelection;
 using skygate::ephemeris::CatalogZipEntrySelector;
 using skygate::ephemeris::tests::makeZip;
@@ -41,6 +43,7 @@ private slots:
     void retainsSingleCatalogCompatibility();
     void reportsNoSupportedMember();
     void reportsNoReadableEntry();
+    void mapsStatusToCatalogErrorCodeAndDetail();
 };
 
 void CatalogZipEntrySelectorTests::selectsUniqueSupportedCsvOverUnrelatedFirstCsv()
@@ -186,6 +189,55 @@ void CatalogZipEntrySelectorTests::reportsNoReadableEntry()
         CatalogZipEntrySelector::select(onlyEncrypted, std::nullopt).status,
         CatalogZipEntrySelection::Status::NoReadableEntry
     );
+}
+
+void CatalogZipEntrySelectorTests::mapsStatusToCatalogErrorCodeAndDetail()
+{
+    const CatalogZipEntrySelection selected{
+        .status = CatalogZipEntrySelection::Status::Selected,
+        .selectedPath = "catalog/hyg.csv",
+    };
+    QCOMPARE(selected.errorCode(), CatalogLoadResult::ErrorCode::NoError);
+    QVERIFY(selected.errorDetail().empty());
+
+    const CatalogZipEntrySelection invalidArchive{.status = CatalogZipEntrySelection::Status::InvalidArchive};
+    QCOMPARE(invalidArchive.errorCode(), CatalogLoadResult::ErrorCode::InvalidZipData);
+    QCOMPARE(invalidArchive.errorDetail(), std::string("ZIP catalog payload could not be parsed."));
+
+    const CatalogZipEntrySelection missingMember{
+        .status = CatalogZipEntrySelection::Status::MissingMember,
+        .selectedPath = "catalog/missing.csv",
+    };
+    QCOMPARE(missingMember.errorCode(), CatalogLoadResult::ErrorCode::ArchiveMemberNotFound);
+    QCOMPARE(
+        missingMember.errorDetail(), std::string("ZIP catalog payload does not contain member 'catalog/missing.csv'.")
+    );
+
+    const CatalogZipEntrySelection unusableMember{
+        .status = CatalogZipEntrySelection::Status::UnusableMember,
+        .selectedPath = "catalog/archive/",
+    };
+    QCOMPARE(unusableMember.errorCode(), CatalogLoadResult::ErrorCode::InvalidZipData);
+    QCOMPARE(
+        unusableMember.errorDetail(),
+        std::string("ZIP catalog member 'catalog/archive/' is not a readable catalog entry.")
+    );
+
+    const CatalogZipEntrySelection ambiguousMember{.status = CatalogZipEntrySelection::Status::AmbiguousMember};
+    QCOMPARE(ambiguousMember.errorCode(), CatalogLoadResult::ErrorCode::AmbiguousArchiveMember);
+    QCOMPARE(
+        ambiguousMember.errorDetail(), std::string("ZIP catalog payload contains multiple supported catalog members.")
+    );
+
+    const CatalogZipEntrySelection noSupportedMember{.status = CatalogZipEntrySelection::Status::NoSupportedMember};
+    QCOMPARE(noSupportedMember.errorCode(), CatalogLoadResult::ErrorCode::InvalidZipData);
+    QCOMPARE(
+        noSupportedMember.errorDetail(), std::string("ZIP catalog payload does not contain a supported catalog member.")
+    );
+
+    const CatalogZipEntrySelection noReadableEntry{.status = CatalogZipEntrySelection::Status::NoReadableEntry};
+    QCOMPARE(noReadableEntry.errorCode(), CatalogLoadResult::ErrorCode::InvalidZipData);
+    QCOMPARE(noReadableEntry.errorDetail(), std::string("ZIP catalog payload does not contain a readable CSV entry."));
 }
 
 QTEST_APPLESS_MAIN(CatalogZipEntrySelectorTests)
