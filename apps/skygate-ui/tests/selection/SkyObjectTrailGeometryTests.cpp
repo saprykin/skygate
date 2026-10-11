@@ -6,6 +6,7 @@
 #include "TrailRenderQuery.hpp"
 #include "engine/IEphemerisEngine.hpp"
 
+#include <QColor>
 #include <QtTest/QtTest>
 
 #include <algorithm>
@@ -112,8 +113,12 @@ private slots:
     void longProjectedJumpsAreDropped();
     void offscreenTrailSamplesStillRenderCrossingSegment();
     void identicalRequestsReuseTrailSamples();
+    void viewportAndThemeChangesReuseTrailSamples();
     void epochChangeResamplesTrail();
     void optionChangeResamplesTrail();
+    void targetChangeResamplesTrail();
+    void engineChangeResamplesTrail();
+    void observerChangeResamplesTrail();
 };
 
 void SkyObjectTrailGeometryTests::invalidInputsAppendNoLines()
@@ -286,6 +291,33 @@ void SkyObjectTrailGeometryTests::identicalRequestsReuseTrailSamples()
     QCOMPARE(secondFrame.lines.size(), frame.lines.size());
 }
 
+void SkyObjectTrailGeometryTests::viewportAndThemeChangesReuseTrailSamples()
+{
+    const auto projection = TrailBuilderTestScenario::makeProjection();
+    QVERIFY(projection.has_value());
+    TrailBuilderTestEngine engine;
+    const SkyObjectTrailBuilder builder;
+    auto input = TrailBuilderTestScenario::makeInput(engine, *projection);
+    input.ephemerisRequest = makeTrailRequest(input);
+    SkyRenderFrame frame;
+
+    builder.appendTrail(frame, input);
+    const int sampleCalls = engine.requestBodyStateCalls();
+    QVERIFY(sampleCalls > 0);
+
+    const auto widerProjection = TrailBuilderTestScenario::makeProjection(70.0);
+    QVERIFY(widerProjection.has_value());
+    input.preparedProjection = &*widerProjection;
+    input.viewportWidth = 1600.0;
+    input.viewportHeight = 1200.0;
+    input.renderTheme.selectionMarkerBorder = QColor("#ff4040");
+    SkyRenderFrame secondFrame;
+    builder.appendTrail(secondFrame, input);
+
+    QCOMPARE(engine.requestBodyStateCalls(), sampleCalls);
+    QVERIFY(!secondFrame.lines.empty());
+}
+
 void SkyObjectTrailGeometryTests::epochChangeResamplesTrail()
 {
     const auto projection = TrailBuilderTestScenario::makeProjection();
@@ -326,6 +358,80 @@ void SkyObjectTrailGeometryTests::optionChangeResamplesTrail()
     builder.appendTrail(secondFrame, input);
 
     QVERIFY(engine.requestBodyStateCalls() > sampleCalls);
+}
+
+void SkyObjectTrailGeometryTests::targetChangeResamplesTrail()
+{
+    const auto projection = TrailBuilderTestScenario::makeProjection();
+    QVERIFY(projection.has_value());
+    TrailBuilderTestEngine engine;
+    const SkyObjectTrailBuilder builder;
+    auto input = TrailBuilderTestScenario::makeInput(engine, *projection);
+    input.ephemerisRequest = makeTrailRequest(input);
+    SkyRenderFrame frame;
+
+    builder.appendTrail(frame, input);
+    const int sampleCalls = engine.requestBodyStateCalls();
+    QVERIFY(sampleCalls > 0);
+
+    input.targetBodyIndex = 9U;
+    SkyRenderFrame indexFrame;
+    builder.appendTrail(indexFrame, input);
+    const int indexCalls = engine.requestBodyStateCalls();
+    QVERIFY(indexCalls > sampleCalls);
+
+    const skygate::ephemeris::CelestialBodyState state{
+        .bodyIndex = input.targetBodyIndex,
+        .equatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.0, .declinationDeg = 12.0}
+    };
+    input.targetState = &state;
+    SkyRenderFrame stateFrame;
+    builder.appendTrail(stateFrame, input);
+
+    QVERIFY(engine.requestBodyStateCalls() > indexCalls);
+}
+
+void SkyObjectTrailGeometryTests::engineChangeResamplesTrail()
+{
+    const auto projection = TrailBuilderTestScenario::makeProjection();
+    QVERIFY(projection.has_value());
+    TrailBuilderTestEngine firstEngine;
+    TrailBuilderTestEngine secondEngine;
+    const SkyObjectTrailBuilder builder;
+    auto input = TrailBuilderTestScenario::makeInput(firstEngine, *projection);
+    input.ephemerisRequest = makeTrailRequest(input);
+    SkyRenderFrame frame;
+
+    builder.appendTrail(frame, input);
+    const int firstCalls = firstEngine.requestBodyStateCalls();
+    QVERIFY(firstCalls > 0);
+
+    input.ephemerisEngine = &secondEngine;
+    SkyRenderFrame secondFrame;
+    builder.appendTrail(secondFrame, input);
+
+    QCOMPARE(firstEngine.requestBodyStateCalls(), firstCalls);
+    QVERIFY(secondEngine.requestBodyStateCalls() > 0);
+}
+
+void SkyObjectTrailGeometryTests::observerChangeResamplesTrail()
+{
+    const auto projection = TrailBuilderTestScenario::makeProjection();
+    QVERIFY(projection.has_value());
+    TrailBuilderTestEngine engine;
+    const SkyObjectTrailBuilder builder;
+    auto input = TrailBuilderTestScenario::makeInput(engine, *projection);
+    SkyRenderFrame frame;
+
+    builder.appendTrail(frame, input);
+    const int contextCalls = engine.contextBodyStateCalls();
+    QVERIFY(contextCalls > 0);
+
+    input.skyContext.observer.longitudeDeg = 9.0;
+    SkyRenderFrame secondFrame;
+    builder.appendTrail(secondFrame, input);
+
+    QVERIFY(engine.contextBodyStateCalls() > contextCalls);
 }
 
 QTEST_APPLESS_MAIN(SkyObjectTrailGeometryTests)

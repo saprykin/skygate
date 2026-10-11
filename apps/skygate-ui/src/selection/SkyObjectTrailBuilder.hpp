@@ -2,19 +2,15 @@
 
 #include "BaseCelestialBody.hpp"
 #include "CelestialBodyState.hpp"
-#include "DistantCelestialBody.hpp"
-#include "EphemerisSnapshot.hpp"
-#include "EquatorialCoordinate.hpp"
+#include "EphemerisRequest.hpp"
 #include "ObservationContext.hpp"
-#include "OwnGalaxyCelestialBody.hpp"
 #include "PreparedProjection.hpp"
+#include "SkyObjectTrailSampler.hpp"
 #include "SkyRenderBuilders.hpp"
-#include "trail/BodyTrailCalculator.hpp"
 
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <vector>
 
 namespace skygate::ephemeris {
 class IEphemerisEngine;
@@ -40,25 +36,5 @@ public:
     void appendTrail(SkyRenderFrame& frame, const SkyObjectTrailInput& input) const;
 
 private:
-    struct TrailSampleCacheKey final {
-        const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
-        const skygate::ephemeris::IEphemerisGuidanceStrategy* guidanceStrategy = nullptr;
-        skygate::core::ObservationContext context;
-        std::optional<skygate::core::AstronomicalEpoch> requestEpoch;
-        std::optional<skygate::ephemeris::EphemerisEngineOptions> requestOptions;
-        std::optional<skygate::core::EquatorialCoordinate> targetEquatorial;
-        std::uint32_t targetBodyIndex = 0;
-    };
-
-    [[nodiscard]] const std::vector<skygate::ephemeris::BodyTrailSample>& trailSamples(
-        const SkyObjectTrailInput& input,
-        const skygate::ephemeris::BodyTrailCalculator& trailCalculator,
-        const skygate::ephemeris::BodyTrailOptions& trailOptions
-    ) const;
-    [[nodiscard]] static TrailSampleCacheKey sampleCacheKeyFor(const SkyObjectTrailInput& input);
-    [[nodiscard]] static bool
-    sampleCacheKeysEqual(const TrailSampleCacheKey& lhs, const TrailSampleCacheKey& rhs) noexcept;
-
-    mutable std::optional<TrailSampleCacheKey> m_sampleCacheKey;
-    mutable std::vector<skygate::ephemeris::BodyTrailSample> m_sampleCache;
+    mutable SkyObjectTrailSampler m_trailSampler;
 };
