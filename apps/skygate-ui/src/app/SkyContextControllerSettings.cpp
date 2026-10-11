@@ -46,14 +46,15 @@ bool SkyContextController::saveSettings() const
     snapshot.logToFile = logToFile();
     snapshot.logFilePath = logFilePath();
     snapshot.ephemeris = m_ephemerisUserSettings;
-    snapshot.ephemeris.engineKind = m_ephemerisEngineKind;
-    snapshot.ephemeris.correctionFlags = m_ephemerisEngineOptions.correctionFlags();
-    snapshot.ephemeris.fallbackToSimpleEngine = m_ephemerisEngineOptions.fallbackToSimpleEngine();
-    snapshot.ephemeris.refractionEnabled = m_ephemerisEngineOptions.enableAtmosphericRefraction();
-    snapshot.ephemeris.atmosphericPressureHpa = m_ephemerisEngineOptions.atmosphericPressureHpa();
-    snapshot.ephemeris.atmosphericTemperatureC = m_ephemerisEngineOptions.atmosphericTemperatureC();
-    snapshot.ephemeris.relativeHumidity = m_ephemerisEngineOptions.relativeHumidity();
-    snapshot.ephemeris.observingWavelengthMicrometers = m_ephemerisEngineOptions.observingWavelengthMicrometers();
+    snapshot.ephemeris.engineKind = m_ephemerisSession->engineKind();
+    snapshot.ephemeris.correctionFlags = m_ephemerisSession->engineOptions().correctionFlags();
+    snapshot.ephemeris.fallbackToSimpleEngine = m_ephemerisSession->engineOptions().fallbackToSimpleEngine();
+    snapshot.ephemeris.refractionEnabled = m_ephemerisSession->engineOptions().enableAtmosphericRefraction();
+    snapshot.ephemeris.atmosphericPressureHpa = m_ephemerisSession->engineOptions().atmosphericPressureHpa();
+    snapshot.ephemeris.atmosphericTemperatureC = m_ephemerisSession->engineOptions().atmosphericTemperatureC();
+    snapshot.ephemeris.relativeHumidity = m_ephemerisSession->engineOptions().relativeHumidity();
+    snapshot.ephemeris.observingWavelengthMicrometers =
+        m_ephemerisSession->engineOptions().observingWavelengthMicrometers();
     snapshot.ephemerisSettingsPresent = true;
     return m_settingsStore->saveState(snapshot);
 }

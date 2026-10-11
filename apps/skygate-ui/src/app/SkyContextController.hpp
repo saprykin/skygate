@@ -10,6 +10,7 @@
 #include "ProjectionType.hpp"
 #include "SkyContextControllerSupport.hpp"
 #include "SkyContextDomainControllers.hpp"
+#include "SkyEphemerisSession.hpp"
 #include "SkyLiveClock.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
 #include "SkySettingsStore.hpp"
@@ -17,7 +18,6 @@
 #include "SystemTimeSource.hpp"
 #include "UtcTimePoint.hpp"
 #include "catalog/IStarCatalog.hpp"
-#include "composition/EphemerisGuidanceComposition.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
@@ -32,14 +32,12 @@
 
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <span>
 #include <utility>
 #include <vector>
 
 namespace skygate::ephemeris {
-class EphemerisBackendResourceCache;
 class IEarthOrientationProvider;
 class IEphemerisDataSnapshot;
 class IEphemerisDiagnosticsSink;
@@ -249,18 +247,7 @@ public:
     using ConstellationAnchorGroup = skygate::ephemeris::ConstellationAnchorGroup;
 
 public:
-    struct EphemerisRequestContext final {
-        skygate::ephemeris::EphemerisRequest request;
-        std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot;
-        std::uint64_t engineOptionsRevision = 0U;
-        std::uint64_t ephemerisDataRevision = 0U;
-        std::uint64_t earthOrientationDataRevision = 0U;
-        std::uint64_t leapSecondDataRevision = 0U;
-        std::uint64_t catalogRevision = 0U;
-        std::optional<skygate::ephemeris::EphemerisDateRange> earthOrientationDataRange;
-        std::optional<skygate::ephemeris::EphemerisDateRange> leapSecondTableRange;
-        std::optional<skygate::ephemeris::EphemerisDateRange> deltaTDataRange;
-    };
+    using EphemerisRequestContext = SkyEphemerisSession::RequestContext;
 
     struct InitializationOptions final {
         struct EphemerisFactoryInputs final {
@@ -529,7 +516,6 @@ private:
     void applyLoggingConfiguration();
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
     void setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type activeEphemerisEngineKind() const noexcept;
     [[nodiscard]] EphemerisRequestContext
     ephemerisRequestContextFor(const skygate::core::ObservationContext& skyContext) const;
     void applyEphemerisUserSettings(const SkySettingsStore::EphemerisUserSettingsSnapshot& settings);
@@ -555,18 +541,9 @@ private:
     std::unique_ptr<SkySettingsStore> m_settingsStore;
     std::unique_ptr<SkyEphemerisDataManager> m_ephemerisDataManager;
     std::unique_ptr<SkyEphemerisUpdateWorkflow> m_ephemerisUpdateWorkflow;
-    std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
-    std::shared_ptr<skygate::ephemeris::IEphemerisGuidanceStrategy> m_ephemerisGuidanceStrategy;
-    mutable std::mutex m_ephemerisEngineMutex;
-    skygate::ephemeris::EphemerisEngineKind::Type m_ephemerisEngineKind =
-        skygate::ephemeris::EphemerisEngineKind::Type::Simple;
-    skygate::ephemeris::EphemerisEngineOptions m_ephemerisEngineOptions;
-    std::uint64_t m_ephemerisOptionsRevision = 1U;
+    std::unique_ptr<SkyEphemerisSession> m_ephemerisSession;
     SkySettingsStore::EphemerisUserSettingsSnapshot m_ephemerisUserSettings;
-    const skygate::ephemeris::EphemerisDatasetInfo* m_ephemerisDatasetManifest = nullptr;
     QString m_ephemerisEngineStatusText;
-    std::unique_ptr<skygate::ephemeris::EphemerisBackendResourceCache> m_ephemerisBackendResourceCache;
-    skygate::ephemeris::IEphemerisDiagnosticsSink* m_ephemerisDiagnosticsSink = nullptr;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;
     std::unique_ptr<skygate::ui::internal::SkyCatalogSourcePresetModel> m_catalogSourcePresetModel;
