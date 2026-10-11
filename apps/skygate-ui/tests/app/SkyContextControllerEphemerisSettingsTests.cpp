@@ -259,6 +259,8 @@ private slots:
     void requestContextConvertsBceUtcToAstronomicalEpoch();
     void ephemerisEngineKindIndexRejectsOutOfRangeValues();
     void engineSwitchResetsCorrectionPresetToDefaults();
+    void unchangedSettingsKeepOptionsRevision();
+    void optionFieldChangeBumpsOptionsRevision();
     void engineModelExposesRegistryLabelsAndCapabilities();
 
 private:
@@ -535,6 +537,33 @@ void SkyContextControllerEphemerisSettingsTests::engineSwitchResetsCorrectionPre
     QCOMPARE(controller->ephemerisEngineKindIndex(), 1);
     QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 3);
     QVERIFY(controller->ephemerisRefractionEnabled());
+}
+
+void SkyContextControllerEphemerisSettingsTests::unchangedSettingsKeepOptionsRevision()
+{
+    const auto controller = createController(false);
+
+    controller->setEphemerisAtmosphericPressureText(QStringLiteral("900"));
+    const std::uint64_t changedRevision = controller->ephemerisRequestContext().engineOptionsRevision;
+    QSignalSpy ephemerisSettingsSpy(controller.get(), &SkyContextController::ephemerisSettingsChanged);
+
+    controller->setEphemerisAtmosphericPressureText(QStringLiteral("900"));
+
+    QCOMPARE(controller->ephemerisRequestContext().engineOptionsRevision, changedRevision);
+    QCOMPARE(ephemerisSettingsSpy.count(), 0);
+}
+
+void SkyContextControllerEphemerisSettingsTests::optionFieldChangeBumpsOptionsRevision()
+{
+    const auto controller = createController(false);
+    const std::uint64_t initialRevision = controller->ephemerisRequestContext().engineOptionsRevision;
+    QSignalSpy ephemerisSettingsSpy(controller.get(), &SkyContextController::ephemerisSettingsChanged);
+
+    controller->setEphemerisAtmosphericPressureText(QStringLiteral("900"));
+
+    QVERIFY(controller->ephemerisRequestContext().engineOptionsRevision != initialRevision);
+    QCOMPARE(ephemerisSettingsSpy.count(), 1);
+    QCOMPARE(controller->ephemerisRequestContext().request.options.atmosphericPressureHpa(), 900.0);
 }
 
 void SkyContextControllerEphemerisSettingsTests::engineModelExposesRegistryLabelsAndCapabilities()

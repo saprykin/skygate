@@ -1351,15 +1351,7 @@ void SkyContextController::applyEphemerisUserSettings(const SkySettingsStore::Ep
     nextOptions.setRelativeHumidity(settings.relativeHumidity);
     nextOptions.setObservingWavelengthMicrometers(settings.observingWavelengthMicrometers);
 
-    if (m_ephemerisEngineKind == settings.engineKind
-        && m_ephemerisEngineOptions.engineKind() == nextOptions.engineKind()
-        && m_ephemerisEngineOptions.correctionFlags() == nextOptions.correctionFlags()
-        && m_ephemerisEngineOptions.fallbackToSimpleEngine() == nextOptions.fallbackToSimpleEngine()
-        && m_ephemerisEngineOptions.enableAtmosphericRefraction() == nextOptions.enableAtmosphericRefraction()
-        && m_ephemerisEngineOptions.atmosphericPressureHpa() == nextOptions.atmosphericPressureHpa()
-        && m_ephemerisEngineOptions.atmosphericTemperatureC() == nextOptions.atmosphericTemperatureC()
-        && m_ephemerisEngineOptions.relativeHumidity() == nextOptions.relativeHumidity()
-        && m_ephemerisEngineOptions.observingWavelengthMicrometers() == nextOptions.observingWavelengthMicrometers()) {
+    if (m_ephemerisEngineKind == settings.engineKind && m_ephemerisEngineOptions == nextOptions) {
         m_ephemerisUserSettings = settings;
         return;
     }

@@ -150,6 +150,8 @@ private slots:
     void repeatedKeysReportNoUpdate();
     void requestBasedSnapshotsUseSelectedEngineOptions();
     void optionChangesOnSameEngineRecomputeSnapshot();
+    void atmosphericPressureChangeRecomputesSnapshot();
+    void optionMaskDifferenceKeepsSnapshotCached();
     void highPrecisionRevisionChangesRecomputeSnapshot();
     void astronomicalEpochSubsecondRecomputeSnapshot();
     void renderOnlyChangesAvoidSnapshotRecompute();
@@ -266,6 +268,68 @@ void SkySceneFramePipelineTests::optionChangesOnSameEngineRecomputeSnapshot()
     QCOMPARE(second->snapshot->states.front().horizontal.azimuthDeg, 181.5);
     QVERIFY(!second->frame->points.empty());
     QVERIFY(second->frame->points.front().x != firstX || second->frame->points.front().y != firstY);
+}
+
+void SkySceneFramePipelineTests::atmosphericPressureChangeRecomputesSnapshot()
+{
+    CountingEngine engine;
+    SkySceneFramePipeline pipeline;
+    auto input = makeInput(engine);
+
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    input.ephemerisRequest = request;
+
+    const auto first = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(first.has_value());
+    QCOMPARE(first->snapshotGeneration, 1U);
+    QCOMPARE(engine.requestComputeCount(), 1);
+
+    request.options.setAtmosphericPressureHpa(900.0);
+    input.ephemerisRequest = request;
+
+    const auto second = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(second.has_value());
+    QVERIFY(second->updated);
+    QCOMPARE(second->snapshotGeneration, 2U);
+    QCOMPARE(engine.requestComputeCount(), 2);
+}
+
+void SkySceneFramePipelineTests::optionMaskDifferenceKeepsSnapshotCached()
+{
+    CountingEngine engine;
+    SkySceneFramePipeline pipeline;
+    auto input = makeInput(engine);
+
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    input.ephemerisRequest = request;
+
+    const auto first = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(first.has_value());
+    QCOMPARE(first->snapshotGeneration, 1U);
+    QCOMPARE(engine.requestComputeCount(), 1);
+
+    // Spelled-out options carry the same values as the defaults, so only the
+    // specified-option mask differs from the first request.
+    skygate::ephemeris::EphemerisEngineOptions specifiedOptions;
+    specifiedOptions.setEngineKind(specifiedOptions.engineKind());
+    specifiedOptions.setCorrectionFlags(specifiedOptions.correctionFlags());
+    specifiedOptions.setFallbackToSimpleEngine(specifiedOptions.fallbackToSimpleEngine());
+    specifiedOptions.setEnableAtmosphericRefraction(specifiedOptions.enableAtmosphericRefraction());
+    specifiedOptions.setAtmosphericPressureHpa(specifiedOptions.atmosphericPressureHpa());
+    specifiedOptions.setAtmosphericTemperatureC(specifiedOptions.atmosphericTemperatureC());
+    specifiedOptions.setRelativeHumidity(specifiedOptions.relativeHumidity());
+    specifiedOptions.setObservingWavelengthMicrometers(specifiedOptions.observingWavelengthMicrometers());
+    QVERIFY(specifiedOptions.isOptionSet(skygate::ephemeris::EphemerisEngineOptions::Key::AtmosphericPressureHpa));
+    request.options = specifiedOptions;
+    input.ephemerisRequest = request;
+
+    const auto second = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(second.has_value());
+    QVERIFY(!second->updated);
+    QCOMPARE(second->snapshotGeneration, 1U);
+    QCOMPARE(engine.requestComputeCount(), 1);
 }
 
 void SkySceneFramePipelineTests::highPrecisionRevisionChangesRecomputeSnapshot()

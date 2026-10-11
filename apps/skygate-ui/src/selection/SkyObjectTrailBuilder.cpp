@@ -108,50 +108,6 @@ makeSingleBodyCatalog(const skygate::ephemeris::BaseCelestialBody& body)
 }
 
 [[nodiscard]] bool
-epochsEqual(const skygate::core::AstronomicalEpoch& lhs, const skygate::core::AstronomicalEpoch& rhs) noexcept
-{
-    return lhs.julianDatePart1 == rhs.julianDatePart1 && lhs.julianDatePart2 == rhs.julianDatePart2
-           && lhs.timeScale == rhs.timeScale;
-}
-
-[[nodiscard]] bool optionalEpochsEqual(
-    const std::optional<skygate::core::AstronomicalEpoch>& lhs,
-    const std::optional<skygate::core::AstronomicalEpoch>& rhs
-) noexcept
-{
-    if (lhs.has_value() != rhs.has_value()) {
-        return false;
-    }
-
-    return !lhs.has_value() || epochsEqual(*lhs, *rhs);
-}
-
-[[nodiscard]] bool optionsEqual(
-    const skygate::ephemeris::EphemerisEngineOptions& lhs, const skygate::ephemeris::EphemerisEngineOptions& rhs
-) noexcept
-{
-    return lhs.engineKind() == rhs.engineKind() && lhs.correctionFlags() == rhs.correctionFlags()
-           && lhs.fallbackToSimpleEngine() == rhs.fallbackToSimpleEngine()
-           && lhs.enableAtmosphericRefraction() == rhs.enableAtmosphericRefraction()
-           && lhs.atmosphericPressureHpa() == rhs.atmosphericPressureHpa()
-           && lhs.atmosphericTemperatureC() == rhs.atmosphericTemperatureC()
-           && lhs.relativeHumidity() == rhs.relativeHumidity()
-           && lhs.observingWavelengthMicrometers() == rhs.observingWavelengthMicrometers();
-}
-
-[[nodiscard]] bool optionalOptionsEqual(
-    const std::optional<skygate::ephemeris::EphemerisEngineOptions>& lhs,
-    const std::optional<skygate::ephemeris::EphemerisEngineOptions>& rhs
-) noexcept
-{
-    if (lhs.has_value() != rhs.has_value()) {
-        return false;
-    }
-
-    return !lhs.has_value() || optionsEqual(*lhs, *rhs);
-}
-
-[[nodiscard]] bool
 equatorialEqual(const skygate::core::EquatorialCoordinate& lhs, const skygate::core::EquatorialCoordinate& rhs) noexcept
 {
     return lhs.rightAscensionHours == rhs.rightAscensionHours && lhs.declinationDeg == rhs.declinationDeg;
@@ -594,9 +550,8 @@ bool SkyObjectTrailBuilder::sampleCacheKeysEqual(
 {
     return lhs.ephemerisEngine == rhs.ephemerisEngine && lhs.guidanceStrategy == rhs.guidanceStrategy
            && lhs.targetBodyIndex == rhs.targetBodyIndex && lhs.context.utcTime == rhs.context.utcTime
-           && observersEqual(lhs.context.observer, rhs.context.observer)
-           && optionalEpochsEqual(lhs.requestEpoch, rhs.requestEpoch)
-           && optionalOptionsEqual(lhs.requestOptions, rhs.requestOptions)
+           && observersEqual(lhs.context.observer, rhs.context.observer) && lhs.requestEpoch == rhs.requestEpoch
+           && lhs.requestOptions == rhs.requestOptions
            && optionalEquatorialsEqual(lhs.targetEquatorial, rhs.targetEquatorial);
 }
 

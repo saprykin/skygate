@@ -89,6 +89,16 @@ public:
     }
 };
 
+[[nodiscard]] skygate::ephemeris::EphemerisRequest makeTrailRequest(const SkyObjectTrailInput& input)
+{
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::core::TimeScale::Utc
+    };
+    return request;
+}
+
 }  // namespace
 
 class SkyObjectTrailGeometryTests final : public QObject {
@@ -101,6 +111,9 @@ private slots:
     void highPrecisionFixedTrailAlignsPresentToMarker();
     void longProjectedJumpsAreDropped();
     void offscreenTrailSamplesStillRenderCrossingSegment();
+    void identicalRequestsReuseTrailSamples();
+    void epochChangeResamplesTrail();
+    void optionChangeResamplesTrail();
 };
 
 void SkyObjectTrailGeometryTests::invalidInputsAppendNoLines()
@@ -250,6 +263,69 @@ void SkyObjectTrailGeometryTests::offscreenTrailSamplesStillRenderCrossingSegmen
     builder.appendTrail(frame, TrailBuilderTestScenario::makeInput(engine, *projection));
 
     QVERIFY(!frame.lines.empty());
+}
+
+void SkyObjectTrailGeometryTests::identicalRequestsReuseTrailSamples()
+{
+    const auto projection = TrailBuilderTestScenario::makeProjection();
+    QVERIFY(projection.has_value());
+    TrailBuilderTestEngine engine;
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+    auto input = TrailBuilderTestScenario::makeInput(engine, *projection);
+    input.ephemerisRequest = makeTrailRequest(input);
+
+    builder.appendTrail(frame, input);
+    const int sampleCalls = engine.requestBodyStateCalls();
+    QVERIFY(sampleCalls > 0);
+
+    SkyRenderFrame secondFrame;
+    builder.appendTrail(secondFrame, input);
+
+    QCOMPARE(engine.requestBodyStateCalls(), sampleCalls);
+    QCOMPARE(secondFrame.lines.size(), frame.lines.size());
+}
+
+void SkyObjectTrailGeometryTests::epochChangeResamplesTrail()
+{
+    const auto projection = TrailBuilderTestScenario::makeProjection();
+    QVERIFY(projection.has_value());
+    TrailBuilderTestEngine engine;
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+    auto input = TrailBuilderTestScenario::makeInput(engine, *projection);
+    input.ephemerisRequest = makeTrailRequest(input);
+
+    builder.appendTrail(frame, input);
+    const int sampleCalls = engine.requestBodyStateCalls();
+    QVERIFY(sampleCalls > 0);
+
+    input.ephemerisRequest->epoch.julianDatePart2 += 1.0 / 86'400'000.0;
+    SkyRenderFrame secondFrame;
+    builder.appendTrail(secondFrame, input);
+
+    QVERIFY(engine.requestBodyStateCalls() > sampleCalls);
+}
+
+void SkyObjectTrailGeometryTests::optionChangeResamplesTrail()
+{
+    const auto projection = TrailBuilderTestScenario::makeProjection();
+    QVERIFY(projection.has_value());
+    TrailBuilderTestEngine engine;
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+    auto input = TrailBuilderTestScenario::makeInput(engine, *projection);
+    input.ephemerisRequest = makeTrailRequest(input);
+
+    builder.appendTrail(frame, input);
+    const int sampleCalls = engine.requestBodyStateCalls();
+    QVERIFY(sampleCalls > 0);
+
+    input.ephemerisRequest->options.setAtmosphericPressureHpa(900.0);
+    SkyRenderFrame secondFrame;
+    builder.appendTrail(secondFrame, input);
+
+    QVERIFY(engine.requestBodyStateCalls() > sampleCalls);
 }
 
 QTEST_APPLESS_MAIN(SkyObjectTrailGeometryTests)
