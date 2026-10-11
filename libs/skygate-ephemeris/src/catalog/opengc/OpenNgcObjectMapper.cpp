@@ -27,7 +27,7 @@ std::optional<RecognizedDesignation> recognizedDesignation(const QString& text)
         QStringLiteral("^(NGC|IC)\\s*(\\d+)([A-Za-z]*)$"), QRegularExpression::CaseInsensitiveOption
     );
 
-    const QRegularExpressionMatch match = designationPattern.match(text.trimmed());
+    const QRegularExpressionMatch match = designationPattern.match(text);
     if (!match.hasMatch()) {
         return std::nullopt;
     }
@@ -118,9 +118,8 @@ void appendDelimitedAliases(std::vector<std::string>& aliases, const QString& te
     }
 }
 
-DeepSkyObjectInfo::Kind kindFromOpenNgcType(QString typeText)
+DeepSkyObjectInfo::Kind kindFromOpenNgcType(const QString& typeText)
 {
-    typeText = typeText.trimmed();
     if (typeText == "G" || typeText == "GGroup" || typeText == "GPair" || typeText == "GTrpl") {
         return DeepSkyObjectInfo::Kind::Galaxy;
     }
@@ -151,11 +150,11 @@ bool OpenNgcObjectMapper::shouldSkipType(const QString& typeText)
 
 QString OpenNgcObjectMapper::withoutLeadingZeros(const QString& value)
 {
-    QString trimmed = value.trimmed();
-    while (trimmed.size() > 1 && trimmed.startsWith('0')) {
-        trimmed.remove(0, 1);
+    QString result = value;
+    while (result.size() > 1 && result.startsWith('0')) {
+        result.remove(0, 1);
     }
-    return trimmed;
+    return result;
 }
 
 OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
@@ -197,7 +196,7 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
             )
         );
     }
-    mapping.sourceRecordId = CatalogParsingUtilities::toUtf8String(name.trimmed());
+    mapping.sourceRecordId = CatalogParsingUtilities::toUtf8String(name);
     appendAlias(mapping.aliases, name);
     appendDelimitedAliases(mapping.aliases, identifiers);
     appendDelimitedAliases(mapping.aliases, commonNames);

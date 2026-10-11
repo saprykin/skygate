@@ -28,6 +28,10 @@ public:
     // returned line never carries one.
     [[nodiscard]] static std::string_view findHeaderLine(std::string_view& remaining) noexcept;
 
+    // Decodes one payload line to UTF-8 text with surrounding whitespace
+    // removed.
+    [[nodiscard]] static QString decodeTrimmedLine(std::string_view line);
+
     // Decodes a header line into a lowercased column-name -> original-column
     // index map. Quoted fields are decoded and empty names are omitted. The
     // line must come from findHeaderLine, which removes the BOM.
