@@ -30,9 +30,7 @@ std::shared_ptr<const ITimeScaleService> TimeScaleProviderLoader::loadTimeScaleS
     TimeScaleServiceOptions timeScaleOptions;
     timeScaleOptions.allowDegradedLeapSecondFallback = true;
     timeScaleOptions.allowUt1DeltaTFallback = true;
-    timeScaleOptions.earthOrientationSampleOptions.allowOutOfRangeNearestSampleFallback = true;
-    timeScaleOptions.earthOrientationSampleOptions.allowMissingDataZeroFallback = true;
-    timeScaleOptions.earthOrientationSampleOptions.degradePredictedData = false;
+    timeScaleOptions.earthOrientationSampleOptions = EarthOrientationSampler::Options::tolerantFallback();
 
     return std::make_shared<LeapSecondTimeScaleService>(
         leapSecondTable.provider,

@@ -253,35 +253,16 @@ private:
             return state;
         }
 
-        const TimeScaleConversionResult utcConversion =
-            m_context.timeScaleService->convert(m_context.request.epoch, skygate::core::TimeScale::Utc);
-        EphemerisMetadataMerger::mergeTimeScale(
-            state.metadata, utcConversion, EphemerisMetadataFailurePolicy::MarkFailed
-        );
-        if (!utcConversion.isSuccess()) {
-            EphemerisMetadataMerger::markCorrectionUnavailable(
-                state.metadata, EphemerisCorrectionFlags::earthOrientation()
+        const std::optional<EarthOrientationSampler::Sample> earthOrientationSample =
+            EphemerisMetadataMerger::prepareEarthOrientation(
+                m_context.request.epoch,
+                m_context.timeScaleService,
+                m_context.earthOrientationProvider,
+                state.metadata,
+                EphemerisMetadataFailurePolicy::MarkFailed,
+                EarthOrientationSampler::Options::tolerantFallback()
             );
-            state.available = false;
-            return state;
-        }
-
-        const EarthOrientationSampler::Sample earthOrientationSample = EarthOrientationSampler::sample(
-            m_context.earthOrientationProvider,
-            utcConversion.epoch,
-            EarthOrientationSampler::Options{
-                .allowOutOfRangeNearestSampleFallback = true,
-                .allowMissingDataZeroFallback = true,
-                .degradePredictedData = false,
-            }
-        );
-        EphemerisMetadataMerger::mergeEarthOrientation(state.metadata, earthOrientationSample);
-        if (!earthOrientationSample.isSuccess()) {
-            EphemerisMetadataMerger::markCorrectionUnavailable(
-                state.metadata, EphemerisCorrectionFlags::earthOrientation()
-            );
-            state.available = false;
-        }
+        state.available = earthOrientationSample.has_value();
 
         return state;
     }

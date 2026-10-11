@@ -14,6 +14,16 @@ public:
         bool allowOutOfRangeNearestSampleFallback = true;
         bool allowMissingDataZeroFallback = false;
         bool degradePredictedData = true;
+
+        // Fallback profile for callers that prefer a degraded sample over an
+        // unavailable Earth-orientation correction.
+        [[nodiscard]] static Options tolerantFallback() noexcept
+        {
+            Options options;
+            options.allowMissingDataZeroFallback = true;
+            options.degradePredictedData = false;
+            return options;
+        }
     };
 
     struct Sample {

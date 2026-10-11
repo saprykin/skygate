@@ -1,5 +1,6 @@
 #include "EphemerisMetadataMerger.hpp"
 #include "ICalcephKernel.hpp"
+#include "engine/ITimeScaleService.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -299,6 +300,57 @@ void EphemerisMetadataMerger::mergeKernelDiagnostics(
             metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed, diagnostic);
         }
     }
+}
+
+std::optional<EarthOrientationSampler::Sample> EphemerisMetadataMerger::prepareEarthOrientation(
+    const skygate::core::AstronomicalEpoch& epoch,
+    const skygate::ephemeris::ITimeScaleService* timeScaleService,
+    const skygate::ephemeris::IEarthOrientationProvider* earthOrientationProvider,
+    EphemerisEngineQueryResult& metadata,
+    const EphemerisMetadataFailurePolicy timeScaleFailurePolicy,
+    const EarthOrientationSampler::Options& sampleOptions,
+    EarthOrientationCache* cache
+)
+{
+    if (!epoch.isFinite()) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+        metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+        return std::nullopt;
+    }
+
+    std::optional<TimeScaleConversionResult> localConversion;
+    std::optional<TimeScaleConversionResult>* conversionSlot =
+        cache != nullptr ? &cache->utcConversion : &localConversion;
+    if (epoch.timeScale == skygate::core::TimeScale::Utc) {
+        *conversionSlot = TimeScaleConversionResult::success(epoch);
+    } else if (timeScaleService == nullptr) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+        metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
+        return std::nullopt;
+    } else if (!conversionSlot->has_value()) {
+        *conversionSlot = timeScaleService->convert(epoch, skygate::core::TimeScale::Utc);
+    }
+
+    const TimeScaleConversionResult& conversion = **conversionSlot;
+    mergeTimeScale(metadata, conversion, timeScaleFailurePolicy);
+    if (!conversion.isSuccess()) {
+        markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::earthOrientation());
+        return std::nullopt;
+    }
+
+    std::optional<EarthOrientationSampler::Sample> localSample;
+    std::optional<EarthOrientationSampler::Sample>& sampleSlot = cache != nullptr ? cache->sample : localSample;
+    if (!sampleSlot.has_value()) {
+        sampleSlot = EarthOrientationSampler::sample(earthOrientationProvider, conversion.epoch, sampleOptions);
+    }
+
+    mergeEarthOrientation(metadata, *sampleSlot);
+    if (!sampleSlot->isSuccess()) {
+        markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::earthOrientation());
+        return std::nullopt;
+    }
+
+    return sampleSlot;
 }
 
 }  // namespace skygate::ephemeris::highprecision

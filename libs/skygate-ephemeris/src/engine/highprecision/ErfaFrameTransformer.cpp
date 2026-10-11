@@ -213,30 +213,15 @@ private:
 
     [[nodiscard]] std::optional<EarthOrientationSampler::Sample> earthOrientation(EphemerisEngineQueryResult& metadata)
     {
-        const std::optional<skygate::core::AstronomicalEpoch> utcEpoch =
-            epochInScale(skygate::core::TimeScale::Utc, metadata);
-        if (!utcEpoch.has_value()) {
-            return std::nullopt;
-        }
-
-        if (!m_earthOrientationSample.has_value()) {
-            m_earthOrientationSample = EarthOrientationSampler::sample(
-                m_earthOrientationProvider,
-                *utcEpoch,
-                EarthOrientationSampler::Options{
-                    .allowOutOfRangeNearestSampleFallback = true,
-                    .allowMissingDataZeroFallback = true,
-                    .degradePredictedData = false,
-                }
-            );
-        }
-
-        EphemerisMetadataMerger::mergeEarthOrientation(metadata, *m_earthOrientationSample);
-        if (!m_earthOrientationSample->isSuccess()) {
-            return std::nullopt;
-        }
-
-        return m_earthOrientationSample;
+        return EphemerisMetadataMerger::prepareEarthOrientation(
+            m_epoch,
+            m_timeScaleService,
+            m_earthOrientationProvider,
+            metadata,
+            EphemerisMetadataFailurePolicy::MarkFailed,
+            EarthOrientationSampler::Options::tolerantFallback(),
+            &m_earthOrientationCache
+        );
     }
 
     [[nodiscard]] std::optional<skygate::core::AstronomicalEpoch> ut1Epoch(EphemerisEngineQueryResult& metadata)
@@ -450,7 +435,7 @@ private:
         case skygate::core::TimeScale::Tt:
             return &m_ttConversion;
         case skygate::core::TimeScale::Utc:
-            return &m_utcConversion;
+            return &m_earthOrientationCache.utcConversion;
         case skygate::core::TimeScale::Ut1:
             return &m_ut1Conversion;
         case skygate::core::TimeScale::Tai:
@@ -467,9 +452,8 @@ private:
     const skygate::ephemeris::ITimeScaleService* const m_timeScaleService = nullptr;
     const skygate::ephemeris::IEarthOrientationProvider* const m_earthOrientationProvider = nullptr;
     std::optional<TimeScaleConversionResult> m_ttConversion;
-    std::optional<TimeScaleConversionResult> m_utcConversion;
+    EphemerisMetadataMerger::EarthOrientationCache m_earthOrientationCache;
     std::optional<TimeScaleConversionResult> m_ut1Conversion;
-    std::optional<EarthOrientationSampler::Sample> m_earthOrientationSample;
     std::optional<MatrixCacheEntry> m_celestialIntermediateMatrix;
     std::optional<MatrixCacheEntry> m_earthRotationMatrix;
     std::optional<MatrixCacheEntry> m_polarMotionMatrix;
