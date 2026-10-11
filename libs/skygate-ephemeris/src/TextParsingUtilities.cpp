@@ -1,4 +1,4 @@
-#include "HighPrecisionTextParser.hpp"
+#include "TextParsingUtilities.hpp"
 #include "NumericParsingUtilities.hpp"
 #include "StringUtilities.hpp"
 #include "time/CalendarTime.hpp"
@@ -12,10 +12,9 @@ namespace skygate::ephemeris {
 namespace {
 
 template <typename Integer>
-[[nodiscard]] bool
-parseInteger(const HighPrecisionTextParser& parser, const std::string_view text, Integer& value) noexcept
+[[nodiscard]] bool parseInteger(const std::string_view text, Integer& value) noexcept
 {
-    const std::string_view trimmed = parser.trimAsciiWhitespace(text);
+    const std::string_view trimmed = StringUtilities::trimAsciiWhitespace(text);
     if (trimmed.empty()) {
         return false;
     }
@@ -28,22 +27,22 @@ parseInteger(const HighPrecisionTextParser& parser, const std::string_view text,
 
 }  // namespace
 
-std::string_view HighPrecisionTextParser::trimAsciiWhitespace(std::string_view text) const noexcept
+std::string_view TextParsingUtilities::trimAsciiWhitespace(std::string_view text) noexcept
 {
     return StringUtilities::trimAsciiWhitespace(text);
 }
 
-bool HighPrecisionTextParser::parseInt(const std::string_view text, int& value) const noexcept
+bool TextParsingUtilities::parseInt(const std::string_view text, int& value) noexcept
 {
-    return parseInteger(*this, text, value);
+    return parseInteger(text, value);
 }
 
-bool HighPrecisionTextParser::parseUint64(const std::string_view text, std::uint64_t& value) const noexcept
+bool TextParsingUtilities::parseUint64(const std::string_view text, std::uint64_t& value) noexcept
 {
-    return parseInteger(*this, text, value);
+    return parseInteger(text, value);
 }
 
-bool HighPrecisionTextParser::parseFiniteDouble(const std::string_view text, double& value) const noexcept
+bool TextParsingUtilities::parseFiniteDouble(const std::string_view text, double& value) noexcept
 {
     const std::optional<double> parsed = NumericParsingUtilities::parseFiniteDouble(text);
     if (!parsed.has_value()) {
@@ -54,7 +53,7 @@ bool HighPrecisionTextParser::parseFiniteDouble(const std::string_view text, dou
     return true;
 }
 
-std::vector<std::string_view> HighPrecisionTextParser::splitAsciiWhitespace(std::string_view text) const
+std::vector<std::string_view> TextParsingUtilities::splitAsciiWhitespace(std::string_view text)
 {
     std::vector<std::string_view> tokens;
     while (true) {
@@ -73,7 +72,7 @@ std::vector<std::string_view> HighPrecisionTextParser::splitAsciiWhitespace(std:
     return tokens;
 }
 
-bool HighPrecisionTextParser::parseBool(const std::string_view text, bool& value) const noexcept
+bool TextParsingUtilities::parseBool(const std::string_view text, bool& value) noexcept
 {
     const std::string_view trimmed = trimAsciiWhitespace(text);
     if (trimmed == "true" || trimmed == "1") {
@@ -88,7 +87,7 @@ bool HighPrecisionTextParser::parseBool(const std::string_view text, bool& value
     return false;
 }
 
-std::vector<std::string_view> HighPrecisionTextParser::splitCommaSeparated(std::string_view line) const
+std::vector<std::string_view> TextParsingUtilities::splitCommaSeparated(std::string_view line)
 {
     std::vector<std::string_view> columns;
     while (true) {
@@ -102,9 +101,9 @@ std::vector<std::string_view> HighPrecisionTextParser::splitCommaSeparated(std::
     return columns;
 }
 
-std::string_view HighPrecisionTextParser::fixedColumn(
+std::string_view TextParsingUtilities::fixedColumn(
     const std::string_view line, const std::size_t offset, const std::size_t length
-) const noexcept
+) noexcept
 {
     if (offset >= line.size()) {
         return {};
@@ -113,12 +112,12 @@ std::string_view HighPrecisionTextParser::fixedColumn(
     return trimAsciiWhitespace(line.substr(offset, std::min(length, line.size() - offset)));
 }
 
-std::string_view HighPrecisionTextParser::takeLine(std::string_view& remaining) const noexcept
+std::string_view TextParsingUtilities::takeLine(std::string_view& remaining) noexcept
 {
     return StringUtilities::takeLine(remaining);
 }
 
-std::optional<int> HighPrecisionTextParser::parseEnglishMonthAbbreviation(const std::string_view text) noexcept
+std::optional<int> TextParsingUtilities::parseEnglishMonthAbbreviation(const std::string_view text) noexcept
 {
     if (text == "Jan") {
         return 1;
@@ -160,7 +159,7 @@ std::optional<int> HighPrecisionTextParser::parseEnglishMonthAbbreviation(const 
     return std::nullopt;
 }
 
-std::optional<skygate::core::CivilDateTime> HighPrecisionTextParser::parseUtcDate(std::string_view text) const noexcept
+std::optional<skygate::core::CivilDateTime> TextParsingUtilities::parseUtcDate(std::string_view text) noexcept
 {
     text = trimAsciiWhitespace(text);
     const std::size_t yearSearchStart = text.starts_with("-") ? 1U : 0U;
@@ -192,8 +191,7 @@ std::optional<skygate::core::CivilDateTime> HighPrecisionTextParser::parseUtcDat
     return dateTime;
 }
 
-std::optional<std::string>
-HighPrecisionTextParser::metadataValue(const std::string_view line, const std::string_view key) const
+std::optional<std::string> TextParsingUtilities::metadataValue(const std::string_view line, const std::string_view key)
 {
     const std::string prefix = "#@ " + std::string(key);
     if (!line.starts_with(prefix)) {

@@ -216,9 +216,8 @@ add_skygate_ephemeris_qtest(
     catalog/io/CatalogDelimitedReaderTests.cpp
 )
 add_skygate_ephemeris_qtest(
-    skygate-ephemeris-highprecision-text-parser-tests
-    highprecision/HighPrecisionTextParserTests.cpp
-    LABELS "unit;highprecision"
+    skygate-ephemeris-text-parsing-utilities-tests
+    engine/TextParsingUtilitiesTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-string-utilities-tests

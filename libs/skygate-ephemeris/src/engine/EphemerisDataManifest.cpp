@@ -1,5 +1,5 @@
 #include "EphemerisDataManifest.hpp"
-#include "text/HighPrecisionTextParser.hpp"
+#include "TextParsingUtilities.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <QByteArray>
@@ -28,7 +28,7 @@ private:
     [[nodiscard]] static std::optional<skygate::core::AstronomicalEpoch> parseUtcDateEpoch(const QString& text) noexcept
     {
         const std::string value = text.toStdString();
-        const std::optional<skygate::core::CivilDateTime> dateTime = HighPrecisionTextParser{}.parseUtcDate(value);
+        const std::optional<skygate::core::CivilDateTime> dateTime = TextParsingUtilities::parseUtcDate(value);
         if (!dateTime.has_value()) {
             return std::nullopt;
         }
@@ -434,7 +434,7 @@ public:
     [[nodiscard]] static ParseResult parse(const std::string_view payload)
     {
         ParseResult result;
-        if (HighPrecisionTextParser{}.trimAsciiWhitespace(payload).empty()) {
+        if (TextParsingUtilities::trimAsciiWhitespace(payload).empty()) {
             result.diagnostics.push_back("Manifest payload is empty.");
             return result;
         }
