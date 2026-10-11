@@ -328,8 +328,20 @@ add_skygate_ui_qtest(
     TIMEOUT 60
 )
 add_skygate_ui_qtest(
-    skygate-ui-sky-catalog-manager-related-data-tests
-    catalog/SkyCatalogManagerRelatedDataTests.cpp
+    skygate-ui-sky-catalog-manager-related-reply-tests
+    catalog/SkyCatalogManagerRelatedReplyTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-manager-related-replacement-tests
+    catalog/SkyCatalogManagerRelatedReplacementTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-manager-related-persistence-tests
+    catalog/SkyCatalogManagerRelatedPersistenceTests.cpp
     LABELS integration
     TIMEOUT 60
 )
