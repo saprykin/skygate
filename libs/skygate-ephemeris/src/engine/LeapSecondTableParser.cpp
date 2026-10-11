@@ -39,24 +39,29 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
     return skygate::core::CalendarTime::civilDateFromUtcParts(*year, *month, *day);
 }
 
-[[nodiscard]] std::optional<std::string>
-applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view line, const std::size_t lineNumber)
+[[nodiscard]] bool applyMetadataLine(
+    ILeapSecondProvider::TableInfo& info,
+    const std::string_view line,
+    const std::size_t lineNumber,
+    std::optional<std::string>& diagnosticText
+)
 {
-    std::optional<std::string> diagnosticText;
+    if (!line.starts_with("#@")) {
+        return false;
+    }
     if (EphemerisTableMetadata::applyCommonLine(info, line, "Leap-second table", lineNumber, diagnosticText)) {
-        return diagnosticText;
-    }
-    if (line.starts_with("#@")) {
-        const std::optional<std::uint64_t> ntpExpiration = NumericParsingUtilities::parseUint64(line.substr(2U));
-        if (!ntpExpiration.has_value()) {
-            return "Leap-second table contains malformed expiration metadata at line " + std::to_string(lineNumber)
-                   + ".";
-        }
-
-        info.expiresAt = skygate::core::EpochCodec::epochFromNtpTimestamp(*ntpExpiration);
+        return true;
     }
 
-    return std::nullopt;
+    const std::optional<std::uint64_t> ntpExpiration = NumericParsingUtilities::parseUint64(line.substr(2U));
+    if (!ntpExpiration.has_value()) {
+        diagnosticText =
+            "Leap-second table contains malformed expiration metadata at line " + std::to_string(lineNumber) + ".";
+        return true;
+    }
+
+    info.expiresAt = skygate::core::EpochCodec::epochFromNtpTimestamp(*ntpExpiration);
+    return true;
 }
 
 [[nodiscard]] bool parseCsvEntryLine(std::string_view line, ILeapSecondProvider::TableEntry& entry) noexcept
@@ -143,41 +148,20 @@ LeapSecondTableParser::Result LeapSecondTableParser::parse(const EphemerisTextDa
     info.provenance = asset.provenance;
 
     std::vector<ILeapSecondProvider::TableEntry> entries;
-    std::string_view remaining = asset.content;
-    std::size_t lineNumber = 0U;
-    while (!remaining.empty()) {
-        ++lineNumber;
-        std::string_view line = StringUtilities::takeLine(remaining);
-
-        line = StringUtilities::trimAsciiWhitespace(line);
-        if (line.empty()) {
-            continue;
-        }
-        if (line.starts_with("#@")) {
-            if (std::optional<std::string> diagnosticText = applyMetadataLine(info, line, lineNumber);
-                diagnosticText.has_value()) {
-                return failureResult(
-                    std::move(info), ILeapSecondProvider::TableStatus::Malformed, std::move(*diagnosticText)
-                );
-            }
-            continue;
-        }
-        if (line.starts_with("#")) {
-            continue;
-        }
-        if (EphemerisTableMetadata::isHeaderLine(line)) {
-            continue;
-        }
-
-        ILeapSecondProvider::TableEntry entry;
-        if (!parseEntryLine(line, entry)) {
-            return failureResult(
-                std::move(info),
-                ILeapSecondProvider::TableStatus::Malformed,
-                "Leap-second table contains a malformed row at line " + std::to_string(lineNumber) + "."
-            );
-        }
-        entries.push_back(entry);
+    std::optional<std::string> malformedLine = EphemerisTableMetadata::parseTableLines(
+        asset.content,
+        [&info](const std::string_view line, const std::size_t lineNumber, std::optional<std::string>& diagnosticText) {
+            return applyMetadataLine(info, line, lineNumber, diagnosticText);
+        },
+        [](const std::string_view, const std::string_view, const bool) noexcept { return false; },
+        [](const std::string_view,
+           const std::string_view trimmedLine,
+           ILeapSecondProvider::TableEntry& entry) noexcept { return parseEntryLine(trimmedLine, entry); },
+        entries,
+        "Leap-second table"
+    );
+    if (malformedLine.has_value()) {
+        return failureResult(std::move(info), ILeapSecondProvider::TableStatus::Malformed, std::move(*malformedLine));
     }
 
     if (entries.empty()) {

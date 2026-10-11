@@ -1,5 +1,6 @@
 #pragma once
 
+#include "StringUtilities.hpp"
 #include "TextParsingUtilities.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/CalendarTime.hpp"
@@ -9,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace skygate::ephemeris {
 
@@ -68,6 +70,52 @@ public:
         }
 
         return false;
+    }
+
+    // Walks one table payload line by line, owning the line numbering, the
+    // blank and comment handling, the shared header check, and the malformed
+    // row diagnostic. The metadata handler consumes '#' lines it recognizes and
+    // reports a malformed value through diagnosticText; the skip predicate drops
+    // format-specific filler lines; the entry parser fills one table row. Lines
+    // are numbered from one and the first malformed line ends the walk.
+    template <typename MetadataLineHandler, typename SkipLinePredicate, typename EntryLineParser, typename Entry>
+    [[nodiscard]] static std::optional<std::string> parseTableLines(
+        const std::string_view content,
+        MetadataLineHandler metadataLineHandler,
+        SkipLinePredicate skipLinePredicate,
+        EntryLineParser entryLineParser,
+        std::vector<Entry>& entries,
+        const std::string_view dataLabel
+    )
+    {
+        std::string_view remaining = content;
+        std::size_t lineNumber = 0U;
+        while (!remaining.empty()) {
+            ++lineNumber;
+            const std::string_view rawLine = StringUtilities::takeLine(remaining);
+            const std::string_view trimmedLine = StringUtilities::trimAsciiWhitespace(rawLine);
+            if (trimmedLine.empty()) {
+                continue;
+            }
+            if (trimmedLine.starts_with("#")) {
+                std::optional<std::string> diagnosticText;
+                if (metadataLineHandler(trimmedLine, lineNumber, diagnosticText) && diagnosticText.has_value()) {
+                    return diagnosticText;
+                }
+                continue;
+            }
+            if (isHeaderLine(trimmedLine) || skipLinePredicate(rawLine, trimmedLine, entries.empty())) {
+                continue;
+            }
+
+            Entry entry;
+            if (!entryLineParser(rawLine, trimmedLine, entry)) {
+                return std::string(dataLabel) + " contains a malformed row at line " + std::to_string(lineNumber) + ".";
+            }
+            entries.push_back(entry);
+        }
+
+        return std::nullopt;
     }
 };
 
