@@ -129,6 +129,7 @@ Rules:
 - Keep rendering-independent calculations testable without UI.
 - Prefer deterministic tests with fixed time/location inputs.
 - Register tests through the existing per-module CMake helpers and CTest flow.
+- Keep test function names at most 48 characters.
 - Do not weaken, delete, or skip tests to make the build pass.
 
 ## Formatting
@@ -137,9 +138,31 @@ Rules:
   C++ files before considering the change complete.
 - When editing Markdown files, `*.md`, keep line width at or below 80
   characters unless a long path, URL, symbol, or name does not fit.
+- Use the humanizer skill when writing code comments and documentation.
+- Add code comments only when they carry information the code itself does
+  not. Keep code files clean.
+
+## Architecture Documentation
+
+- Architecture docs live in `docs/arch/`, one topic per file.
+  `docs/ARCHITECTURE.md` is only a hub that links to them.
+- When a change alters behavior, contracts, or architecture, update the
+  matching `docs/arch/*.md` file in the same change.
+- Write the docs for humans, not for agents:
+  - describe what the code does, not what was changed and when;
+  - no task identifiers, review guidelines, or line-count heuristics;
+  - no AI-flavored filler: no em dashes, one-line closers, bold labels,
+    forced triads, or "not X but Y" contrasts;
+  - sentence-case headings, plain language, code names in backticks.
+- Keep one topic per file. If a section grows into a distinct topic, split
+  it into its own file and link it from the hub.
+- Verify claims against the code when the relevant behavior changes; do
+  not let the docs drift.
 
 ## Agent Workflow
 
+- Use cheaper flash models for subagents unless a larger model is explicitly
+  required by the task or requested by the user.
 - Make minimal, focused changes.
 - Do not rewrite unrelated files.
 - Do not reformat unrelated files.
