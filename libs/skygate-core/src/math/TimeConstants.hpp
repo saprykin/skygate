@@ -17,6 +17,7 @@ public:
     static constexpr double kJulianDaysPerYear = 365.25;
     static constexpr double kSecondsPerJulianYear = kJulianDaysPerYear * kSecondsPerDay;
     static constexpr double kJulianDateUnixEpoch = 2'440'587.5;
+    static constexpr double kJulianDateNtpEpoch = 2'415'020.5;
     static constexpr double kJulianDateJ2000 = 2'451'545.0;
     static constexpr double kJulianDateKnownNewMoon = 2'451'550.1;
     static constexpr double kTtMinusTaiSeconds = 32.184;

@@ -6,6 +6,7 @@
 #include "catalog/io/CatalogParsingUtilities.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
 #include "math/MathConstants.hpp"
+#include "math/TimeConstants.hpp"
 
 #include <QString>
 #include <QStringView>
@@ -26,7 +27,7 @@ constexpr double kHygMissingDistanceParsecs = 100'000.0;
 [[nodiscard]] skygate::core::AstronomicalEpoch j2000CatalogEpoch() noexcept
 {
     return {
-        .julianDatePart1 = 2'451'545.0,
+        .julianDatePart1 = skygate::core::TimeConstants::kJulianDateJ2000,
         .julianDatePart2 = 0.0,
         .timeScale = skygate::core::TimeScale::Tt,
     };

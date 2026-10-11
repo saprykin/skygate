@@ -30,6 +30,16 @@ UtcTimePoint EpochCodec::utcTimeFromEpoch(const AstronomicalEpoch& epoch) noexce
     return UtcTimeCodec::fromEpochMicros(static_cast<std::int64_t>(epochMicros));
 }
 
+AstronomicalEpoch EpochCodec::epochFromNtpTimestamp(const std::uint64_t ntpTimestamp) noexcept
+{
+    return AstronomicalEpoch{
+        .julianDatePart1 = TimeConstants::kJulianDateNtpEpoch,
+        .julianDatePart2 = static_cast<double>(ntpTimestamp) / TimeConstants::kSecondsPerDay,
+        .timeScale = TimeScale::Utc,
+    }
+        .normalized();
+}
+
 double EpochCodec::julianDayFromUtc(const UtcTimePoint& utcTime) noexcept
 {
     return UtcTimeCodec::secondsSinceEpochDouble(utcTime) / TimeConstants::kSecondsPerDay
