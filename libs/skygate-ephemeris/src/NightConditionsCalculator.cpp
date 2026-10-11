@@ -3,6 +3,7 @@
 #include "CelestialBodyState.hpp"
 #include "MoonPhaseCalculator.hpp"
 #include "ObservationEventCalculator.hpp"
+#include "SolarAltitudeThresholds.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "engine/IEphemerisEngine.hpp"
 
@@ -12,11 +13,6 @@
 
 namespace skygate::ephemeris {
 namespace {
-
-constexpr double kSunriseSunsetAltitudeDeg = -0.833;
-constexpr double kCivilTwilightAltitudeDeg = -6.0;
-constexpr double kNauticalTwilightAltitudeDeg = -12.0;
-constexpr double kAstronomicalTwilightAltitudeDeg = -18.0;
 
 [[nodiscard]] ObservationEvent unavailableEvent() noexcept
 {
@@ -98,13 +94,31 @@ NightConditions NightConditionsCalculator::compute(
 
     const ObservationEventCalculator eventCalculator(m_guidanceStrategy);
     const auto sunHorizon = computeEventSummaryForNightConditions(
-        eventCalculator, ephemerisEngine, request, sunBodyIndex, sunBody, kSunriseSunsetAltitudeDeg, eventSearchMode
+        eventCalculator,
+        ephemerisEngine,
+        request,
+        sunBodyIndex,
+        sunBody,
+        SolarAltitudeThresholds::kSunriseSunsetAltitudeDeg,
+        eventSearchMode
     );
     const auto civil = computeEventSummaryForNightConditions(
-        eventCalculator, ephemerisEngine, request, sunBodyIndex, sunBody, kCivilTwilightAltitudeDeg, eventSearchMode
+        eventCalculator,
+        ephemerisEngine,
+        request,
+        sunBodyIndex,
+        sunBody,
+        SolarAltitudeThresholds::kCivilTwilightAltitudeDeg,
+        eventSearchMode
     );
     const auto nautical = computeEventSummaryForNightConditions(
-        eventCalculator, ephemerisEngine, request, sunBodyIndex, sunBody, kNauticalTwilightAltitudeDeg, eventSearchMode
+        eventCalculator,
+        ephemerisEngine,
+        request,
+        sunBodyIndex,
+        sunBody,
+        SolarAltitudeThresholds::kNauticalTwilightAltitudeDeg,
+        eventSearchMode
     );
     const auto astronomical = computeEventSummaryForNightConditions(
         eventCalculator,
@@ -112,7 +126,7 @@ NightConditions NightConditionsCalculator::compute(
         request,
         sunBodyIndex,
         sunBody,
-        kAstronomicalTwilightAltitudeDeg,
+        SolarAltitudeThresholds::kAstronomicalTwilightAltitudeDeg,
         eventSearchMode
     );
     const auto moonHorizon = computeEventSummaryForNightConditions(
