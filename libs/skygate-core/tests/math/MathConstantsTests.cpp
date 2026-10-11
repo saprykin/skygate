@@ -20,6 +20,7 @@ private slots:
     void kPi_hasExpectedValue();
     void kTwoPi_isDoubleOfkPi();
     void kDegreesToRadians_isInverseOfkRadiansToDegrees();
+    void kDegreesPerHour_isFifteenDegrees();
     void kRadiansPerHour_isPiOverTwelve();
     void kHoursPerRadian_isTwelveOverPi();
     void kArcsecondsToRadians_isPiOver180Over3600();
@@ -43,6 +44,15 @@ void MathConstantsTests::kDegreesToRadians_isInverseOfkRadiansToDegrees()
     QVERIFY(
         isNear(skygate::core::MathConstants::kDegreesToRadians * skygate::core::MathConstants::kRadiansToDegrees, 1.0)
     );
+}
+
+void MathConstantsTests::kDegreesPerHour_isFifteenDegrees()
+{
+    QVERIFY(isNear(skygate::core::MathConstants::kDegreesPerHour, 15.0));
+    QVERIFY(isNear(
+        skygate::core::MathConstants::kDegreesPerHour * skygate::core::MathConstants::kDegreesToRadians,
+        skygate::core::MathConstants::kRadiansPerHour
+    ));
 }
 
 void MathConstantsTests::kRadiansPerHour_isPiOverTwelve()

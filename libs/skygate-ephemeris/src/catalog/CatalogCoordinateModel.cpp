@@ -14,8 +14,6 @@ namespace {
 // larger separation is an unrelated coordinate model rather than noise.
 constexpr double kDirectionToleranceArcseconds = 1.0;
 
-constexpr double kDegreesPerHour = 15.0;
-
 // Right-ascension difference projected onto the tangent plane at the mean
 // declination, so it can be combined with the declination difference as one
 // small-angle separation.
@@ -24,7 +22,7 @@ constexpr double kDegreesPerHour = 15.0;
 ) noexcept
 {
     const double deltaRaDeg = skygate::core::AngleMath::normalizeDegreesSigned(
-        (to.rightAscensionHours - from.rightAscensionHours) * kDegreesPerHour
+        (to.rightAscensionHours - from.rightAscensionHours) * skygate::core::MathConstants::kDegreesPerHour
     );
     const double meanDeclinationRad =
         skygate::core::AngleMath::toRadians(0.5 * (from.declinationDeg + to.declinationDeg));
