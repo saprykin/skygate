@@ -106,35 +106,8 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
             schemaPayload = *unwrappedData;
             decodedContainer = true;
         } else {
-            switch (selection.status) {
-            case CatalogZipEntrySelection::Status::Selected:
-                break;
-            case CatalogZipEntrySelection::Status::InvalidArchive:
-                result.errorCode = CatalogLoadResult::ErrorCode::InvalidZipData;
-                result.errorDetail = "ZIP catalog payload could not be parsed.";
-                break;
-            case CatalogZipEntrySelection::Status::MissingMember:
-                result.errorCode = CatalogLoadResult::ErrorCode::ArchiveMemberNotFound;
-                result.errorDetail = "ZIP catalog payload does not contain member '" + selection.selectedPath + "'.";
-                break;
-            case CatalogZipEntrySelection::Status::UnusableMember:
-                result.errorCode = CatalogLoadResult::ErrorCode::InvalidZipData;
-                result.errorDetail =
-                    "ZIP catalog member '" + selection.selectedPath + "' is not a readable catalog entry.";
-                break;
-            case CatalogZipEntrySelection::Status::AmbiguousMember:
-                result.errorCode = CatalogLoadResult::ErrorCode::AmbiguousArchiveMember;
-                result.errorDetail = "ZIP catalog payload contains multiple supported catalog members.";
-                break;
-            case CatalogZipEntrySelection::Status::NoSupportedMember:
-                result.errorCode = CatalogLoadResult::ErrorCode::InvalidZipData;
-                result.errorDetail = "ZIP catalog payload does not contain a supported catalog member.";
-                break;
-            case CatalogZipEntrySelection::Status::NoReadableEntry:
-                result.errorCode = CatalogLoadResult::ErrorCode::InvalidZipData;
-                result.errorDetail = "ZIP catalog payload does not contain a readable CSV entry.";
-                break;
-            }
+            result.errorCode = selection.errorCode();
+            result.errorDetail = selection.errorDetail();
             qCWarning(skygateCatalogParseLog).noquote()
                 << "Catalog ZIP parse failed:" << QString::fromStdString(result.errorDetail);
             return result;

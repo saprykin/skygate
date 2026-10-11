@@ -1,5 +1,7 @@
 #pragma once
 
+#include "catalog/CatalogLoadResult.hpp"
+
 #include <cstdint>
 #include <string>
 
@@ -20,6 +22,9 @@ struct CatalogZipEntrySelection final {
     Status status = Status::NoReadableEntry;
     std::string selectedPath;
     std::string payload;
+
+    [[nodiscard]] CatalogLoadResult::ErrorCode errorCode() const noexcept;
+    [[nodiscard]] std::string errorDetail() const;
 };
 
 }  // namespace skygate::ephemeris
