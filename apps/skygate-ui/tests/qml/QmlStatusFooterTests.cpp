@@ -20,10 +20,10 @@ class QmlStatusFooterTests final : public QObject {
 private slots:
     void initTestCase();
     void init();
-    void dateTimeClickAndTrackingIndicatorInvokeControllerActions();
+    void dateTimeClickAndTrackingIndicatorInvokeActions();
     void degradationWarningClickInvokesFooterSignal();
     void liveAndTrackingStateUpdateFooterPresentation();
-    void rightFooterClusterKeepsNightTrackingAndTimeTargetsOrdered();
+    void rightFooterKeepsNightTrackingAndTimeOrder();
 
 private:
     QmlSettingsFixture m_settings;
@@ -39,7 +39,7 @@ void QmlStatusFooterTests::init()
     m_settings.resetForCurrentTest();
 }
 
-void QmlStatusFooterTests::dateTimeClickAndTrackingIndicatorInvokeControllerActions()
+void QmlStatusFooterTests::dateTimeClickAndTrackingIndicatorInvokeActions()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -252,7 +252,7 @@ void QmlStatusFooterTests::liveAndTrackingStateUpdateFooterPresentation()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlStatusFooterTests::rightFooterClusterKeepsNightTrackingAndTimeTargetsOrdered()
+void QmlStatusFooterTests::rightFooterKeepsNightTrackingAndTimeOrder()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);

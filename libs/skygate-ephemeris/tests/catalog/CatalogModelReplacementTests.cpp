@@ -28,15 +28,15 @@ class CatalogModelReplacementTests final : public QObject {
 private slots:
     void repeatedBridgesKeepTheEarliestRowModel();
     void laterSourceModelReplacesAnEarlierBridgedModel();
-    void secondPassKeepsTheEarliestRowModelAcrossALateLocalBridge();
-    void localBridgeAndLaterReplacementKeepNameMagnitudeAndModel();
-    void repeatedBridgesKeepTheEarliestModelUnderALaterReplacement();
-    void earliestFixedRowKeepsTheBridgesMeasuredAstrometry();
-    void duplicateBridgesKeepTheEarliestRowsModelAndMeasurements();
-    void adoptedAstrometrySurvivesWithoutAnIndependentModel();
-    void earliestFixedRowRejectsTheBridgesConflictingAstrometry();
-    void repairedBridgeKeepsItsAstrometryUnderALaterReplacement();
-    void repairedBridgeAstrometryKeepsItsSupplyingRowsAcrossALaterBridge();
+    void secondPassKeepsEarliestModelAcrossLocalBridge();
+    void localBridgeAndLaterReplacementKeepNameAndModel();
+    void repeatedBridgesKeepEarliestModelUnderReplacement();
+    void earliestFixedRowKeepsBridgedAstrometry();
+    void duplicateBridgesKeepEarliestModelAndMeasurements();
+    void adoptedAstrometrySurvivesWithoutModel();
+    void earliestFixedRowRejectsConflictingAstrometry();
+    void repairedBridgeKeepsAstrometryUnderReplacement();
+    void repairedBridgeKeepsSupplyingRowsAcrossBridge();
 };
 
 void CatalogModelReplacementTests::repeatedBridgesKeepTheEarliestRowModel()
@@ -207,7 +207,7 @@ void CatalogModelReplacementTests::laterSourceModelReplacesAnEarlierBridgedModel
     QVERIFY(CatalogMergeTestSupport::hasRetainedCanonicalId(*survivor, "a_bridge"));
 }
 
-void CatalogModelReplacementTests::secondPassKeepsTheEarliestRowModelAcrossALateLocalBridge()
+void CatalogModelReplacementTests::secondPassKeepsEarliestModelAcrossLocalBridge()
 {
     // Source A links HIP 17 with HYG 2. Source B's first row describes HYG 2
     // at RA 5; the later local bridge carries the model of its earliest row,
@@ -291,7 +291,7 @@ void CatalogModelReplacementTests::secondPassKeepsTheEarliestRowModelAcrossALate
     QVERIFY(CatalogMergeTestSupport::hasRetainedCanonicalId(*survivor, "b_bridge"));
 }
 
-void CatalogModelReplacementTests::localBridgeAndLaterReplacementKeepNameMagnitudeAndModel()
+void CatalogModelReplacementTests::localBridgeAndLaterReplacementKeepNameAndModel()
 {
     // Source A only records that HIP 1 and HYG 2 identify one object. Source B
     // bridges HIP 1 with HIP 3 in its last row, so the row that supplies the
@@ -456,7 +456,7 @@ void CatalogModelReplacementTests::localBridgeAndLaterReplacementKeepNameMagnitu
     QCOMPARE(varied.contributorSourceIds.front(), (std::vector<std::string>{"source-2", "source-1", "source-0"}));
 }
 
-void CatalogModelReplacementTests::repeatedBridgesKeepTheEarliestModelUnderALaterReplacement()
+void CatalogModelReplacementTests::repeatedBridgesKeepEarliestModelUnderReplacement()
 {
     // Three rows describe the object at RA 1, 5, and 7, and two bridge rows
     // chain over them with conflicting models of their own. The first row's
@@ -585,7 +585,7 @@ void CatalogModelReplacementTests::repeatedBridgesKeepTheEarliestModelUnderALate
     QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"second", "first"}));
 }
 
-void CatalogModelReplacementTests::earliestFixedRowKeepsTheBridgesMeasuredAstrometry()
+void CatalogModelReplacementTests::earliestFixedRowKeepsBridgedAstrometry()
 {
     // The first two rows only fix the shared object at RA 1, while the bridge
     // measures proper motion and parallax at the same direction. The earliest
@@ -638,7 +638,7 @@ void CatalogModelReplacementTests::earliestFixedRowKeepsTheBridgesMeasuredAstrom
     QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"primary"}));
 }
 
-void CatalogModelReplacementTests::duplicateBridgesKeepTheEarliestRowsModelAndMeasurements()
+void CatalogModelReplacementTests::duplicateBridgesKeepEarliestModelAndMeasurements()
 {
     // The bridge is an ordinary duplicate of the fixed-only HIP row, so the
     // earliest row keeps its fixed position while the compatible bridge
@@ -722,7 +722,7 @@ void CatalogModelReplacementTests::duplicateBridgesKeepTheEarliestRowsModelAndMe
     QCOMPARE(repeatedBridge.contributorSourceIds.front(), (std::vector<std::string>{"primary"}));
 }
 
-void CatalogModelReplacementTests::adoptedAstrometrySurvivesWithoutAnIndependentModel()
+void CatalogModelReplacementTests::adoptedAstrometrySurvivesWithoutModel()
 {
     // The second identifier row describes no coordinates at all, so the
     // bridge still absorbs it and the earliest row's fixed-only model replaces
@@ -816,7 +816,7 @@ void CatalogModelReplacementTests::adoptedAstrometrySurvivesWithoutAnIndependent
     QCOMPARE(declaredEpoch.contributorSourceIds.front(), (std::vector<std::string>{"primary"}));
 }
 
-void CatalogModelReplacementTests::earliestFixedRowRejectsTheBridgesConflictingAstrometry()
+void CatalogModelReplacementTests::earliestFixedRowRejectsConflictingAstrometry()
 {
     // The bridge describes the object only through astrometry at RA 5, while
     // both identifier rows fix it at RA 1. The earliest row's fixed-only model
@@ -865,7 +865,7 @@ void CatalogModelReplacementTests::earliestFixedRowRejectsTheBridgesConflictingA
     QVERIFY(CatalogMergeTestSupport::hasRetainedCanonicalId(*survivor, "hd_27"));
 }
 
-void CatalogModelReplacementTests::repairedBridgeKeepsItsAstrometryUnderALaterReplacement()
+void CatalogModelReplacementTests::repairedBridgeKeepsAstrometryUnderReplacement()
 {
     // The earliest row fixes the object at RA 1 and carries its name and
     // magnitude, while the bridge row measures proper motion, parallax, and
@@ -991,7 +991,7 @@ void CatalogModelReplacementTests::repairedBridgeKeepsItsAstrometryUnderALaterRe
     QCOMPARE(varied.contributorSourceIds.front(), (std::vector<std::string>{"source-1", "source-0"}));
 }
 
-void CatalogModelReplacementTests::repairedBridgeAstrometryKeepsItsSupplyingRowsAcrossALaterBridge()
+void CatalogModelReplacementTests::repairedBridgeKeepsSupplyingRowsAcrossBridge()
 {
     // The repaired bridge keeps each measured field with the row that supplied
     // it, so a later bridge row that absorbs it together with another measured

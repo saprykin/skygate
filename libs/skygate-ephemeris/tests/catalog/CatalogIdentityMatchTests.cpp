@@ -58,10 +58,10 @@ private slots:
     void keepsIncompatibleKindsDistinct();
     void preservesStableOrdering();
     void keepsSharedCommonNameDesignationsDistinct();
-    void keepsFallbackDesignationsDistinctWhenOnlyTheCommonNameMatches();
-    void matchingFallbackRowPreservesConfiguredWinnerValues();
+    void keepsFallbackDesignationsDistinctForCommonName();
+    void matchingFallbackRowPreservesWinnerValues();
     void keepsFallbackIncompatibleKindDistinct();
-    void augmentCoreKeepsBundledBodyDistinctFromConfiguredDeepSkyObject();
+    void augmentCoreKeepsBundledBodyDistinctFromDeepSky();
     void keepsAmbiguousFallbackAliasMatchDistinct();
     void matchesCaseAndPaddingDesignationVariants();
     void keepsSuffixDesignationsDistinct();
@@ -327,7 +327,7 @@ void CatalogIdentityMatchTests::keepsSharedCommonNameDesignationsDistinct()
     QCOMPARE(second->fixedEquatorialValue()->rightAscensionHours, 10.0);
 }
 
-void CatalogIdentityMatchTests::keepsFallbackDesignationsDistinctWhenOnlyTheCommonNameMatches()
+void CatalogIdentityMatchTests::keepsFallbackDesignationsDistinctForCommonName()
 {
     // Both records carry a recognized NGC designation and share only the
     // descriptive common name, so the fallback row describes a different
@@ -376,7 +376,7 @@ void CatalogIdentityMatchTests::keepsFallbackDesignationsDistinctWhenOnlyTheComm
     QCOMPARE(result.sourceIds.back(), std::string("gap-fill"));
 }
 
-void CatalogIdentityMatchTests::matchingFallbackRowPreservesConfiguredWinnerValues()
+void CatalogIdentityMatchTests::matchingFallbackRowPreservesWinnerValues()
 {
     // The fallback row carries the same authoritative designation, so the
     // shared identity decision proves both records describe one object.
@@ -464,7 +464,7 @@ void CatalogIdentityMatchTests::keepsFallbackIncompatibleKindDistinct()
     QCOMPARE(deepSky->kind, BaseCelestialBody::Kind::DeepSkyObject);
 }
 
-void CatalogIdentityMatchTests::augmentCoreKeepsBundledBodyDistinctFromConfiguredDeepSkyObject()
+void CatalogIdentityMatchTests::augmentCoreKeepsBundledBodyDistinctFromDeepSky()
 {
     // A configured deep-sky record whose canonical id collides with a bundled
     // core body of another kind must not suppress the bundled augmentation.

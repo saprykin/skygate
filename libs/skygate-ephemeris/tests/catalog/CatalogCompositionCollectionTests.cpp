@@ -180,7 +180,7 @@ class CatalogCompositionCollectionTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void composesTwoStarAndTwoDsoSourcesWithOverlapsAndMixedSource();
+    void starAndDsoSourcesWithOverlapsAndMixedSource();
     void disabledSourceContributesNothing();
     void disappearingContributorRestoresEarlierWinner();
     void reorderingSourcesChangesWinners();
@@ -188,18 +188,18 @@ private slots:
     void reportsDeterministicCounts();
     void reportsSourceRowAndPerKindCounts();
     void bundledAugmentationCarriesOwnProvenance();
-    void deepSkyFallbackFillsGapsWithoutReplacingConfiguredValues();
+    void deepSkyFallbackFillsGapsWithoutReplacingValues();
     void deepSkyFallbackNeverOverridesReplacementOrder();
     void doesNotDuplicatePrimarySolarSystemBodies();
     void bundledBrightStarsOnlyAddedWhenNoStarsPresent();
     void usesCurrentConstellationCountWhenLarger();
     void ignoresNonDeepSkyRowsFromDeepSkySource();
-    void reorderedBridgeSourcesKeepSingleWinnerAndCompleteContributors();
-    void repeatedImportsKeepDeterministicWinnerAndContributors();
+    void reorderedBridgeSourcesKeepWinnerAndContributors();
+    void repeatedImportsKeepWinnerAndContributors();
     void reimportedDescriptorReplacesAbsorbedRecord();
 };
 
-void CatalogCompositionCollectionTests::composesTwoStarAndTwoDsoSourcesWithOverlapsAndMixedSource()
+void CatalogCompositionCollectionTests::starAndDsoSourcesWithOverlapsAndMixedSource()
 {
     auto starA = createCatalog(
         {
@@ -575,7 +575,7 @@ void CatalogCompositionCollectionTests::bundledAugmentationCarriesOwnProvenance(
     QCOMPARE(*sourceIdFor(result, bodies, "constellation_orion"), std::string("primary"));
 }
 
-void CatalogCompositionCollectionTests::deepSkyFallbackFillsGapsWithoutReplacingConfiguredValues()
+void CatalogCompositionCollectionTests::deepSkyFallbackFillsGapsWithoutReplacingValues()
 {
     DistantCelestialBody configuredM31 =
         makeDeepSkyObject("messier_031", "Configured M31", {"M31"}, {CatalogIdentifier::make("messier", "31")});
@@ -816,7 +816,7 @@ void CatalogCompositionCollectionTests::ignoresNonDeepSkyRowsFromDeepSkySource()
     QVERIFY(findBodyById(bodies, "ngc_1") != nullptr);
 }
 
-void CatalogCompositionCollectionTests::reorderedBridgeSourcesKeepSingleWinnerAndCompleteContributors()
+void CatalogCompositionCollectionTests::reorderedBridgeSourcesKeepWinnerAndContributors()
 {
     // Source A knows HIP 1, source C knows HD 2, and source B carries both
     // identifiers, so B is the bridge no matter where it appears in the
@@ -894,7 +894,7 @@ void CatalogCompositionCollectionTests::reorderedBridgeSourcesKeepSingleWinnerAn
     }
 }
 
-void CatalogCompositionCollectionTests::repeatedImportsKeepDeterministicWinnerAndContributors()
+void CatalogCompositionCollectionTests::repeatedImportsKeepWinnerAndContributors()
 {
     const auto sourceA =
         createCatalog({makeStar("a_hip1", "Alpha", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)}, {});

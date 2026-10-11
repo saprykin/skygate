@@ -463,14 +463,14 @@ private slots:
     void dispatchesSolarSystemAndStarBodies();
     void singleBodyOverloadsShareResultsAndCaches_data();
     void singleBodyOverloadsShareResultsAndCaches();
-    void failsRequestedCorrectionsWhenApparentPlaceCalculatorIsMissing();
+    void failsRequestedCorrectionsWithoutApparentPlace();
     void usesBatchStarPathForFullFrameSnapshot();
-    void batchesRepresentativeLargeCatalogWithoutSingleStarDispatch();
-    void batchesRepresentativeLargeCatalogApparentPlaceTransformsOnce();
+    void batchesLargeCatalogWithoutSingleStarDispatch();
+    void batchesLargeCatalogApparentPlaceTransformsOnce();
     void batchesTopocentricApparentPlaceRequestWideState();
-    void fallsBackToSingleStarPathWhenBatchReturnsNoResults();
-    void forwardsOptionsThroughCollaboratorsAndResultBuilder();
-    void bypassesApparentPlaceForGeometricSolarSystemRequests();
+    void fallsBackToSingleStarWhenBatchIsEmpty();
+    void forwardsOptionsThroughCollaboratorsAndBuilder();
+    void bypassesApparentPlaceForGeometricSolarSystem();
     void bypassesApparentPlaceForGeometricStarRequests();
     void validatesRequestsBeforeDispatchingCalculators();
     void returnsStructuredUnsupportedStatus();
@@ -624,7 +624,7 @@ void HighPrecisionEngineDispatchTests::singleBodyOverloadsShareResultsAndCaches(
     QCOMPARE(stars->callCount(), 1);
 }
 
-void HighPrecisionEngineDispatchTests::failsRequestedCorrectionsWhenApparentPlaceCalculatorIsMissing()
+void HighPrecisionEngineDispatchTests::failsRequestedCorrectionsWithoutApparentPlace()
 {
     const std::array bodies{
         HighPrecisionEngineFixture::sunBody(),
@@ -708,7 +708,7 @@ void HighPrecisionEngineDispatchTests::usesBatchStarPathForFullFrameSnapshot()
     QCOMPARE(secondSnapshot.states[2].equatorial.rightAscensionHours, 15.75);
 }
 
-void HighPrecisionEngineDispatchTests::batchesRepresentativeLargeCatalogWithoutSingleStarDispatch()
+void HighPrecisionEngineDispatchTests::batchesLargeCatalogWithoutSingleStarDispatch()
 {
     constexpr std::size_t kRepresentativeCatalogSize = 4'096U;
     std::vector<OwnGalaxyCelestialBody> bodies;
@@ -740,7 +740,7 @@ void HighPrecisionEngineDispatchTests::batchesRepresentativeLargeCatalogWithoutS
     QCOMPARE(snapshot.states.back().bodyIndex, static_cast<std::uint32_t>(kRepresentativeCatalogSize - 1U));
 }
 
-void HighPrecisionEngineDispatchTests::batchesRepresentativeLargeCatalogApparentPlaceTransformsOnce()
+void HighPrecisionEngineDispatchTests::batchesLargeCatalogApparentPlaceTransformsOnce()
 {
     constexpr std::size_t kRepresentativeCatalogSize = 4'096U;
     std::vector<OwnGalaxyCelestialBody> bodies;
@@ -812,7 +812,7 @@ void HighPrecisionEngineDispatchTests::batchesTopocentricApparentPlaceRequestWid
     QCOMPARE(snapshot.states.back().bodyIndex, static_cast<std::uint32_t>(kRepresentativeCatalogSize - 1U));
 }
 
-void HighPrecisionEngineDispatchTests::fallsBackToSingleStarPathWhenBatchReturnsNoResults()
+void HighPrecisionEngineDispatchTests::fallsBackToSingleStarWhenBatchIsEmpty()
 {
     const std::array bodies{
         HighPrecisionEngineFixture::fixedStarBody("star-a", 2.0, 10.0),
@@ -836,7 +836,7 @@ void HighPrecisionEngineDispatchTests::fallsBackToSingleStarPathWhenBatchReturns
     QCOMPARE(snapshot.states[1].equatorial.rightAscensionHours, 3.5);
 }
 
-void HighPrecisionEngineDispatchTests::forwardsOptionsThroughCollaboratorsAndResultBuilder()
+void HighPrecisionEngineDispatchTests::forwardsOptionsThroughCollaboratorsAndBuilder()
 {
     const std::array bodies{HighPrecisionEngineFixture::sunBody()};
     auto solarSystemCalculator = std::make_shared<RecordingSolarSystemCalculator>();
@@ -881,7 +881,7 @@ void HighPrecisionEngineDispatchTests::forwardsOptionsThroughCollaboratorsAndRes
     QCOMPARE(*state->metadata.estimatedAngularUncertaintyArcsec, 0.42);
 }
 
-void HighPrecisionEngineDispatchTests::bypassesApparentPlaceForGeometricSolarSystemRequests()
+void HighPrecisionEngineDispatchTests::bypassesApparentPlaceForGeometricSolarSystem()
 {
     const std::array bodies{HighPrecisionEngineFixture::sunBody()};
     auto solarSystemCalculator = std::make_shared<RecordingSolarSystemCalculator>();

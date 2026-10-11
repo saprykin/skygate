@@ -149,12 +149,12 @@ private slots:
     void simpleEngineRejectsExplicitNonUtcEpoch();
     void simpleEngineRejectsNonFiniteExplicitEpoch();
     void simpleEngineUsesExplicitUtcEpochOverStaleContext();
-    void simpleEngineConvenienceOverloadMatchesExplicitUtcRequest();
+    void simpleEngineOverloadMatchesExplicitUtcRequest();
     void simpleEngineZeroEpochRemainsContextOnly();
 #ifdef SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS
     void highPrecisionEngineUsesExplicitUtcEpoch();
     void highPrecisionEngineUsesExplicitTdbEpoch();
-    void highPrecisionEngineConvenienceOverloadBuildsUtcEpoch();
+    void highPrecisionEngineOverloadBuildsUtcEpoch();
     void highPrecisionEngineRejectsNonExplicitEpoch();
 #endif
     void constructsRequestsWithFactory();
@@ -319,7 +319,7 @@ void EphemerisRequestTimeContractTests::simpleEngineUsesExplicitUtcEpochOverStal
     );
 }
 
-void EphemerisRequestTimeContractTests::simpleEngineConvenienceOverloadMatchesExplicitUtcRequest()
+void EphemerisRequestTimeContractTests::simpleEngineOverloadMatchesExplicitUtcRequest()
 {
     const std::array<OwnGalaxyCelestialBody, 1> bodies{makeSunBody()};
     const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
@@ -458,7 +458,7 @@ void EphemerisRequestTimeContractTests::highPrecisionEngineUsesExplicitTdbEpoch(
     );
 }
 
-void EphemerisRequestTimeContractTests::highPrecisionEngineConvenienceOverloadBuildsUtcEpoch()
+void EphemerisRequestTimeContractTests::highPrecisionEngineOverloadBuildsUtcEpoch()
 {
     const std::array<OwnGalaxyCelestialBody, 1> bodies{makeFixedStarBody()};
     const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});

@@ -141,8 +141,8 @@ private slots:
     void buildsFrameAndSupportsHitTesting();
     void reusesSnapshotAcrossViewChanges();
     void highPrecisionSceneFrameUsesLeanRenderRequest();
-    void degradationReasonsOnlyExposeOutOfRangeKernelSupport();
-    void referenceOverlayContextComesFromSelectedRequestSnapshot();
+    void degradationReasonsExposeOutOfRangeKernelSupport();
+    void referenceOverlayContextUsesSelectedSnapshot();
 };
 
 void SkySceneModelFrameTests::buildsFrameAndSupportsHitTesting()
@@ -227,7 +227,7 @@ void SkySceneModelFrameTests::highPrecisionSceneFrameUsesLeanRenderRequest()
     );
 }
 
-void SkySceneModelFrameTests::degradationReasonsOnlyExposeOutOfRangeKernelSupport()
+void SkySceneModelFrameTests::degradationReasonsExposeOutOfRangeKernelSupport()
 {
     auto starCatalog = skygate::ui::tests::createTestCatalog({
         makeFixedBody("resolved", "Resolved", skygate::ephemeris::BaseCelestialBody::Kind::Star, 1.0, 0.0, 0.0),
@@ -265,7 +265,7 @@ void SkySceneModelFrameTests::degradationReasonsOnlyExposeOutOfRangeKernelSuppor
     QVERIFY(reason.contains(QStringLiteral("DE440s kernel range: 1849-12-26 to 2150-01-22")));
 }
 
-void SkySceneModelFrameTests::referenceOverlayContextComesFromSelectedRequestSnapshot()
+void SkySceneModelFrameTests::referenceOverlayContextUsesSelectedSnapshot()
 {
     auto starCatalog = skygate::ui::tests::createTestCatalog({
         makeFixedBody("resolved", "Resolved", skygate::ephemeris::BaseCelestialBody::Kind::Star, 1.0, 0.0, 0.0),

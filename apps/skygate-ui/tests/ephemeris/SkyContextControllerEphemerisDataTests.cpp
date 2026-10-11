@@ -229,10 +229,10 @@ private slots:
     void initTestCase();
     void init();
     void controllerOwnsManagerAndExposesSnapshot();
-    void controllerUpdateRefreshesRemoteManifestAndReportsProgress();
-    void controllerCatalogChangePreservesEphemerisDataSelection();
-    void controllerCatalogChangePreservesSelectedEngineConfiguration();
-    void controllerActiveDataChangePreservesSelectedEngineConfiguration();
+    void updateRefreshesRemoteManifestAndReportsProgress();
+    void catalogChangePreservesDataSelection();
+    void catalogChangePreservesEngineConfiguration();
+    void activeDataChangePreservesEngineConfiguration();
     void managerDoesNotTouchCatalogState();
 
 private:
@@ -261,7 +261,7 @@ void SkyContextControllerEphemerisDataTests::controllerOwnsManagerAndExposesSnap
     QVERIFY(controller.activeEphemerisDataSnapshot() != nullptr);
 }
 
-void SkyContextControllerEphemerisDataTests::controllerUpdateRefreshesRemoteManifestAndReportsProgress()
+void SkyContextControllerEphemerisDataTests::updateRefreshesRemoteManifestAndReportsProgress()
 {
     const QString initialKernelPath = m_settings.filePath(QStringLiteral("initial-remote-manifest-kernel.bsp"));
     const QString freshKernelPath = m_settings.filePath(QStringLiteral("fresh-remote-manifest-kernel.bsp"));
@@ -307,7 +307,7 @@ void SkyContextControllerEphemerisDataTests::controllerUpdateRefreshesRemoteMani
     );
 }
 
-void SkyContextControllerEphemerisDataTests::controllerCatalogChangePreservesEphemerisDataSelection()
+void SkyContextControllerEphemerisDataTests::catalogChangePreservesDataSelection()
 {
     const QString kernelPath = m_settings.filePath(QStringLiteral("controller-catalog-kernel.bsp"));
     const QString earthOrientationPath = m_settings.filePath(QStringLiteral("controller-catalog-eop.txt"));
@@ -345,7 +345,7 @@ void SkyContextControllerEphemerisDataTests::controllerCatalogChangePreservesEph
     QVERIFY(controller.ephemerisEngine() != nullptr);
 }
 
-void SkyContextControllerEphemerisDataTests::controllerCatalogChangePreservesSelectedEngineConfiguration()
+void SkyContextControllerEphemerisDataTests::catalogChangePreservesEngineConfiguration()
 {
     SkyContextController::InitializationOptions options;
     options.loadSettings = false;
@@ -365,7 +365,7 @@ void SkyContextControllerEphemerisDataTests::controllerCatalogChangePreservesSel
     verifyHighPrecisionOptions(*controller.ephemerisEngine());
 }
 
-void SkyContextControllerEphemerisDataTests::controllerActiveDataChangePreservesSelectedEngineConfiguration()
+void SkyContextControllerEphemerisDataTests::activeDataChangePreservesEngineConfiguration()
 {
     SkyContextController::InitializationOptions options;
     options.loadSettings = false;

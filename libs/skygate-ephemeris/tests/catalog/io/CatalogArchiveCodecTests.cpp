@@ -15,8 +15,8 @@ private slots:
     void extractsFirstCsvEntryFromZipPayloads();
     void extractsStoredCsvEntryFromZipPayloads();
     void choosesCsvEntryOverEarlierNonCsvEntry();
-    void ignoresDirectoriesAndMatchesCsvExtensionCaseInsensitively();
-    void rejectsUnsupportedCompressionAndCorruptLocalHeaders();
+    void ignoresDirectoriesAndMatchesCsvCaseInsensitively();
+    void rejectsUnsupportedCompressionAndCorruptHeaders();
     void findsEndOfCentralDirectoryWithComment();
 };
 
@@ -81,7 +81,7 @@ void CatalogArchiveCodecTests::choosesCsvEntryOverEarlierNonCsvEntry()
     QVERIFY(zipEntry->find("hip,ra,dec,mag") != std::string::npos);
 }
 
-void CatalogArchiveCodecTests::ignoresDirectoriesAndMatchesCsvExtensionCaseInsensitively()
+void CatalogArchiveCodecTests::ignoresDirectoriesAndMatchesCsvCaseInsensitively()
 {
     const std::string zipData = skygate::ephemeris::tests::makeZip({
         skygate::ephemeris::tests::ZipEntrySpec{
@@ -100,7 +100,7 @@ void CatalogArchiveCodecTests::ignoresDirectoriesAndMatchesCsvExtensionCaseInsen
     QVERIFY(zipEntry->find("8,1,2,3") != std::string::npos);
 }
 
-void CatalogArchiveCodecTests::rejectsUnsupportedCompressionAndCorruptLocalHeaders()
+void CatalogArchiveCodecTests::rejectsUnsupportedCompressionAndCorruptHeaders()
 {
     const std::string unsupportedZip = skygate::ephemeris::tests::makeZip({
         skygate::ephemeris::tests::ZipEntrySpec{

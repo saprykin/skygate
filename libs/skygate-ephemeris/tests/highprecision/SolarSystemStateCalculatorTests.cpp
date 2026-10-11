@@ -237,20 +237,20 @@ class SolarSystemStateCalculatorTests final : public QObject {
 
 private slots:
     void computesGeometricRaDecFromKernelVector();
-    void computesGeometricRaDecAgainstSelfDerivedSmokeFixture();
+    void computesGeometricRaDecAgainstSmokeFixture();
     void mapsSupportedBodiesToNaifIds();
-    void fallsBackToPlanetarySystemBarycenterWhenBodyCenterIsMissing();
+    void fallsBackToBarycenterWhenBodyCenterMissing();
     void prefersPlanetarySystemBarycenterWhenConfigured();
-    void usesAvailableBodyCentersWhenBarycenterPreferenceConfigured();
-    void appliesLightTimeCorrectionFromRetardedTargetAndReceiveEarth();
+    void usesBodyCentersWhenBarycenterPreferred();
+    void appliesLightTimeFromRetardedTargetAndEarth();
     void computesLightTimeRaDecAgainstHorizonsFixture();
-    void reportsUnavailableLightTimeInputsWithoutDroppingGeometricResult();
+    void unavailableLightTimeInputsKeepGeometric();
     void appliesStellarAberrationFromEarthVelocity();
     void skipsStellarAberrationWhenDisabled();
-    void reportsUnavailableStellarAberrationInputsWithoutDroppingGeometricResult();
+    void unavailableStellarAberrationInputsKeepGeometric();
     void appliesSolarGravitationalLightDeflection();
-    void skipsSolarGravitationalLightDeflectionWhenDisabled();
-    void reportsUnavailableSolarDeflectionInputsWithoutDroppingGeometricResult();
+    void skipsSolarGravitationalDeflectionWhenDisabled();
+    void unavailableSolarDeflectionInputsKeepGeometric();
     void reportsUnsupportedPlanetIdsWithoutCallingKernel();
     void reportsMissingKernelProvider();
     void propagatesOutOfRangeKernelStatus();
@@ -288,7 +288,7 @@ void SolarSystemStateCalculatorTests::computesGeometricRaDecFromKernelVector()
     QVERIFY(result.metadata.dataSourceProvenance == std::string{"Horizons ICRF geometric fixture"});
 }
 
-void SolarSystemStateCalculatorTests::computesGeometricRaDecAgainstSelfDerivedSmokeFixture()
+void SolarSystemStateCalculatorTests::computesGeometricRaDecAgainstSmokeFixture()
 {
     const GeometricFixture fixture = loadSmokeFixture();
     const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
@@ -343,7 +343,7 @@ void SolarSystemStateCalculatorTests::mapsSupportedBodiesToNaifIds()
     }
 }
 
-void SolarSystemStateCalculatorTests::fallsBackToPlanetarySystemBarycenterWhenBodyCenterIsMissing()
+void SolarSystemStateCalculatorTests::fallsBackToBarycenterWhenBodyCenterMissing()
 {
     const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
     ICalcephKernel::StateResult missingBodyCenter;
@@ -392,7 +392,7 @@ void SolarSystemStateCalculatorTests::prefersPlanetarySystemBarycenterWhenConfig
     QVERIFY(result.metadata.dataSourceProvenance == std::string{"Horizons ICRF geometric fixture"});
 }
 
-void SolarSystemStateCalculatorTests::usesAvailableBodyCentersWhenBarycenterPreferenceConfigured()
+void SolarSystemStateCalculatorTests::usesBodyCentersWhenBarycenterPreferred()
 {
     struct Case {
         std::string_view id;
@@ -425,7 +425,7 @@ void SolarSystemStateCalculatorTests::usesAvailableBodyCentersWhenBarycenterPref
     }
 }
 
-void SolarSystemStateCalculatorTests::appliesLightTimeCorrectionFromRetardedTargetAndReceiveEarth()
+void SolarSystemStateCalculatorTests::appliesLightTimeFromRetardedTargetAndEarth()
 {
     const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
     provider->response(499, 399) = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
@@ -514,7 +514,7 @@ void SolarSystemStateCalculatorTests::computesLightTimeRaDecAgainstHorizonsFixtu
     );
 }
 
-void SolarSystemStateCalculatorTests::reportsUnavailableLightTimeInputsWithoutDroppingGeometricResult()
+void SolarSystemStateCalculatorTests::unavailableLightTimeInputsKeepGeometric()
 {
     const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
     provider->response(499, 399) = makeKernelVector({.x = 0.0, .y = 1.0, .z = 0.0});
@@ -595,7 +595,7 @@ void SolarSystemStateCalculatorTests::skipsStellarAberrationWhenDisabled()
     ));
 }
 
-void SolarSystemStateCalculatorTests::reportsUnavailableStellarAberrationInputsWithoutDroppingGeometricResult()
+void SolarSystemStateCalculatorTests::unavailableStellarAberrationInputsKeepGeometric()
 {
     const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
     provider->response(499, 399) = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
@@ -649,7 +649,7 @@ void SolarSystemStateCalculatorTests::appliesSolarGravitationalLightDeflection()
     );
 }
 
-void SolarSystemStateCalculatorTests::skipsSolarGravitationalLightDeflectionWhenDisabled()
+void SolarSystemStateCalculatorTests::skipsSolarGravitationalDeflectionWhenDisabled()
 {
     const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
     provider->response(499, 399) = makeKernelVector({.x = std::cos(0.1), .y = std::sin(0.1), .z = 0.0});
@@ -665,7 +665,7 @@ void SolarSystemStateCalculatorTests::skipsSolarGravitationalLightDeflectionWhen
     ));
 }
 
-void SolarSystemStateCalculatorTests::reportsUnavailableSolarDeflectionInputsWithoutDroppingGeometricResult()
+void SolarSystemStateCalculatorTests::unavailableSolarDeflectionInputsKeepGeometric()
 {
     const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
     provider->response(499, 399) = makeKernelVector({.x = 0.0, .y = 1.0, .z = 0.0});

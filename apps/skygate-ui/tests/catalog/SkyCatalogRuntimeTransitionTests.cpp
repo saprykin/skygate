@@ -77,16 +77,16 @@ class SkyCatalogRuntimeTransitionTests final : public QObject {
 
 private slots:
     void initializeBuildsActiveCatalogAndExposesSources();
-    void nullCatalogPreservesLastGoodStateAndReportsFailure();
+    void nullCatalogKeepsLastGoodStateAndReportsFailure();
     void rejectedCollectionPreservesLastGoodState();
-    void failedTransitionKeepsResolvedReferencesAndRevision();
+    void failedTransitionKeepsResolvedRefsAndRevision();
     void successfulTransitionsPublishAlignedState();
-    void sourcesLoadReplaceEnableDisableAndRemoveIndependently();
+    void sourcesLoadReplaceToggleAndRemoveIndependently();
     void moveSourceReordersAndClampsTarget();
     void provenanceKeepsStableIdentitiesBeyondByteRange();
-    void identicalTitlesStayDistinctAndTitleChangesKeepIdentity();
+    void titleChangesKeepIdentityWhileTitlesStayDistinct();
     void initialActivationInstallsFirstUseDefaultSource();
-    void removingSoleConfiguredSourceLeavesEmptyConfiguration();
+    void removingSoleSourceLeavesEmptyConfiguration();
     void emptyReplacementDoesNotRecreateConfiguredSource();
 
 private:
@@ -127,7 +127,7 @@ void SkyCatalogRuntimeTransitionTests::initializeBuildsActiveCatalogAndExposesSo
     QVERIFY(sources[0].catalog != nullptr);
 }
 
-void SkyCatalogRuntimeTransitionTests::nullCatalogPreservesLastGoodStateAndReportsFailure()
+void SkyCatalogRuntimeTransitionTests::nullCatalogKeepsLastGoodStateAndReportsFailure()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(CatalogRuntimeFixture::makeCatalog());
     QVERIFY(runtime.initialize({}).succeeded);
@@ -313,7 +313,7 @@ void SkyCatalogRuntimeTransitionTests::rejectedCollectionPreservesLastGoodState(
     QCOMPARE(runtime.catalogRevision(), revisionBefore);
 }
 
-void SkyCatalogRuntimeTransitionTests::failedTransitionKeepsResolvedReferencesAndRevision()
+void SkyCatalogRuntimeTransitionTests::failedTransitionKeepsResolvedRefsAndRevision()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(CatalogRuntimeFixture::makeCrossIdentifiedCatalog());
     QVERIFY(runtime.initialize({}).succeeded);
@@ -492,7 +492,7 @@ void SkyCatalogRuntimeTransitionTests::successfulTransitionsPublishAlignedState(
     expectConsistentPublication(runtime);
 }
 
-void SkyCatalogRuntimeTransitionTests::sourcesLoadReplaceEnableDisableAndRemoveIndependently()
+void SkyCatalogRuntimeTransitionTests::sourcesLoadReplaceToggleAndRemoveIndependently()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(CatalogRuntimeFixture::makeCatalog());
     static_cast<void>(runtime.initialize({}));
@@ -694,7 +694,7 @@ void SkyCatalogRuntimeTransitionTests::provenanceKeepsStableIdentitiesBeyondByte
     QVERIFY(sawLast);
 }
 
-void SkyCatalogRuntimeTransitionTests::identicalTitlesStayDistinctAndTitleChangesKeepIdentity()
+void SkyCatalogRuntimeTransitionTests::titleChangesKeepIdentityWhileTitlesStayDistinct()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(CatalogRuntimeFixture::makeCatalog());
     static_cast<void>(runtime.initialize({}));
@@ -764,7 +764,7 @@ void SkyCatalogRuntimeTransitionTests::initialActivationInstallsFirstUseDefaultS
     QVERIFY(runtime.sourceInstanceIds().isEmpty());
 }
 
-void SkyCatalogRuntimeTransitionTests::removingSoleConfiguredSourceLeavesEmptyConfiguration()
+void SkyCatalogRuntimeTransitionTests::removingSoleSourceLeavesEmptyConfiguration()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(CatalogRuntimeFixture::makeCatalog());
     const skygate::ui::internal::SkyCatalogRuntimeBuildOptions options{};

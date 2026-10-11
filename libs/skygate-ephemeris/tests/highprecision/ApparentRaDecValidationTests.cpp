@@ -205,10 +205,10 @@ class ApparentRaDecValidationTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void computesGeocentricApparentRaDecAgainstHorizonsFixture();
+    void geocentricApparentRaDecAgainstHorizonsFixture();
 };
 
-void ApparentRaDecValidationTests::computesGeocentricApparentRaDecAgainstHorizonsFixture()
+void ApparentRaDecValidationTests::geocentricApparentRaDecAgainstHorizonsFixture()
 {
     QString errorText;
     const std::optional<ApparentValidationFixture> loadedFixture = loadApparentValidationFixture(&errorText);

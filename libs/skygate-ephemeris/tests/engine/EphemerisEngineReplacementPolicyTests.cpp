@@ -42,16 +42,16 @@ class EphemerisEngineReplacementPolicyTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void keepsCurrentHighPrecisionEngineWhenRebuildFallsBackToSimple();
+    void keepsCurrentHighPrecisionWhenRebuildFallsBack();
     void replacesCurrentEngineForNonFallbackResults();
-    void replacesCurrentEngineWhenRequestedKindIsNotHighPrecision();
-    void replacesCurrentEngineWhenCurrentKindIsNotHighPrecision();
-    void keepsCurrentNonEnumeratedEngineWhenRebuildFallsBack();
-    void replacesCurrentEngineWhenFallbackRequestedKindDiffersFromCurrent();
-    void replacesCurrentNonEnumeratedEngineForNonFallbackResult();
+    void replacesCurrentEngineForSimpleRequestedKind();
+    void replacesCurrentEngineForSimpleCurrentKind();
+    void keepsCurrentNonEnumeratedWhenRebuildFallsBack();
+    void replacesCurrentEngineForDifferentFallbackKind();
+    void replacesNonEnumeratedEngineForNonFallbackResult();
 };
 
-void EphemerisEngineReplacementPolicyTests::keepsCurrentHighPrecisionEngineWhenRebuildFallsBackToSimple()
+void EphemerisEngineReplacementPolicyTests::keepsCurrentHighPrecisionWhenRebuildFallsBack()
 {
     const EphemerisEngineFactoryResult fallbackResult =
         makeSimpleFallbackResult(EphemerisEngineKind::Type::HighPrecision);
@@ -82,7 +82,7 @@ void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineForNonFallbackR
     ));
 }
 
-void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineWhenRequestedKindIsNotHighPrecision()
+void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineForSimpleRequestedKind()
 {
     const EphemerisEngineFactoryResult fallbackResult = makeSimpleFallbackResult(EphemerisEngineKind::Type::Simple);
 
@@ -91,7 +91,7 @@ void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineWhenRequestedKi
     ));
 }
 
-void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineWhenCurrentKindIsNotHighPrecision()
+void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineForSimpleCurrentKind()
 {
     const EphemerisEngineFactoryResult fallbackResult =
         makeSimpleFallbackResult(EphemerisEngineKind::Type::HighPrecision);
@@ -101,7 +101,7 @@ void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineWhenCurrentKind
     ));
 }
 
-void EphemerisEngineReplacementPolicyTests::keepsCurrentNonEnumeratedEngineWhenRebuildFallsBack()
+void EphemerisEngineReplacementPolicyTests::keepsCurrentNonEnumeratedWhenRebuildFallsBack()
 {
     const EphemerisEngineFactoryResult fallbackResult = makeSimpleFallbackResult(kNonEnumeratedEngineKind);
     QVERIFY(fallbackResult.usedSimpleEngineFallback());
@@ -113,7 +113,7 @@ void EphemerisEngineReplacementPolicyTests::keepsCurrentNonEnumeratedEngineWhenR
     );
 }
 
-void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineWhenFallbackRequestedKindDiffersFromCurrent()
+void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineForDifferentFallbackKind()
 {
     const EphemerisEngineFactoryResult fallbackResult = makeSimpleFallbackResult(kNonEnumeratedEngineKind);
 
@@ -122,7 +122,7 @@ void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineWhenFallbackReq
     ));
 }
 
-void EphemerisEngineReplacementPolicyTests::replacesCurrentNonEnumeratedEngineForNonFallbackResult()
+void EphemerisEngineReplacementPolicyTests::replacesNonEnumeratedEngineForNonFallbackResult()
 {
     const EphemerisEngineFactoryResult requestedResult = makeRequestedEngineResult(kNonEnumeratedEngineKind);
 

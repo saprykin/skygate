@@ -280,15 +280,15 @@ class HighPrecisionResultBuilderTests final : public QObject {
 
 private slots:
     void defaultResultBuilderAssemblesValidMetadata();
-    void defaultResultBuilderTracksRequestedAppliedSkippedAndUnavailableCorrections();
-    void defaultResultBuilderTurnsOutOfRangeFallbackIntoDegradedResult();
-    void defaultResultBuilderPreservesOutOfRangeWithoutFallback();
-    void defaultResultBuilderPreservesFailedResultsWithoutFallback();
-    void defaultResultBuilderPreservesDegradedDataWarnings();
-    void defaultResultBuilderAssemblesMissingLongRangeKernelFallback();
-    void defaultResultBuilderAssemblesStaleEarthOrientationWarnings();
-    void defaultResultBuilderAssemblesStaleLeapSecondWarnings();
-    void defaultResultBuilderAssemblesAncientDeltaTFallbackWarnings();
+    void defaultResultBuilderTracksCorrectionOutcomes();
+    void defaultResultBuilderDegradesOutOfRangeFallback();
+    void defaultResultBuilderKeepsOutOfRangeNoFallback();
+    void defaultResultBuilderKeepsFailedWithoutFallback();
+    void defaultResultBuilderKeepsDegradedDataWarnings();
+    void defaultResultBuilderAssemblesLongRangeFallback();
+    void defaultResultBuilderStaleOrientationWarnings();
+    void defaultResultBuilderStaleLeapSecondWarnings();
+    void defaultResultBuilderAncientDeltaTWarnings();
 };
 
 void HighPrecisionResultBuilderTests::defaultResultBuilderAssemblesValidMetadata()
@@ -347,7 +347,7 @@ void HighPrecisionResultBuilderTests::defaultResultBuilderAssemblesValidMetadata
     );
 }
 
-void HighPrecisionResultBuilderTests::defaultResultBuilderTracksRequestedAppliedSkippedAndUnavailableCorrections()
+void HighPrecisionResultBuilderTests::defaultResultBuilderTracksCorrectionOutcomes()
 {
     HighPrecisionCalculatorResult calculatorResult;
     calculatorResult.equatorial = EquatorialCoordinate{
@@ -405,7 +405,7 @@ void HighPrecisionResultBuilderTests::defaultResultBuilderTracksRequestedApplied
     QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
 }
 
-void HighPrecisionResultBuilderTests::defaultResultBuilderTurnsOutOfRangeFallbackIntoDegradedResult()
+void HighPrecisionResultBuilderTests::defaultResultBuilderDegradesOutOfRangeFallback()
 {
     HighPrecisionCalculatorResult calculatorResult;
     calculatorResult.equatorial = EquatorialCoordinate{
@@ -439,7 +439,7 @@ void HighPrecisionResultBuilderTests::defaultResultBuilderTurnsOutOfRangeFallbac
     QCOMPARE(state->equatorial.declinationDeg, -7.0);
 }
 
-void HighPrecisionResultBuilderTests::defaultResultBuilderPreservesOutOfRangeWithoutFallback()
+void HighPrecisionResultBuilderTests::defaultResultBuilderKeepsOutOfRangeNoFallback()
 {
     HighPrecisionCalculatorResult calculatorResult;
     calculatorResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
@@ -472,7 +472,7 @@ void HighPrecisionResultBuilderTests::defaultResultBuilderPreservesOutOfRangeWit
     QVERIFY(std::isnan(state->equatorial.declinationDeg));
 }
 
-void HighPrecisionResultBuilderTests::defaultResultBuilderPreservesFailedResultsWithoutFallback()
+void HighPrecisionResultBuilderTests::defaultResultBuilderKeepsFailedWithoutFallback()
 {
     HighPrecisionCalculatorResult calculatorResult;
     calculatorResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
@@ -502,7 +502,7 @@ void HighPrecisionResultBuilderTests::defaultResultBuilderPreservesFailedResults
     QVERIFY(std::isnan(state->equatorial.rightAscensionHours));
 }
 
-void HighPrecisionResultBuilderTests::defaultResultBuilderPreservesDegradedDataWarnings()
+void HighPrecisionResultBuilderTests::defaultResultBuilderKeepsDegradedDataWarnings()
 {
     HighPrecisionCalculatorResult calculatorResult;
     calculatorResult.equatorial = EquatorialCoordinate{
@@ -540,7 +540,7 @@ void HighPrecisionResultBuilderTests::defaultResultBuilderPreservesDegradedDataW
     QCOMPARE(state->equatorial.declinationDeg, 9.0);
 }
 
-void HighPrecisionResultBuilderTests::defaultResultBuilderAssemblesMissingLongRangeKernelFallback()
+void HighPrecisionResultBuilderTests::defaultResultBuilderAssemblesLongRangeFallback()
 {
     const std::array bodies{HighPrecisionEngineFixture::sunBody()};
     auto kernel = HighPrecisionEngineFixture::longRangeFallbackKernel();
@@ -582,7 +582,7 @@ void HighPrecisionResultBuilderTests::defaultResultBuilderAssemblesMissingLongRa
     QVERIFY(std::isfinite(state->equatorial.declinationDeg));
 }
 
-void HighPrecisionResultBuilderTests::defaultResultBuilderAssemblesStaleEarthOrientationWarnings()
+void HighPrecisionResultBuilderTests::defaultResultBuilderStaleOrientationWarnings()
 {
     const std::array bodies{HighPrecisionEngineFixture::sunBody()};
     auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(makeApparentPipelineInputResult());
@@ -630,7 +630,7 @@ void HighPrecisionResultBuilderTests::defaultResultBuilderAssemblesStaleEarthOri
     QVERIFY(std::isfinite(state->horizontal.azimuthDeg));
 }
 
-void HighPrecisionResultBuilderTests::defaultResultBuilderAssemblesStaleLeapSecondWarnings()
+void HighPrecisionResultBuilderTests::defaultResultBuilderStaleLeapSecondWarnings()
 {
     const std::array bodies{HighPrecisionEngineFixture::sunBody()};
     auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(makeApparentPipelineInputResult());
@@ -665,7 +665,7 @@ void HighPrecisionResultBuilderTests::defaultResultBuilderAssemblesStaleLeapSeco
     QVERIFY(std::isfinite(state->equatorial.declinationDeg));
 }
 
-void HighPrecisionResultBuilderTests::defaultResultBuilderAssemblesAncientDeltaTFallbackWarnings()
+void HighPrecisionResultBuilderTests::defaultResultBuilderAncientDeltaTWarnings()
 {
     const std::array bodies{HighPrecisionEngineFixture::sunBody()};
     auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(makeApparentPipelineInputResult());

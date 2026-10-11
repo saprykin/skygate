@@ -92,7 +92,7 @@ private slots:
     void installedDataStatusAndSnapshot();
     void legacyShortRangeProfileIdRestoresAsDe440sProfile();
     void missingInstalledDataFallsBackToBundled();
-    void unbundledProductionManifestDoesNotExposeMissingFallbackFiles();
+    void unbundledProductionOmitsMissingFallbackFiles();
     void revisionSignalEmitsOnlyWhenActiveDataChanges();
 
 private:
@@ -249,7 +249,7 @@ void SkyEphemerisDataStatusTests::missingInstalledDataFallsBackToBundled()
     QVERIFY(manager.activeDataSnapshot() != nullptr);
 }
 
-void SkyEphemerisDataStatusTests::unbundledProductionManifestDoesNotExposeMissingFallbackFiles()
+void SkyEphemerisDataStatusTests::unbundledProductionOmitsMissingFallbackFiles()
 {
     const skygate::ephemeris::EphemerisDataManifest manifest = loadProductionManifest();
     SkySettingsStore store;

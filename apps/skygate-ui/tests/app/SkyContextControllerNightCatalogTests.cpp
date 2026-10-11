@@ -215,7 +215,7 @@ class SkyContextControllerNightCatalogTests final : public QObject {
 private slots:
     void initTestCase();
     void init();
-    void nightConditionsPopulateAndRefreshForValidObserver();
+    void nightConditionsPopulateAndRefreshForObserver();
     void nightConditionsUseSelectedEngineRequest();
     void failedDeepSkyCatalogDownloadKeepsCountLabel();
     void restoresCachedCatalogConstellationCount();
@@ -234,7 +234,7 @@ void SkyContextControllerNightCatalogTests::init()
     m_settings.resetForCurrentTest();
 }
 
-void SkyContextControllerNightCatalogTests::nightConditionsPopulateAndRefreshForValidObserver()
+void SkyContextControllerNightCatalogTests::nightConditionsPopulateAndRefreshForObserver()
 {
     const auto controller = createController();
     configureFocusTestContext(*controller);

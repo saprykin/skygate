@@ -35,16 +35,16 @@ private slots:
     void initTestCase();
     void init();
     void customDeepSkyDownloadUsesGenericSourceLabel();
-    void localCatalogDownloadTogglesBusyProcessingAndAppliesCatalog();
+    void localDownloadTogglesBusyAndAppliesCatalog();
     void cancelCatalogDownloadClearsBusyAndIgnoresResult();
-    void failedLocalCatalogDownloadClearsBusyAndReportsStatus();
-    void failedCollectionLoadPreservesPriorDataAndRetrySucceeds();
-    void failedUpdateKeepsAcceptedSourceFactsWhenPersisting();
-    void acceptedSourceFactsSurviveRestartAfterFailedUpdate();
+    void failedLocalDownloadClearsBusyAndReportsStatus();
+    void failedLoadPreservesPriorDataAndRetrySucceeds();
+    void failedUpdateKeepsAcceptedFactsWhenPersisting();
+    void acceptedFactsSurviveRestartAfterFailedUpdate();
     void successfulRetryInstallsUpdateFactsTogether();
     void canceledUpdateKeepsAcceptedSourceFacts();
     void parseFailedUpdateKeepsAcceptedSourceFacts();
-    void rejectedCompositionAfterParsedUpdateKeepsAcceptedSourceFacts();
+    void rejectedParsedUpdateKeepsAcceptedSourceFacts();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -85,7 +85,7 @@ void SkyCatalogManagerImportTests::customDeepSkyDownloadUsesGenericSourceLabel()
     QVERIFY(!manager.statusText().contains(QStringLiteral("OpenNGC")));
 }
 
-void SkyCatalogManagerImportTests::localCatalogDownloadTogglesBusyProcessingAndAppliesCatalog()
+void SkyCatalogManagerImportTests::localDownloadTogglesBusyAndAppliesCatalog()
 {
     const QString catalogPath = m_settings.filePath(QStringLiteral("manager-local-stars.csv"));
     QVERIFY(
@@ -164,7 +164,7 @@ void SkyCatalogManagerImportTests::cancelCatalogDownloadClearsBusyAndIgnoresResu
     QCOMPARE(catalogSpy.count(), 0);
 }
 
-void SkyCatalogManagerImportTests::failedLocalCatalogDownloadClearsBusyAndReportsStatus()
+void SkyCatalogManagerImportTests::failedLocalDownloadClearsBusyAndReportsStatus()
 {
     const QString missingCatalogUrl =
         QUrl::fromLocalFile(m_settings.filePath(QStringLiteral("missing-stars.csv"))).toString();
@@ -190,7 +190,7 @@ void SkyCatalogManagerImportTests::failedLocalCatalogDownloadClearsBusyAndReport
     QCOMPARE(catalogSpy.count(), 0);
 }
 
-void SkyCatalogManagerImportTests::failedCollectionLoadPreservesPriorDataAndRetrySucceeds()
+void SkyCatalogManagerImportTests::failedLoadPreservesPriorDataAndRetrySucceeds()
 {
     SkySettingsStore store;
     SkyCatalogManager manager(&store);
@@ -280,7 +280,7 @@ void SkyCatalogManagerImportTests::failedCollectionLoadPreservesPriorDataAndRetr
 // An update attempt that never becomes active must not become the source's
 // configurable facts: the still-active source keeps its accepted descriptor,
 // parse contract, and payload, and ordinary persistence serializes only those.
-void SkyCatalogManagerImportTests::failedUpdateKeepsAcceptedSourceFactsWhenPersisting()
+void SkyCatalogManagerImportTests::failedUpdateKeepsAcceptedFactsWhenPersisting()
 {
     const QString acceptedUrl = QStringLiteral("https://example.test/accepted-archive.zip");
     const QString rejectedUrl = QStringLiteral("https://example.test/rejected-archive.zip");
@@ -385,7 +385,7 @@ void SkyCatalogManagerImportTests::failedUpdateKeepsAcceptedSourceFactsWhenPersi
     QCOMPARE(recordAfterRetry->payload, acceptedPayload);
 }
 
-void SkyCatalogManagerImportTests::acceptedSourceFactsSurviveRestartAfterFailedUpdate()
+void SkyCatalogManagerImportTests::acceptedFactsSurviveRestartAfterFailedUpdate()
 {
     const QString cacheDirectory = m_settings.filePath(QStringLiteral("failed-update-restart-cache"));
     QDir(cacheDirectory).removeRecursively();
@@ -709,7 +709,7 @@ void SkyCatalogManagerImportTests::parseFailedUpdateKeepsAcceptedSourceFacts()
     );
 }
 
-void SkyCatalogManagerImportTests::rejectedCompositionAfterParsedUpdateKeepsAcceptedSourceFacts()
+void SkyCatalogManagerImportTests::rejectedParsedUpdateKeepsAcceptedSourceFacts()
 {
     const QString acceptedUrl = QStringLiteral("https://example.test/composition-accepted.csv");
     const QString updateUrl = QStringLiteral("https://example.test/composition-update.csv");

@@ -29,19 +29,19 @@ class CatalogModelSelectionTests final : public QObject {
 
 private slots:
     void keepsWinnerCoordinatesOverConflictingAstrometry();
-    void rejectsLosingAstrometryThatContradictsTheWinningFixedPosition();
-    void keepsOneCoherentCoordinateModelWhenConflictingSourcesAreReordered();
-    void adoptsCompatibleLosingAstrometryForAFixedPositionWinner();
-    void fillsMissingAstrometryFieldsAcrossCompatibleEpochs();
-    void fillsMissingAstrometryFieldsFromAnUndeclaredEpoch();
-    void rejectsLosingAstrometryThatDisagreesAfterEpochConversion();
-    void rejectsLosingFixedCoordinatesThatContradictWinningAstrometry();
+    void rejectsLosingAstrometryContradictingFixedWinner();
+    void keepsOneCoherentModelWhenSourcesAreReordered();
+    void adoptsCompatibleAstrometryForFixedWinner();
+    void fillsMissingAstrometryAcrossCompatibleEpochs();
+    void fillsMissingAstrometryFromUndeclaredEpoch();
+    void rejectsLosingAstrometryAfterEpochConversion();
+    void rejectsFixedCoordinatesContradictingAstrometry();
     void earliestRowModelWinsAcrossALocalBridge();
-    void ordinaryDuplicateRowsKeepTheFirstRowsCoherentModel();
+    void ordinaryDuplicateRowsKeepFirstCoherentModel();
     void reversedRowsAndALocalBridgeKeepTheFirstRowsModel();
-    void referenceOnlyAstrometryAnchorsTheEarliestRowModel();
-    void epochCompatibilityDecidesTheOptionalFieldsOfTheEarliestModel();
-    void adoptsAContradictoryDonorsFixedPositionWithoutItsAstrometry();
+    void referenceOnlyAstrometryAnchorsEarliestModel();
+    void epochCompatibilityDecidesEarliestModelFields();
+    void adoptsDonorsFixedPositionWithoutItsAstrometry();
 };
 
 void CatalogModelSelectionTests::keepsWinnerCoordinatesOverConflictingAstrometry()
@@ -67,7 +67,7 @@ void CatalogModelSelectionTests::keepsWinnerCoordinatesOverConflictingAstrometry
     QCOMPARE(merged->fixedEquatorialValue()->declinationDeg, 2.0);
 }
 
-void CatalogModelSelectionTests::rejectsLosingAstrometryThatContradictsTheWinningFixedPosition()
+void CatalogModelSelectionTests::rejectsLosingAstrometryContradictingFixedWinner()
 {
     // The earlier source places the shared HIP 1 object at RA 1 with
     // astrometry at the same default reference epoch. The later source fixes
@@ -113,7 +113,7 @@ void CatalogModelSelectionTests::rejectsLosingAstrometryThatContradictsTheWinnin
     QVERIFY(!winner->starAstrometryValue().has_value());
 }
 
-void CatalogModelSelectionTests::keepsOneCoherentCoordinateModelWhenConflictingSourcesAreReordered()
+void CatalogModelSelectionTests::keepsOneCoherentModelWhenSourcesAreReordered()
 {
     // The same two records in the opposite collection order: the later source
     // now owns the coherent fixed plus astrometry model, so it wins whole and
@@ -155,7 +155,7 @@ void CatalogModelSelectionTests::keepsOneCoherentCoordinateModelWhenConflictingS
     QCOMPARE(*winner->starAstrometryValue()->properMotionRightAscensionMasPerYear, 125.0);
 }
 
-void CatalogModelSelectionTests::adoptsCompatibleLosingAstrometryForAFixedPositionWinner()
+void CatalogModelSelectionTests::adoptsCompatibleAstrometryForFixedWinner()
 {
     // The winner's fixed position and the losing reference position agree, so
     // the losing astrometry enriches the survivor instead of being dropped.
@@ -212,7 +212,7 @@ void CatalogModelSelectionTests::adoptsCompatibleLosingAstrometryForAFixedPositi
     QCOMPARE(QString::fromStdString(astrometry.validityRange->id), QStringLiteral("donor-validity"));
 }
 
-void CatalogModelSelectionTests::fillsMissingAstrometryFieldsAcrossCompatibleEpochs()
+void CatalogModelSelectionTests::fillsMissingAstrometryAcrossCompatibleEpochs()
 {
     // The donor reference position lies 50 years of proper motion away from the
     // winner reference position, expressed in the catalog's mas/year units.
@@ -287,7 +287,7 @@ void CatalogModelSelectionTests::fillsMissingAstrometryFieldsAcrossCompatibleEpo
     QCOMPARE(QString::fromStdString(astrometry.validityRange->id), QStringLiteral("donor-validity"));
 }
 
-void CatalogModelSelectionTests::fillsMissingAstrometryFieldsFromAnUndeclaredEpoch()
+void CatalogModelSelectionTests::fillsMissingAstrometryFromUndeclaredEpoch()
 {
     // A reference position that declares no epoch claims the same epoch as the
     // winner's declared reference epoch, so no epoch conversion applies and
@@ -327,7 +327,7 @@ void CatalogModelSelectionTests::fillsMissingAstrometryFieldsFromAnUndeclaredEpo
     QCOMPARE(*astrometry.radialVelocityKmPerSecond, -3.0);
 }
 
-void CatalogModelSelectionTests::rejectsLosingAstrometryThatDisagreesAfterEpochConversion()
+void CatalogModelSelectionTests::rejectsLosingAstrometryAfterEpochConversion()
 {
     // Same epoch gap and reference offset as the compatible case, but the
     // losing proper motion is twice the rate the offset implies. The epoch
@@ -397,7 +397,7 @@ void CatalogModelSelectionTests::rejectsLosingAstrometryThatDisagreesAfterEpochC
     QVERIFY(!astrometry.validityRange.has_value());
 }
 
-void CatalogModelSelectionTests::rejectsLosingFixedCoordinatesThatContradictWinningAstrometry()
+void CatalogModelSelectionTests::rejectsFixedCoordinatesContradictingAstrometry()
 {
     // The winner (later source) carries astrometry at RA 1 and no fixed
     // position. The losing record's fixed position at RA 10 is unrelated, so it
@@ -501,7 +501,7 @@ void CatalogModelSelectionTests::earliestRowModelWinsAcrossALocalBridge()
     );
 }
 
-void CatalogModelSelectionTests::ordinaryDuplicateRowsKeepTheFirstRowsCoherentModel()
+void CatalogModelSelectionTests::ordinaryDuplicateRowsKeepFirstCoherentModel()
 {
     // Two rows of one source place the object at RA 1 and RA 5 with internally
     // consistent models. The first row is authoritative within its source, so
@@ -603,7 +603,7 @@ void CatalogModelSelectionTests::reversedRowsAndALocalBridgeKeepTheFirstRowsMode
     QCOMPARE(survivor->starAstrometryValue()->referenceEquatorial.declinationDeg, 2.0);
 }
 
-void CatalogModelSelectionTests::referenceOnlyAstrometryAnchorsTheEarliestRowModel()
+void CatalogModelSelectionTests::referenceOnlyAstrometryAnchorsEarliestModel()
 {
     // The first two rows carry only a reference position and epoch, with no
     // fixed position and no optional fields, while the bridge carries a full
@@ -676,7 +676,7 @@ void CatalogModelSelectionTests::referenceOnlyAstrometryAnchorsTheEarliestRowMod
     QCOMPARE(*astrometry.stellarParallaxMas, 5.0);
 }
 
-void CatalogModelSelectionTests::epochCompatibilityDecidesTheOptionalFieldsOfTheEarliestModel()
+void CatalogModelSelectionTests::epochCompatibilityDecidesEarliestModelFields()
 {
     // The earliest row anchors the model at RA 1 with a declared epoch, and
     // the second row declares the same direction 50 years later through its
@@ -816,7 +816,7 @@ void CatalogModelSelectionTests::epochCompatibilityDecidesTheOptionalFieldsOfThe
     QVERIFY(!incompatibleAstrometry.stellarParallaxMas.has_value());
 }
 
-void CatalogModelSelectionTests::adoptsAContradictoryDonorsFixedPositionWithoutItsAstrometry()
+void CatalogModelSelectionTests::adoptsDonorsFixedPositionWithoutItsAstrometry()
 {
     // The donor row fixes the object at RA 1 while its own astrometry anchors
     // it at RA 5. The bridge row carries no model of its own, so it adopts the

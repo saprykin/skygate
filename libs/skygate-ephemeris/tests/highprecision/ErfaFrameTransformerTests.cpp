@@ -244,21 +244,21 @@ private slots:
     void returnsEmptyResultsForEmptyVectorBatch();
     void preservesBatchResultOrder();
     void usesTimeScaleServiceForNonTtEpochs();
-    void reportsMissingTimeScaleServiceForNonTtCirsTransforms();
-    void rejectsUnsupportedTrueEquatorAndEquinoxTerrestrialTransforms();
+    void missingTimeScaleServiceForNonTtCirsTransforms();
+    void rejectsTrueEquatorAndEquinoxTransforms();
     void transformsCirsToTirsAgainstSofaReference();
     void transformsTirsToItrsAgainstSofaReference();
     void transformsGcrsToItrsAgainstSofaReference();
     void recordsPerStageMetadataForComposedTransforms();
     void reusesTimeScaleConversionsAcrossComposedStages();
-    void reusesEarthOrientationSampleAcrossComposedTerrestrialStages();
+    void reusesEarthOrientationSampleAcrossStages();
     void preservesIcrsSourceFrameInComposedStageMetadata();
     void preservesIcrsTargetFrameInComposedStageMetadata();
-    void recordsUnavailableStageWhenTransformCannotBeComputed();
-    void acceptsItrsTransformWithPredictedEarthOrientationData();
-    void degradesItrsTransformForStaleEarthOrientationData();
-    void degradesItrsTransformForEstimatedEarthOrientationData();
-    void degradesItrsTransformForMissingEarthOrientationData();
+    void recordsUnavailableStageWhenTransformFails();
+    void acceptsItrsTransformWithPredictedOrientation();
+    void degradesItrsTransformForStaleOrientation();
+    void degradesItrsTransformForEstimatedOrientation();
+    void degradesItrsTransformForMissingOrientation();
 };
 
 void ErfaFrameTransformerTests::transformsGcrsToCirsAgainstSofaReference()
@@ -430,7 +430,7 @@ void ErfaFrameTransformerTests::usesTimeScaleServiceForNonTtEpochs()
     QCOMPARE(service->lastEpoch.julianDatePart2, epoch.julianDatePart2);
 }
 
-void ErfaFrameTransformerTests::reportsMissingTimeScaleServiceForNonTtCirsTransforms()
+void ErfaFrameTransformerTests::missingTimeScaleServiceForNonTtCirsTransforms()
 {
     const ErfaFrameTransformer transformer(nullptr);
 
@@ -450,7 +450,7 @@ void ErfaFrameTransformerTests::reportsMissingTimeScaleServiceForNonTtCirsTransf
     QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
 }
 
-void ErfaFrameTransformerTests::rejectsUnsupportedTrueEquatorAndEquinoxTerrestrialTransforms()
+void ErfaFrameTransformerTests::rejectsTrueEquatorAndEquinoxTransforms()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
     const std::array<std::pair<CelestialReferenceFrame::Type, CelestialReferenceFrame::Type>, 4U> cases{{
@@ -653,7 +653,7 @@ void ErfaFrameTransformerTests::reusesTimeScaleConversionsAcrossComposedStages()
     QCOMPARE(service->convertCallCount, 2);
 }
 
-void ErfaFrameTransformerTests::reusesEarthOrientationSampleAcrossComposedTerrestrialStages()
+void ErfaFrameTransformerTests::reusesEarthOrientationSampleAcrossStages()
 {
     auto eopProvider = std::make_shared<RecordingEarthOrientationProvider>(earthOrientationProvider());
     const TimeScaleServiceOptions options{
@@ -729,7 +729,7 @@ void ErfaFrameTransformerTests::preservesIcrsTargetFrameInComposedStageMetadata(
     );
 }
 
-void ErfaFrameTransformerTests::recordsUnavailableStageWhenTransformCannotBeComputed()
+void ErfaFrameTransformerTests::recordsUnavailableStageWhenTransformFails()
 {
     const ErfaFrameTransformer transformer(nullptr);
 
@@ -761,7 +761,7 @@ void ErfaFrameTransformerTests::recordsUnavailableStageWhenTransformCannotBeComp
     );
 }
 
-void ErfaFrameTransformerTests::acceptsItrsTransformWithPredictedEarthOrientationData()
+void ErfaFrameTransformerTests::acceptsItrsTransformWithPredictedOrientation()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider(true));
 
@@ -781,7 +781,7 @@ void ErfaFrameTransformerTests::acceptsItrsTransformWithPredictedEarthOrientatio
     QVERIFY(!result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
 }
 
-void ErfaFrameTransformerTests::degradesItrsTransformForStaleEarthOrientationData()
+void ErfaFrameTransformerTests::degradesItrsTransformForStaleOrientation()
 {
     const ErfaFrameTransformer transformer(
         frameTimeScaleService(), earthOrientationProvider(false, IEarthOrientationProvider::DataStatus::Stale)
@@ -803,7 +803,7 @@ void ErfaFrameTransformerTests::degradesItrsTransformForStaleEarthOrientationDat
     QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
 }
 
-void ErfaFrameTransformerTests::degradesItrsTransformForEstimatedEarthOrientationData()
+void ErfaFrameTransformerTests::degradesItrsTransformForEstimatedOrientation()
 {
     const ErfaFrameTransformer transformer(
         frameTimeScaleService(), earthOrientationProvider(false, IEarthOrientationProvider::DataStatus::Estimated)
@@ -825,7 +825,7 @@ void ErfaFrameTransformerTests::degradesItrsTransformForEstimatedEarthOrientatio
     QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
 }
 
-void ErfaFrameTransformerTests::degradesItrsTransformForMissingEarthOrientationData()
+void ErfaFrameTransformerTests::degradesItrsTransformForMissingOrientation()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), nullptr);
 

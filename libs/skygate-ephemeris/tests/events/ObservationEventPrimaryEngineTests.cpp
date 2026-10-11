@@ -227,17 +227,17 @@ class ObservationEventPrimaryEngineTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void untrustedFixedStarGuidedSearchVerifiesAgainstPrimaryEngine();
-    void untrustedGuidedApproximateVerifiesAgainstPrimaryEngine();
-    void trustedFixedStarGuidedSearchSkipsPrimaryVerification();
+    void untrustedFixedStarGuidedSearchVerifiesPrimary();
+    void untrustedGuidedApproximateVerifiesPrimary();
+    void trustedFixedStarGuidedSkipsPrimaryVerification();
     void untrustedGuidedAlwaysAboveFallsBackToPrimary();
-    void untrustedGuidedApproximateAlwaysAboveFallsBackToPrimary();
+    void untrustedGuidedApproximateAlwaysAboveFallback();
     void untrustedGuidedAlwaysBelowFallsBackToPrimary();
-    void untrustedGuidedApproximateWindowMissFallsBackToPrimary();
-    void trustedGuidedApproximateFixedBodyShortcutSkipsPrimary();
+    void untrustedGuidedApproximateWindowMissFallback();
+    void trustedGuidedApproximateFixedBodySkipsPrimary();
 };
 
-void ObservationEventPrimaryEngineTests::untrustedFixedStarGuidedSearchVerifiesAgainstPrimaryEngine()
+void ObservationEventPrimaryEngineTests::untrustedFixedStarGuidedSearchVerifiesPrimary()
 {
     const auto strategy = std::make_shared<MarkerGuidanceStrategy>();
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
@@ -259,7 +259,7 @@ void ObservationEventPrimaryEngineTests::untrustedFixedStarGuidedSearchVerifiesA
     QVERIFY(std::abs(state->horizontal.altitudeDeg - 0.0) < 1.0);
 }
 
-void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateVerifiesAgainstPrimaryEngine()
+void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateVerifiesPrimary()
 {
     const auto strategy = std::make_shared<MarkerGuidanceStrategy>();
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
@@ -281,7 +281,7 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateVerifiesAgain
     QVERIFY(std::abs(state->horizontal.altitudeDeg - 0.0) < 1.0);
 }
 
-void ObservationEventPrimaryEngineTests::trustedFixedStarGuidedSearchSkipsPrimaryVerification()
+void ObservationEventPrimaryEngineTests::trustedFixedStarGuidedSkipsPrimaryVerification()
 {
     const auto strategy = std::make_shared<MarkerGuidanceStrategy>();
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
@@ -324,7 +324,7 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedAlwaysAboveFallsBackToPr
     verifyPrimaryCrossingAltitude(engine, request, *summary.nextSet.utcTime);
 }
 
-void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateAlwaysAboveFallsBackToPrimary()
+void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateAlwaysAboveFallback()
 {
     const auto strategy = std::make_shared<OffsetGuidanceStrategy>(40.0);
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
@@ -364,7 +364,7 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedAlwaysBelowFallsBackToPr
     verifyPrimaryCrossingAltitude(engine, request, *summary.nextSet.utcTime);
 }
 
-void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateWindowMissFallsBackToPrimary()
+void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateWindowMissFallback()
 {
     const auto strategy = std::make_shared<OffsetGuidanceStrategy>(40.0);
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
@@ -384,7 +384,7 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateWindowMissFal
     verifyPrimaryCrossingAltitude(engine, request, *summary.nextSet.utcTime);
 }
 
-void ObservationEventPrimaryEngineTests::trustedGuidedApproximateFixedBodyShortcutSkipsPrimary()
+void ObservationEventPrimaryEngineTests::trustedGuidedApproximateFixedBodySkipsPrimary()
 {
     const auto strategy = std::make_shared<OffsetGuidanceStrategy>(40.0);
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);

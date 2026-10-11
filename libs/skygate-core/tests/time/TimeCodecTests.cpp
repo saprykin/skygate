@@ -57,7 +57,7 @@ private slots:
     void epochCodecRoundTripsUtcAndEpoch();
     void astronomicalEpochAddsSecondsAndNormalizes();
     void astronomicalEpochComparesEqual();
-    void astronomicalTimeReportsJ2000GreenwichSiderealTime();
+    void astronomicalTimeReportsJ2000SiderealTime();
 };
 
 void TimeCodecTests::calendarTimeMapsJ2000CivilDateToJulianDate()
@@ -145,7 +145,7 @@ void TimeCodecTests::astronomicalEpochComparesEqual()
     QVERIFY(lhs != other);
 }
 
-void TimeCodecTests::astronomicalTimeReportsJ2000GreenwichSiderealTime()
+void TimeCodecTests::astronomicalTimeReportsJ2000SiderealTime()
 {
     QVERIFY(isNear(skygate::core::AstronomicalTime::meanObliquityDeg(0.0), 23.4393));
     QVERIFY(isNear(skygate::core::AstronomicalTime::greenwichMeanSiderealTimeDeg(j2000UtcTime()), 280.46061837));

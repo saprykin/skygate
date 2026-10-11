@@ -330,17 +330,17 @@ private slots:
     void focusSearchTargetUsesSingleBodyLookupForMoon();
     void focusSearchTargetCentersConstellationLabelResult();
     void focusSearchTargetIgnoresInvalidTargets();
-    void trackSearchTargetStartsLiveAtTimelineTimeAndCentersBody();
+    void trackSearchTargetStartsLiveAndCentersBody();
     void trackSearchTargetPreservesBceTimelineAnchor();
-    void trackedBceTargetPlaybackUsesConfiguredStepWhileCatchingUp();
+    void trackedBcePlaybackCatchUpUsesConfiguredStep();
     void trackSearchTargetUsesSelectedEngineRequest();
     void searchModelRemainsCatalogAndLabelOnly();
-    void trackSearchTargetRejectsInvalidTargetsWithoutMutation();
+    void trackSearchTargetRejectsInvalidWithoutMutation();
     void trackedTargetRecentersOnStepAndManualPan();
-    void staleTrackedTargetClearsAndAllowsViewCenterChanges();
-    void focusSearchTargetClearsTrackingForDifferentTarget();
-    void clearingTrackedTargetPreservesSelectedSearchTarget();
-    void collapsingSearchToolbarClearsSelectedSearchTarget();
+    void staleTrackedTargetClearsForViewCenterChanges();
+    void focusSearchTargetClearsTrackingForOtherTarget();
+    void clearingTrackedTargetPreservesSearchTarget();
+    void collapsingSearchToolbarClearsSelectedTarget();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -470,7 +470,7 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetIgnoresInvalidTar
     QCOMPARE(controller->viewCenterAzimuthDeg(), 123.0);
 }
 
-void SkyContextControllerSearchTrackingTests::trackSearchTargetStartsLiveAtTimelineTimeAndCentersBody()
+void SkyContextControllerSearchTrackingTests::trackSearchTargetStartsLiveAndCentersBody()
 {
     FakeTimeSource timeSource;
     const auto controller = createSingleBodyController("demo_target", "Demo Target", &timeSource);
@@ -515,7 +515,7 @@ void SkyContextControllerSearchTrackingTests::trackSearchTargetPreservesBceTimel
     QCOMPARE(controllerUtcTime(*controller).time(), QTime(12, 0, 0));
 }
 
-void SkyContextControllerSearchTrackingTests::trackedBceTargetPlaybackUsesConfiguredStepWhileCatchingUp()
+void SkyContextControllerSearchTrackingTests::trackedBcePlaybackCatchUpUsesConfiguredStep()
 {
     FakeTimeSource timeSource;
     const auto controller = createSingleBodyController("demo_target", "Demo Target", &timeSource);
@@ -578,7 +578,7 @@ void SkyContextControllerSearchTrackingTests::searchModelRemainsCatalogAndLabelO
     QVERIFY(targetIdsBeforeFocus.contains(QStringLiteral("demo_target")));
 }
 
-void SkyContextControllerSearchTrackingTests::trackSearchTargetRejectsInvalidTargetsWithoutMutation()
+void SkyContextControllerSearchTrackingTests::trackSearchTargetRejectsInvalidWithoutMutation()
 {
     const auto controller = createSingleBodyController();
     controller->setLive(false);
@@ -623,7 +623,7 @@ void SkyContextControllerSearchTrackingTests::trackedTargetRecentersOnStepAndMan
     QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
 }
 
-void SkyContextControllerSearchTrackingTests::staleTrackedTargetClearsAndAllowsViewCenterChanges()
+void SkyContextControllerSearchTrackingTests::staleTrackedTargetClearsForViewCenterChanges()
 {
     const auto controller = createSingleBodyController();
 
@@ -638,7 +638,7 @@ void SkyContextControllerSearchTrackingTests::staleTrackedTargetClearsAndAllowsV
     QCOMPARE(controller->viewCenterAzimuthDeg(), 123.0);
 }
 
-void SkyContextControllerSearchTrackingTests::focusSearchTargetClearsTrackingForDifferentTarget()
+void SkyContextControllerSearchTrackingTests::focusSearchTargetClearsTrackingForOtherTarget()
 {
     auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
@@ -677,7 +677,7 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetClearsTrackingFor
     QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), searchState->horizontal.azimuthDeg) < 1e-6);
 }
 
-void SkyContextControllerSearchTrackingTests::clearingTrackedTargetPreservesSelectedSearchTarget()
+void SkyContextControllerSearchTrackingTests::clearingTrackedTargetPreservesSearchTarget()
 {
     const auto controller = createSingleBodyController();
 
@@ -692,7 +692,7 @@ void SkyContextControllerSearchTrackingTests::clearingTrackedTargetPreservesSele
     QCOMPARE(controller->selectedSearchTargetId(), QString("demo_target"));
 }
 
-void SkyContextControllerSearchTrackingTests::collapsingSearchToolbarClearsSelectedSearchTarget()
+void SkyContextControllerSearchTrackingTests::collapsingSearchToolbarClearsSelectedTarget()
 {
     auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(

@@ -45,7 +45,7 @@ private slots:
     void combinesCorrectionFlags();
     void constructsRequestAndDataSetModels();
     void constructsCatalogStarAstrometryModel();
-    void constructsAndNormalizesAstronomicalTimePrimitives();
+    void constructsAndNormalizesAstronomicalTimes();
     void exposesCelestialReferenceFrameHelpers();
     void constructsCelestialFrameTransformResults();
     void convertsCivilDatesAndDefinesNoYearZeroPolicy();
@@ -213,7 +213,7 @@ void EphemerisApiModelTests::constructsCatalogStarAstrometryModel()
     QCOMPARE(body.starAstrometry->radialVelocityKmPerSecond.value_or(0.0), -13.9);
 }
 
-void EphemerisApiModelTests::constructsAndNormalizesAstronomicalTimePrimitives()
+void EphemerisApiModelTests::constructsAndNormalizesAstronomicalTimes()
 {
     const skygate::core::AstronomicalEpoch overflowEpoch{
         .julianDatePart1 = 2'451'545.0,

@@ -110,12 +110,12 @@ class CatalogSnapshotBoundaryTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void factoryConsumesAlternativeProviderThroughCommonBodyView();
-    void engineSnapshotRemainsValidAfterProviderOwnerChange();
-    void catalogSnapshotCopiesBodiesIndependentlyOfProvider();
+    void factoryConsumesProviderThroughCommonBodyView();
+    void engineSnapshotRemainsValidAfterProviderChange();
+    void snapshotCopiesBodiesIndependentlyOfProvider();
 };
 
-void CatalogSnapshotBoundaryTests::factoryConsumesAlternativeProviderThroughCommonBodyView()
+void CatalogSnapshotBoundaryTests::factoryConsumesProviderThroughCommonBodyView()
 {
     const ObservationContext context = makeObservationContext();
     AlternativeInMemoryStarCatalog provider(
@@ -142,7 +142,7 @@ void CatalogSnapshotBoundaryTests::factoryConsumesAlternativeProviderThroughComm
     QCOMPARE(deepSkyState->equatorial.declinationDeg, 41.3);
 }
 
-void CatalogSnapshotBoundaryTests::engineSnapshotRemainsValidAfterProviderOwnerChange()
+void CatalogSnapshotBoundaryTests::engineSnapshotRemainsValidAfterProviderChange()
 {
     const ObservationContext context = makeObservationContext();
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> engine;
@@ -173,7 +173,7 @@ void CatalogSnapshotBoundaryTests::engineSnapshotRemainsValidAfterProviderOwnerC
     QCOMPARE(byId->equatorial.declinationDeg, 41.3);
 }
 
-void CatalogSnapshotBoundaryTests::catalogSnapshotCopiesBodiesIndependentlyOfProvider()
+void CatalogSnapshotBoundaryTests::snapshotCopiesBodiesIndependentlyOfProvider()
 {
     std::optional<CelestialBodyCatalog> snapshot;
     {

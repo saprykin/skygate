@@ -8,11 +8,11 @@ class EphemerisPrecisionPolicyTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void sceneRenderAndTrailsUseLeanTopocentricCorrections();
-    void detailAndEventPoliciesPreserveRequestedCorrections();
+    void sceneRenderAndTrailsUseLeanCorrections();
+    void detailAndEventPoliciesPreserveCorrections();
 };
 
-void EphemerisPrecisionPolicyTests::sceneRenderAndTrailsUseLeanTopocentricCorrections()
+void EphemerisPrecisionPolicyTests::sceneRenderAndTrailsUseLeanCorrections()
 {
     const skygate::ephemeris::tests::NonEnumeratedHighPrecisionTraitsEngine engine;
     skygate::ephemeris::EphemerisRequest request;
@@ -41,7 +41,7 @@ void EphemerisPrecisionPolicyTests::sceneRenderAndTrailsUseLeanTopocentricCorrec
     );
 }
 
-void EphemerisPrecisionPolicyTests::detailAndEventPoliciesPreserveRequestedCorrections()
+void EphemerisPrecisionPolicyTests::detailAndEventPoliciesPreserveCorrections()
 {
     const skygate::ephemeris::tests::FixedAltitudeEngine engine(0.0);
     skygate::ephemeris::EphemerisRequest request;

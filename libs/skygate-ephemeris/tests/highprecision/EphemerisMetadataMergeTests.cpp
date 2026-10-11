@@ -15,19 +15,19 @@ class EphemerisMetadataMergeTests final : public QObject {
 
 private slots:
     void degradedTimeScaleConversionMapsWarningCodes();
-    void degradedTimeScaleConversionPreservesSpecificCodesAndText();
+    void degradedTimeScalePreservesCodesAndText();
     void failedTimeScaleConversionHonorsFailurePolicy();
     void degradedEarthOrientationSampleMapsWarningCodes();
-    void degradedEarthOrientationSamplePreservesSpecificCodesAndText();
+    void degradedEarthOrientationPreservesCodesAndText();
     void failedEarthOrientationSampleMapsWarningCodes();
-    void mergeKernelDiagnosticsAppendsUnreportedDiagnostics();
+    void mergeAppendsUnreportedKernelDiagnostics();
     void markCorrectionUnavailableDegradesAndAddsWarning();
-    void markCorrectionFailedFailsRecoverableStatusesAndAddsWarnings();
-    void markCorrectionFailedPreservesTerminalStatusesAndAddsWarnings();
+    void markCorrectionFailedFailsRecoverableStatuses();
+    void markCorrectionFailedPreservesTerminalStatuses();
     void markCorrectionAppliedRecordsCorrection();
     void mergePropagatesFullResultStatuses();
     void mergeRespectsDegradedAndFailedOnlyStatusPolicy();
-    void mergeCombinesCorrectionsWarningsAndOptionalMetadata();
+    void mergeCombinesCorrectionsWarningsAndMetadata();
     void mergeHonorsMetadataOptionToggles();
 };
 
@@ -50,7 +50,7 @@ void EphemerisMetadataMergeTests::degradedTimeScaleConversionMapsWarningCodes()
     QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
 }
 
-void EphemerisMetadataMergeTests::degradedTimeScaleConversionPreservesSpecificCodesAndText()
+void EphemerisMetadataMergeTests::degradedTimeScalePreservesCodesAndText()
 {
     TimeScaleConversionResult conversion;
     conversion.status = TimeScaleConversionStatus::Degraded;
@@ -122,7 +122,7 @@ void EphemerisMetadataMergeTests::degradedEarthOrientationSampleMapsWarningCodes
     QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
 }
 
-void EphemerisMetadataMergeTests::degradedEarthOrientationSamplePreservesSpecificCodesAndText()
+void EphemerisMetadataMergeTests::degradedEarthOrientationPreservesCodesAndText()
 {
     EarthOrientationSampler::Sample sample;
     sample.status = EarthOrientationSampler::Sample::Status::Degraded;
@@ -180,7 +180,7 @@ void EphemerisMetadataMergeTests::markCorrectionUnavailableDegradesAndAddsWarnin
     );
 }
 
-void EphemerisMetadataMergeTests::markCorrectionFailedFailsRecoverableStatusesAndAddsWarnings()
+void EphemerisMetadataMergeTests::markCorrectionFailedFailsRecoverableStatuses()
 {
     EphemerisEngineQueryResult validMetadata;
     EphemerisMetadataMerger::markCorrectionFailed(validMetadata, EphemerisCorrectionFlags::precessionNutation());
@@ -214,7 +214,7 @@ void EphemerisMetadataMergeTests::markCorrectionFailedFailsRecoverableStatusesAn
     );
 }
 
-void EphemerisMetadataMergeTests::markCorrectionFailedPreservesTerminalStatusesAndAddsWarnings()
+void EphemerisMetadataMergeTests::markCorrectionFailedPreservesTerminalStatuses()
 {
     EphemerisEngineQueryResult outOfRangeMetadata;
     outOfRangeMetadata.status = EphemerisEngineQueryStatus::Type::OutOfRange;
@@ -362,7 +362,7 @@ void EphemerisMetadataMergeTests::mergeRespectsDegradedAndFailedOnlyStatusPolicy
     );
 }
 
-void EphemerisMetadataMergeTests::mergeCombinesCorrectionsWarningsAndOptionalMetadata()
+void EphemerisMetadataMergeTests::mergeCombinesCorrectionsWarningsAndMetadata()
 {
     EphemerisEngineQueryResult source;
     source.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
@@ -435,7 +435,7 @@ void EphemerisMetadataMergeTests::mergeHonorsMetadataOptionToggles()
     QCOMPARE(*target.estimatedAngularUncertaintyArcsec, 1.0);
 }
 
-void EphemerisMetadataMergeTests::mergeKernelDiagnosticsAppendsUnreportedDiagnostics()
+void EphemerisMetadataMergeTests::mergeAppendsUnreportedKernelDiagnostics()
 {
     skygate::ephemeris::tests::TestCalcephKernel kernel;
     kernel.setDiagnostics({"calceph compute failed", "already reported"});

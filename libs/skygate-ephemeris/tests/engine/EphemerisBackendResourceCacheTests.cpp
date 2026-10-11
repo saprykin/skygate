@@ -202,16 +202,16 @@ class EphemerisBackendResourceCacheTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void reusesProvidersWhenRevisionAndManifestAreUnchanged();
-    void invalidatesAndReloadsProvidersWhenRevisionChanges();
-    void preservesInjectedProvidersWhenNoManagedProviderWasLoaded();
+    void reusesProvidersWhenRevisionAndManifestUnchanged();
+    void invalidatesAndReloadsProvidersOnRevisionChange();
+    void preservesInjectedProvidersWhenNothingLoaded();
     void assemblesProviderFieldsIntoFactoryRequest();
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     void cachedKernelProviderSkipsChecksumVerification();
 #endif
 };
 
-void EphemerisBackendResourceCacheTests::reusesProvidersWhenRevisionAndManifestAreUnchanged()
+void EphemerisBackendResourceCacheTests::reusesProvidersWhenRevisionAndManifestUnchanged()
 {
     const std::shared_ptr<const TestEphemerisDataSnapshot> snapshot = makeSnapshot();
     skygate::ephemeris::EphemerisBackendResourceCache cache;
@@ -228,7 +228,7 @@ void EphemerisBackendResourceCacheTests::reusesProvidersWhenRevisionAndManifestA
     QVERIFY(cache.earthOrientationProvider() == firstEarthOrientationProvider);
 }
 
-void EphemerisBackendResourceCacheTests::invalidatesAndReloadsProvidersWhenRevisionChanges()
+void EphemerisBackendResourceCacheTests::invalidatesAndReloadsProvidersOnRevisionChange()
 {
     const std::shared_ptr<const TestEphemerisDataSnapshot> snapshot = makeSnapshot();
     skygate::ephemeris::EphemerisBackendResourceCache cache;
@@ -246,7 +246,7 @@ void EphemerisBackendResourceCacheTests::invalidatesAndReloadsProvidersWhenRevis
     QVERIFY(cache.earthOrientationProvider() != firstEarthOrientationProvider);
 }
 
-void EphemerisBackendResourceCacheTests::preservesInjectedProvidersWhenNoManagedProviderWasLoaded()
+void EphemerisBackendResourceCacheTests::preservesInjectedProvidersWhenNothingLoaded()
 {
     const std::shared_ptr<const TestEphemerisDataSnapshot> snapshot = makeSnapshot();
     const auto injectedTimeScaleService = std::make_shared<FakeTimeScaleService>();

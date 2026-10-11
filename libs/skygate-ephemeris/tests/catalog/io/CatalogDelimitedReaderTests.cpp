@@ -13,13 +13,13 @@ class CatalogDelimitedReaderTests final : public QObject {
 
 private slots:
     void tokenizesQuotedRowsAndDecodesEscapes();
-    void tokenizesSemicolonRowsWithoutSplittingQuotedSeparators();
+    void tokenizesSemicolonRowsKeepingQuotedSeparators();
     void decodesUnterminatedQuotesAsBestEffortField();
-    void readerHandlesBomBlankRowsCrlfAndFinalLineWithoutNewline();
+    void readerHandlesBomBlankRowsCrlfAndMissingNewline();
     void readerRejectsMissingRequiredColumns();
     void readerRejectsSubstringLookalikeHeaders();
     void readerSkipsLeadingCommentsAndPreservesQuotedHash();
-    void readerStopsOnHandlerFailureAndPreservesPartialResult();
+    void readerStopsOnHandlerFailureWithPartialResult();
 };
 
 void CatalogDelimitedReaderTests::tokenizesQuotedRowsAndDecodesEscapes()
@@ -35,7 +35,7 @@ void CatalogDelimitedReaderTests::tokenizesQuotedRowsAndDecodesEscapes()
     QCOMPARE(skygate::ephemeris::CsvRowTokenizer::decodeField(columns.at(3)), QString("delta"));
 }
 
-void CatalogDelimitedReaderTests::tokenizesSemicolonRowsWithoutSplittingQuotedSeparators()
+void CatalogDelimitedReaderTests::tokenizesSemicolonRowsKeepingQuotedSeparators()
 {
     const QString row = QStringLiteral(R"(name;"M 42; NGC 1976";"Great ""Nebula""")");
 
@@ -56,7 +56,7 @@ void CatalogDelimitedReaderTests::decodesUnterminatedQuotesAsBestEffortField()
     QCOMPARE(skygate::ephemeris::CsvRowTokenizer::decodeField(columns.at(1)), QString("\"unterminated,beta"));
 }
 
-void CatalogDelimitedReaderTests::readerHandlesBomBlankRowsCrlfAndFinalLineWithoutNewline()
+void CatalogDelimitedReaderTests::readerHandlesBomBlankRowsCrlfAndMissingNewline()
 {
     skygate::ephemeris::DelimitedCatalogReaderOptions options;
     options.separator = ',';
@@ -146,7 +146,7 @@ void CatalogDelimitedReaderTests::readerSkipsLeadingCommentsAndPreservesQuotedHa
     QCOMPARE(quotedIds.at(0), QString("1"));
 }
 
-void CatalogDelimitedReaderTests::readerStopsOnHandlerFailureAndPreservesPartialResult()
+void CatalogDelimitedReaderTests::readerStopsOnHandlerFailureWithPartialResult()
 {
     skygate::ephemeris::DelimitedCatalogReaderOptions options;
     options.requiredColumns = {QStringLiteral("name"), QStringLiteral("value")};

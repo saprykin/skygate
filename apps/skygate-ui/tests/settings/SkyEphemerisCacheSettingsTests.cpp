@@ -12,7 +12,7 @@ private slots:
     void initTestCase();
     void savesLoadsAndClearsEphemerisDataCacheMetadata();
     void ephemerisDataCachePathsRoundTripExactly();
-    void partialAndMalformedEphemerisDataCacheMetadataFallsBack();
+    void partialAndMalformedCacheMetadataFallsBack();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -108,7 +108,7 @@ void SkyEphemerisCacheSettingsTests::ephemerisDataCachePathsRoundTripExactly()
     QCOMPARE(loadedSnapshot.installedDeltaTDataPath, savedSnapshot.installedDeltaTDataPath);
 }
 
-void SkyEphemerisCacheSettingsTests::partialAndMalformedEphemerisDataCacheMetadataFallsBack()
+void SkyEphemerisCacheSettingsTests::partialAndMalformedCacheMetadataFallsBack()
 {
     QSettings settings;
     settings.clear();

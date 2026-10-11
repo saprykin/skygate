@@ -32,11 +32,11 @@ private slots:
     void initTestCase();
     void init();
     void clearSourceCacheEvictsOwnedRelatedPayload();
-    void relatedReplyAfterCacheEvictionStaysOutOfPersistedRecord();
+    void relatedReplyAfterCacheEvictionStaysUnpersisted();
     void relatedDatasetsRoundTripToTheirOwnSources();
-    void disabledOwnerRelatedDataStaysOwnedButInactiveAfterRestart();
+    void disabledOwnerDataStaysOwnedButInactive();
     void removedOwnerRelatedDataDoesNotReturnAfterRestart();
-    void corruptOwnerRelatedPayloadLeavesSiblingDatasetIntact();
+    void corruptOwnerPayloadLeavesSiblingDatasetIntact();
     void migratesPriorSingleOwnerRelatedPayloadOnce();
 
 private:
@@ -126,7 +126,7 @@ void SkyCatalogManagerRelatedPersistenceTests::clearSourceCacheEvictsOwnedRelate
     QCOMPARE(toggledRecord->constellationCount, std::size_t{0});
 }
 
-void SkyCatalogManagerRelatedPersistenceTests::relatedReplyAfterCacheEvictionStaysOutOfPersistedRecord()
+void SkyCatalogManagerRelatedPersistenceTests::relatedReplyAfterCacheEvictionStaysUnpersisted()
 {
     const QString catalogUrl = QStringLiteral("https://example.test/evict-related-stars.csv");
     const QString relatedUrl = QStringLiteral("https://example.test/evict-related-lines.json");
@@ -268,7 +268,7 @@ void SkyCatalogManagerRelatedPersistenceTests::relatedDatasetsRoundTripToTheirOw
     QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{4});
 }
 
-void SkyCatalogManagerRelatedPersistenceTests::disabledOwnerRelatedDataStaysOwnedButInactiveAfterRestart()
+void SkyCatalogManagerRelatedPersistenceTests::disabledOwnerDataStaysOwnedButInactive()
 {
     const QString sourceAUrl = QStringLiteral("https://example.test/disabled-owner-a-stars.csv");
     const QString sourceARelatedUrl = QStringLiteral("https://example.test/disabled-owner-a-lines.json");
@@ -424,7 +424,7 @@ void SkyCatalogManagerRelatedPersistenceTests::removedOwnerRelatedDataDoesNotRet
     QCOMPARE(secondRestart.constellationCount(), std::size_t{1});
 }
 
-void SkyCatalogManagerRelatedPersistenceTests::corruptOwnerRelatedPayloadLeavesSiblingDatasetIntact()
+void SkyCatalogManagerRelatedPersistenceTests::corruptOwnerPayloadLeavesSiblingDatasetIntact()
 {
     const QString sourceAUrl = QStringLiteral("https://example.test/corrupt-owner-a-stars.csv");
     const QString sourceARelatedUrl = QStringLiteral("https://example.test/corrupt-owner-a-lines.json");

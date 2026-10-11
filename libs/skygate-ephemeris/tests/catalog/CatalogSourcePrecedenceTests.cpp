@@ -31,23 +31,23 @@ class CatalogSourcePrecedenceTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void fillsMissingMetadataWithoutDiscardingWinnerValues();
-    void bridgeInheritsMissingMetadataFromTheLatestContributor();
+    void fillsMissingMetadataWithoutDiscardingWinner();
+    void bridgeInheritsMissingMetadataFromContributor();
     void bridgeWinnerKeepsItsOwnMetadata();
-    void bridgeInheritsOptionalStarMetadataFromTheLatestContributor();
+    void bridgeInheritsStarMetadataFromLatestContributor();
     void reorderingBridgeSourcesChangesInheritedMetadata();
-    void bridgeAbsorptionUsesSourcePrecedenceAfterReplacements();
+    void bridgeAbsorptionUsesPrecedenceAfterReplacements();
     void bridgePrefersTheNameOfItsActualSupplyingSource();
-    void bridgePrefersTheDeepSkyAxisOfItsActualSupplyingSource();
+    void bridgePrefersDeepSkyAxisOfSupplyingSource();
     void explicitReplacementValueOutranksAnInheritedValue();
-    void deepSkyValuesResolveIndependentlyBySupplyingSource();
+    void deepSkyValuesResolveBySupplyingSource();
     void absentAndZeroDeepSkyValuesKeepTheirMeaning();
-    void inheritedAstrometryValuesKeepTheirSupplyingSource();
-    void inheritedFixedCoordinatesFollowTheirSupplyingSource();
+    void inheritedAstrometryValuesKeepSupplyingSource();
+    void inheritedFixedCoordinatesFollowSupplyingSource();
     void reorderedReplacementChainChangesTheInheritedName();
 };
 
-void CatalogSourcePrecedenceTests::fillsMissingMetadataWithoutDiscardingWinnerValues()
+void CatalogSourcePrecedenceTests::fillsMissingMetadataWithoutDiscardingWinner()
 {
     const auto primary = CatalogMergeTestSupport::createCatalog(
         {},
@@ -88,7 +88,7 @@ void CatalogSourcePrecedenceTests::fillsMissingMetadataWithoutDiscardingWinnerVa
     QVERIFY(CatalogMergeTestSupport::hasAlias(merged->identity.aliases, "M 31"));
 }
 
-void CatalogSourcePrecedenceTests::bridgeInheritsMissingMetadataFromTheLatestContributor()
+void CatalogSourcePrecedenceTests::bridgeInheritsMissingMetadataFromContributor()
 {
     // The bridge resolves the shared object but carries no display name of
     // its own, so its missing name must come from the highest-priority
@@ -182,7 +182,7 @@ void CatalogSourcePrecedenceTests::bridgeWinnerKeepsItsOwnMetadata()
     QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-c", "source-b", "source-a"}));
 }
 
-void CatalogSourcePrecedenceTests::bridgeInheritsOptionalStarMetadataFromTheLatestContributor()
+void CatalogSourcePrecedenceTests::bridgeInheritsStarMetadataFromLatestContributor()
 {
     // Acceptance with optional domain metadata instead of the display name:
     // the bridge owns no astrometry, so its missing fields come from the
@@ -288,7 +288,7 @@ void CatalogSourcePrecedenceTests::reorderingBridgeSourcesChangesInheritedMetada
     QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-c", "source-a", "source-b"}));
 }
 
-void CatalogSourcePrecedenceTests::bridgeAbsorptionUsesSourcePrecedenceAfterReplacements()
+void CatalogSourcePrecedenceTests::bridgeAbsorptionUsesPrecedenceAfterReplacements()
 {
     // A replacement runs before the bridge: source-2 replaced source-0's HIP 1
     // survivor, and the replacement's contributor list carries source-0, whose
@@ -382,7 +382,7 @@ void CatalogSourcePrecedenceTests::bridgePrefersTheNameOfItsActualSupplyingSourc
     );
 }
 
-void CatalogSourcePrecedenceTests::bridgePrefersTheDeepSkyAxisOfItsActualSupplyingSource()
+void CatalogSourcePrecedenceTests::bridgePrefersDeepSkyAxisOfSupplyingSource()
 {
     // Domain metadata follows the same rule: the NGC object carries a major
     // axis of 1 arcminute, the IC object 2 arcminutes, and the record that
@@ -486,7 +486,7 @@ void CatalogSourcePrecedenceTests::explicitReplacementValueOutranksAnInheritedVa
     QCOMPARE(*deepSkyInfo->majorAxisArcmin, 3.0);
 }
 
-void CatalogSourcePrecedenceTests::deepSkyValuesResolveIndependentlyBySupplyingSource()
+void CatalogSourcePrecedenceTests::deepSkyValuesResolveBySupplyingSource()
 {
     // Two objects carry different deep-sky values for the same body, and both
     // the record that replaces the NGC survivor and the bridge supply no
@@ -607,7 +607,7 @@ void CatalogSourcePrecedenceTests::absentAndZeroDeepSkyValuesKeepTheirMeaning()
     QVERIFY(!deepSkyInfo->minorAxisArcmin.has_value());
 }
 
-void CatalogSourcePrecedenceTests::inheritedAstrometryValuesKeepTheirSupplyingSource()
+void CatalogSourcePrecedenceTests::inheritedAstrometryValuesKeepSupplyingSource()
 {
     // The earliest source supplies the parallax of the HIP 1 object, and the
     // record that replaces it carries no astrometry of its own, so the model
@@ -661,7 +661,7 @@ void CatalogSourcePrecedenceTests::inheritedAstrometryValuesKeepTheirSupplyingSo
     QCOMPARE(*astrometry.properMotionDeclinationMasPerYear, 0.0);
 }
 
-void CatalogSourcePrecedenceTests::inheritedFixedCoordinatesFollowTheirSupplyingSource()
+void CatalogSourcePrecedenceTests::inheritedFixedCoordinatesFollowSupplyingSource()
 {
     // Neither the replacement nor the bridge carries a position of its own,
     // and the two absorbed objects disagree about where the shared body is.

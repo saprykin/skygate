@@ -572,11 +572,11 @@ class SkyContextControllerSelectedEngineMatrixTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void consumersSwitchTogetherForSimpleAndHighPrecisionEngines();
-    void optionChangesAffectPositionsWithoutChangingCatalogSearchResults();
+    void consumersSwitchTogetherBetweenEngines();
+    void optionChangesAffectPositionsNotCatalogResults();
 };
 
-void SkyContextControllerSelectedEngineMatrixTests::consumersSwitchTogetherForSimpleAndHighPrecisionEngines()
+void SkyContextControllerSelectedEngineMatrixTests::consumersSwitchTogetherBetweenEngines()
 {
     MatrixConsumerObservations simpleObservations;
     verifyConsumerMatrix(
@@ -615,7 +615,7 @@ void SkyContextControllerSelectedEngineMatrixTests::consumersSwitchTogetherForSi
     );
 }
 
-void SkyContextControllerSelectedEngineMatrixTests::optionChangesAffectPositionsWithoutChangingCatalogSearchResults()
+void SkyContextControllerSelectedEngineMatrixTests::optionChangesAffectPositionsNotCatalogResults()
 {
     MatrixHarness astrometricHarness = createMatrixHarness(
         skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision,

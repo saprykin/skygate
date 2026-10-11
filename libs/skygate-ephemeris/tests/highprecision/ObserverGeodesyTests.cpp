@@ -17,13 +17,13 @@ class ObserverGeodesyTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void convertsEquatorPrimeMeridianToWgs84EquatorialRadius();
+    void convertsEquatorToWgs84EquatorialRadius();
     void convertsNorthPoleToWgs84PolarRadius();
     void includesElevationAlongLocalUp();
     void rejectsInvalidObservers();
 };
 
-void ObserverGeodesyTests::convertsEquatorPrimeMeridianToWgs84EquatorialRadius()
+void ObserverGeodesyTests::convertsEquatorToWgs84EquatorialRadius()
 {
     const std::optional<Vector3d> position = ObserverGeodesy::observerItrsPositionAu(
         GeoLocation{

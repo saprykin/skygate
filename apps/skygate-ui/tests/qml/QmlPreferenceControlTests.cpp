@@ -73,11 +73,11 @@ class QmlPreferenceControlTests final : public QObject {
 private slots:
     void initTestCase();
     void init();
-    void preferencesTextFieldEditsAcceptsAndTracksEnabledState();
+    void preferencesTextFieldEditsAndTracksEnabledState();
     void preferencesComboBoxActivatesAndShowsPopup();
     void preferencesComboBoxPopupRowsShowModelText();
-    void preferencesCityPickerFiltersChoosesAndClearsModelFilter();
-    void preferencesButtonCheckboxAndSectionControlsRespond();
+    void preferencesCityPickerFiltersChoosesAndClears();
+    void preferencesButtonCheckboxSectionControlsWork();
 
 private:
     QmlSettingsFixture m_settings;
@@ -93,7 +93,7 @@ void QmlPreferenceControlTests::init()
     m_settings.resetForCurrentTest();
 }
 
-void QmlPreferenceControlTests::preferencesTextFieldEditsAcceptsAndTracksEnabledState()
+void QmlPreferenceControlTests::preferencesTextFieldEditsAndTracksEnabledState()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -281,7 +281,7 @@ void QmlPreferenceControlTests::preferencesComboBoxPopupRowsShowModelText()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClearsModelFilter()
+void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClears()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -352,7 +352,7 @@ void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClearsMode
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlPreferenceControlTests::preferencesButtonCheckboxAndSectionControlsRespond()
+void QmlPreferenceControlTests::preferencesButtonCheckboxSectionControlsWork()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);

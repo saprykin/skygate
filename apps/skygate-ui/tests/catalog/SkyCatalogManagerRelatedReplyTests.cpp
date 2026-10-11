@@ -47,19 +47,19 @@ class SkyCatalogManagerRelatedReplyTests final : public QObject {
 private slots:
     void initTestCase();
     void init();
-    void staleConstellationResponseIgnoredAfterBundledSwitch();
-    void staleConstellationResponseIgnoredAfterCustomSwitch();
-    void cancelDuringConstellationLoadingIgnoresStaleCompletion();
+    void staleConstellationResponseAfterBundledSwitch();
+    void staleConstellationResponseAfterCustomSwitch();
+    void cancelDuringConstellationLoadIgnoresStaleReply();
     void currentConstellationResponseAppliesOnce();
     void failedUpdateSupersedesItsPendingRelatedResponse();
-    void relatedConstellationDatasetsStayOwnedByTheirSources();
-    void overlappingConstellationDatasetsFollowSourceOrder();
+    void relatedDatasetsStayOwnedByTheirSources();
+    void overlappingDatasetsFollowSourceOrder();
     void lateRelatedResponseAfterOwnerRemovalIsIgnored();
     void readdedOwnerRejectsPreviousIncarnationResponse();
-    void disablingOwnerSupersedesItsPendingRelatedResponse();
-    void lateRelatedFailureStatusFromSupersededOwnerIsIgnored();
+    void disablingOwnerSupersedesPendingRelatedReply();
+    void lateRelatedFailureFromSupersededOwnerIgnored();
     void outOfOrderRelatedRepliesPopulateTheirOwnSources();
-    void reloadingOrRemovingAnotherSourceKeepsPendingOwnerResponse();
+    void reloadOrRemoveOtherSourceKeepsPendingReply();
     void lateReplyToRemovedRelatedDeclarationIsRejected();
 
 private:
@@ -81,7 +81,7 @@ void SkyCatalogManagerRelatedReplyTests::init()
     QDir(m_settings.filePath(QStringLiteral("catalog-collection-cache"))).removeRecursively();
 }
 
-void SkyCatalogManagerRelatedReplyTests::staleConstellationResponseIgnoredAfterBundledSwitch()
+void SkyCatalogManagerRelatedReplyTests::staleConstellationResponseAfterBundledSwitch()
 {
     const QString catalogUrl = kHygPreset.urls.value(0);
     const QString constellationUrl = kHygPreset.relatedDatasetUrls.value(0);
@@ -134,7 +134,7 @@ void SkyCatalogManagerRelatedReplyTests::staleConstellationResponseIgnoredAfterB
     QCOMPARE(statusSpy.count(), statusChangesAfterSwitch);
 }
 
-void SkyCatalogManagerRelatedReplyTests::staleConstellationResponseIgnoredAfterCustomSwitch()
+void SkyCatalogManagerRelatedReplyTests::staleConstellationResponseAfterCustomSwitch()
 {
     const QString catalogUrl = kHygPreset.urls.value(0);
     const QString constellationUrl = kHygPreset.relatedDatasetUrls.value(0);
@@ -197,7 +197,7 @@ void SkyCatalogManagerRelatedReplyTests::staleConstellationResponseIgnoredAfterC
     QVERIFY(cacheSnapshot.snapshot.sources[0].constellationAnchorGroupRows.isEmpty());
 }
 
-void SkyCatalogManagerRelatedReplyTests::cancelDuringConstellationLoadingIgnoresStaleCompletion()
+void SkyCatalogManagerRelatedReplyTests::cancelDuringConstellationLoadIgnoresStaleReply()
 {
     const QString catalogUrl = kHygPreset.urls.value(0);
     const QString constellationUrl = kHygPreset.relatedDatasetUrls.value(0);
@@ -348,7 +348,7 @@ void SkyCatalogManagerRelatedReplyTests::failedUpdateSupersedesItsPendingRelated
     QVERIFY(record->constellationLineRows.isEmpty());
 }
 
-void SkyCatalogManagerRelatedReplyTests::relatedConstellationDatasetsStayOwnedByTheirSources()
+void SkyCatalogManagerRelatedReplyTests::relatedDatasetsStayOwnedByTheirSources()
 {
     const QString sourceAUrl = QStringLiteral("https://example.test/related-a-stars.csv");
     const QString sourceARelatedUrl = QStringLiteral("https://example.test/related-a-lines.json");
@@ -423,7 +423,7 @@ void SkyCatalogManagerRelatedReplyTests::relatedConstellationDatasetsStayOwnedBy
     QVERIFY(manager.isSourceEnabled(sourceBId));
 }
 
-void SkyCatalogManagerRelatedReplyTests::overlappingConstellationDatasetsFollowSourceOrder()
+void SkyCatalogManagerRelatedReplyTests::overlappingDatasetsFollowSourceOrder()
 {
     const QString sourceAUrl = QStringLiteral("https://example.test/overlap-a-stars.csv");
     const QString sourceARelatedUrl = QStringLiteral("https://example.test/overlap-a-lines.json");
@@ -673,7 +673,7 @@ void SkyCatalogManagerRelatedReplyTests::readdedOwnerRejectsPreviousIncarnationR
     QCOMPARE(staleRecord->constellationLineRows, persistedLineRows);
 }
 
-void SkyCatalogManagerRelatedReplyTests::disablingOwnerSupersedesItsPendingRelatedResponse()
+void SkyCatalogManagerRelatedReplyTests::disablingOwnerSupersedesPendingRelatedReply()
 {
     const QString catalogUrl = QStringLiteral("https://example.test/disabled-owner-stars.csv");
     const QString relatedUrl = QStringLiteral("https://example.test/disabled-owner-lines.json");
@@ -735,7 +735,7 @@ void SkyCatalogManagerRelatedReplyTests::disablingOwnerSupersedesItsPendingRelat
     QCOMPARE(manager.constellationCount(), std::size_t{0});
 }
 
-void SkyCatalogManagerRelatedReplyTests::lateRelatedFailureStatusFromSupersededOwnerIsIgnored()
+void SkyCatalogManagerRelatedReplyTests::lateRelatedFailureFromSupersededOwnerIgnored()
 {
     const QString catalogUrl = QStringLiteral("https://example.test/failed-owner-stars.csv");
     const QString relatedUrl = QStringLiteral("https://example.test/failed-owner-lines.json");
@@ -846,7 +846,7 @@ void SkyCatalogManagerRelatedReplyTests::outOfOrderRelatedRepliesPopulateTheirOw
     QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
 }
 
-void SkyCatalogManagerRelatedReplyTests::reloadingOrRemovingAnotherSourceKeepsPendingOwnerResponse()
+void SkyCatalogManagerRelatedReplyTests::reloadOrRemoveOtherSourceKeepsPendingReply()
 {
     const QString sourceAUrl = QStringLiteral("https://example.test/pending-owner-a-stars.csv");
     const QString sourceARelatedUrl = QStringLiteral("https://example.test/pending-owner-a-lines.json");

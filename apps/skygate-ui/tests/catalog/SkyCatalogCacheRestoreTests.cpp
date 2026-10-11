@@ -134,17 +134,17 @@ private slots:
     void restoresBinaryCatalogPayloadsWithoutUpgrade();
     void corruptBinaryPayloadFallsBackToCsvParsing();
     void legacyBinarySchemaVersionFallsBackToCsvParsing();
-    void damagedSourceKeepsConfigurationWithoutDiscardingSiblings();
-    void restoresSelectedArchiveMemberWhenBinaryCacheIsMissing();
-    void restoresSelectedArchiveMemberWhenBinaryCacheIsOutdated();
-    void restoresSelectedArchiveMemberWhenBinaryCacheIsCorrupt();
-    void parseOptionFailuresKeepDamagedRecordsAsConfiguration();
+    void damagedSourceKeepsConfigurationAndSiblings();
+    void restoresSelectedArchiveMemberWhenCacheMissing();
+    void restoresSelectedArchiveMemberWhenCacheOutdated();
+    void restoresSelectedArchiveMemberWhenCacheCorrupt();
+    void optionFailuresKeepDamagedRecordsAsConfiguration();
     void unreadableSchemaHintFallsBackToDetection();
-    void roundTripsParseOptionsDescriptorMetadataAndAttribution();
+    void roundTripsParseOptionsDescriptorAndAttribution();
     void persistsAndRestoresBundledRecordsFromFactory();
     void olderRecordFormatRestoresDefinedDefaults();
     void roundTripsThreeEnabledSourcesPlusDisabledSource();
-    void derivesDeepSkyFoundCountFromMixedSourceAfterRestore();
+    void restoreDerivesDeepSkyFoundCountFromMixedSource();
 
 private:
     void resetSettings();
@@ -242,7 +242,7 @@ void SkyCatalogCacheRestoreTests::legacyBinarySchemaVersionFallsBackToCsvParsing
     QCOMPARE(result.sources[0].record.catalog->bodies().size(), std::size_t{1});
 }
 
-void SkyCatalogCacheRestoreTests::damagedSourceKeepsConfigurationWithoutDiscardingSiblings()
+void SkyCatalogCacheRestoreTests::damagedSourceKeepsConfigurationAndSiblings()
 {
     auto snapshot = CatalogCacheFixture::makeCollectionSnapshot();
     snapshot.sources[1].payload = "this is not a catalog";
@@ -278,7 +278,7 @@ void SkyCatalogCacheRestoreTests::damagedSourceKeepsConfigurationWithoutDiscardi
     QCOMPARE(stillPersisted.snapshot.sources.size(), 2);
 }
 
-void SkyCatalogCacheRestoreTests::restoresSelectedArchiveMemberWhenBinaryCacheIsMissing()
+void SkyCatalogCacheRestoreTests::restoresSelectedArchiveMemberWhenCacheMissing()
 {
     SkySettingsStore store;
     QVERIFY(store.saveCatalogCollectionCache(makeArchiveCollectionSnapshot()));
@@ -295,7 +295,7 @@ void SkyCatalogCacheRestoreTests::restoresSelectedArchiveMemberWhenBinaryCacheIs
     QCOMPARE(CatalogCacheFixture::firstBodyId(*result.sources[0].record.catalog), QStringLiteral("messier_031"));
 }
 
-void SkyCatalogCacheRestoreTests::restoresSelectedArchiveMemberWhenBinaryCacheIsOutdated()
+void SkyCatalogCacheRestoreTests::restoresSelectedArchiveMemberWhenCacheOutdated()
 {
     // A binary sidecar written by an older binary schema is not trusted, so the
     // raw archive must be reparsed with the stored member selection. The
@@ -320,7 +320,7 @@ void SkyCatalogCacheRestoreTests::restoresSelectedArchiveMemberWhenBinaryCacheIs
     QCOMPARE(CatalogCacheFixture::firstBodyId(*result.sources[0].record.catalog), QStringLiteral("messier_031"));
 }
 
-void SkyCatalogCacheRestoreTests::restoresSelectedArchiveMemberWhenBinaryCacheIsCorrupt()
+void SkyCatalogCacheRestoreTests::restoresSelectedArchiveMemberWhenCacheCorrupt()
 {
     auto snapshot = makeArchiveCollectionSnapshot();
     snapshot.sources[0].binaryPayload = "corrupt archive binary payload";
@@ -340,7 +340,7 @@ void SkyCatalogCacheRestoreTests::restoresSelectedArchiveMemberWhenBinaryCacheIs
     QCOMPARE(CatalogCacheFixture::firstBodyId(*result.sources[0].record.catalog), QStringLiteral("messier_031"));
 }
 
-void SkyCatalogCacheRestoreTests::parseOptionFailuresKeepDamagedRecordsAsConfiguration()
+void SkyCatalogCacheRestoreTests::optionFailuresKeepDamagedRecordsAsConfiguration()
 {
     SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = kCurrentCollectionSchemaVersion;
@@ -438,7 +438,7 @@ void SkyCatalogCacheRestoreTests::unreadableSchemaHintFallsBackToDetection()
     QCOMPARE(CatalogCacheFixture::firstBodyId(*result.sources[0].record.catalog), QStringLiteral("messier_031"));
 }
 
-void SkyCatalogCacheRestoreTests::roundTripsParseOptionsDescriptorMetadataAndAttribution()
+void SkyCatalogCacheRestoreTests::roundTripsParseOptionsDescriptorAndAttribution()
 {
     SkyCatalogCollectionPersistRequest request;
     SkyCatalogSourcePersistEntry entry;
@@ -709,7 +709,7 @@ void SkyCatalogCacheRestoreTests::roundTripsThreeEnabledSourcesPlusDisabledSourc
     }
 }
 
-void SkyCatalogCacheRestoreTests::derivesDeepSkyFoundCountFromMixedSourceAfterRestore()
+void SkyCatalogCacheRestoreTests::restoreDerivesDeepSkyFoundCountFromMixedSource()
 {
     skygate::ephemeris::OwnGalaxyCelestialBody star;
     star.id = "hip_1";

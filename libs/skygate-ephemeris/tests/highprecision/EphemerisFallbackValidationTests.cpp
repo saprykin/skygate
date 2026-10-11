@@ -166,8 +166,8 @@ private slots:
     void missingLongRangeKernelFallbackIsDegraded();
     void staleDataWarningsRemainVisible();
     void unsupportedBodyReturnsStructuredWarning();
-    void outOfRangeSolarSystemRequestUsesSimpleFallbackWhenEnabled();
-    void fallbackMarksDroppedCorrectionsUnavailableAndResetsValidity();
+    void outOfRangeSolarSystemRequestUsesSimpleFallback();
+    void fallbackMarksDroppedCorrectionsUnavailable();
     void outOfRangeRequestWithoutFallbackStaysOutOfRange();
     void failedRequestReturnsFailedStatus();
 };
@@ -362,7 +362,7 @@ void EphemerisFallbackValidationTests::outOfRangeRequestWithoutFallbackStaysOutO
     QVERIFY(std::isnan(state->equatorial.declinationDeg));
 }
 
-void EphemerisFallbackValidationTests::outOfRangeSolarSystemRequestUsesSimpleFallbackWhenEnabled()
+void EphemerisFallbackValidationTests::outOfRangeSolarSystemRequestUsesSimpleFallback()
 {
     HighPrecisionCalculatorResult calculatorResult;
     calculatorResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
@@ -398,7 +398,7 @@ void EphemerisFallbackValidationTests::outOfRangeSolarSystemRequestUsesSimpleFal
     QVERIFY(std::isfinite(state->horizontal.azimuthDeg));
 }
 
-void EphemerisFallbackValidationTests::fallbackMarksDroppedCorrectionsUnavailableAndResetsValidity()
+void EphemerisFallbackValidationTests::fallbackMarksDroppedCorrectionsUnavailable()
 {
     HighPrecisionCalculatorResult calculatorResult;
     calculatorResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;

@@ -32,11 +32,11 @@ private slots:
     void init();
     void restoresLegacyPersistedInstanceIdsWithReferences();
     void legacyMigrationRenamesDuplicateInstanceIds();
-    void legacyBundledStarSlotSurvivesMigrationThroughManager();
-    void unreadablePayloadKeepsConfiguredSourceWithoutErasingSiblings();
-    void legacySourcesStayRetiredAfterMigratedCollectionIsEmptied();
-    void interruptedGenerationUpgradeRestoresFlatSourcesAcrossRestarts();
-    void unreadableCommittedCollectionKeepsActiveCollectionAndReportsFailure();
+    void legacyBundledStarSlotSurvivesMigration();
+    void unreadablePayloadKeepsConfiguredAndSiblings();
+    void legacySourcesStayRetiredAfterEmptyMigration();
+    void interruptedGenerationUpgradeRestoresFlatSources();
+    void unreadableCommittedKeepsActiveCollection();
 
 private:
     SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
@@ -181,7 +181,7 @@ void SkyCatalogManagerRecoveryTests::legacyMigrationRenamesDuplicateInstanceIds(
     QCOMPARE(restoredManager.sourceInstanceIds(), restoredIds);
 }
 
-void SkyCatalogManagerRecoveryTests::legacyBundledStarSlotSurvivesMigrationThroughManager()
+void SkyCatalogManagerRecoveryTests::legacyBundledStarSlotSurvivesMigration()
 {
     SkySettingsStore::CatalogCacheSnapshot legacy;
     legacy.deepSkySourceLabel = QStringLiteral("OpenNGC");
@@ -220,7 +220,7 @@ void SkyCatalogManagerRecoveryTests::legacyBundledStarSlotSurvivesMigrationThrou
     );
 }
 
-void SkyCatalogManagerRecoveryTests::unreadablePayloadKeepsConfiguredSourceWithoutErasingSiblings()
+void SkyCatalogManagerRecoveryTests::unreadablePayloadKeepsConfiguredAndSiblings()
 {
     const QString damagedUrl = QStringLiteral("https://example.test/damaged-stars.csv");
     const QString healthyUrl = QStringLiteral("https://example.test/healthy-stars.csv");
@@ -331,7 +331,7 @@ void SkyCatalogManagerRecoveryTests::unreadablePayloadKeepsConfiguredSourceWitho
     QVERIFY(CatalogBodyQuery::containsDisplayName(restoredManager.starCatalog(), QStringLiteral("Healthy Star")));
 }
 
-void SkyCatalogManagerRecoveryTests::legacySourcesStayRetiredAfterMigratedCollectionIsEmptied()
+void SkyCatalogManagerRecoveryTests::legacySourcesStayRetiredAfterEmptyMigration()
 {
     SkySettingsStore::CatalogCacheSnapshot legacy;
     legacy.sourceLabel = QStringLiteral("Legacy Custom");
@@ -410,7 +410,7 @@ void SkyCatalogManagerRecoveryTests::legacySourcesStayRetiredAfterMigratedCollec
     QVERIFY(store.loadCatalogCache().has_value());
 }
 
-void SkyCatalogManagerRecoveryTests::interruptedGenerationUpgradeRestoresFlatSourcesAcrossRestarts()
+void SkyCatalogManagerRecoveryTests::interruptedGenerationUpgradeRestoresFlatSources()
 {
     SkySettingsStore store;
     // The retired two-slot cache stays readable on disk, so a restore that
@@ -525,7 +525,7 @@ void SkyCatalogManagerRecoveryTests::interruptedGenerationUpgradeRestoresFlatSou
     QVERIFY(store.loadCatalogCache().has_value());
 }
 
-void SkyCatalogManagerRecoveryTests::unreadableCommittedCollectionKeepsActiveCollectionAndReportsFailure()
+void SkyCatalogManagerRecoveryTests::unreadableCommittedKeepsActiveCollection()
 {
     // The retired pre-generation two-slot cache stays readable on disk, so a
     // restore that fell back to it would visibly resurrect its source.

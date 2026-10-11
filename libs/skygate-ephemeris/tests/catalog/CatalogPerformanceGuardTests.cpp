@@ -27,7 +27,7 @@ class CatalogPerformanceGuardTests final : public QObject {
 
 private slots:
     void parsesModeratelyLargeHygCatalogWithinGuardrail();
-    void parsesModeratelyLargeOpenNgcCatalogWithinGuardrail();
+    void parsesLargeOpenNgcCatalogWithinGuardrail();
     void scansZipWithManyEntriesWithinGuardrail();
     void mergesLargeFixtureWithoutAllPairsScan();
     void wallClockBudgetsAreAdvisoryByDefault();
@@ -211,7 +211,7 @@ void CatalogPerformanceGuardTests::parsesModeratelyLargeHygCatalogWithinGuardrai
     verifyElapsedBelow(elapsedMs, kLargeCatalogParseBudgetMs, "large HYG parse");
 }
 
-void CatalogPerformanceGuardTests::parsesModeratelyLargeOpenNgcCatalogWithinGuardrail()
+void CatalogPerformanceGuardTests::parsesLargeOpenNgcCatalogWithinGuardrail()
 {
     const std::string payload = makeLargeOpenNgcCatalog(12000);
     const skygate::ephemeris::CatalogPayloadParser parser;

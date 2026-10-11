@@ -56,7 +56,7 @@ class SkyViewportInternalsTests final : public QObject {
 
 private slots:
     void geometryAppendsFrameLinesAndDeepSkyGlyphSegments();
-    void sceneGraphBucketsLineSegmentsAndSkipsDegenerateLines();
+    void sceneGraphBucketsAndSkipsDegenerateLines();
     void sceneGraphBucketsPointsByColor();
     void sceneRootOwnsSeparateLineAndPointRoots();
 };
@@ -118,7 +118,7 @@ void SkyViewportInternalsTests::geometryAppendsFrameLinesAndDeepSkyGlyphSegments
     QCOMPARE(glyphSegmentCount, 34);
 }
 
-void SkyViewportInternalsTests::sceneGraphBucketsLineSegmentsAndSkipsDegenerateLines()
+void SkyViewportInternalsTests::sceneGraphBucketsAndSkipsDegenerateLines()
 {
     QSGNode root;
     const std::vector<skygate::ui::internal::SkyViewportLineSegment> segments{

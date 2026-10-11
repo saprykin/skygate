@@ -53,7 +53,7 @@ class EphemerisRegressionTests final : public QObject {
 
 private slots:
     void solarSystemBodiesMatchGoldenApproximation();
-    void solarSystemBodiesMatchGoldenApproximationAcrossContexts();
+    void solarSystemBodiesMatchGoldenAcrossContexts();
     void solarSystemBodiesStayNearExternalReferenceValues();
     void eclipticToEquatorialPreservesSeasonalAnchors();
     void equatorialToHorizontalPlacesTransitAtZenith();
@@ -102,7 +102,7 @@ void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximation()
     }
 }
 
-void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximationAcrossContexts()
+void EphemerisRegressionTests::solarSystemBodiesMatchGoldenAcrossContexts()
 {
     const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);

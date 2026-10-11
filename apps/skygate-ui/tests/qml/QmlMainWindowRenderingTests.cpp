@@ -6,7 +6,7 @@ class QmlMainWindowRenderingTests final : public QObject {
 private slots:
     void initTestCase();
     void init();
-    void mainWindowsRenderNonBlankAndKeepVisibleControlsInBounds();
+    void mainWindowsRenderNonBlankWithControlsInBounds();
 
 private:
     QmlSettingsFixture m_settings;
@@ -22,7 +22,7 @@ void QmlMainWindowRenderingTests::init()
     m_settings.resetForCurrentTest();
 }
 
-void QmlMainWindowRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControlsInBounds()
+void QmlMainWindowRenderingTests::mainWindowsRenderNonBlankWithControlsInBounds()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);

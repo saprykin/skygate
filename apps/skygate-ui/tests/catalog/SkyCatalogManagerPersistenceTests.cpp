@@ -61,11 +61,11 @@ private slots:
     void init();
     void restoreCachePathThroughManager();
     void clearSourceCacheKeepsConfiguredRecords();
-    void restoresArchiveSelectionAndSourceMetadataAfterBinaryCacheLoss();
-    void persistsBundledSourceConfigurationWithoutNetworkOperation();
-    void restoredBundledDeepSkySourceKeepsFreshObjectCount();
-    void interleavedBundledAndDownloadedSourcesPreserveOrderAndPrecedence();
-    void rejectedRestoreKeepsPreviousCollectionAndReportsError();
+    void restoresArchiveSelectionAndMetadataOnCacheLoss();
+    void persistsBundledSourceConfigurationWithoutNetwork();
+    void restoredBundledDeepSkyKeepsFreshObjectCount();
+    void interleavedSourcesPreserveOrderAndPrecedence();
+    void rejectedRestoreKeepsCollectionAndReportsError();
     void removedBundledSourceDoesNotReturnAfterRestart();
     void savedEmptyCollectionRestoresEmptyAcrossRestarts();
 
@@ -246,7 +246,7 @@ void SkyCatalogManagerPersistenceTests::clearSourceCacheKeepsConfiguredRecords()
     QVERIFY(CatalogSourceFactsQuery::findRecord(afterRemove.snapshot, aId) == nullptr);
 }
 
-void SkyCatalogManagerPersistenceTests::restoresArchiveSelectionAndSourceMetadataAfterBinaryCacheLoss()
+void SkyCatalogManagerPersistenceTests::restoresArchiveSelectionAndMetadataOnCacheLoss()
 {
     const QString cacheDirectory = m_settings.filePath(QStringLiteral("archive-restore-cache"));
     QDir(cacheDirectory).removeRecursively();
@@ -343,7 +343,7 @@ void SkyCatalogManagerPersistenceTests::restoresArchiveSelectionAndSourceMetadat
     QVERIFY(!CatalogBodyQuery::containsId(restoredManager.starCatalog(), QStringLiteral("hip_900101")));
 }
 
-void SkyCatalogManagerPersistenceTests::persistsBundledSourceConfigurationWithoutNetworkOperation()
+void SkyCatalogManagerPersistenceTests::persistsBundledSourceConfigurationWithoutNetwork()
 {
     SkySettingsStore store;
     SkyCatalogManager manager(&store);
@@ -387,7 +387,7 @@ void SkyCatalogManagerPersistenceTests::persistsBundledSourceConfigurationWithou
     QVERIFY(!view[0].enabled);
 }
 
-void SkyCatalogManagerPersistenceTests::restoredBundledDeepSkySourceKeepsFreshObjectCount()
+void SkyCatalogManagerPersistenceTests::restoredBundledDeepSkyKeepsFreshObjectCount()
 {
     SkySettingsStore store;
     QString freshInfoText;
@@ -407,7 +407,7 @@ void SkyCatalogManagerPersistenceTests::restoredBundledDeepSkySourceKeepsFreshOb
     QCOMPARE(restoredManager.deepSkyCatalogInfoText(), freshInfoText);
 }
 
-void SkyCatalogManagerPersistenceTests::interleavedBundledAndDownloadedSourcesPreserveOrderAndPrecedence()
+void SkyCatalogManagerPersistenceTests::interleavedSourcesPreserveOrderAndPrecedence()
 {
     const auto writeSourceFile = [&](const QString& fileName, const char* properName) -> QString {
         const QString path = m_settings.filePath(fileName);
@@ -493,7 +493,7 @@ void SkyCatalogManagerPersistenceTests::interleavedBundledAndDownloadedSourcesPr
     QVERIFY(!CatalogBodyQuery::containsDisplayName(restoredManager.starCatalog(), QStringLiteral("Interleave Star A")));
 }
 
-void SkyCatalogManagerPersistenceTests::rejectedRestoreKeepsPreviousCollectionAndReportsError()
+void SkyCatalogManagerPersistenceTests::rejectedRestoreKeepsCollectionAndReportsError()
 {
     // A persisted instance identity colliding with the implicit bundled core
     // source makes the restored collection uncomposable. The rejected restore

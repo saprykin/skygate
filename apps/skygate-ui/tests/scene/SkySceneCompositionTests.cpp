@@ -80,8 +80,8 @@ private slots:
     void rebuildCopiesFrameLabelsIntoOverlayItems();
     void unchangedCompositionKeyAvoidsWork();
     void selectionOnlyKeyChangePreservesFrameContent();
-    void referenceOverlayLabelsUseResolvedRequestContextWithoutEngineLookup();
-    void referenceOverlayLabelsUseSnapshotContextWhenItDiffersFromInput();
+    void referenceOverlayLabelsUseResolvedRequestContext();
+    void referenceOverlayLabelsPreferSnapshotContext();
     void resetForcesNextCompositionToRebuild();
 };
 
@@ -170,7 +170,7 @@ void SkySceneCompositionTests::selectionOnlyKeyChangePreservesFrameContent()
     QCOMPARE(sceneFrame.overlayItems.front().text, QString("First"));
 }
 
-void SkySceneCompositionTests::referenceOverlayLabelsUseResolvedRequestContextWithoutEngineLookup()
+void SkySceneCompositionTests::referenceOverlayLabelsUseResolvedRequestContext()
 {
     const skygate::core::GeoLocation observer{.latitudeDeg = 47.0, .longitudeDeg = 8.0, .elevationMeters = 400.0};
     const skygate::core::UtcTimePoint utcTime(std::chrono::seconds(1'717'276'800));
@@ -229,7 +229,7 @@ void SkySceneCompositionTests::referenceOverlayLabelsUseResolvedRequestContextWi
     );
 }
 
-void SkySceneCompositionTests::referenceOverlayLabelsUseSnapshotContextWhenItDiffersFromInput()
+void SkySceneCompositionTests::referenceOverlayLabelsPreferSnapshotContext()
 {
     const skygate::core::GeoLocation resolvedObserver{
         .latitudeDeg = 47.0, .longitudeDeg = 8.0, .elevationMeters = 400.0

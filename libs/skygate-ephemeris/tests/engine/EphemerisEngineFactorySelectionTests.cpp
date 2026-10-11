@@ -120,11 +120,11 @@ class EphemerisEngineFactorySelectionTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void createsRequestedSimpleEngineWithCatalogAndOptions();
-    void fallsBackToSimpleWhenHighPrecisionIsUnavailableAndFallbackIsAllowed();
-    void fallsBackDefaultHighPrecisionRequestWhenHighPrecisionIsUnavailable();
-    void failsStrictHighPrecisionRequestWhenHighPrecisionIsUnavailable();
-    void fallsBackWithAllowPolicyWhenRuntimeFallbackIsDisabled();
+    void requestedSimpleEngineAppliesCatalogAndOptions();
+    void fallsBackToSimpleWhenFallbackIsRequested();
+    void defaultHighPrecisionRequestFallsBackToSimple();
+    void strictHighPrecisionRequestFailsWhenUnavailable();
+    void allowPolicyStillFallsBackWhenRuntimeDisabled();
     void defaultFactoryRequestCreatesSaneSimpleEngine();
     void simpleRequestCreatesRequestedEngineWithOptions();
     void compatibilityOverloadsCreateSimpleEngines();
@@ -134,7 +134,7 @@ private slots:
     void exposesFactoryFallbackPolicyHelpers();
 };
 
-void EphemerisEngineFactorySelectionTests::createsRequestedSimpleEngineWithCatalogAndOptions()
+void EphemerisEngineFactorySelectionTests::requestedSimpleEngineAppliesCatalogAndOptions()
 {
     const std::array bodies{makeFactoryBody()};
 
@@ -183,7 +183,7 @@ void EphemerisEngineFactorySelectionTests::createsRequestedSimpleEngineWithCatal
     QVERIFY(state->metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::CorrectionUnavailable));
 }
 
-void EphemerisEngineFactorySelectionTests::fallsBackToSimpleWhenHighPrecisionIsUnavailableAndFallbackIsAllowed()
+void EphemerisEngineFactorySelectionTests::fallsBackToSimpleWhenFallbackIsRequested()
 {
     const std::array bodies{makeFactoryBody()};
 
@@ -232,7 +232,7 @@ void EphemerisEngineFactorySelectionTests::fallsBackToSimpleWhenHighPrecisionIsU
     QVERIFY(state->metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::CorrectionUnavailable));
 }
 
-void EphemerisEngineFactorySelectionTests::fallsBackDefaultHighPrecisionRequestWhenHighPrecisionIsUnavailable()
+void EphemerisEngineFactorySelectionTests::defaultHighPrecisionRequestFallsBackToSimple()
 {
     const std::array bodies{makeFactoryBody()};
 
@@ -269,7 +269,7 @@ void EphemerisEngineFactorySelectionTests::fallsBackDefaultHighPrecisionRequestW
     QVERIFY(!result.diagnostics.front().displayText().empty());
 }
 
-void EphemerisEngineFactorySelectionTests::failsStrictHighPrecisionRequestWhenHighPrecisionIsUnavailable()
+void EphemerisEngineFactorySelectionTests::strictHighPrecisionRequestFailsWhenUnavailable()
 {
     const std::array bodies{makeFactoryBody()};
 
@@ -307,7 +307,7 @@ void EphemerisEngineFactorySelectionTests::failsStrictHighPrecisionRequestWhenHi
     QVERIFY(!result.diagnostics.front().displayText().empty());
 }
 
-void EphemerisEngineFactorySelectionTests::fallsBackWithAllowPolicyWhenRuntimeFallbackIsDisabled()
+void EphemerisEngineFactorySelectionTests::allowPolicyStillFallsBackWhenRuntimeDisabled()
 {
     const std::array bodies{makeFactoryBody()};
 

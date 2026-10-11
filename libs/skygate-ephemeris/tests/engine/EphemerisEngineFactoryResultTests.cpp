@@ -33,9 +33,9 @@ class EphemerisEngineFactoryResultTests final : public QObject {
 private slots:
     void fallbackEffectiveKindSurvivesEngineMove();
     void requestedEffectiveKindSurvivesEngineMove();
-    void failureEffectiveKindUsesRequestedKindWithoutEngine();
+    void failedResultWithoutEngineUsesRequestedKind();
     void constructsFactoryResultAndCreationDiagnostics();
-    void resultHelpersDistinguishSuccessFallbackFailureAndDiagnostics();
+    void resultHelpersDistinguishOutcomesAndDiagnostics();
 };
 
 void EphemerisEngineFactoryResultTests::fallbackEffectiveKindSurvivesEngineMove()
@@ -84,7 +84,7 @@ void EphemerisEngineFactoryResultTests::requestedEffectiveKindSurvivesEngineMove
     QCOMPARE(kindValue(engine->kind()), kindValue(EphemerisEngineKind::Type::HighPrecision));
 }
 
-void EphemerisEngineFactoryResultTests::failureEffectiveKindUsesRequestedKindWithoutEngine()
+void EphemerisEngineFactoryResultTests::failedResultWithoutEngineUsesRequestedKind()
 {
     const EphemerisEngineFactoryResult result = EphemerisEngineFactoryResult::failure(
         EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable,
@@ -216,7 +216,7 @@ void EphemerisEngineFactoryResultTests::constructsFactoryResultAndCreationDiagno
     QCOMPARE(strictFailureResult.diagnostics.size(), std::size_t{1});
 }
 
-void EphemerisEngineFactoryResultTests::resultHelpersDistinguishSuccessFallbackFailureAndDiagnostics()
+void EphemerisEngineFactoryResultTests::resultHelpersDistinguishOutcomesAndDiagnostics()
 {
     skygate::ephemeris::EphemerisFactoryCreationDiagnostic warning{
         skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable,

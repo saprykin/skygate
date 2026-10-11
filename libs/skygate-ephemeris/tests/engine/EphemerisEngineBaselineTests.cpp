@@ -55,13 +55,13 @@ private slots:
     void movingBodiesChangeAcrossDays();
     void computesCatalogOwnedReferenceStarCoordinates();
     void supportsNullCatalogAndImportedFixedCoordinates();
-    void computesSingleBodyStateByCaseInsensitiveIdAndIndex();
+    void computesSingleBodyStateByInsensitiveIdAndIndex();
     void requestBasedSnapshotComputeMatchesSkyContextPath();
-    void requestBasedSnapshotReportsUnsupportedSimpleOptions();
-    void requestWithNoCorrectionsAndAtmosphericRefractionEnabledStaysValid();
-    void skyContextCompatibilityPathAppliesEngineDefaultOptions();
-    void requestBasedSingleBodyStateByCaseInsensitiveIdAndIndex();
-    void requestBasedSingleBodyStateReturnsNulloptForMissingIdAndIndex();
+    void requestBasedSnapshotDegradesSimpleOptions();
+    void noCorrectionsWithRefractionRequestStaysValid();
+    void skyContextCompatibilityAppliesEngineDefaults();
+    void requestBasedStateLookupByInsensitiveIdAndIndex();
+    void requestBasedMissingIdAndIndexReturnNullopt();
 };
 
 void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
@@ -257,7 +257,7 @@ void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinate
     QVERIFY(skygate::ephemeris::tests::isNear(importedSnapshot.states[0].equatorial.declinationDeg, -30.0, 1e-8));
 }
 
-void EphemerisEngineBaselineTests::computesSingleBodyStateByCaseInsensitiveIdAndIndex()
+void EphemerisEngineBaselineTests::computesSingleBodyStateByInsensitiveIdAndIndex()
 {
     skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
@@ -362,7 +362,7 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotComputeMatchesSkyContextP
     }
 }
 
-void EphemerisEngineBaselineTests::requestBasedSnapshotReportsUnsupportedSimpleOptions()
+void EphemerisEngineBaselineTests::requestBasedSnapshotDegradesSimpleOptions()
 {
     skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
@@ -429,7 +429,7 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotReportsUnsupportedSimpleO
     );
 }
 
-void EphemerisEngineBaselineTests::requestWithNoCorrectionsAndAtmosphericRefractionEnabledStaysValid()
+void EphemerisEngineBaselineTests::noCorrectionsWithRefractionRequestStaysValid()
 {
     skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
@@ -474,7 +474,7 @@ void EphemerisEngineBaselineTests::requestWithNoCorrectionsAndAtmosphericRefract
     QCOMPARE(state.metadata.unavailableCorrections, skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
 }
 
-void EphemerisEngineBaselineTests::skyContextCompatibilityPathAppliesEngineDefaultOptions()
+void EphemerisEngineBaselineTests::skyContextCompatibilityAppliesEngineDefaults()
 {
     skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
@@ -532,7 +532,7 @@ void EphemerisEngineBaselineTests::skyContextCompatibilityPathAppliesEngineDefau
     );
 }
 
-void EphemerisEngineBaselineTests::requestBasedSingleBodyStateByCaseInsensitiveIdAndIndex()
+void EphemerisEngineBaselineTests::requestBasedStateLookupByInsensitiveIdAndIndex()
 {
     skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
@@ -602,7 +602,7 @@ void EphemerisEngineBaselineTests::requestBasedSingleBodyStateByCaseInsensitiveI
     QVERIFY(skygate::ephemeris::tests::isNear(byIndex->horizontal.azimuthDeg, byId->horizontal.azimuthDeg, 1e-12));
 }
 
-void EphemerisEngineBaselineTests::requestBasedSingleBodyStateReturnsNulloptForMissingIdAndIndex()
+void EphemerisEngineBaselineTests::requestBasedMissingIdAndIndexReturnNullopt()
 {
     skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;

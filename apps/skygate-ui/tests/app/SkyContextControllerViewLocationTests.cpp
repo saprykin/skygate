@@ -8,12 +8,12 @@ private slots:
     void init();
     void pinchZoomScaleDeltaAdjustsAndClampsFieldOfView();
     void pinchZoomScaleDeltaIgnoresInvalidValues();
-    void selectingCityUpdatesCoordinatesAndPreservesElevation();
+    void selectingCityUpdatesCoordinatesKeepsElevation();
     void manualCoordinateEditSwitchesToCustom();
     void invalidSavedCityFallsBackToCustom();
     void defaultsLocationSourceByPositioningAvailability();
     void currentDevicePositionSourceAppliesUpdates();
-    void currentDevicePositionSourceReportsErrorsAndIgnoresInvalidUpdates();
+    void devicePositionSourceReportsErrorsIgnoresInvalid();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -57,7 +57,7 @@ void SkyContextControllerViewLocationTests::pinchZoomScaleDeltaIgnoresInvalidVal
     QCOMPARE(controller->viewFieldOfViewDeg(), initialFieldOfViewDeg);
 }
 
-void SkyContextControllerViewLocationTests::selectingCityUpdatesCoordinatesAndPreservesElevation()
+void SkyContextControllerViewLocationTests::selectingCityUpdatesCoordinatesKeepsElevation()
 {
     const auto controller = createController();
 
@@ -156,7 +156,7 @@ void SkyContextControllerViewLocationTests::currentDevicePositionSourceAppliesUp
 #endif
 }
 
-void SkyContextControllerViewLocationTests::currentDevicePositionSourceReportsErrorsAndIgnoresInvalidUpdates()
+void SkyContextControllerViewLocationTests::devicePositionSourceReportsErrorsIgnoresInvalid()
 {
 #if SKYGATE_HAS_POSITIONING
     FakePositionSource positionSource;

@@ -7,11 +7,11 @@ private slots:
     void initTestCase();
     void init();
     void skyViewportItemRendersNonBlankScene();
-    void skyViewportItemHandlesModelLifecycleGeometryAndFrameChanges();
-    void skyViewportItemOverlayLayersAddExpectedGeometry_data();
-    void skyViewportItemOverlayLayersAddExpectedGeometry();
-    void skyViewportItemAstronomicalLayersAddExpectedGeometry_data();
-    void skyViewportItemAstronomicalLayersAddExpectedGeometry();
+    void skyViewportItemHandlesModelAndGeometryChanges();
+    void skyViewportOverlayLayersAddGeometry_data();
+    void skyViewportOverlayLayersAddGeometry();
+    void skyViewportAstronomicalLayersAddGeometry_data();
+    void skyViewportAstronomicalLayersAddGeometry();
 
 private:
     QmlSettingsFixture m_settings;
@@ -82,7 +82,7 @@ void QmlViewportRenderingTests::skyViewportItemRendersNonBlankScene()
     );
 }
 
-void QmlViewportRenderingTests::skyViewportItemHandlesModelLifecycleGeometryAndFrameChanges()
+void QmlViewportRenderingTests::skyViewportItemHandlesModelAndGeometryChanges()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -152,7 +152,7 @@ void QmlViewportRenderingTests::skyViewportItemHandlesModelLifecycleGeometryAndF
     QVERIFY(geometryVertexCount(paintNode.get()) > 0);
 }
 
-void QmlViewportRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry_data()
+void QmlViewportRenderingTests::skyViewportOverlayLayersAddGeometry_data()
 {
     QTest::addColumn<QString>("propertyName");
 
@@ -162,7 +162,7 @@ void QmlViewportRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry_
     QTest::newRow("deep-sky-glyphs") << QStringLiteral("deepSkyObjects");
 }
 
-void QmlViewportRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry()
+void QmlViewportRenderingTests::skyViewportOverlayLayersAddGeometry()
 {
     QFETCH(QString, propertyName);
 
@@ -244,7 +244,7 @@ void QmlViewportRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry(
     }
 }
 
-void QmlViewportRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeometry_data()
+void QmlViewportRenderingTests::skyViewportAstronomicalLayersAddGeometry_data()
 {
     QTest::addColumn<QString>("propertyName");
     QTest::addColumn<QString>("labelText");
@@ -262,7 +262,7 @@ void QmlViewportRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeom
         << QDateTime(QDate(2026, 1, 15), QTime(0, 0), QTimeZone::UTC) << 45.0 << 0.0;
 }
 
-void QmlViewportRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeometry()
+void QmlViewportRenderingTests::skyViewportAstronomicalLayersAddGeometry()
 {
     QFETCH(QString, propertyName);
     QFETCH(QString, labelText);

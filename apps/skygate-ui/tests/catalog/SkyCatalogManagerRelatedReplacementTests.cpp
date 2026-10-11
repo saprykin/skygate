@@ -37,14 +37,14 @@ private slots:
     void initTestCase();
     void init();
     void reloadClearsOwnerRelatedDataBeforePublishing();
-    void failedRelatedReplacementKeepsPublishedStateSynchronized();
-    void canceledRelatedReplacementKeepsPublishedStateSynchronized();
+    void failedReplacementKeepsPublishedStateInSync();
+    void canceledReplacementKeepsPublishedStateInSync();
     void reloadClearsOnlyOwningRelatedDataset();
     void updateRemovingRelatedDeclarationRetiresOwnedData();
-    void failedUpdateAttemptingToRemoveRelatedDeclarationKeepsDataset();
-    void bundledUpdateRetiresOwnedRelatedDataUnderEveryPolicy_data();
-    void bundledUpdateRetiresOwnedRelatedDataUnderEveryPolicy();
-    void payloadOriginSwitchesFollowTheAcceptedRelatedDeclaration();
+    void failedUpdateRemovingDeclarationKeepsDataset();
+    void bundledUpdateRetiresOwnedDataEveryPolicy_data();
+    void bundledUpdateRetiresOwnedDataEveryPolicy();
+    void payloadOriginSwitchesFollowAcceptedDeclaration();
     void rejectedBundledUpdateKeepsOwnedRelatedData();
 
 private:
@@ -151,7 +151,7 @@ void SkyCatalogManagerRelatedReplacementTests::reloadClearsOwnerRelatedDataBefor
     CatalogNotificationRecorder::assertMatchesRuntime(manager, observations.back());
 }
 
-void SkyCatalogManagerRelatedReplacementTests::failedRelatedReplacementKeepsPublishedStateSynchronized()
+void SkyCatalogManagerRelatedReplacementTests::failedReplacementKeepsPublishedStateInSync()
 {
     const QString catalogUrl = QStringLiteral("https://example.test/failed-replacement-stars.csv");
     const QString relatedUrl = QStringLiteral("https://example.test/failed-replacement-lines.json");
@@ -237,7 +237,7 @@ void SkyCatalogManagerRelatedReplacementTests::failedRelatedReplacementKeepsPubl
     QVERIFY(record->constellationAnchorGroupRows.isEmpty());
 }
 
-void SkyCatalogManagerRelatedReplacementTests::canceledRelatedReplacementKeepsPublishedStateSynchronized()
+void SkyCatalogManagerRelatedReplacementTests::canceledReplacementKeepsPublishedStateInSync()
 {
     const QString catalogUrl = QStringLiteral("https://example.test/cancel-replacement-stars.csv");
     const QString relatedUrl = QStringLiteral("https://example.test/cancel-replacement-lines.json");
@@ -439,7 +439,7 @@ void SkyCatalogManagerRelatedReplacementTests::updateRemovingRelatedDeclarationR
     }
 }
 
-void SkyCatalogManagerRelatedReplacementTests::failedUpdateAttemptingToRemoveRelatedDeclarationKeepsDataset()
+void SkyCatalogManagerRelatedReplacementTests::failedUpdateRemovingDeclarationKeepsDataset()
 {
     const QString catalogUrl = QStringLiteral("https://example.test/failed-removal-stars.csv");
     const QString relatedUrl = QStringLiteral("https://example.test/failed-removal-lines.json");
@@ -496,7 +496,7 @@ void SkyCatalogManagerRelatedReplacementTests::failedUpdateAttemptingToRemoveRel
     QVERIFY(!record->constellationAnchorGroupRows.isEmpty());
 }
 
-void SkyCatalogManagerRelatedReplacementTests::bundledUpdateRetiresOwnedRelatedDataUnderEveryPolicy_data()
+void SkyCatalogManagerRelatedReplacementTests::bundledUpdateRetiresOwnedDataEveryPolicy_data()
 {
     QTest::addColumn<int>("policy");
     QTest::addRow("merge") << static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::Merge);
@@ -507,7 +507,7 @@ void SkyCatalogManagerRelatedReplacementTests::bundledUpdateRetiresOwnedRelatedD
     QTest::addRow("augment-core") << static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::AugmentCore);
 }
 
-void SkyCatalogManagerRelatedReplacementTests::bundledUpdateRetiresOwnedRelatedDataUnderEveryPolicy()
+void SkyCatalogManagerRelatedReplacementTests::bundledUpdateRetiresOwnedDataEveryPolicy()
 {
     QFETCH(int, policy);
     const auto bundledPolicy = static_cast<skygate::ephemeris::CatalogCompositionPolicy>(policy);
@@ -604,7 +604,7 @@ void SkyCatalogManagerRelatedReplacementTests::bundledUpdateRetiresOwnedRelatedD
     QVERIFY(ConstellationAnchorGroupLookup::find(restoredManager, "Lyra") != nullptr);
 }
 
-void SkyCatalogManagerRelatedReplacementTests::payloadOriginSwitchesFollowTheAcceptedRelatedDeclaration()
+void SkyCatalogManagerRelatedReplacementTests::payloadOriginSwitchesFollowAcceptedDeclaration()
 {
     const QString catalogUrl = QStringLiteral("https://example.test/origin-switch-stars.csv");
     const QString relatedUrl = QStringLiteral("https://example.test/origin-switch-lines.json");

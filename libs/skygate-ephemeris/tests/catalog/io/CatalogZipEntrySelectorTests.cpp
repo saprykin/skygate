@@ -36,7 +36,7 @@ private slots:
     void reportsAmbiguityAcrossDifferentSchemas();
     void reportsMissingMemberExplicitly();
     void rejectsDirectoryAndEncryptedMembersWhenRequested();
-    void ignoresDirectoriesAndEncryptedEntriesWithoutSelector();
+    void ignoresDirectoriesAndEncryptedEntries();
     void reportsMalformedArchive();
     void retainsSingleCatalogCompatibility();
     void reportsNoSupportedMember();
@@ -124,7 +124,7 @@ void CatalogZipEntrySelectorTests::rejectsDirectoryAndEncryptedMembersWhenReques
     QCOMPARE(encryptedSelection.selectedPath, std::string("secret.csv"));
 }
 
-void CatalogZipEntrySelectorTests::ignoresDirectoriesAndEncryptedEntriesWithoutSelector()
+void CatalogZipEntrySelectorTests::ignoresDirectoriesAndEncryptedEntries()
 {
     const std::string zipData = makeZip({
         ZipEntrySpec{.path = "catalog/", .data = {}},

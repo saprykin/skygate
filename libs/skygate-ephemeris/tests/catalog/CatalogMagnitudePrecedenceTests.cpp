@@ -23,14 +23,14 @@ class CatalogMagnitudePrecedenceTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void bridgesWithinOneSourceResolveMagnitudeBySupplyingRow();
-    void zeroAndNegativeMagnitudesKeepSupplyingRowPrecedence();
+    void bridgeWithinOneSourceResolvesMagnitudeByRow();
+    void zeroAndNegativeMagnitudesKeepRowPrecedence();
     void bridgedDeepSkyMagnitudesFillOnlyMissingValues();
     void replacementMagnitudeKeepsSourcePrecedence();
-    void samePassDuplicateKeepsMagnitudeInheritedFromAnEarlierSource();
+    void samePassDuplicateInheritsEarlierMagnitude();
 };
 
-void CatalogMagnitudePrecedenceTests::bridgesWithinOneSourceResolveMagnitudeBySupplyingRow()
+void CatalogMagnitudePrecedenceTests::bridgeWithinOneSourceResolvesMagnitudeByRow()
 {
     // The bridging row carries the largest magnitude of the fixture, but the
     // magnitude is enriched metadata like every other field: the earliest row
@@ -78,7 +78,7 @@ void CatalogMagnitudePrecedenceTests::bridgesWithinOneSourceResolveMagnitudeBySu
     QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"primary"}));
 }
 
-void CatalogMagnitudePrecedenceTests::zeroAndNegativeMagnitudesKeepSupplyingRowPrecedence()
+void CatalogMagnitudePrecedenceTests::zeroAndNegativeMagnitudesKeepRowPrecedence()
 {
     // The first row supplies an explicit zero magnitude, the second row a
     // negative one, and both later bridge rows magnitudes of their own. Zero is
@@ -404,7 +404,7 @@ void CatalogMagnitudePrecedenceTests::replacementMagnitudeKeepsSourcePrecedence(
     QCOMPARE(chain.contributorSourceIds.front(), (std::vector<std::string>{"source-2", "source-1", "source-0"}));
 }
 
-void CatalogMagnitudePrecedenceTests::samePassDuplicateKeepsMagnitudeInheritedFromAnEarlierSource()
+void CatalogMagnitudePrecedenceTests::samePassDuplicateInheritsEarlierMagnitude()
 {
     // Source A links HIP 1 and HYG 2 and measures the object at magnitude 7
     // with a coherent model. Source B's first row replaces A's survivor

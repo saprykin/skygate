@@ -29,7 +29,7 @@ private slots:
     void unitVectorsMapToHorizontalCoordinates();
     void buildsOrthonormalProjectionBasis();
     void projectionBasisNormalizesAzimuthAndSupportsNadir();
-    void rejectsInvalidProjectionCenterWithoutMutatingOutputs();
+    void rejectsInvalidProjectionCenterKeepsOutputs();
 };
 
 void SphericalGeometryTests::horizontalCoordinatesMapToUnitVectors()
@@ -130,7 +130,7 @@ void SphericalGeometryTests::projectionBasisNormalizesAzimuthAndSupportsNadir()
     QVERIFY(isNear(nadirRight.dot(nadirUp), 0.0));
 }
 
-void SphericalGeometryTests::rejectsInvalidProjectionCenterWithoutMutatingOutputs()
+void SphericalGeometryTests::rejectsInvalidProjectionCenterKeepsOutputs()
 {
     skygate::core::Vector3d center{.x = 1.0, .y = 2.0, .z = 3.0};
     skygate::core::Vector3d right{.x = 4.0, .y = 5.0, .z = 6.0};

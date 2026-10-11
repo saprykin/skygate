@@ -98,7 +98,7 @@ private slots:
     void invalidInputsAppendNoLines();
     void appendsPastDashesFutureSegmentsAndTickLabels();
     void invalidSamplesBreakContinuity();
-    void highPrecisionFixedTargetTrailAlignsPresentSampleToMarker();
+    void highPrecisionFixedTrailAlignsPresentToMarker();
     void longProjectedJumpsAreDropped();
     void offscreenTrailSamplesStillRenderCrossingSegment();
 };
@@ -166,7 +166,7 @@ void SkyObjectTrailGeometryTests::invalidSamplesBreakContinuity()
     QVERIFY(gappedFrame.lines.size() < continuousFrame.lines.size());
 }
 
-void SkyObjectTrailGeometryTests::highPrecisionFixedTargetTrailAlignsPresentSampleToMarker()
+void SkyObjectTrailGeometryTests::highPrecisionFixedTrailAlignsPresentToMarker()
 {
     const auto projection = TrailBuilderTestScenario::makeProjection();
     QVERIFY(projection.has_value());

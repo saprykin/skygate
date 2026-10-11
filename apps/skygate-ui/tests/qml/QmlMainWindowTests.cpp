@@ -10,8 +10,8 @@ private slots:
     void init();
     void responsiveToolbarPolicyKeepsControlsSeparated();
     void topToolbarsStayAboveOverlay();
-    void footerPopupToolbarToggleClickClosesPopupAndTogglesToolbar();
-    void nativeMenuActionsOpenSharedAboutAndPreferencesWindows();
+    void footerPopupToggleClosesPopupAndTogglesToolbar();
+    void nativeMenuActionsOpenSharedAboutAndPreferences();
     void compactAppMenuOpensAboutAndPreferencesWindows();
     void mainWindowPreferenceSearchAndTrackingJourney();
 
@@ -149,7 +149,7 @@ void QmlMainWindowTests::topToolbarsStayAboveOverlay()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlMainWindowTests::footerPopupToolbarToggleClickClosesPopupAndTogglesToolbar()
+void QmlMainWindowTests::footerPopupToggleClosesPopupAndTogglesToolbar()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -203,7 +203,7 @@ void QmlMainWindowTests::footerPopupToolbarToggleClickClosesPopupAndTogglesToolb
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlMainWindowTests::nativeMenuActionsOpenSharedAboutAndPreferencesWindows()
+void QmlMainWindowTests::nativeMenuActionsOpenSharedAboutAndPreferences()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);

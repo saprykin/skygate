@@ -52,17 +52,17 @@ class ConstellationReferenceResolverTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void resolvesHipReferenceToDifferentlyNamedCanonicalId();
+    void resolvesHipToDifferentlyNamedCanonicalId();
     void resolvesCanonicalHipIdForHygStyleBody();
     void reportsUnresolvedReference();
     void reportsAmbiguousReference();
     void doesNotCollideAcrossNamespaces();
     void treatsNonHipReferenceAsUnresolved();
     void resolveLinesKeepsOnlyFullyResolvedSegments();
-    void resolveAnchorsKeepsResolvedAnchorsAndDropsEmptyGroups();
+    void resolveAnchorsKeepsResolvedAndDropsEmptyGroups();
 };
 
-void ConstellationReferenceResolverTests::resolvesHipReferenceToDifferentlyNamedCanonicalId()
+void ConstellationReferenceResolverTests::resolvesHipToDifferentlyNamedCanonicalId()
 {
     ResolverFixture fixture;
     fixture.add(makeStar("catalog_a_27989", {CatalogIdentifier::make("hip", "27989")}));
@@ -152,7 +152,7 @@ void ConstellationReferenceResolverTests::resolveLinesKeepsOnlyFullyResolvedSegm
     QVERIFY(resolved[0].second == "catalog_a_2");
 }
 
-void ConstellationReferenceResolverTests::resolveAnchorsKeepsResolvedAnchorsAndDropsEmptyGroups()
+void ConstellationReferenceResolverTests::resolveAnchorsKeepsResolvedAndDropsEmptyGroups()
 {
     ResolverFixture fixture;
     fixture.add(makeStar("catalog_a_1", {CatalogIdentifier::make("hip", "1")}));

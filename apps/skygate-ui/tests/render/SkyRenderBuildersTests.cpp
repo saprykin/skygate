@@ -138,11 +138,11 @@ class SkyRenderBuildersTests final : public QObject {
 
 private slots:
     void starDecimationKeepsBrighterStarInScreenCell();
-    void deepSkyVisibilityAndGlyphPolicyFollowPresentationRules();
-    void deepSkyGlyphRendersWhenCenterIsJustOutsideViewport();
-    void deepSkyLabelsPreferNamedObjectsAndRespectVisibility();
-    void constellationLinesAndLabelsRespectRefsAndVisibility();
-    void constellationLineRendersWhenEndpointsAreOutsideViewport();
+    void deepSkyVisibilityAndGlyphPolicyFollowRules();
+    void deepSkyGlyphRendersJustOutsideViewport();
+    void deepSkyLabelsPreferNamedAndRespectVisibility();
+    void constellationGeometryRespectsRefsAndVisibility();
+    void constellationLineRendersWithEndpointsOutside();
 };
 
 void SkyRenderBuildersTests::starDecimationKeepsBrighterStarInScreenCell()
@@ -168,7 +168,7 @@ void SkyRenderBuildersTests::starDecimationKeepsBrighterStarInScreenCell()
     QCOMPARE(frame.points.front().bodyIndex, 1U);
 }
 
-void SkyRenderBuildersTests::deepSkyVisibilityAndGlyphPolicyFollowPresentationRules()
+void SkyRenderBuildersTests::deepSkyVisibilityAndGlyphPolicyFollowRules()
 {
     auto fixture = makeFixture(
         {
@@ -200,7 +200,7 @@ void SkyRenderBuildersTests::deepSkyVisibilityAndGlyphPolicyFollowPresentationRu
     QVERIFY(frame.glyphs.empty());
 }
 
-void SkyRenderBuildersTests::deepSkyGlyphRendersWhenCenterIsJustOutsideViewport()
+void SkyRenderBuildersTests::deepSkyGlyphRendersJustOutsideViewport()
 {
     auto fixture = makeFixture(
         {
@@ -217,7 +217,7 @@ void SkyRenderBuildersTests::deepSkyGlyphRendersWhenCenterIsJustOutsideViewport(
     QCOMPARE(frame.glyphs.size(), 1U);
 }
 
-void SkyRenderBuildersTests::deepSkyLabelsPreferNamedObjectsAndRespectVisibility()
+void SkyRenderBuildersTests::deepSkyLabelsPreferNamedAndRespectVisibility()
 {
     auto fixture = makeFixture(
         {
@@ -240,7 +240,7 @@ void SkyRenderBuildersTests::deepSkyLabelsPreferNamedObjectsAndRespectVisibility
     QVERIFY(!labelsContainText(frame.labels, "M31"));
 }
 
-void SkyRenderBuildersTests::constellationLinesAndLabelsRespectRefsAndVisibility()
+void SkyRenderBuildersTests::constellationGeometryRespectsRefsAndVisibility()
 {
     auto fixture = makeFixture({
         makeBody("hip_a", "", skygate::ephemeris::BaseCelestialBody::Kind::Constellation, 1.0),
@@ -269,7 +269,7 @@ void SkyRenderBuildersTests::constellationLinesAndLabelsRespectRefsAndVisibility
     QVERIFY(!labelsContainText(frame.labels, "Demo"));
 }
 
-void SkyRenderBuildersTests::constellationLineRendersWhenEndpointsAreOutsideViewport()
+void SkyRenderBuildersTests::constellationLineRendersWithEndpointsOutside()
 {
     auto fixture = makeFixture(
         {

@@ -49,7 +49,7 @@ private slots:
     void parsesStrictHipText();
     void rejectsMalformedHipText();
     void parsesHipIdentifiersFromJsonValues();
-    void rejectsInvalidHipPolylinesAndCollectsNestedObjects();
+    void rejectsInvalidHipPolylinesAndCollectsNested();
 };
 
 void StellariumExtractorTests::extractsLineRefs()
@@ -214,7 +214,7 @@ void StellariumExtractorTests::parsesHipIdentifiersFromJsonValues()
     QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonObject{{"hip", "bad"}}).has_value());
 }
 
-void StellariumExtractorTests::rejectsInvalidHipPolylinesAndCollectsNestedObjects()
+void StellariumExtractorTests::rejectsInvalidHipPolylinesAndCollectsNested()
 {
     using skygate::ephemeris::StellariumHipParser;
 

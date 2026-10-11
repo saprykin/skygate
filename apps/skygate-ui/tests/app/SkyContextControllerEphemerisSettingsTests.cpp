@@ -251,15 +251,15 @@ private slots:
     void initTestCase();
     void init();
     void loadSavePreservesAllEphemerisUserSettings();
-    void loadSettingsWithEphemerisSettingsNotifiesSceneConsumers();
-    void loadSettingsBuildsHighPrecisionEngineFromInstalledEphemerisData();
-    void cachedProvidersRebuildAndInvalidateWithInstalledData();
+    void loadSettingsNotifiesSceneConsumers();
+    void loadSettingsBuildsHighPrecisionEngineFromData();
+    void cachedProvidersRebuildAndInvalidate();
     void requestContextUsesSimpleEngineDefaults();
-    void requestContextCombinesRestoredSettingsObserverTimeAndDataRevision();
+    void requestContextCombinesObserverTimeAndRevision();
     void requestContextConvertsBceUtcToAstronomicalEpoch();
     void ephemerisEngineKindIndexRejectsOutOfRangeValues();
-    void ephemerisEngineSwitchResetsCorrectionPresetFromDescriptorDefaults();
-    void ephemerisEngineModelExposesRegistryDrivenLabelsAndCapabilities();
+    void engineSwitchResetsCorrectionPresetToDefaults();
+    void engineModelExposesRegistryLabelsAndCapabilities();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -294,7 +294,7 @@ void SkyContextControllerEphemerisSettingsTests::loadSavePreservesAllEphemerisUs
     verifyEphemerisUserSettings(savedSnapshot->ephemeris, expectedSettings);
 }
 
-void SkyContextControllerEphemerisSettingsTests::loadSettingsBuildsHighPrecisionEngineFromInstalledEphemerisData()
+void SkyContextControllerEphemerisSettingsTests::loadSettingsBuildsHighPrecisionEngineFromData()
 {
     const QByteArray kernelPayload("test kernel payload");
     const QString kernelPath = m_settings.currentTestFilePath(QStringLiteral("de440s.bsp"));
@@ -330,7 +330,7 @@ void SkyContextControllerEphemerisSettingsTests::loadSettingsBuildsHighPrecision
     QCOMPARE(controller->ephemerisDataStatusText(), QString("Ephemeris data: Installed data active"));
 }
 
-void SkyContextControllerEphemerisSettingsTests::cachedProvidersRebuildAndInvalidateWithInstalledData()
+void SkyContextControllerEphemerisSettingsTests::cachedProvidersRebuildAndInvalidate()
 {
     QFile fixtureKernel(QStringLiteral(SKYGATE_EPHEMERIS_TESTDATA_DIR "/ephemeris/kernels/de432s.bsp"));
     QVERIFY(fixtureKernel.open(QIODevice::ReadOnly));
@@ -395,7 +395,7 @@ void SkyContextControllerEphemerisSettingsTests::cachedProvidersRebuildAndInvali
     );
 }
 
-void SkyContextControllerEphemerisSettingsTests::loadSettingsWithEphemerisSettingsNotifiesSceneConsumers()
+void SkyContextControllerEphemerisSettingsTests::loadSettingsNotifiesSceneConsumers()
 {
     const auto controller = createController(false);
     SkySettingsStore store;
@@ -444,7 +444,7 @@ void SkyContextControllerEphemerisSettingsTests::requestContextUsesSimpleEngineD
     QCOMPARE(requestContext.catalogRevision, controller->catalogRevision());
 }
 
-void SkyContextControllerEphemerisSettingsTests::requestContextCombinesRestoredSettingsObserverTimeAndDataRevision()
+void SkyContextControllerEphemerisSettingsTests::requestContextCombinesObserverTimeAndRevision()
 {
     auto expectedSettings = customEphemerisUserSettings();
     expectedSettings.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
@@ -511,7 +511,7 @@ void SkyContextControllerEphemerisSettingsTests::ephemerisEngineKindIndexRejects
     QCOMPARE(controller->ephemerisEngineKindIndex(), 0);
 }
 
-void SkyContextControllerEphemerisSettingsTests::ephemerisEngineSwitchResetsCorrectionPresetFromDescriptorDefaults()
+void SkyContextControllerEphemerisSettingsTests::engineSwitchResetsCorrectionPresetToDefaults()
 {
     const auto controller = createController(false);
     QCOMPARE(controller->ephemerisEngineKindIndex(), 0);
@@ -537,7 +537,7 @@ void SkyContextControllerEphemerisSettingsTests::ephemerisEngineSwitchResetsCorr
     QVERIFY(controller->ephemerisRefractionEnabled());
 }
 
-void SkyContextControllerEphemerisSettingsTests::ephemerisEngineModelExposesRegistryDrivenLabelsAndCapabilities()
+void SkyContextControllerEphemerisSettingsTests::engineModelExposesRegistryLabelsAndCapabilities()
 {
     const auto controller = createController(false);
 
