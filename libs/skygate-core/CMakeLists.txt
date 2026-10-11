@@ -48,28 +48,20 @@ add_library(skygate-core STATIC
     src/PreparedProjection.cpp
     src/ProjectionParams.cpp
     src/ScreenPoint.cpp
-    src/ObservationContext.cpp
     src/SystemTimeSource.cpp
     src/UtcTimeCodec.cpp
-    src/NaifBodyIds.cpp
     src/time/AstronomicalEpoch.cpp
     src/time/AstronomicalTime.cpp
     src/time/CalendarTime.cpp
-    src/time/CivilDateTime.cpp
     src/time/EpochCodec.cpp
-    src/time/TimeScale.cpp
     src/math/AngleMath.cpp
     src/math/CircleHitIndex.cpp
-    src/math/CircleHitTarget.cpp
     src/math/Geometry2d.cpp
-    src/math/LineSegment2d.cpp
     src/math/LinePattern.cpp
     src/math/Matrix3x3.cpp
     src/math/ProjectedPolylineBuilder.cpp
-    src/math/Rect2d.cpp
     src/math/RectOccupancyGrid.cpp
     src/math/SphericalGeometry.cpp
-    src/math/Vector2d.cpp
     src/math/Vector3d.cpp
     src/math/ViewportMath.cpp
     src/math/Wgs84Geodesy.cpp
