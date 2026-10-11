@@ -122,13 +122,7 @@ std::string_view HighPrecisionTextParser::fixedColumn(
 
 std::string_view HighPrecisionTextParser::takeLine(std::string_view& remaining) const noexcept
 {
-    const std::size_t newline = remaining.find('\n');
-    std::string_view line = newline == std::string_view::npos ? remaining : remaining.substr(0U, newline);
-    remaining = newline == std::string_view::npos ? std::string_view{} : remaining.substr(newline + 1U);
-    if (!line.empty() && line.back() == '\r') {
-        line.remove_suffix(1U);
-    }
-    return line;
+    return StringUtilities::takeLine(remaining);
 }
 
 std::optional<skygate::core::CivilDateTime> HighPrecisionTextParser::parseUtcDate(std::string_view text) const noexcept

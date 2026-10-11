@@ -36,6 +36,17 @@ std::string_view StringUtilities::trimAsciiWhitespace(const std::string_view val
     return trimmed;
 }
 
+std::string_view StringUtilities::takeLine(std::string_view& remaining) noexcept
+{
+    const std::size_t newline = remaining.find('\n');
+    std::string_view line = newline == std::string_view::npos ? remaining : remaining.substr(0U, newline);
+    remaining = newline == std::string_view::npos ? std::string_view{} : remaining.substr(newline + 1U);
+    if (!line.empty() && line.back() == '\r') {
+        line.remove_suffix(1U);
+    }
+    return line;
+}
+
 bool StringUtilities::equalsIgnoreAsciiCase(const std::string_view lhs, const std::string_view rhs) noexcept
 {
     if (lhs.size() != rhs.size()) {

@@ -7,26 +7,21 @@
 #include <QVector>
 
 #include <algorithm>
-#include <cstddef>
 
 namespace skygate::ephemeris {
 
 std::string_view CatalogHeaderPolicy::findHeaderLine(std::string_view& remaining) noexcept
 {
     // A UTF-8 BOM marks the start of the payload, so it is stripped before the
-    // header line is located.
+    // header line is located. This is the only place that strips it, so the
+    // returned line and the rest of `remaining` are always BOM-free.
     if (remaining.size() >= 3U && static_cast<unsigned char>(remaining[0]) == 0xEFU
         && static_cast<unsigned char>(remaining[1]) == 0xBBU && static_cast<unsigned char>(remaining[2]) == 0xBFU) {
         remaining.remove_prefix(3U);
     }
 
     while (!remaining.empty()) {
-        const std::size_t newline = remaining.find('\n');
-        std::string_view line = newline == std::string_view::npos ? remaining : remaining.substr(0U, newline);
-        remaining = newline == std::string_view::npos ? std::string_view{} : remaining.substr(newline + 1U);
-        if (!line.empty() && line.back() == '\r') {
-            line.remove_suffix(1U);
-        }
+        std::string_view line = StringUtilities::takeLine(remaining);
 
         line = StringUtilities::trimAsciiWhitespace(line);
 
@@ -57,9 +52,6 @@ CatalogHeaderPolicy::decodeHeaderLine(const std::string_view headerLine, const Q
     headerIndex.reserve(columns.size());
     for (qsizetype index = 0; index < columns.size(); ++index) {
         QString header = CsvRowTokenizer::decodeField(columns.at(index)).trimmed();
-        if (index == 0 && header.startsWith(QChar(0xfeff))) {
-            header.remove(0, 1);
-        }
         header = header.toLower();
         if (!header.isEmpty()) {
             headerIndex.insert(header, index);
