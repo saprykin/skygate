@@ -5,6 +5,7 @@
 #include "catalog/CatalogSchemaRegistry.hpp"
 #include "catalog/io/CatalogParsingUtilities.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
+#include "math/MathConstants.hpp"
 
 #include <QString>
 #include <QStringView>
@@ -20,7 +21,6 @@ namespace {
 
 constexpr std::size_t kHygRowCountLimitFloor = 2000000;
 constexpr std::size_t kHygMinExpectedBytesPerDataRow = 6;
-constexpr double kMasPerArcsecond = 1'000.0;
 constexpr double kHygMissingDistanceParsecs = 100'000.0;
 
 [[nodiscard]] skygate::core::AstronomicalEpoch j2000CatalogEpoch() noexcept
@@ -54,7 +54,7 @@ constexpr double kHygMissingDistanceParsecs = 100'000.0;
     }
     if (const std::optional<double> distanceParsecs = optionalFiniteDoubleColumn(row, QStringLiteral("dist"));
         distanceParsecs.has_value() && *distanceParsecs > 0.0 && *distanceParsecs < kHygMissingDistanceParsecs) {
-        return kMasPerArcsecond / *distanceParsecs;
+        return skygate::core::MathConstants::kMilliarcsecondsPerArcsecond / *distanceParsecs;
     }
 
     return std::nullopt;

@@ -23,6 +23,7 @@ private slots:
     void kDegreesPerHour_isFifteenDegrees();
     void kRadiansPerHour_isPiOverTwelve();
     void kHoursPerRadian_isTwelveOverPi();
+    void kMilliarcsecondsPerArcsecond_isThousand();
     void kArcsecondsToRadians_isPiOver180Over3600();
     void kMilliarcsecondsToRadians_isArcsecondsOver1000();
     void kEpsilon_isPositiveAndSmall();
@@ -63,6 +64,15 @@ void MathConstantsTests::kRadiansPerHour_isPiOverTwelve()
 void MathConstantsTests::kHoursPerRadian_isTwelveOverPi()
 {
     QVERIFY(isNear(skygate::core::MathConstants::kHoursPerRadian, 12.0 / skygate::core::MathConstants::kPi));
+}
+
+void MathConstantsTests::kMilliarcsecondsPerArcsecond_isThousand()
+{
+    QVERIFY(isNear(skygate::core::MathConstants::kMilliarcsecondsPerArcsecond, 1000.0));
+    QVERIFY(isNear(
+        skygate::core::MathConstants::kArcsecondsToRadians / skygate::core::MathConstants::kMilliarcsecondsPerArcsecond,
+        skygate::core::MathConstants::kMilliarcsecondsToRadians
+    ));
 }
 
 void MathConstantsTests::kArcsecondsToRadians_isPiOver180Over3600()

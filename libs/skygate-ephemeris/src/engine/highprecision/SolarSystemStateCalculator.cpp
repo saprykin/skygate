@@ -6,6 +6,7 @@
 #include "ICalcephKernel.hpp"
 #include "StringUtilities.hpp"
 #include "NaifBodyIds.hpp"
+#include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
 #include "math/Vector3d.hpp"
 
@@ -20,6 +21,7 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
+using skygate::core::MathConstants;
 using skygate::core::NaifBodyIds;
 using skygate::core::PhysicalConstants;
 constexpr int kLightTimeIterationCount = 3;
@@ -276,7 +278,7 @@ applySolarGravitationalDeflection(const skygate::core::Vector3d& vector, const s
     }
 
     const double cosineElongation = std::clamp(targetDirection->dot(*sunDirection), -1.0, 1.0);
-    const double denominator = std::max(1.0 - cosineElongation, 1.0e-12);
+    const double denominator = std::max(1.0 - cosineElongation, MathConstants::kEpsilon);
     const double deflectionScale = PhysicalConstants::kSolarSchwarzschildRadiusAu / observerSunDistanceAu / denominator;
     const skygate::core::Vector3d awayFromSun = (*targetDirection * cosineElongation) - *sunDirection;
     return withDirectionPreservingDistance(vector, *targetDirection + (awayFromSun * deflectionScale));
