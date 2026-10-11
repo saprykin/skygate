@@ -17,6 +17,11 @@ public:
 
     static constexpr double kSolarMeanAnomalyDegAtJ2000 = 357.528;
     static constexpr double kSolarMeanAnomalyDegPerDay = 0.9856003;
+
+    // USNO approximation of TDB minus TT, in seconds, as a function of the
+    // solar mean anomaly.
+    static constexpr double kTdbMinusTtPrincipalCoefficientSeconds = 0.001657;
+    static constexpr double kTdbMinusTtSecondHarmonicCoefficientSeconds = 0.00001385;
 };
 
 }  // namespace skygate::core

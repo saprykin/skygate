@@ -32,7 +32,8 @@ using skygate::core::PhysicalConstants;
         PhysicalConstants::kSolarMeanAnomalyDegAtJ2000 + PhysicalConstants::kSolarMeanAnomalyDegPerDay * daysSinceJ2000
     );
     const double meanAnomalyRadians = AngleMath::toRadians(meanAnomalyDegrees);
-    return 0.001657 * std::sin(meanAnomalyRadians) + 0.00001385 * std::sin(2.0 * meanAnomalyRadians);
+    return PhysicalConstants::kTdbMinusTtPrincipalCoefficientSeconds * std::sin(meanAnomalyRadians)
+           + PhysicalConstants::kTdbMinusTtSecondHarmonicCoefficientSeconds * std::sin(2.0 * meanAnomalyRadians);
 }
 
 [[nodiscard]] std::optional<double> tdbMinusTtSeconds(const skygate::core::AstronomicalEpoch& terrestrialTime) noexcept
