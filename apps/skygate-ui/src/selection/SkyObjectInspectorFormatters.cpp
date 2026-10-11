@@ -1,4 +1,5 @@
 #include "SkyObjectInspectorFormatters.hpp"
+#include "ObservationEventCalculator.hpp"
 #include "SkyQtTimeCodec.hpp"
 #include "SkyTimeController.hpp"
 #include "time/CalendarTime.hpp"
@@ -90,7 +91,7 @@ QString formatObservationStatus(const skygate::ephemeris::ObservationEventStatus
     case ObservationEventStatus::Type::AlwaysBelow:
         return QString::fromUtf8(ObservationEventStatus::displayText(status));
     case ObservationEventStatus::Type::NoEventInSearchWindow:
-        return "No event in next 72h";
+        return QString("No event in next %1h").arg(skygate::ephemeris::ObservationEventCalculator::kSearchHorizonHours);
     case ObservationEventStatus::Type::InvalidInput:
     case ObservationEventStatus::Type::Unresolved:
         return "--";

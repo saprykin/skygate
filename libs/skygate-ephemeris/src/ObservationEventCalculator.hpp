@@ -1,7 +1,8 @@
 #pragma once
 
-#include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "ObservationEventSummary.hpp"
+#include "engine/IEphemerisGuidanceStrategy.hpp"
+#include "math/TimeConstants.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -45,6 +46,11 @@ public:
         double crossingAltitudeDeg,
         SearchMode searchMode
     ) const;
+
+    // Longest search window used when a crossing event is not found earlier.
+    static constexpr int kSearchHorizonHours = 72;
+    static constexpr int kSearchHorizonSeconds =
+        kSearchHorizonHours * static_cast<int>(skygate::core::TimeConstants::kSecondsPerHour);
 
 private:
     std::shared_ptr<IEphemerisGuidanceStrategy> m_guidanceStrategy;
