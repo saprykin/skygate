@@ -197,10 +197,7 @@ LeapSecondOffsetResolver::lookupTaiOffset(const skygate::core::AstronomicalEpoch
 
 void LeapSecondOffsetResolver::mergeWarnings(TimeScaleConversionResult& result, const Result& lookup) noexcept
 {
-    result.warningCodeMask |= lookup.warningCodeMask;
-    if (lookup.status == TimeScaleConversionStatus::Degraded && result.status == TimeScaleConversionStatus::Valid) {
-        result.status = TimeScaleConversionStatus::Degraded;
-    }
+    TimeScaleConversionResult::mergeWarnings(result, lookup.status, lookup.warningCodeMask);
 }
 
 }  // namespace skygate::ephemeris

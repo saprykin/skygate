@@ -15,10 +15,7 @@
 #endif
 
 #include <cmath>
-#include <cstdint>
 #include <optional>
-#include <string>
-#include <utility>
 
 namespace skygate::ephemeris {
 
@@ -66,40 +63,6 @@ using skygate::core::TimeConstants;
     return approximateTdbMinusTtSeconds(terrestrialTime);
 }
 
-[[nodiscard]] TimeScaleConversionResult successResult(
-    skygate::core::AstronomicalEpoch epoch,
-    const TimeScaleConversionStatus status = TimeScaleConversionStatus::Valid,
-    const std::uint32_t warningCodeMask = 0U,
-    std::string diagnosticText = {}
-)
-{
-    if (diagnosticText.empty()) {
-        diagnosticText = status == TimeScaleConversionStatus::Valid ? "Time-scale conversion succeeded."
-                                                                    : "Time-scale conversion degraded.";
-    }
-
-    return TimeScaleConversionResult{
-        .epoch = epoch.normalized(),
-        .status = status,
-        .warningCodeMask = warningCodeMask,
-        .diagnosticText = std::move(diagnosticText),
-    };
-}
-
-[[nodiscard]] TimeScaleConversionResult failureResult(
-    const skygate::core::AstronomicalEpoch& epoch,
-    const skygate::core::TimeScale targetScale,
-    std::string diagnosticText
-)
-{
-    TimeScaleConversionResult result;
-    result.epoch = epoch;
-    result.epoch.timeScale = targetScale;
-    result.status = TimeScaleConversionStatus::Failed;
-    result.diagnosticText = std::move(diagnosticText);
-    return result;
-}
-
 void addTdbApproximationWarning(TimeScaleConversionResult& result) noexcept
 {
     result.status = TimeScaleConversionStatus::Degraded;
@@ -112,13 +75,14 @@ TimeScaleConversionResult TdbTtConverter::ttToTdb(const skygate::core::Astronomi
 {
     const std::optional<double> tdbMinusTt = tdbMinusTtSeconds(terrestrialTime);
     if (!tdbMinusTt.has_value()) {
-        TimeScaleConversionResult result =
-            failureResult(terrestrialTime, skygate::core::TimeScale::Tdb, "TT to TDB conversion input is invalid.");
+        TimeScaleConversionResult result = TimeScaleConversionResult::failure(
+            terrestrialTime, skygate::core::TimeScale::Tdb, "TT to TDB conversion input is invalid."
+        );
         result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
         return result;
     }
 
-    TimeScaleConversionResult result = successResult(
+    TimeScaleConversionResult result = TimeScaleConversionResult::success(
         terrestrialTime.addSeconds(*tdbMinusTt, skygate::core::TimeScale::Tdb),
         TimeScaleConversionStatus::Degraded,
         TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::TdbApproximationApplied),
@@ -135,15 +99,16 @@ TimeScaleConversionResult TdbTtConverter::tdbToTt(const skygate::core::Astronomi
     for (int iteration = 0; iteration < 3; ++iteration) {
         const std::optional<double> tdbMinusTt = tdbMinusTtSeconds(tt);
         if (!tdbMinusTt.has_value()) {
-            TimeScaleConversionResult result =
-                failureResult(tdbEpoch, skygate::core::TimeScale::Tt, "TDB to TT conversion input is invalid.");
+            TimeScaleConversionResult result = TimeScaleConversionResult::failure(
+                tdbEpoch, skygate::core::TimeScale::Tt, "TDB to TT conversion input is invalid."
+            );
             result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
             return result;
         }
         tt = tdbEpoch.addSeconds(-*tdbMinusTt, skygate::core::TimeScale::Tt);
     }
 
-    TimeScaleConversionResult result = successResult(
+    TimeScaleConversionResult result = TimeScaleConversionResult::success(
         tt,
         TimeScaleConversionStatus::Degraded,
         TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::TdbApproximationApplied),
