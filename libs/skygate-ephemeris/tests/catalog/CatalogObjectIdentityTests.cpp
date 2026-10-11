@@ -291,10 +291,9 @@ void CatalogObjectIdentityTests::binaryRoundTripPreservesIdentity()
 
 void CatalogObjectIdentityTests::rejectsLegacyBinarySchemaVersion()
 {
-    // Version 2 predates the identity payload and version 4 predates the
-    // retained canonical ids. Rejecting every non-current version is the
-    // established older-cache path: the cache layer falls back to raw payload
-    // parsing instead of trusting an older identity layout.
+    // Payloads carrying any schema version other than the current one are
+    // rejected, so the cache layer falls back to raw catalog parsing instead
+    // of trusting an unknown identity layout.
     for (const std::uint16_t legacyVersion : {std::uint16_t{2U}, std::uint16_t{4U}}) {
         QByteArray buffer;
         QDataStream stream(&buffer, QIODevice::WriteOnly);
