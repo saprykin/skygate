@@ -1,11 +1,9 @@
 #include "ConstellationReferenceCalculator.hpp"
 #include "StringUtilities.hpp"
-#include "math/AngleMath.hpp"
 #include "math/SphericalGeometry.hpp"
 #include "math/Vector3d.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <string>
 #include <unordered_map>
 
@@ -60,12 +58,7 @@ std::optional<skygate::core::HorizontalCoordinate> ConstellationReferenceCalcula
         return std::nullopt;
     }
 
-    return skygate::core::HorizontalCoordinate{
-        .altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(std::clamp(normalizedVector->z, -1.0, 1.0))),
-        .azimuthDeg = skygate::core::AngleMath::normalizeDegrees(
-            skygate::core::AngleMath::toDegrees(std::atan2(normalizedVector->x, normalizedVector->y))
-        )
-    };
+    return skygate::core::SphericalGeometry::horizontalFromUnitVector(*normalizedVector);
 }
 
 }  // namespace skygate::ephemeris

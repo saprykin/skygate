@@ -1,13 +1,11 @@
 #include "SkySelectionMarkerBuilder.hpp"
 #include "SkySceneShared.hpp"
-#include "math/AngleMath.hpp"
 #include "math/SphericalGeometry.hpp"
 #include "math/Vector3d.hpp"
 
 #include <QPointF>
 
 #include <algorithm>
-#include <cmath>
 #include <optional>
 
 namespace {
@@ -98,12 +96,8 @@ std::optional<QPointF> selectedConstellationPoint(
         return std::nullopt;
     }
 
-    const skygate::core::HorizontalCoordinate center{
-        .altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(std::clamp(normalizedVector->z, -1.0, 1.0))),
-        .azimuthDeg = skygate::core::AngleMath::normalizeDegrees(
-            skygate::core::AngleMath::toDegrees(std::atan2(normalizedVector->x, normalizedVector->y))
-        )
-    };
+    const skygate::core::HorizontalCoordinate center =
+        skygate::core::SphericalGeometry::horizontalFromUnitVector(*normalizedVector);
     const auto projected = preparedProjection.project(center);
     if (!projected.isVisible) {
         return std::nullopt;
