@@ -50,6 +50,7 @@ private slots:
     void constructsCelestialFrameTransformResults();
     void convertsCivilDatesAndDefinesNoYearZeroPolicy();
     void constructsResultStatusAndWarningModels();
+    void engineWarningTextMatchesTimeScaleWarningTexts();
     void keepsLegacyBodyStateFieldsReadableWithMetadata();
     void simpleEngineExposesMetadataDefaults();
     void distinguishesGeometricFromNoCorrections();
@@ -526,6 +527,110 @@ void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
             metadata.skippedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::gravitationalLightDeflection()
         )
     );
+}
+
+void EphemerisApiModelTests::engineWarningTextMatchesTimeScaleWarningTexts()
+{
+    struct SharedWarning {
+        skygate::ephemeris::EphemerisEngineWarning::Code engineCode;
+        skygate::ephemeris::TimeScaleConversionWarningCode timeScaleCode;
+    };
+
+    constexpr std::array sharedWarnings{
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::LeapSecondTableMissing,
+            skygate::ephemeris::TimeScaleConversionWarningCode::LeapSecondTableMissing
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::LeapSecondTableStale,
+            skygate::ephemeris::TimeScaleConversionWarningCode::LeapSecondTableStale
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::EpochOutsideLeapSecondTable,
+            skygate::ephemeris::TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::LeapSecondFallbackApplied,
+            skygate::ephemeris::TimeScaleConversionWarningCode::LeapSecondFallbackApplied
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::UnsupportedTimeScaleConversion,
+            skygate::ephemeris::TimeScaleConversionWarningCode::UnsupportedConversion
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::InvalidTimeScaleInput,
+            skygate::ephemeris::TimeScaleConversionWarningCode::InvalidInput
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::TdbApproximationApplied,
+            skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationDataMissing,
+            skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataMissing
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationDataStale,
+            skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataStale
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationDataPredicted,
+            skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataPredicted
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::EpochOutsideEarthOrientationData,
+            skygate::ephemeris::TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::DeltaTFallbackApplied,
+            skygate::ephemeris::TimeScaleConversionWarningCode::DeltaTFallbackApplied
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::DeltaTUnavailable,
+            skygate::ephemeris::TimeScaleConversionWarningCode::DeltaTUnavailable
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationDataEstimated,
+            skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataEstimated
+        },
+    };
+
+    for (const SharedWarning& sharedWarning : sharedWarnings) {
+        QCOMPARE(
+            skygate::ephemeris::EphemerisEngineWarning::text(sharedWarning.engineCode),
+            skygate::ephemeris::TimeScaleConversionDiagnostics::warningText(sharedWarning.timeScaleCode)
+        );
+    }
+
+    constexpr std::array aliasWarnings{
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationStaleData,
+            skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataStale
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationPredictedData,
+            skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataPredicted
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationMissingData,
+            skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataMissing
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationEpochOutsideRange,
+            skygate::ephemeris::TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData
+        },
+        SharedWarning{
+            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationEstimatedData,
+            skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataEstimated
+        },
+    };
+
+    for (const SharedWarning& aliasWarning : aliasWarnings) {
+        QCOMPARE(
+            skygate::ephemeris::EphemerisEngineWarning::text(aliasWarning.engineCode),
+            skygate::ephemeris::TimeScaleConversionDiagnostics::warningText(aliasWarning.timeScaleCode)
+        );
+    }
 }
 
 void EphemerisApiModelTests::keepsLegacyBodyStateFieldsReadableWithMetadata()
