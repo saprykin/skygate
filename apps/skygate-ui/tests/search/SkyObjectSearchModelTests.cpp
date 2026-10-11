@@ -210,7 +210,7 @@ void SkyObjectSearchModelTests::filtersDeepSkyAliases()
     model.setFilterText("andromeda");
     QCOMPARE(model.rowCount(), 1);
     QCOMPARE(displayTextAt(model, 0), QString("Andromeda Galaxy"));
-    QCOMPARE(detailTextAt(model, 0), QString("Deep sky • Galaxy • messier_031"));
+    QCOMPARE(detailTextAt(model, 0), QString("Deep sky object • Galaxy • messier_031"));
     QCOMPARE(targetKindAt(model, 0), QString("body"));
     QCOMPARE(targetIdAt(model, 0), QString("messier_031"));
 }
@@ -338,7 +338,7 @@ void SkyObjectSearchModelTests::ranksLargerMixedCatalogWithCollisions()
     QCOMPARE(displayTextAt(model, 0), QString("Andromeda"));
     QCOMPARE(targetKindAt(model, 0), QString("body"));
     QCOMPARE(targetIdAt(model, 0), QString("messier_031"));
-    QCOMPARE(detailTextAt(model, 0), QString("Deep sky • Galaxy • messier_031"));
+    QCOMPARE(detailTextAt(model, 0), QString("Deep sky object • Galaxy • messier_031"));
     QCOMPARE(displayTextAt(model, 1), QString("Andromeda Galaxy"));
     QCOMPARE(targetIdAt(model, 1), QString("messier_031"));
 
@@ -347,7 +347,7 @@ void SkyObjectSearchModelTests::ranksLargerMixedCatalogWithCollisions()
     QCOMPARE(displayTextAt(model, 0), QString("Ring Nebula"));
     QCOMPARE(targetKindAt(model, 0), QString("body"));
     QCOMPARE(targetIdAt(model, 0), QString("messier_057"));
-    QCOMPARE(detailTextAt(model, 0), QString("Deep sky • Planetary nebula • messier_057"));
+    QCOMPARE(detailTextAt(model, 0), QString("Deep sky object • Planetary nebula • messier_057"));
 
     model.setFilterText("orion");
     QCOMPARE(model.rowCount(), 1);

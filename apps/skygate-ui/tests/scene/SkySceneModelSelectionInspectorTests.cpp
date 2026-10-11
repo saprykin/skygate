@@ -132,8 +132,8 @@ void SkySceneModelSelectionInspectorTests::circumpolarInspectorShowsObservationF
 
     const QVariantMap inspector = sceneModel.selectedObjectInspector();
     QCOMPARE(inspector.value("title").toString(), QString("Demo Circumpolar"));
-    QCOMPARE(inspectorFieldValue(inspector, "Rise"), QString("Always above"));
-    QCOMPARE(inspectorFieldValue(inspector, "Set"), QString("Always above"));
+    QCOMPARE(inspectorFieldValue(inspector, "Rise"), QString("Always up"));
+    QCOMPARE(inspectorFieldValue(inspector, "Set"), QString("Always up"));
     QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC"));
     QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("deg"));
 }

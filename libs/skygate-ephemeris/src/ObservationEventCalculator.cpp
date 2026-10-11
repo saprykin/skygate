@@ -72,17 +72,17 @@ isSetBracket(const AltitudeSample& previous, const AltitudeSample& next, double 
     return previous.utcTime + std::chrono::duration_cast<skygate::core::UtcTimePoint::duration>(spanSeconds * fraction);
 }
 
-[[nodiscard]] ObservationEventStatus unavailableCrossingStatus(
-    const std::vector<AltitudeSample>& samples, std::optional<ObservationEventStatus> provenFixedStatus
+[[nodiscard]] ObservationEventStatus::Type unavailableCrossingStatus(
+    const std::vector<AltitudeSample>& samples, std::optional<ObservationEventStatus::Type> provenFixedStatus
 ) noexcept
 {
     if (samples.empty()) {
-        return ObservationEventStatus::Unresolved;
+        return ObservationEventStatus::Type::Unresolved;
     }
     if (provenFixedStatus.has_value()) {
         return *provenFixedStatus;
     }
-    return ObservationEventStatus::NoEventInSearchWindow;
+    return ObservationEventStatus::Type::NoEventInSearchWindow;
 }
 
 class EventSearch final {
@@ -107,19 +107,19 @@ public:
         SampleRole sampleRole,
         bool trustGuidance,
         bool rising,
-        std::optional<ObservationEventStatus> provenFixedStatus
+        std::optional<ObservationEventStatus::Type> provenFixedStatus
     );
 
     [[nodiscard]] ObservationEvent findCulmination(const std::vector<AltitudeSample>& samples, bool trustGuidance);
 
-    [[nodiscard]] std::optional<ObservationEventStatus> fixedHorizonStatus() const noexcept;
+    [[nodiscard]] std::optional<ObservationEventStatus::Type> fixedHorizonStatus() const noexcept;
 
     [[nodiscard]] static ObservationEventSummary invalidSummary() noexcept
     {
         return ObservationEventSummary{
-            .nextRise = {.status = ObservationEventStatus::InvalidInput},
-            .nextSet = {.status = ObservationEventStatus::InvalidInput},
-            .culmination = {.status = ObservationEventStatus::InvalidInput}
+            .nextRise = {.status = ObservationEventStatus::Type::InvalidInput},
+            .nextSet = {.status = ObservationEventStatus::Type::InvalidInput},
+            .culmination = {.status = ObservationEventStatus::Type::InvalidInput}
         };
     }
 
@@ -176,7 +176,7 @@ std::vector<AltitudeSample> EventSearch::sampleAltitudes(
     return samples;
 }
 
-std::optional<ObservationEventStatus> EventSearch::fixedHorizonStatus() const noexcept
+std::optional<ObservationEventStatus::Type> EventSearch::fixedHorizonStatus() const noexcept
 {
     if (m_body == nullptr || !m_body->fixedEquatorialValue().has_value()) {
         return std::nullopt;
@@ -191,10 +191,10 @@ std::optional<ObservationEventStatus> EventSearch::fixedHorizonStatus() const no
     const double minAltitudeDeg = std::abs(m_request.context.observer.latitudeDeg + equatorial.declinationDeg) - 90.0;
 
     if (minAltitudeDeg >= m_crossingAltitudeDeg - kAltitudeClassificationToleranceDeg) {
-        return ObservationEventStatus::AlwaysAbove;
+        return ObservationEventStatus::Type::AlwaysAbove;
     }
     if (maxAltitudeDeg <= m_crossingAltitudeDeg + kAltitudeClassificationToleranceDeg) {
-        return ObservationEventStatus::AlwaysBelow;
+        return ObservationEventStatus::Type::AlwaysBelow;
     }
 
     return std::nullopt;
@@ -256,7 +256,7 @@ ObservationEvent EventSearch::findCrossing(
     const SampleRole sampleRole,
     const bool trustGuidance,
     const bool rising,
-    const std::optional<ObservationEventStatus> provenFixedStatus
+    const std::optional<ObservationEventStatus::Type> provenFixedStatus
 )
 {
     bool rejectedGuidanceBracket = false;
@@ -289,14 +289,14 @@ ObservationEvent EventSearch::findCrossing(
                             );
 
         return ObservationEvent{
-            .status = ObservationEventStatus::Available,
+            .status = ObservationEventStatus::Type::Available,
             .utcTime = crossingUtcTime,
             .altitudeDeg = m_crossingAltitudeDeg
         };
     }
 
     if (rejectedGuidanceBracket) {
-        return ObservationEvent{.status = ObservationEventStatus::Unresolved};
+        return ObservationEvent{.status = ObservationEventStatus::Type::Unresolved};
     }
 
     return ObservationEvent{.status = unavailableCrossingStatus(samples, provenFixedStatus)};
@@ -357,12 +357,15 @@ ObservationEvent EventSearch::findCulmination(const std::vector<AltitudeSample>&
         }
 
         return ObservationEvent{
-            .status = ObservationEventStatus::Available, .utcTime = maximum.utcTime, .altitudeDeg = maximum.altitudeDeg
+            .status = ObservationEventStatus::Type::Available,
+            .utcTime = maximum.utcTime,
+            .altitudeDeg = maximum.altitudeDeg
         };
     }
 
     return ObservationEvent{
-        .status = samples.empty() ? ObservationEventStatus::Unresolved : ObservationEventStatus::NoEventInSearchWindow,
+        .status = samples.empty() ? ObservationEventStatus::Type::Unresolved
+                                  : ObservationEventStatus::Type::NoEventInSearchWindow,
         .utcTime = std::nullopt,
         .altitudeDeg = std::nullopt
     };
@@ -405,8 +408,8 @@ shouldUseGuidanceEngine(const IEphemerisEngine& engine, const BaseCelestialBody*
     // engine before it is reported, including for fixed bodies whose catalog
     // geometry may not match the engine's corrected positions.
     if (!trustGuidance) {
-        return nextRise.status != ObservationEventStatus::Available
-               || nextSet.status != ObservationEventStatus::Available;
+        return nextRise.status != ObservationEventStatus::Type::Available
+               || nextSet.status != ObservationEventStatus::Type::Available;
     }
 
     if (searchMode == SearchMode::GuidedApproximate) {
@@ -414,11 +417,11 @@ shouldUseGuidanceEngine(const IEphemerisEngine& engine, const BaseCelestialBody*
     }
 
     const bool fixedBody = body != nullptr && body->fixedEquatorialValue().has_value();
-    const bool unresolved =
-        nextRise.status == ObservationEventStatus::Unresolved || nextSet.status == ObservationEventStatus::Unresolved;
+    const bool unresolved = nextRise.status == ObservationEventStatus::Type::Unresolved
+                            || nextSet.status == ObservationEventStatus::Type::Unresolved;
     const bool nonFixedMiss = !fixedBody
-                              && (nextRise.status == ObservationEventStatus::NoEventInSearchWindow
-                                  || nextSet.status == ObservationEventStatus::NoEventInSearchWindow);
+                              && (nextRise.status == ObservationEventStatus::Type::NoEventInSearchWindow
+                                  || nextSet.status == ObservationEventStatus::Type::NoEventInSearchWindow);
     return unresolved || nonFixedMiss;
 }
 

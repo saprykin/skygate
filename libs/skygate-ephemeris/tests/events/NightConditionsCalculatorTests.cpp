@@ -111,7 +111,7 @@ makeCatalog(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies)
 
 [[nodiscard]] bool isAvailable(const skygate::ephemeris::ObservationEvent& event)
 {
-    return event.status == skygate::ephemeris::ObservationEventStatus::Available && event.utcTime.has_value();
+    return event.status == skygate::ephemeris::ObservationEventStatus::Type::Available && event.utcTime.has_value();
 }
 
 [[nodiscard]] skygate::ephemeris::tests::RequestCountingEphemerisEngine
@@ -341,8 +341,8 @@ void NightConditionsCalculatorTests::invalidObserverReturnsUnavailableConditions
 
     QVERIFY(!conditions.valid);
     QVERIFY(!conditions.sunAltitudeDeg.has_value());
-    QCOMPARE(conditions.sunrise.status, skygate::ephemeris::ObservationEventStatus::Unresolved);
-    QCOMPARE(conditions.moonrise.status, skygate::ephemeris::ObservationEventStatus::Unresolved);
+    QCOMPARE(conditions.sunrise.status, skygate::ephemeris::ObservationEventStatus::Type::Unresolved);
+    QCOMPARE(conditions.moonrise.status, skygate::ephemeris::ObservationEventStatus::Type::Unresolved);
     QCOMPARE(conditions.moonIlluminationPercent, 0.0);
     QVERIFY(conditions.moonPhaseName.empty());
 }
@@ -359,10 +359,10 @@ void NightConditionsCalculatorTests::polarTwilightReportsStableUnavailableStatus
 
     QVERIFY(conditions.valid);
     QVERIFY(conditions.sunAltitudeDeg.has_value());
-    QVERIFY(conditions.sunrise.status != skygate::ephemeris::ObservationEventStatus::InvalidInput);
-    QVERIFY(conditions.sunset.status != skygate::ephemeris::ObservationEventStatus::InvalidInput);
-    QVERIFY(conditions.astronomicalDusk.status != skygate::ephemeris::ObservationEventStatus::InvalidInput);
-    QVERIFY(conditions.astronomicalDawn.status != skygate::ephemeris::ObservationEventStatus::InvalidInput);
+    QVERIFY(conditions.sunrise.status != skygate::ephemeris::ObservationEventStatus::Type::InvalidInput);
+    QVERIFY(conditions.sunset.status != skygate::ephemeris::ObservationEventStatus::Type::InvalidInput);
+    QVERIFY(conditions.astronomicalDusk.status != skygate::ephemeris::ObservationEventStatus::Type::InvalidInput);
+    QVERIFY(conditions.astronomicalDawn.status != skygate::ephemeris::ObservationEventStatus::Type::InvalidInput);
 }
 
 void NightConditionsCalculatorTests::moonRiseSetAndIlluminationArePopulated()
@@ -596,7 +596,7 @@ void NightConditionsCalculatorTests::untrustedApproximateVerifiesAgainstPrimary(
     const auto conditions = calculator.compute(engine, request, 0U, &bodies->bodyAt(0), 1U, &bodies->bodyAt(1));
 
     QVERIFY(conditions.valid);
-    QCOMPARE(conditions.sunrise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(conditions.sunrise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(conditions.sunrise.utcTime.has_value());
     QVERIFY(*primaryCall > 2);
 
@@ -623,7 +623,7 @@ void NightConditionsCalculatorTests::trustedApproximateSkipPrimaryVerification()
     const auto conditions = calculator.compute(engine, request, 0U, &bodies->bodyAt(0), 1U, &bodies->bodyAt(1));
 
     QVERIFY(conditions.valid);
-    QCOMPARE(conditions.sunrise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(conditions.sunrise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QCOMPARE(*primaryCall, 2);
 }
 

@@ -20,7 +20,7 @@ constexpr double kAstronomicalTwilightAltitudeDeg = -18.0;
 
 [[nodiscard]] ObservationEvent unavailableEvent() noexcept
 {
-    return ObservationEvent{.status = ObservationEventStatus::Unresolved};
+    return ObservationEvent{.status = ObservationEventStatus::Type::Unresolved};
 }
 
 [[nodiscard]] ObservationEventCalculator::SearchMode

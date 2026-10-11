@@ -248,7 +248,7 @@ void ObservationEventPrimaryEngineTests::untrustedFixedStarGuidedSearchVerifiesP
     const auto request = makeRequest(makeContext(), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
 
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.nextRise.utcTime.has_value());
     QVERIFY(*primaryCall > 0);
 
@@ -270,7 +270,7 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateVerifiesPrima
     const auto request = makeRequest(makeContext(), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::GuidedApproximate);
 
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.nextRise.utcTime.has_value());
     QVERIFY(*primaryCall > 0);
 
@@ -292,7 +292,7 @@ void ObservationEventPrimaryEngineTests::trustedFixedStarGuidedSkipsPrimaryVerif
     const auto request = makeRequest(makeContext(), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
 
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.nextRise.utcTime.has_value());
     QCOMPARE(*primaryCall, 0);
 
@@ -315,8 +315,8 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedAlwaysAboveFallsBackToPr
     const auto request = makeRequest(makeContext(47.3769), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
 
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.nextRise.utcTime.has_value());
     QVERIFY(summary.nextSet.utcTime.has_value());
     QVERIFY(*primaryCall > 0);
@@ -335,8 +335,8 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateAlwaysAboveFa
     const auto request = makeRequest(makeContext(47.3769), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::GuidedApproximate);
 
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.nextRise.utcTime.has_value());
     QVERIFY(summary.nextSet.utcTime.has_value());
     QVERIFY(*primaryCall > 0);
@@ -355,8 +355,8 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedAlwaysBelowFallsBackToPr
     const auto request = makeRequest(makeContext(47.3769), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
 
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.nextRise.utcTime.has_value());
     QVERIFY(summary.nextSet.utcTime.has_value());
     QVERIFY(*primaryCall > 0);
@@ -375,8 +375,8 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateWindowMissFal
     const auto request = makeRequest(makeContext(), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::GuidedApproximate);
 
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.nextRise.utcTime.has_value());
     QVERIFY(summary.nextSet.utcTime.has_value());
     QVERIFY(*primaryCall > 0);
@@ -395,8 +395,8 @@ void ObservationEventPrimaryEngineTests::trustedGuidedApproximateFixedBodySkipsP
     const auto request = makeRequest(makeContext(47.3769), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::GuidedApproximate);
 
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::AlwaysAbove);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::AlwaysAbove);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::AlwaysAbove);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::AlwaysAbove);
     QCOMPARE(*primaryCall, 0);
 }
 

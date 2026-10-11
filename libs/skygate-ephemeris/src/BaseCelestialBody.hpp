@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace skygate::ephemeris {
 
@@ -21,6 +22,26 @@ public:
         Constellation,
         DeepSkyObject
     };
+
+    [[nodiscard]] static constexpr std::string_view kindLabel(const Kind kind) noexcept
+    {
+        switch (kind) {
+        case Kind::Star:
+            return "Star";
+        case Kind::Planet:
+            return "Planet";
+        case Kind::Moon:
+            return "Moon";
+        case Kind::Sun:
+            return "Sun";
+        case Kind::Constellation:
+            return "Constellation";
+        case Kind::DeepSkyObject:
+            return "Deep sky object";
+        }
+
+        return "Object";
+    }
 
     virtual ~BaseCelestialBody();
 

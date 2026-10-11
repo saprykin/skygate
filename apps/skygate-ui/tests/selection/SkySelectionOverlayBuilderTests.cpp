@@ -605,8 +605,8 @@ void SkySelectionOverlayBuilderTests::inspectorIncludesObservationEventsAndFallb
 
     input.selectedObjectTargetId = "circumpolar";
     inspector = builder.buildSelectedObjectInspectorData(input);
-    QCOMPARE(overlayInspectorFieldValue(inspector, "Rise"), QString("Always above"));
-    QCOMPARE(overlayInspectorFieldValue(inspector, "Set"), QString("Always above"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Rise"), QString("Always up"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Set"), QString("Always up"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Culmination").contains("UTC+06:00"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Culmination").contains("deg"));
 }
