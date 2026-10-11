@@ -111,7 +111,8 @@ set_tests_properties(skygate-ephemeris-simple-engine-isolation-test
 # engine implementation headers. Concrete headers are the engine/simple/ and
 # engine/highprecision/ implementation directories plus the concrete guidance
 # strategy engine/SimpleEphemerisGuidanceStrategy.hpp, which lives directly
-# under engine/.
+# under engine/. The descriptor registry is allowed to reach the simple engine
+# so the registry and the engine share one default-options definition.
 set(SKYGATE_ENGINE_HEADER_ISOLATION_SCAN_ROOTS
     "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src"
     "${CMAKE_SOURCE_DIR}/apps/skygate-ui/src"
@@ -121,6 +122,7 @@ set(SKYGATE_ENGINE_HEADER_ISOLATION_ALLOWLIST
     "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/composition/"
     "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/simple/"
     "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/highprecision/"
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/EphemerisEngineDescriptorRegistry.cpp"
     "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/TdbTtConverter.cpp"
     "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/tests/support/"
     "${CMAKE_SOURCE_DIR}/apps/skygate-ui/tests/support/"
