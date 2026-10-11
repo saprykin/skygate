@@ -1,23 +1,16 @@
 #include "ConstellationReferenceCalculator.hpp"
 #include "SkyContextController.hpp"
 #include "SkyPerformanceLogging.hpp"
+#include "StringUtilities.hpp"
 
 #include <QElapsedTimer>
 
 #include <cmath>
 #include <string>
 
+using skygate::ephemeris::StringUtilities;
+
 namespace {
-
-QString normalizedLookupKey(const QString& value)
-{
-    return value.trimmed().toCaseFolded();
-}
-
-QString normalizedLookupKey(const std::string& value)
-{
-    return normalizedLookupKey(QString::fromStdString(value));
-}
 
 bool hasFiniteHorizontal(const skygate::core::HorizontalCoordinate& horizontal)
 {
@@ -27,10 +20,10 @@ bool hasFiniteHorizontal(const skygate::core::HorizontalCoordinate& horizontal)
 const skygate::ephemeris::CelestialBodyState*
 findBodyStateById(const skygate::ephemeris::EphemerisSnapshot& snapshot, const QString& targetId)
 {
-    const QString normalizedTargetId = normalizedLookupKey(targetId);
+    const std::string normalizedTargetId = StringUtilities::normalizedLookupKey(targetId.toStdString());
     for (const auto& state : snapshot.states) {
         const auto& body = snapshot.bodyAt(state.bodyIndex);
-        if (normalizedLookupKey(body.id) == normalizedTargetId) {
+        if (StringUtilities::normalizedLookupKey(body.id) == normalizedTargetId) {
             return &state;
         }
     }
@@ -69,7 +62,7 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
 
     const auto requestContext = ephemerisRequestContext();
     const qint64 requestContextNs = skygate::ui::performanceElapsedNanoseconds(timer);
-    const QString normalizedTargetKind = normalizedLookupKey(targetKind);
+    const std::string normalizedTargetKind = StringUtilities::normalizedLookupKey(targetKind.toStdString());
     if (normalizedTargetKind == "body") {
         const std::string trimmedTargetId = targetId.trimmed().toStdString();
         const auto bodyState = engine->computeBodyState(requestContext.request, trimmedTargetId);
@@ -79,8 +72,9 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
         }
 
         if (hasTrackedTarget()
-            && (normalizedLookupKey(m_search.trackedTargetKind()) != "body"
-                || normalizedLookupKey(m_search.trackedTargetId()) != normalizedLookupKey(targetId))) {
+            && (StringUtilities::normalizedLookupKey(m_search.trackedTargetKind().toStdString()) != "body"
+                || StringUtilities::normalizedLookupKey(m_search.trackedTargetId().toStdString())
+                       != StringUtilities::normalizedLookupKey(targetId.toStdString()))) {
             clearTrackedTarget();
         }
         const qint64 trackingNs = skygate::ui::performanceElapsedNanoseconds(timer);
@@ -142,7 +136,8 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
 bool SkyContextController::trackSearchTarget(const QString& targetKind, const QString& targetId)
 {
     const auto* engine = ephemerisEngine();
-    if (engine == nullptr || normalizedLookupKey(targetKind) != "body" || targetId.trimmed().isEmpty()) {
+    if (engine == nullptr || StringUtilities::normalizedLookupKey(targetKind.toStdString()) != "body"
+        || targetId.trimmed().isEmpty()) {
         return false;
     }
 
@@ -188,7 +183,8 @@ bool SkyContextController::recenterTrackedTarget(const bool emitSkyContextChange
     }
 
     const auto* engine = ephemerisEngine();
-    if (engine == nullptr || normalizedLookupKey(m_search.trackedTargetKind()) != "body") {
+    if (engine == nullptr
+        || StringUtilities::normalizedLookupKey(m_search.trackedTargetKind().toStdString()) != "body") {
         clearTrackedTarget();
         return false;
     }
