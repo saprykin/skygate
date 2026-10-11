@@ -275,7 +275,10 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
         if (kernelProvider == nullptr) {
             skygate::ephemeris::highprecision::CalcephKernelProvider::Options kernelSelectionOptions;
             kernelProvider = std::make_shared<skygate::ephemeris::highprecision::CalcephKernelProvider>(
-                *request.activeDataSnapshot, *request.dataManifest, std::move(kernelSelectionOptions)
+                *request.activeDataSnapshot,
+                *request.dataManifest,
+                std::move(kernelSelectionOptions),
+                request.timeScaleService
             );
         }
 

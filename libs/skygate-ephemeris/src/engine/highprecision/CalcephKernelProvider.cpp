@@ -77,8 +77,14 @@ public:
         std::optional<Info> m_kernelInfo;
     };
 
-    Impl(const IEphemerisDataSnapshot& snapshot, EphemerisDataManifest manifest, Options options)
-        : m_manifest(std::move(manifest)), m_options(std::move(options)), m_kernelAssets(collectKernelAssets(snapshot))
+    Impl(
+        const IEphemerisDataSnapshot& snapshot,
+        EphemerisDataManifest manifest,
+        Options options,
+        std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService
+    )
+        : m_manifest(std::move(manifest)), m_options(std::move(options)),
+          m_timeScaleService(std::move(timeScaleService)), m_kernelAssets(collectKernelAssets(snapshot))
     {
     }
 
@@ -176,7 +182,7 @@ public:
             kernelInfo.provenance = snapshotAsset->provenance;
         }
 
-        return std::make_shared<CalcephKernel>(std::move(kernelInfo));
+        return std::make_shared<CalcephKernel>(std::move(kernelInfo), m_timeScaleService);
 #endif
     }
 
@@ -317,20 +323,31 @@ public:
 
     EphemerisDataManifest m_manifest;
     Options m_options;
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_timeScaleService;
     std::vector<EphemerisKernelDataAsset> m_kernelAssets;
 };
 
 CalcephKernelProvider::CalcephKernelProvider(
     const IEphemerisDataSnapshot& snapshot, const EphemerisDataManifest& manifest
 )
-    : CalcephKernelProvider(snapshot, manifest, Options{})
+    : CalcephKernelProvider(snapshot, manifest, Options{}, nullptr)
 {
 }
 
 CalcephKernelProvider::CalcephKernelProvider(
     const IEphemerisDataSnapshot& snapshot, const EphemerisDataManifest& manifest, Options options
 )
-    : m_impl(std::make_unique<Impl>(snapshot, manifest, std::move(options)))
+    : CalcephKernelProvider(snapshot, manifest, std::move(options), nullptr)
+{
+}
+
+CalcephKernelProvider::CalcephKernelProvider(
+    const IEphemerisDataSnapshot& snapshot,
+    const EphemerisDataManifest& manifest,
+    Options options,
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService
+)
+    : m_impl(std::make_unique<Impl>(snapshot, manifest, std::move(options), std::move(timeScaleService)))
 {
 }
 

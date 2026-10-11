@@ -5,11 +5,17 @@
 #include <memory>
 #include <optional>
 
+namespace skygate::ephemeris {
+class ITimeScaleService;
+}  // namespace skygate::ephemeris
+
 namespace skygate::ephemeris::highprecision {
 
 class CalcephKernel final : public ICalcephKernel {
 public:
-    explicit CalcephKernel(Info info);
+    explicit CalcephKernel(
+        Info info, std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService = nullptr
+    );
     ~CalcephKernel() override;
 
     CalcephKernel(const CalcephKernel&) = delete;
