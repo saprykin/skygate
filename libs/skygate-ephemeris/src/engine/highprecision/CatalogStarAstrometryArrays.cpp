@@ -8,15 +8,9 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-[[nodiscard]] bool isCatalogStarBody(const BaseCelestialBody& body) noexcept
-{
-    return body.kind == BaseCelestialBody::Kind::Star || body.fixedEquatorialValue().has_value();
-}
-
 [[nodiscard]] bool hasAstrometryArrayInput(const BaseCelestialBody& body) noexcept
 {
-    return isCatalogStarBody(body)
-           && (body.starAstrometryValue().has_value() || body.fixedEquatorialValue().has_value());
+    return body.isCatalogStar() && (body.starAstrometryValue().has_value() || body.fixedEquatorialValue().has_value());
 }
 
 [[nodiscard]] double optionalOrQuietNaN(const std::optional<double> value) noexcept

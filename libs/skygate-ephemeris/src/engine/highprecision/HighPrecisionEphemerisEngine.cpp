@@ -15,6 +15,7 @@
 #include "StarAstrometryBatchResult.hpp"
 #include "StringUtilities.hpp"
 #include "UtcTimeCodec.hpp"
+#include "catalog/CatalogIdentity.hpp"
 #include "engine/IEphemerisFallbackStrategy.hpp"
 #include "engine/ITimeScaleService.hpp"
 #include "time/EpochCodec.hpp"
@@ -41,17 +42,6 @@ constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris 
 [[nodiscard]] bool hasValidEpoch(const skygate::core::AstronomicalEpoch& epoch) noexcept
 {
     return epoch.hasExplicit();
-}
-
-[[nodiscard]] bool isSolarSystemBody(const BaseCelestialBody& body) noexcept
-{
-    return body.kind == BaseCelestialBody::Kind::Sun || body.kind == BaseCelestialBody::Kind::Moon
-           || body.kind == BaseCelestialBody::Kind::Planet;
-}
-
-[[nodiscard]] bool isCatalogStarBody(const BaseCelestialBody& body) noexcept
-{
-    return body.kind == BaseCelestialBody::Kind::Star || body.fixedEquatorialValue().has_value();
 }
 
 [[nodiscard]] bool requestsApparentPlaceProcessing(const EphemerisRequest& request) noexcept
@@ -476,7 +466,7 @@ private:
         }
 
         const ISolarSystemStateCalculator* solarSystemCalculator = m_dependencies.solarSystemStateCalculator.get();
-        if (isSolarSystemBody(body) && solarSystemCalculator != nullptr) {
+        if (CatalogIdentity::isAnalyticSolarSystemBody(body) && solarSystemCalculator != nullptr) {
             HighPrecisionCalculatorResult kernelEpochMetadata;
             const std::optional<skygate::core::AstronomicalEpoch> kernelEpoch = kernelEpochForSolarSystemState(
                 kernelEpochMetadata.metadata, request, input.preparedRequestState.get(), m_dependencies.timeScaleService
@@ -505,7 +495,7 @@ private:
         }
 
         const IStarAstrometryCalculator* starAstrometryCalculator = m_dependencies.starAstrometryCalculator.get();
-        if (isCatalogStarBody(body) && starAstrometryCalculator != nullptr) {
+        if (body.isCatalogStar() && starAstrometryCalculator != nullptr) {
             HighPrecisionCalculatorResult calculatorResult = starAstrometryCalculator->calculate(input);
             HighPrecisionCalculatorResult apparentResult =
                 applyApparentPlaceIfRequested(m_dependencies, request, input, calculatorResult);
