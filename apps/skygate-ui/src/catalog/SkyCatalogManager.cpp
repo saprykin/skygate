@@ -3,6 +3,7 @@
 #include "SkyCatalogSourceInstance.hpp"
 #include "SkyCatalogSourceRecord.hpp"
 #include "SkyContextControllerSupport.hpp"
+#include "catalog/CatalogDownloadCancellation.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
 #include "catalog/SkyCatalogImportWorkflow.hpp"
@@ -11,7 +12,6 @@
 #include "catalog/SkyCatalogText.hpp"
 
 #include <QNetworkAccessManager>
-#include <QNetworkReply>
 
 #include <optional>
 #include <utility>
@@ -43,9 +43,10 @@ SkyCatalogManager::SkyCatalogManager(
 )
     : QObject(parent), m_runtime(std::make_unique<SkyCatalogRuntime>(std::move(starCatalog)))
 {
-    m_networkAccessManager = networkAccessManager != nullptr ? networkAccessManager : new QNetworkAccessManager(this);
+    QNetworkAccessManager* const effectiveNetworkAccessManager =
+        networkAccessManager != nullptr ? networkAccessManager : new QNetworkAccessManager(this);
     m_cacheController = std::make_unique<SkyCatalogCacheController>(settingsStore);
-    m_importWorkflow = std::make_unique<SkyCatalogImportWorkflow>(m_networkAccessManager);
+    m_importWorkflow = std::make_unique<SkyCatalogImportWorkflow>(effectiveNetworkAccessManager);
     applyRuntimeResult(m_runtime->initialize(runtimeBuildOptions()));
 
     m_catalogUrlText = SkyCatalogPresets::defaultCatalogUrlText();
@@ -440,17 +441,24 @@ void SkyCatalogManager::cancelCatalogDownload()
         return;
     }
 
+    // Every operation is marked terminal before any transfer is aborted: a
+    // completion already queued or a parse already underway then finds no
+    // current operation and is discarded.
     invalidateAllPendingSourceWork();
     const QString activeInstanceId = m_activeDownloadInstanceId;
     m_activeDownloadInstanceId.clear();
-    if (m_networkAccessManager != nullptr) {
-        const QList<QNetworkReply*> replies = m_networkAccessManager->findChildren<QNetworkReply*>();
-        for (QNetworkReply* reply : replies) {
-            if (reply != nullptr && reply->isRunning()) {
-                reply->abort();
-            }
+
+    // Only this manager's own transfers are aborted. Requests issued by
+    // unrelated owners on an injected network manager keep running.
+    for (SourceOperation& operation : m_sourceOperations) {
+        if (operation.catalogCancellation != nullptr) {
+            operation.catalogCancellation->cancel();
+        }
+        if (operation.relatedCancellation != nullptr) {
+            operation.relatedCancellation->cancel();
         }
     }
+
     setDownloadingCatalog(false);
     setCatalogProcessing(false);
     setStatusText(QStringLiteral("Catalog: Download canceled."));
@@ -693,7 +701,7 @@ void SkyCatalogManager::loadSourceInstance(
     setCatalogProcessing(false);
     setDownloadingCatalog(true);
 
-    m_importWorkflow->downloadSource(
+    operation->catalogCancellation = m_importWorkflow->downloadSource(
         instance,
         policy,
         this,
@@ -820,6 +828,7 @@ void SkyCatalogManager::handleSourceImportFinished(
     if (operation == nullptr || operation->revision != revision) {
         return;
     }
+    operation->catalogCancellation.reset();
 
     if (result.catalog == nullptr) {
         operation->busy = false;
@@ -902,7 +911,7 @@ void SkyCatalogManager::downloadConstellationLinesAfterCatalog(
     }
 
     operation->constellationPending = true;
-    m_importWorkflow->downloadConstellationLines(
+    operation->relatedCancellation = m_importWorkflow->downloadConstellationLines(
         constellationLineUrlTexts,
         this,
         [this, catalogSummaryText, instanceId, revision](const QString& statusText) {
@@ -916,6 +925,7 @@ void SkyCatalogManager::downloadConstellationLinesAfterCatalog(
             }
             if (SourceOperation* operation = findOperation(instanceId)) {
                 operation->constellationPending = false;
+                operation->relatedCancellation.reset();
             }
             handleConstellationLineImportFinished(instanceId, catalogSummaryText, std::move(lineResult));
         }

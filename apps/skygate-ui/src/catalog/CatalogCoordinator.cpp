@@ -67,7 +67,7 @@ CatalogCoordinator::CatalogCoordinator(QNetworkAccessManager* networkAccessManag
 
 CatalogCoordinator::~CatalogCoordinator() = default;
 
-void CatalogCoordinator::downloadCatalogFromUrls(
+std::shared_ptr<CatalogDownloadCancellation> CatalogCoordinator::downloadCatalogFromUrls(
     const QStringList& urlTexts,
     CatalogParseOptions parseOptions,
     QObject* callbackContext,
@@ -79,10 +79,10 @@ void CatalogCoordinator::downloadCatalogFromUrls(
         DownloadResult result;
         result.errorText = "Catalog: Network unavailable";
         completionHandler(std::move(result));
-        return;
+        return nullptr;
     }
 
-    m_downloadService->downloadFirstSuccessfulFromUrls(
+    return m_downloadService->downloadFirstSuccessfulFromUrls(
         urlTexts,
         callbackContext,
         statusHandler,
@@ -153,7 +153,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
     );
 }
 
-void CatalogCoordinator::downloadRawDataFromUrls(
+std::shared_ptr<CatalogDownloadCancellation> CatalogCoordinator::downloadRawDataFromUrls(
     const QStringList& urlTexts,
     QObject* callbackContext,
     StatusHandler statusHandler,
@@ -164,10 +164,10 @@ void CatalogCoordinator::downloadRawDataFromUrls(
         RawDownloadResult result;
         result.errorText = "Catalog: Network unavailable";
         completionHandler(std::move(result));
-        return;
+        return nullptr;
     }
 
-    m_downloadService->downloadFirstSuccessfulFromUrls(
+    return m_downloadService->downloadFirstSuccessfulFromUrls(
         urlTexts,
         callbackContext,
         statusHandler,

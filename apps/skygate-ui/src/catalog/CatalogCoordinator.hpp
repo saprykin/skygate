@@ -12,6 +12,7 @@
 #include <functional>
 #include <memory>
 
+class CatalogDownloadCancellation;
 class QNetworkAccessManager;
 class QObject;
 class CatalogDownloadService;
@@ -41,7 +42,9 @@ public:
     explicit CatalogCoordinator(QNetworkAccessManager* networkAccessManager);
     ~CatalogCoordinator();
 
-    void downloadCatalogFromUrls(
+    // Returns the cancellation handle of the started download, or null when
+    // no download was started.
+    std::shared_ptr<CatalogDownloadCancellation> downloadCatalogFromUrls(
         const QStringList& urlTexts,
         CatalogParseOptions parseOptions,
         QObject* callbackContext,
@@ -49,7 +52,7 @@ public:
         CompletionHandler completionHandler
     ) const;
 
-    void downloadRawDataFromUrls(
+    std::shared_ptr<CatalogDownloadCancellation> downloadRawDataFromUrls(
         const QStringList& urlTexts,
         QObject* callbackContext,
         StatusHandler statusHandler,

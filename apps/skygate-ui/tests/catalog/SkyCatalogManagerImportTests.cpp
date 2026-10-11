@@ -4,6 +4,7 @@
 #include "CatalogTestPayloadFile.hpp"
 #include "CatalogTestPayloads.hpp"
 #include "FakeNetworkAccessManager.hpp"
+#include "FakeReplyQuery.hpp"
 #include "SettingsTestFixture.hpp"
 #include "SkyCatalogManager.hpp"
 #include "SkyCatalogSourceInstance.hpp"
@@ -17,6 +18,7 @@
 #include <QRegularExpression>
 #include <QSettings>
 #include <QSignalSpy>
+#include <QThreadPool>
 #include <QUrl>
 #include <QtTest/QtTest>
 
@@ -27,6 +29,7 @@ using skygate::ui::tests::CatalogArchiveFixture;
 using skygate::ui::tests::CatalogBodyQuery;
 using skygate::ui::tests::CatalogSourceFactsQuery;
 using skygate::ui::tests::CatalogTestPayloadFile;
+using skygate::ui::tests::FakeReplyQuery;
 
 class SkyCatalogManagerImportTests final : public QObject {
     Q_OBJECT
@@ -37,6 +40,8 @@ private slots:
     void customDeepSkyDownloadUsesGenericSourceLabel();
     void localDownloadTogglesBusyAndAppliesCatalog();
     void cancelCatalogDownloadClearsBusyAndIgnoresResult();
+    void cancelAbortsOnlyOwnTransfers();
+    void cancelWhileParsingIgnoresQueuedCompletion();
     void failedLocalDownloadClearsBusyAndReportsStatus();
     void failedLoadPreservesPriorDataAndRetrySucceeds();
     void failedUpdateKeepsAcceptedFactsWhenPersisting();
@@ -162,6 +167,182 @@ void SkyCatalogManagerImportTests::cancelCatalogDownloadClearsBusyAndIgnoresResu
     QVERIFY(!CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QString("Canceled Manager Star")));
     QVERIFY(downloadSpy.count() >= 2);
     QCOMPARE(catalogSpy.count(), 0);
+}
+
+void SkyCatalogManagerImportTests::cancelAbortsOnlyOwnTransfers()
+{
+    const QString ownedAcceptedUrl = QStringLiteral("https://example.test/scope-accepted.csv");
+    const QString ownedPendingUrl = QStringLiteral("https://example.test/scope-pending.csv");
+    const QString ownedFallbackUrl = QStringLiteral("https://example.test/scope-fallback.csv");
+    const QString otherOwnerUrl = QStringLiteral("https://example.test/scope-other-owner.csv");
+    const QByteArray pendingPayload = skygate::ui::tests::sampleHygCsvPayload(
+        {.id = 908100, .hip = 908100, .properName = "Scope Update Star", .mag = "1.0"}
+    );
+    const QByteArray otherOwnerPayload = skygate::ui::tests::sampleHygCsvPayload(
+        {.id = 908200, .hip = 908200, .properName = "Other Owner Star", .mag = "1.0"}
+    );
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        ownedAcceptedUrl,
+        {.payload = skygate::ui::tests::sampleHygCsvPayload(
+             {.id = 908000, .hip = 908000, .properName = "Scope Accepted Star", .mag = "1.0"}
+         )}
+    );
+    networkAccessManager.enqueueResponse(ownedPendingUrl, {.payload = pendingPayload, .manualFinish = true});
+    networkAccessManager.enqueueResponse(ownedFallbackUrl, {.payload = pendingPayload});
+    networkAccessManager.enqueueResponse(otherOwnerUrl, {.payload = otherOwnerPayload, .manualFinish = true});
+
+    SkySettingsStore ownedStore;
+    SkySettingsStore otherStore;
+    SkyCatalogManager ownedManager(&ownedStore, nullptr, nullptr, &networkAccessManager);
+    SkyCatalogManager otherManager(&otherStore, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy ownedCatalogSpy(&ownedManager, &SkyCatalogManager::catalogChanged);
+    QSignalSpy otherCatalogSpy(&otherManager, &SkyCatalogManager::catalogChanged);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance accepted =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(ownedAcceptedUrl, QStringLiteral("v1"));
+    const QString instanceId = accepted.instanceId;
+    ownedManager.loadSource(accepted, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!ownedManager.downloadingCatalog());
+    QVERIFY(CatalogBodyQuery::containsDisplayName(ownedManager.starCatalog(), QStringLiteral("Scope Accepted Star")));
+
+    // The pending update carries a fallback candidate a cancellation must never
+    // request, and the other owner shares the same network manager.
+    skygate::ui::internal::SkyCatalogSourceInstance update = accepted;
+    update.title = QStringLiteral("Scope Update Title");
+    update.version = QStringLiteral("v2");
+    update.urls = QStringList{ownedPendingUrl, ownedFallbackUrl};
+    ownedManager.loadSource(update, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    otherManager.downloadCatalogFromUrl(otherOwnerUrl);
+
+    QVERIFY(ownedManager.downloadingCatalog());
+    QVERIFY(otherManager.downloadingCatalog());
+    skygate::ui::tests::FakeNetworkReply* ownedReply =
+        FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, ownedPendingUrl);
+    skygate::ui::tests::FakeNetworkReply* otherReply =
+        FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, otherOwnerUrl);
+    QVERIFY(ownedReply != nullptr);
+    QVERIFY(otherReply != nullptr);
+
+    const auto revisionBeforeCancel = ownedManager.catalogRevision();
+    const std::size_t bodyCountBeforeCancel = ownedManager.bodyCount();
+    const int changesBeforeCancel = ownedCatalogSpy.count();
+
+    ownedManager.cancelCatalogDownload();
+
+    QVERIFY(ownedReply->isAborted());
+    QVERIFY(!otherReply->isAborted());
+    QVERIFY(!otherReply->isFinished());
+    QVERIFY(!ownedManager.downloadingCatalog());
+    QVERIFY(otherManager.downloadingCatalog());
+    QCOMPARE(networkAccessManager.requestedUrls(), QStringList({ownedAcceptedUrl, ownedPendingUrl, otherOwnerUrl}));
+    QCOMPARE(networkAccessManager.abortedUrls(), QStringList({ownedPendingUrl}));
+    QCOMPARE(ownedManager.catalogRevision(), revisionBeforeCancel);
+    QCOMPARE(ownedManager.bodyCount(), bodyCountBeforeCancel);
+    QCOMPARE(ownedCatalogSpy.count(), changesBeforeCancel);
+    QVERIFY(CatalogBodyQuery::containsDisplayName(ownedManager.starCatalog(), QStringLiteral("Scope Accepted Star")));
+    QVERIFY(!CatalogBodyQuery::containsDisplayName(ownedManager.starCatalog(), QStringLiteral("Scope Update Star")));
+
+    const QVector<SkyCatalogManager::SourceViewEntry> canceledView = ownedManager.sourceViewEntries();
+    const auto canceledEntry = std::find_if(
+        canceledView.begin(), canceledView.end(), [&instanceId](const SkyCatalogManager::SourceViewEntry& entry) {
+            return entry.instanceId == instanceId;
+        }
+    );
+    QVERIFY(canceledEntry != canceledView.end());
+    QVERIFY(!canceledEntry->busy);
+    QCOMPARE(canceledEntry->statusText, QStringLiteral("Canceled"));
+
+    // The other owner's transfer completes normally on the shared manager.
+    otherReply->finishNow();
+    QTRY_VERIFY(!otherManager.downloadingCatalog());
+    QVERIFY(CatalogBodyQuery::containsDisplayName(otherManager.starCatalog(), QStringLiteral("Other Owner Star")));
+    QVERIFY(otherCatalogSpy.count() >= 1);
+    QVERIFY(!CatalogBodyQuery::containsDisplayName(ownedManager.starCatalog(), QStringLiteral("Other Owner Star")));
+}
+
+void SkyCatalogManagerImportTests::cancelWhileParsingIgnoresQueuedCompletion()
+{
+    const QString acceptedUrl = QStringLiteral("https://example.test/parse-cancel-accepted.csv");
+    const QString updateUrl = QStringLiteral("https://example.test/parse-cancel-update.csv");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        acceptedUrl,
+        {.payload = skygate::ui::tests::sampleHygCsvPayload(
+             {.id = 908300, .hip = 908300, .properName = "Before Cancel Star", .mag = "1.0"}
+         )}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance accepted =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(acceptedUrl, QStringLiteral("v1"));
+    const QString instanceId = accepted.instanceId;
+    manager.loadSource(accepted, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Before Cancel Star")));
+
+    const auto revisionBeforeCancel = manager.catalogRevision();
+    const std::size_t bodyCountBeforeCancel = manager.bodyCount();
+    const skygate::ephemeris::IStarCatalog* const catalogBeforeCancel = manager.starCatalog();
+    const QString acceptedTitleBeforeCancel = manager.sourceTitles().value(instanceId);
+    const int changesBeforeCancel = catalogSpy.count();
+
+    // The reply completes and hands its payload to the background parser; the
+    // parsed result is still queued when the operation is canceled.
+    networkAccessManager.enqueueResponse(
+        updateUrl,
+        {.payload = skygate::ui::tests::sampleHygCsvPayload(
+             {.id = 908301, .hip = 908301, .properName = "After Cancel Star", .mag = "2.0"}
+         ),
+         .manualFinish = true}
+    );
+    skygate::ui::internal::SkyCatalogSourceInstance update = accepted;
+    update.title = QStringLiteral("Parse Cancel Update Title");
+    update.version = QStringLiteral("v2");
+    update.urls = QStringList{updateUrl};
+    manager.loadSource(update, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QVERIFY(manager.downloadingCatalog());
+
+    skygate::ui::tests::FakeNetworkReply* reply =
+        FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, updateUrl);
+    QVERIFY(reply != nullptr);
+    reply->finishNow();
+    QVERIFY(manager.catalogProcessing());
+
+    manager.cancelCatalogDownload();
+    QVERIFY(!manager.downloadingCatalog());
+    QVERIFY(!manager.catalogProcessing());
+    QCOMPARE(manager.statusText(), QStringLiteral("Catalog: Download canceled."));
+
+    // The queued parse result finds a superseded operation and is discarded.
+    QThreadPool::globalInstance()->waitForDone();
+    QCoreApplication::processEvents();
+
+    QCOMPARE(catalogSpy.count(), changesBeforeCancel);
+    QCOMPARE(manager.catalogRevision(), revisionBeforeCancel);
+    QCOMPARE(manager.bodyCount(), bodyCountBeforeCancel);
+    QCOMPARE(manager.starCatalog(), catalogBeforeCancel);
+    QCOMPARE(manager.sourceTitles().value(instanceId), acceptedTitleBeforeCancel);
+    QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Before Cancel Star")));
+    QVERIFY(!CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("After Cancel Star")));
+    QCOMPARE(manager.statusText(), QStringLiteral("Catalog: Download canceled."));
+    QVERIFY(!manager.downloadingCatalog());
+    QVERIFY(!manager.catalogProcessing());
+
+    const QVector<SkyCatalogManager::SourceViewEntry> canceledView = manager.sourceViewEntries();
+    const auto canceledEntry = std::find_if(
+        canceledView.begin(), canceledView.end(), [&instanceId](const SkyCatalogManager::SourceViewEntry& entry) {
+            return entry.instanceId == instanceId;
+        }
+    );
+    QVERIFY(canceledEntry != canceledView.end());
+    QVERIFY(!canceledEntry->busy);
+    QCOMPARE(canceledEntry->statusText, QStringLiteral("Canceled"));
 }
 
 void SkyCatalogManagerImportTests::failedLocalDownloadClearsBusyAndReportsStatus()

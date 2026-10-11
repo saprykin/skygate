@@ -230,10 +230,13 @@ void SkyCatalogManagerRelatedReplyTests::cancelDuringConstellationLoadIgnoresSta
     QCOMPARE(manager.statusText(), QStringLiteral("Catalog: Download canceled."));
     QVERIFY(manager.constellationLineRefs().empty());
 
-    QTRY_VERIFY(networkAccessManager.requestedUrls().size() >= 4);
+    // Cancellation aborts the pending transfer without requesting the next
+    // candidate URL.
     QTRY_VERIFY(FakeReplyQuery::allIssuedRepliesFinished(networkAccessManager));
     QCoreApplication::processEvents();
 
+    QCOMPARE(networkAccessManager.requestedUrls(), QStringList({catalogUrl, constellationUrl}));
+    QCOMPARE(networkAccessManager.abortedUrls(), QStringList({constellationUrl}));
     QCOMPARE(manager.statusText(), QStringLiteral("Catalog: Download canceled."));
     QVERIFY(manager.constellationLineRefs().empty());
     QVERIFY(manager.constellationAnchorGroups().empty());

@@ -1,6 +1,7 @@
 #include "AsyncTestSupport.hpp"
 #include "CatalogDownloadWorkflowTestSupport.hpp"
 #include "CatalogTestPayloads.hpp"
+#include "catalog/CatalogDownloadCancellation.hpp"
 #include "catalog/CatalogDownloadService.hpp"
 #include "FakeNetworkAccessManager.hpp"
 #include "LogCapture.hpp"
@@ -26,7 +27,8 @@ private slots:
     void rejectsEmptyAndOversizedPayloads();
     void doesNotCallDestroyedCallbackContext();
     void stopsRetryAfterDestroyedCallbackContext();
-    void retriesAfterAbortedReply();
+    void fallsBackWhenReplyAbortsWithoutCancellation();
+    void explicitCancellationStopsFallbackChain();
     void completesConcurrentRequestsIndependently();
     void concurrentFallbackChainsRemainIsolated();
     void successReleasesCompletionCapture();
@@ -218,7 +220,7 @@ void CatalogDownloadServiceTests::stopsRetryAfterDestroyedCallbackContext()
     QVERIFY(networkAccessManager.abortedUrls().isEmpty());
 }
 
-void CatalogDownloadServiceTests::retriesAfterAbortedReply()
+void CatalogDownloadServiceTests::fallsBackWhenReplyAbortsWithoutCancellation()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
@@ -263,6 +265,46 @@ void CatalogDownloadServiceTests::retriesAfterAbortedReply()
     QCOMPARE(networkAccessManager.abortedUrls(), QStringList({"https://example.test/cancelled.csv"}));
     QVERIFY(std::any_of(statuses.begin(), statuses.end(), [](const QString& status) {
         return status.contains("Operation canceled");
+    }));
+}
+
+void CatalogDownloadServiceTests::explicitCancellationStopsFallbackChain()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/pending.csv",
+        {.payload = sampleHygCsvPayload({1, 1, "Pending", "1.0", "2.0", "3.0"}), .manualFinish = true}
+    );
+    networkAccessManager.enqueueResponse(
+        "https://example.test/after-cancel.csv",
+        {.payload = sampleHygCsvPayload({2, 2, "After Cancel", "4.0", "5.0", "6.0"})}
+    );
+    CatalogDownloadService service(&networkAccessManager);
+
+    int completionCount = 0;
+    QStringList statuses;
+    const std::shared_ptr<CatalogDownloadCancellation> cancellation = service.downloadFirstSuccessfulFromUrls(
+        {"https://example.test/pending.csv", "https://example.test/after-cancel.csv"},
+        this,
+        [&statuses](const QString& status) { statuses.push_back(status); },
+        [&completionCount](CatalogDownloadService::DownloadResult) { ++completionCount; }
+    );
+    QVERIFY(cancellation != nullptr);
+    QCOMPARE(networkAccessManager.requestedUrls(), QStringList({"https://example.test/pending.csv"}));
+
+    cancellation->cancel();
+
+    QVERIFY(cancellation->isCanceled());
+    FakeNetworkReply* reply = onlyIssuedReply(networkAccessManager);
+    QVERIFY(reply->isAborted());
+    waitForFakeReplyFinished(reply);
+    QCoreApplication::processEvents();
+
+    QCOMPARE(completionCount, 0);
+    QCOMPARE(networkAccessManager.requestedUrls(), QStringList({"https://example.test/pending.csv"}));
+    QCOMPARE(networkAccessManager.abortedUrls(), QStringList({"https://example.test/pending.csv"}));
+    QVERIFY(std::none_of(statuses.begin(), statuses.end(), [](const QString& status) {
+        return status.contains("failed", Qt::CaseInsensitive);
     }));
 }
 

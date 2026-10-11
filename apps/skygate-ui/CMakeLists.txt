@@ -84,6 +84,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/SkyCatalogRuntime.hpp
     src/catalog/SkyCatalogSourceRecord.cpp
     src/catalog/SkyCatalogSourceRecord.hpp
+    src/catalog/CatalogDownloadCancellation.cpp
+    src/catalog/CatalogDownloadCancellation.hpp
     src/catalog/CatalogDownloadService.cpp
     src/catalog/CatalogDownloadService.hpp
     src/catalog/SkyCatalogImportWorkflow.cpp
