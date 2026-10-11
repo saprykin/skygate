@@ -6,14 +6,14 @@ namespace skygate::ephemeris {
 
 TimeScaleConversionResult TimeScaleConversionResult::success(
     skygate::core::AstronomicalEpoch epoch,
-    const TimeScaleConversionStatus status,
+    const TimeScaleConversionStatus::Type status,
     const std::uint32_t warningCodeMask,
     std::string diagnosticText
 )
 {
     if (diagnosticText.empty()) {
-        diagnosticText = status == TimeScaleConversionStatus::Valid ? "Time-scale conversion succeeded."
-                                                                    : "Time-scale conversion degraded.";
+        diagnosticText = status == TimeScaleConversionStatus::Type::Valid ? "Time-scale conversion succeeded."
+                                                                          : "Time-scale conversion degraded.";
     }
 
     return TimeScaleConversionResult{
@@ -33,20 +33,21 @@ TimeScaleConversionResult TimeScaleConversionResult::failure(
     TimeScaleConversionResult result;
     result.epoch = epoch;
     result.epoch.timeScale = targetScale;
-    result.status = TimeScaleConversionStatus::Failed;
+    result.status = TimeScaleConversionStatus::Type::Failed;
     result.diagnosticText = std::move(diagnosticText);
     return result;
 }
 
 void TimeScaleConversionResult::mergeWarnings(
     TimeScaleConversionResult& result,
-    const TimeScaleConversionStatus sourceStatus,
+    const TimeScaleConversionStatus::Type sourceStatus,
     const std::uint32_t sourceWarningCodeMask
 ) noexcept
 {
     result.warningCodeMask |= sourceWarningCodeMask;
-    if (sourceStatus == TimeScaleConversionStatus::Degraded && result.status == TimeScaleConversionStatus::Valid) {
-        result.status = TimeScaleConversionStatus::Degraded;
+    if (sourceStatus == TimeScaleConversionStatus::Type::Degraded
+        && result.status == TimeScaleConversionStatus::Type::Valid) {
+        result.status = TimeScaleConversionStatus::Type::Degraded;
     }
 }
 

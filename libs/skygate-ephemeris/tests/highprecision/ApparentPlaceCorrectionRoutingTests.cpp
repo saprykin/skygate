@@ -55,8 +55,8 @@ public:
         if (targetScale != skygate::core::TimeScale::Tt) {
             TimeScaleConversionResult result;
             result.epoch = epoch;
-            result.status = TimeScaleConversionStatus::Failed;
-            result.addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
+            result.status = TimeScaleConversionStatus::Type::Failed;
+            result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
             return result;
         }
 
@@ -68,9 +68,9 @@ public:
                 .timeScale = skygate::core::TimeScale::Tt,
             }
                 .normalized();
-        result.status = TimeScaleConversionStatus::Degraded;
+        result.status = TimeScaleConversionStatus::Type::Degraded;
         result.diagnosticText = "unit test degraded TT conversion";
-        result.addWarning(TimeScaleConversionWarningCode::LeapSecondTableMissing);
+        result.addWarning(TimeScaleConversionWarningCode::Type::LeapSecondTableMissing);
         return result;
     }
 

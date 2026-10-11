@@ -20,7 +20,7 @@ TimeScaleConversionResult ValidUtcTimeScaleService::convert(
                 .timeScale = targetScale,
             }
                 .normalized(),
-        .status = TimeScaleConversionStatus::Valid,
+        .status = TimeScaleConversionStatus::Type::Valid,
         .diagnosticText = "unit test conversion",
     };
 }

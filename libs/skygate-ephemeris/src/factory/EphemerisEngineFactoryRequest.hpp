@@ -30,7 +30,8 @@ struct EphemerisEngineFactoryRequest {
     std::shared_ptr<const ITimeScaleService> timeScaleService;
     std::shared_ptr<const IEarthOrientationProvider> earthOrientationProvider;
     std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelProvider> calcephKernelProvider;
-    EphemerisFactoryFallbackPolicy fallbackPolicy = EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+    EphemerisFactoryFallbackPolicy::Type fallbackPolicy =
+        EphemerisFactoryFallbackPolicy::Type::AllowSimpleEngineFallback;
     IEphemerisDiagnosticsSink* diagnosticsSink = nullptr;
 };
 

@@ -157,7 +157,7 @@ public:
         skygate::ephemeris::TimeScaleConversionResult result;
         result.epoch = epoch;
         result.epoch.timeScale = targetScale;
-        result.status = skygate::ephemeris::TimeScaleConversionStatus::Valid;
+        result.status = skygate::ephemeris::TimeScaleConversionStatus::Type::Valid;
         return result;
     }
 
@@ -172,8 +172,8 @@ public:
         }
 
         skygate::ephemeris::TimeScaleConversionResult result;
-        result.status = skygate::ephemeris::TimeScaleConversionStatus::Failed;
-        result.addWarning(skygate::ephemeris::TimeScaleConversionWarningCode::InvalidInput);
+        result.status = skygate::ephemeris::TimeScaleConversionStatus::Type::Failed;
+        result.addWarning(skygate::ephemeris::TimeScaleConversionWarningCode::Type::InvalidInput);
         return result;
     }
 };

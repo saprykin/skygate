@@ -18,15 +18,16 @@ class Ut1OffsetResolver final {
 public:
     struct Result {
         std::optional<double> ut1MinusUtcSeconds;
-        TimeScaleConversionStatus status = TimeScaleConversionStatus::Valid;
+        TimeScaleConversionStatus::Type status = TimeScaleConversionStatus::Type::Valid;
         std::uint32_t warningCodeMask = 0U;
         std::string diagnosticText;
 
-        void addWarning(const TimeScaleConversionWarningCode code) noexcept;
+        void addWarning(const TimeScaleConversionWarningCode::Type code) noexcept;
 
         [[nodiscard]] bool isSuccess() const noexcept
         {
-            return status == TimeScaleConversionStatus::Valid || status == TimeScaleConversionStatus::Degraded;
+            return status == TimeScaleConversionStatus::Type::Valid
+                   || status == TimeScaleConversionStatus::Type::Degraded;
         }
     };
 

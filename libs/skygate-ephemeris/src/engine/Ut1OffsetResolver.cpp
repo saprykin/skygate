@@ -11,25 +11,25 @@ namespace skygate::ephemeris {
 
 namespace {
 
-[[nodiscard]] TimeScaleConversionWarningCode
+[[nodiscard]] TimeScaleConversionWarningCode::Type
 timeScaleWarningFromEarthOrientationWarning(const EarthOrientationSampler::Sample::WarningCode code) noexcept
 {
     switch (code) {
     case EarthOrientationSampler::Sample::WarningCode::StaleData:
-        return TimeScaleConversionWarningCode::EarthOrientationDataStale;
+        return TimeScaleConversionWarningCode::Type::EarthOrientationDataStale;
     case EarthOrientationSampler::Sample::WarningCode::PredictedData:
-        return TimeScaleConversionWarningCode::EarthOrientationDataPredicted;
+        return TimeScaleConversionWarningCode::Type::EarthOrientationDataPredicted;
     case EarthOrientationSampler::Sample::WarningCode::MissingData:
-        return TimeScaleConversionWarningCode::EarthOrientationDataMissing;
+        return TimeScaleConversionWarningCode::Type::EarthOrientationDataMissing;
     case EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange:
-        return TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData;
+        return TimeScaleConversionWarningCode::Type::EpochOutsideEarthOrientationData;
     case EarthOrientationSampler::Sample::WarningCode::InvalidInput:
-        return TimeScaleConversionWarningCode::InvalidInput;
+        return TimeScaleConversionWarningCode::Type::InvalidInput;
     case EarthOrientationSampler::Sample::WarningCode::EstimatedData:
-        return TimeScaleConversionWarningCode::EarthOrientationDataEstimated;
+        return TimeScaleConversionWarningCode::Type::EarthOrientationDataEstimated;
     }
 
-    return TimeScaleConversionWarningCode::EarthOrientationDataMissing;
+    return TimeScaleConversionWarningCode::Type::EarthOrientationDataMissing;
 }
 
 void mergeEarthOrientationSampleWarnings(
@@ -65,14 +65,14 @@ void mergeEarthOrientationSampleWarnings(
     result.diagnosticText = sample.diagnosticText;
     mergeEarthOrientationSampleWarnings(result, sample);
     if (!sample.isSuccess()) {
-        result.status = TimeScaleConversionStatus::Failed;
+        result.status = TimeScaleConversionStatus::Type::Failed;
         return result;
     }
 
     result.ut1MinusUtcSeconds = sample.ut1MinusUtcSeconds;
     result.status = sample.status == EarthOrientationSampler::Sample::Status::Degraded
-                        ? TimeScaleConversionStatus::Degraded
-                        : TimeScaleConversionStatus::Valid;
+                        ? TimeScaleConversionStatus::Type::Degraded
+                        : TimeScaleConversionStatus::Type::Valid;
     return result;
 }
 
@@ -89,21 +89,21 @@ void mergeEarthOrientationSampleWarnings(
         if (result.diagnosticText.empty()) {
             result.diagnosticText = "UT1 conversion requires usable Earth-orientation data.";
         }
-        result.status = TimeScaleConversionStatus::Failed;
+        result.status = TimeScaleConversionStatus::Type::Failed;
         return result;
     }
 
     if (deltaTProvider == nullptr) {
-        result.status = TimeScaleConversionStatus::Failed;
-        result.addWarning(TimeScaleConversionWarningCode::DeltaTUnavailable);
+        result.status = TimeScaleConversionStatus::Type::Failed;
+        result.addWarning(TimeScaleConversionWarningCode::Type::DeltaTUnavailable);
         result.diagnosticText = "UT1 conversion could not use Delta T fallback because data is unavailable.";
         return result;
     }
 
     const IDeltaTProvider::Estimate estimate = deltaTProvider->deltaTSeconds(utcEpoch);
     if (!estimate.isUsable() || !estimate.deltaTSeconds.has_value()) {
-        result.status = TimeScaleConversionStatus::Failed;
-        result.addWarning(TimeScaleConversionWarningCode::DeltaTUnavailable);
+        result.status = TimeScaleConversionStatus::Type::Failed;
+        result.addWarning(TimeScaleConversionWarningCode::Type::DeltaTUnavailable);
         result.diagnosticText = estimate.diagnosticText.empty()
                                     ? "UT1 conversion could not use Delta T fallback for the requested epoch."
                                     : estimate.diagnosticText;
@@ -112,7 +112,7 @@ void mergeEarthOrientationSampleWarnings(
 
     const LeapSecondOffsetResolver::Result utcOffset = leapSecondResolver.lookupUtcOffset(utcEpoch);
     if (!utcOffset.offsetSeconds.has_value()) {
-        result.status = TimeScaleConversionStatus::Failed;
+        result.status = TimeScaleConversionStatus::Type::Failed;
         result.warningCodeMask |= utcOffset.warningCodeMask;
         result.diagnosticText = utcOffset.diagnosticText;
         return result;
@@ -120,11 +120,11 @@ void mergeEarthOrientationSampleWarnings(
 
     result.ut1MinusUtcSeconds = static_cast<double>(*utcOffset.offsetSeconds)
                                 + skygate::core::TimeConstants::kTtMinusTaiSeconds - *estimate.deltaTSeconds;
-    result.status = TimeScaleConversionStatus::Degraded;
+    result.status = TimeScaleConversionStatus::Type::Degraded;
     result.warningCodeMask |= utcOffset.warningCodeMask;
-    result.addWarning(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
+    result.addWarning(TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied);
     if (estimate.status == IDeltaTProvider::EstimateStatus::Degraded) {
-        result.addWarning(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
+        result.addWarning(TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied);
     }
     result.diagnosticText =
         estimate.diagnosticText.empty() ? "UT1 conversion used Delta T fallback metadata." : estimate.diagnosticText;
@@ -145,7 +145,7 @@ void mergeEarthOrientationSampleWarnings(
         );
         result.warningCodeMask = sourceFailure.warningCodeMask;
         if (deltaTProvider == nullptr) {
-            result.addWarning(TimeScaleConversionWarningCode::DeltaTUnavailable);
+            result.addWarning(TimeScaleConversionWarningCode::Type::DeltaTUnavailable);
         }
         return result;
     }
@@ -161,7 +161,7 @@ void mergeEarthOrientationSampleWarnings(
                                             : estimate.diagnosticText
         );
         result.warningCodeMask = sourceFailure.warningCodeMask;
-        result.addWarning(TimeScaleConversionWarningCode::DeltaTUnavailable);
+        result.addWarning(TimeScaleConversionWarningCode::Type::DeltaTUnavailable);
         return result;
     }
 
@@ -179,17 +179,17 @@ void mergeEarthOrientationSampleWarnings(
 
     TimeScaleConversionResult result = TimeScaleConversionResult::success(
         taiEpoch.addSeconds(-static_cast<double>(*taiOffset.offsetSeconds), skygate::core::TimeScale::Utc),
-        TimeScaleConversionStatus::Degraded,
+        TimeScaleConversionStatus::Type::Degraded,
         sourceFailure.warningCodeMask | taiOffset.warningCodeMask,
         estimate.diagnosticText.empty() ? "UT1 conversion used Delta T fallback metadata." : estimate.diagnosticText
     );
-    result.addWarning(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
+    result.addWarning(TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied);
     return result;
 }
 
 }  // namespace
 
-void Ut1OffsetResolver::Result::addWarning(const TimeScaleConversionWarningCode code) noexcept
+void Ut1OffsetResolver::Result::addWarning(const TimeScaleConversionWarningCode::Type code) noexcept
 {
     warningCodeMask |= BitFlagSetOperations::bit(code);
 }

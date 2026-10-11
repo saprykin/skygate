@@ -154,7 +154,7 @@ private:
 {
     return {
         .epoch = sofaReferenceTtEpoch(),
-        .status = TimeScaleConversionStatus::Valid,
+        .status = TimeScaleConversionStatus::Type::Valid,
         .diagnosticText = "unit test conversion",
     };
 }
@@ -163,7 +163,7 @@ private:
 {
     return {
         .epoch = sofaReferenceUtcEpoch(),
-        .status = TimeScaleConversionStatus::Valid,
+        .status = TimeScaleConversionStatus::Type::Valid,
         .diagnosticText = "unit test UTC conversion",
     };
 }
@@ -172,7 +172,7 @@ private:
 {
     return {
         .epoch = sofaReferenceUt1Epoch(),
-        .status = TimeScaleConversionStatus::Valid,
+        .status = TimeScaleConversionStatus::Type::Valid,
         .diagnosticText = "unit test UT1 conversion",
     };
 }

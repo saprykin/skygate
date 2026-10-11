@@ -30,65 +30,30 @@
 
 namespace skygate::ephemeris {
 
-bool EphemerisEngineFactory::allowsSimpleEngineFallback(const EphemerisFactoryFallbackPolicy policy) noexcept
+bool EphemerisEngineFactory::allowsSimpleEngineFallback(const EphemerisFactoryFallbackPolicy::Type policy) noexcept
 {
-    return policy == EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+    return policy == EphemerisFactoryFallbackPolicy::Type::AllowSimpleEngineFallback;
 }
 
-std::string_view EphemerisEngineFactory::displayName(const EphemerisFactoryFallbackPolicy policy) noexcept
+std::string_view EphemerisEngineFactory::displayName(const EphemerisFactoryFallbackPolicy::Type policy) noexcept
 {
-    switch (policy) {
-    case EphemerisFactoryFallbackPolicy::StrictHighPrecision:
-        return "strict high precision";
-    case EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback:
-        return "allow simple engine fallback";
-    }
-
-    return {};
+    return EphemerisFactoryFallbackPolicy::displayName(policy);
 }
 
-std::string_view EphemerisEngineFactory::displayName(const EphemerisFactoryCreationStatus status) noexcept
+std::string_view EphemerisEngineFactory::displayName(const EphemerisFactoryCreationStatus::Type status) noexcept
 {
-    switch (status) {
-    case EphemerisFactoryCreationStatus::CreatedRequestedEngine:
-        return "created requested engine";
-    case EphemerisFactoryCreationStatus::CreatedSimpleFallback:
-        return "created simple engine fallback";
-    case EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable:
-        return "strict high precision unavailable";
-    case EphemerisFactoryCreationStatus::FailedInvalidRequest:
-        return "invalid factory request";
-    case EphemerisFactoryCreationStatus::FailedCreationError:
-        return "engine creation failed";
-    }
-
-    return {};
+    return EphemerisFactoryCreationStatus::displayName(status);
 }
 
-bool EphemerisEngineFactory::isCreationSuccess(const EphemerisFactoryCreationStatus status) noexcept
+bool EphemerisEngineFactory::isCreationSuccess(const EphemerisFactoryCreationStatus::Type status) noexcept
 {
-    return status == EphemerisFactoryCreationStatus::CreatedRequestedEngine
-           || status == EphemerisFactoryCreationStatus::CreatedSimpleFallback;
+    return status == EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine
+           || status == EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback;
 }
 
 std::string_view EphemerisEngineFactory::diagnosticText(const EphemerisFactoryCreationDiagnosticCode code) noexcept
 {
-    switch (code) {
-    case EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable:
-        return "High-precision ephemeris creation is unavailable.";
-    case EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable:
-        return "Required ephemeris data is unavailable.";
-    case EphemerisFactoryCreationDiagnosticCode::RequiredTimeScaleServiceUnavailable:
-        return "Required time-scale service is unavailable.";
-    case EphemerisFactoryCreationDiagnosticCode::RequiredEarthOrientationProviderUnavailable:
-        return "Required Earth-orientation provider is unavailable.";
-    case EphemerisFactoryCreationDiagnosticCode::InvalidRequest:
-        return "The ephemeris engine factory request is invalid.";
-    case EphemerisFactoryCreationDiagnosticCode::EngineCreationFailed:
-        return "Ephemeris engine creation failed.";
-    }
-
-    return "Ephemeris engine creation diagnostic.";
+    return EphemerisFactoryCreationDiagnostic::text(code);
 }
 
 namespace {
@@ -106,7 +71,7 @@ namespace {
 makeInvalidFactoryRequestResult(const EphemerisEngineKind::Type requestedKind)
 {
     return EphemerisEngineFactoryResult::failure(
-        EphemerisFactoryCreationStatus::FailedInvalidRequest,
+        EphemerisFactoryCreationStatus::Type::FailedInvalidRequest,
         {EphemerisFactoryCreationDiagnostic{
             EphemerisFactoryCreationDiagnosticCode::InvalidRequest,
             EphemerisFactoryCreationDiagnosticSeverity::Error,
@@ -116,17 +81,17 @@ makeInvalidFactoryRequestResult(const EphemerisEngineKind::Type requestedKind)
     );
 }
 
-[[nodiscard]] EphemerisFactoryCreationStatus
+[[nodiscard]] EphemerisFactoryCreationStatus::Type
 highPrecisionFailureStatus(const std::vector<EphemerisFactoryCreationDiagnostic>& diagnostics) noexcept
 {
     for (const EphemerisFactoryCreationDiagnostic& diagnostic : diagnostics) {
         if (diagnostic.code == EphemerisFactoryCreationDiagnosticCode::EngineCreationFailed
             || diagnostic.code == EphemerisFactoryCreationDiagnosticCode::InvalidRequest) {
-            return EphemerisFactoryCreationStatus::FailedCreationError;
+            return EphemerisFactoryCreationStatus::Type::FailedCreationError;
         }
     }
 
-    return EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable;
+    return EphemerisFactoryCreationStatus::Type::FailedStrictHighPrecisionUnavailable;
 }
 
 [[nodiscard]] std::vector<EphemerisFactoryCreationDiagnostic> withSeverity(
@@ -333,7 +298,7 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
                     request.options,
                     std::move(dependencies)
                 ),
-                EphemerisFactoryCreationStatus::CreatedRequestedEngine,
+                EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine,
                 {},
                 request.engineKind
             );
@@ -345,7 +310,7 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
             std::make_unique<SimpleEphemerisEngine>(
                 request.catalog != nullptr ? *request.catalog : CelestialBodyCatalog{}, request.options
             ),
-            EphemerisFactoryCreationStatus::CreatedSimpleFallback,
+            EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback,
             withSeverity(std::move(diagnostics), EphemerisFactoryCreationDiagnosticSeverity::Warning),
             request.engineKind
         );
@@ -394,7 +359,7 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngin
                 normalizedRequest.catalog != nullptr ? *normalizedRequest.catalog : CelestialBodyCatalog{},
                 normalizedRequest.options
             ),
-            EphemerisFactoryCreationStatus::CreatedRequestedEngine,
+            EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine,
             {},
             normalizedRequest.engineKind
         );

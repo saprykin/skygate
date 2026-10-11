@@ -260,7 +260,7 @@ void EphemerisEngineFactorySelectionTests::defaultHighPrecisionRequestFallsBackT
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback)
     );
     QVERIFY(result.hasDiagnostics());
     QVERIFY(!result.hasErrors());
@@ -278,7 +278,7 @@ void EphemerisEngineFactorySelectionTests::strictHighPrecisionRequestFailsWhenUn
     request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setFallbackToSimpleEngine(true);
-    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
 
     const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
@@ -297,7 +297,7 @@ void EphemerisEngineFactorySelectionTests::strictHighPrecisionRequestFailsWhenUn
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),
         static_cast<std::uint8_t>(
-            skygate::ephemeris::EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable
+            skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedStrictHighPrecisionUnavailable
         )
     );
     QVERIFY(result.hasDiagnostics());
@@ -316,7 +316,7 @@ void EphemerisEngineFactorySelectionTests::allowPolicyStillFallsBackWhenRuntimeD
     request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setFallbackToSimpleEngine(false);
-    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::AllowSimpleEngineFallback;
 
     const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
@@ -379,7 +379,7 @@ void EphemerisEngineFactorySelectionTests::simpleRequestCreatesRequestedEngineWi
     QVERIFY(!result.hasDiagnostics());
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedRequestedEngine)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine)
     );
 
     const auto options = result.engine->options();
@@ -520,7 +520,7 @@ void EphemerisEngineFactorySelectionTests::invalidEngineKindReturnsStructuredInv
     QVERIFY(result.hasErrors());
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::FailedInvalidRequest)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedInvalidRequest)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.diagnostics.front().code),
@@ -541,7 +541,8 @@ void EphemerisEngineFactorySelectionTests::highPrecisionRequestFallsBackOnlyWhen
     fallbackRequest.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     fallbackRequest.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
     fallbackRequest.options.setFallbackToSimpleEngine(true);
-    fallbackRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+    fallbackRequest.fallbackPolicy =
+        skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::AllowSimpleEngineFallback;
     fallbackRequest.diagnosticsSink = &fallbackDiagnosticsSink;
 
     auto fallback = skygate::ephemeris::EphemerisEngineFactory::create(fallbackRequest);
@@ -561,7 +562,7 @@ void EphemerisEngineFactorySelectionTests::highPrecisionRequestFallsBackOnlyWhen
     QVERIFY(!fallback.hasErrors());
     QCOMPARE(
         static_cast<std::uint8_t>(fallback.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback)
     );
     QCOMPARE(fallbackDiagnosticsSink.diagnostics().size(), fallback.diagnostics.size());
     QCOMPARE(
@@ -572,7 +573,7 @@ void EphemerisEngineFactorySelectionTests::highPrecisionRequestFallsBackOnlyWhen
     RecordingEphemerisDiagnosticsSink strictDiagnosticsSink;
     skygate::ephemeris::EphemerisEngineFactoryRequest strictRequest = fallbackRequest;
     strictRequest.options.setFallbackToSimpleEngine(false);
-    strictRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    strictRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
     strictRequest.diagnosticsSink = &strictDiagnosticsSink;
 
     const auto strict = skygate::ephemeris::EphemerisEngineFactory::create(strictRequest);
@@ -594,7 +595,7 @@ void EphemerisEngineFactorySelectionTests::highPrecisionRequestFallsBackOnlyWhen
     QCOMPARE(
         static_cast<std::uint8_t>(strict.status),
         static_cast<std::uint8_t>(
-            skygate::ephemeris::EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable
+            skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedStrictHighPrecisionUnavailable
         )
     );
     QCOMPARE(strictDiagnosticsSink.diagnostics().size(), strict.diagnostics.size());
@@ -607,11 +608,19 @@ void EphemerisEngineFactorySelectionTests::highPrecisionRequestFallsBackOnlyWhen
 
 void EphemerisEngineFactorySelectionTests::exposesFactoryFallbackPolicyHelpers()
 {
-    constexpr auto strictPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
-    constexpr auto fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+    constexpr auto strictPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
+    constexpr auto fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::AllowSimpleEngineFallback;
 
     QVERIFY(!skygate::ephemeris::EphemerisEngineFactory::allowsSimpleEngineFallback(strictPolicy));
     QVERIFY(skygate::ephemeris::EphemerisEngineFactory::allowsSimpleEngineFallback(fallbackPolicy));
+    QCOMPARE(
+        skygate::ephemeris::EphemerisEngineFactory::displayName(strictPolicy),
+        skygate::ephemeris::EphemerisFactoryFallbackPolicy::displayName(strictPolicy)
+    );
+    QCOMPARE(
+        skygate::ephemeris::EphemerisEngineFactory::displayName(fallbackPolicy),
+        skygate::ephemeris::EphemerisFactoryFallbackPolicy::displayName(fallbackPolicy)
+    );
     QVERIFY(
         skygate::ephemeris::EphemerisEngineFactory::displayName(strictPolicy)
         == std::string_view{"strict high precision"}

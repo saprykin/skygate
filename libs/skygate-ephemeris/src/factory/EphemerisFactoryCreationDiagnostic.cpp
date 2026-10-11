@@ -17,7 +17,11 @@ std::string_view EphemerisFactoryCreationDiagnostic::displayText() const noexcep
         return diagnosticText;
     }
 
-    // Match the old ephemerisFactoryCreationDiagnosticText() mapping.
+    return text(code);
+}
+
+std::string_view EphemerisFactoryCreationDiagnostic::text(const EphemerisFactoryCreationDiagnosticCode code) noexcept
+{
     switch (code) {
     case EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable:
         return "High-precision ephemeris creation is unavailable.";

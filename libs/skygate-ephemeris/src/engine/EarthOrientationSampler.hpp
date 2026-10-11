@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BitFlagSetOperations.hpp"
+#include "EphemerisEngineWarning.hpp"
 #include "IEarthOrientationProvider.hpp"
 
 #include <cstdint>
@@ -67,6 +68,8 @@ public:
         {
             return (warningCodeMask & BitFlagSetOperations::bit(code)) != 0U;
         }
+
+        [[nodiscard]] static EphemerisEngineWarning::Code engineWarningCode(WarningCode code) noexcept;
     };
 
     [[nodiscard]] static Sample

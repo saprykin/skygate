@@ -11,18 +11,18 @@ namespace skygate::ephemeris {
 
 struct TimeScaleConversionResult {
     skygate::core::AstronomicalEpoch epoch;
-    TimeScaleConversionStatus status = TimeScaleConversionStatus::Failed;
+    TimeScaleConversionStatus::Type status = TimeScaleConversionStatus::Type::Failed;
     std::uint32_t warningCodeMask = 0U;
     std::string diagnosticText;
 
     [[nodiscard]] bool isSuccess() const noexcept
     {
-        return status == TimeScaleConversionStatus::Valid || status == TimeScaleConversionStatus::Degraded;
+        return status == TimeScaleConversionStatus::Type::Valid || status == TimeScaleConversionStatus::Type::Degraded;
     }
 
     [[nodiscard]] static TimeScaleConversionResult success(
         skygate::core::AstronomicalEpoch epoch,
-        TimeScaleConversionStatus status = TimeScaleConversionStatus::Valid,
+        TimeScaleConversionStatus::Type status = TimeScaleConversionStatus::Type::Valid,
         std::uint32_t warningCodeMask = 0U,
         std::string diagnosticText = {}
     );
@@ -32,15 +32,17 @@ struct TimeScaleConversionResult {
     );
 
     static void mergeWarnings(
-        TimeScaleConversionResult& result, TimeScaleConversionStatus sourceStatus, std::uint32_t sourceWarningCodeMask
+        TimeScaleConversionResult& result,
+        TimeScaleConversionStatus::Type sourceStatus,
+        std::uint32_t sourceWarningCodeMask
     ) noexcept;
 
-    void addWarning(const TimeScaleConversionWarningCode code) noexcept
+    void addWarning(const TimeScaleConversionWarningCode::Type code) noexcept
     {
         warningCodeMask |= BitFlagSetOperations::bit(code);
     }
 
-    [[nodiscard]] bool hasWarning(const TimeScaleConversionWarningCode code) const noexcept
+    [[nodiscard]] bool hasWarning(const TimeScaleConversionWarningCode::Type code) const noexcept
     {
         return (warningCodeMask & BitFlagSetOperations::bit(code)) != 0U;
     }

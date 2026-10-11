@@ -15,11 +15,11 @@ class LeapSecondOffsetResolver final {
 public:
     struct Result {
         std::optional<int> offsetSeconds;
-        TimeScaleConversionStatus status = TimeScaleConversionStatus::Valid;
+        TimeScaleConversionStatus::Type status = TimeScaleConversionStatus::Type::Valid;
         std::uint32_t warningCodeMask = 0U;
         std::string diagnosticText;
 
-        void addWarning(const TimeScaleConversionWarningCode code) noexcept;
+        void addWarning(const TimeScaleConversionWarningCode::Type code) noexcept;
     };
 
     LeapSecondOffsetResolver(

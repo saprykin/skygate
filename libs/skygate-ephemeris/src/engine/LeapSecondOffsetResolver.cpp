@@ -31,21 +31,21 @@ namespace {
 }
 
 [[nodiscard]] LeapSecondOffsetResolver::Result fallbackOffset(
-    const TimeScaleServiceOptions& options, TimeScaleConversionWarningCode warningCode, std::string diagnosticText
+    const TimeScaleServiceOptions& options, TimeScaleConversionWarningCode::Type warningCode, std::string diagnosticText
 )
 {
     LeapSecondOffsetResolver::Result result;
     if (!options.allowDegradedLeapSecondFallback) {
-        result.status = TimeScaleConversionStatus::Failed;
+        result.status = TimeScaleConversionStatus::Type::Failed;
         result.diagnosticText = std::move(diagnosticText);
         result.addWarning(warningCode);
         return result;
     }
 
     result.offsetSeconds = options.fallbackTaiMinusUtcSeconds;
-    result.status = TimeScaleConversionStatus::Degraded;
+    result.status = TimeScaleConversionStatus::Type::Degraded;
     result.addWarning(warningCode);
-    result.addWarning(TimeScaleConversionWarningCode::LeapSecondFallbackApplied);
+    result.addWarning(TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied);
     result.diagnosticText = "Time-scale conversion used a degraded leap-second fallback.";
     return result;
 }
@@ -59,7 +59,7 @@ namespace {
     if (provider == nullptr || !provider->tableInfo().isUsable()) {
         return fallbackOffset(
             options,
-            TimeScaleConversionWarningCode::LeapSecondTableMissing,
+            TimeScaleConversionWarningCode::Type::LeapSecondTableMissing,
             "Leap-second table is unavailable for UTC conversion."
         );
     }
@@ -67,24 +67,24 @@ namespace {
     LeapSecondOffsetResolver::Result result;
     const ILeapSecondProvider::TableInfo& tableInfo = provider->tableInfo();
     if (tableInfo.status == ILeapSecondProvider::TableStatus::Stale) {
-        result.status = TimeScaleConversionStatus::Degraded;
-        result.addWarning(TimeScaleConversionWarningCode::LeapSecondTableStale);
+        result.status = TimeScaleConversionStatus::Type::Degraded;
+        result.addWarning(TimeScaleConversionWarningCode::Type::LeapSecondTableStale);
         result.diagnosticText = "Leap-second table is stale for UTC conversion.";
     }
 
     if (tableInfo.validityRange.has_value() && !tableInfo.validityRange->contains(utcEpoch)) {
         const std::optional<int> tableOffset = provider->taiMinusUtcSeconds(utcEpoch);
         if (!options.allowDegradedLeapSecondFallback) {
-            result.status = TimeScaleConversionStatus::Failed;
-            result.addWarning(TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable);
+            result.status = TimeScaleConversionStatus::Type::Failed;
+            result.addWarning(TimeScaleConversionWarningCode::Type::EpochOutsideLeapSecondTable);
             result.diagnosticText = "UTC epoch is outside the leap-second table validity range.";
             return result;
         }
 
         result.offsetSeconds = tableOffset.value_or(options.fallbackTaiMinusUtcSeconds);
-        result.status = TimeScaleConversionStatus::Degraded;
-        result.addWarning(TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable);
-        result.addWarning(TimeScaleConversionWarningCode::LeapSecondFallbackApplied);
+        result.status = TimeScaleConversionStatus::Type::Degraded;
+        result.addWarning(TimeScaleConversionWarningCode::Type::EpochOutsideLeapSecondTable);
+        result.addWarning(TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied);
         result.diagnosticText = "UTC epoch used a degraded leap-second range fallback.";
         return result;
     }
@@ -93,7 +93,7 @@ namespace {
     if (!result.offsetSeconds.has_value()) {
         return fallbackOffset(
             options,
-            TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable,
+            TimeScaleConversionWarningCode::Type::EpochOutsideLeapSecondTable,
             "UTC epoch is before the first leap-second table entry."
         );
     }
@@ -110,7 +110,7 @@ namespace {
     if (provider == nullptr || !provider->tableInfo().isUsable()) {
         return fallbackOffset(
             options,
-            TimeScaleConversionWarningCode::LeapSecondTableMissing,
+            TimeScaleConversionWarningCode::Type::LeapSecondTableMissing,
             "Leap-second table is unavailable for TAI conversion."
         );
     }
@@ -118,8 +118,8 @@ namespace {
     LeapSecondOffsetResolver::Result result;
     const ILeapSecondProvider::TableInfo& tableInfo = provider->tableInfo();
     if (tableInfo.status == ILeapSecondProvider::TableStatus::Stale) {
-        result.status = TimeScaleConversionStatus::Degraded;
-        result.addWarning(TimeScaleConversionWarningCode::LeapSecondTableStale);
+        result.status = TimeScaleConversionStatus::Type::Degraded;
+        result.addWarning(TimeScaleConversionWarningCode::Type::LeapSecondTableStale);
         result.diagnosticText = "Leap-second table is stale for TAI conversion.";
     }
 
@@ -137,16 +137,16 @@ namespace {
 
     if (tableInfo.validityRange.has_value() && taiEpochOutsideUtcRange(taiEpoch, *tableInfo.validityRange, provider)) {
         if (!options.allowDegradedLeapSecondFallback) {
-            result.status = TimeScaleConversionStatus::Failed;
-            result.addWarning(TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable);
+            result.status = TimeScaleConversionStatus::Type::Failed;
+            result.addWarning(TimeScaleConversionWarningCode::Type::EpochOutsideLeapSecondTable);
             result.diagnosticText = "TAI epoch is outside the leap-second table validity range.";
             return result;
         }
 
         result.offsetSeconds = offset.value_or(options.fallbackTaiMinusUtcSeconds);
-        result.status = TimeScaleConversionStatus::Degraded;
-        result.addWarning(TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable);
-        result.addWarning(TimeScaleConversionWarningCode::LeapSecondFallbackApplied);
+        result.status = TimeScaleConversionStatus::Type::Degraded;
+        result.addWarning(TimeScaleConversionWarningCode::Type::EpochOutsideLeapSecondTable);
+        result.addWarning(TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied);
         result.diagnosticText = "TAI epoch used a degraded leap-second range fallback.";
         return result;
     }
@@ -154,7 +154,7 @@ namespace {
     if (!offset.has_value()) {
         return fallbackOffset(
             options,
-            TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable,
+            TimeScaleConversionWarningCode::Type::EpochOutsideLeapSecondTable,
             "TAI epoch is before the first leap-second table entry."
         );
     }
@@ -165,7 +165,7 @@ namespace {
 
 }  // namespace
 
-void LeapSecondOffsetResolver::Result::addWarning(const TimeScaleConversionWarningCode code) noexcept
+void LeapSecondOffsetResolver::Result::addWarning(const TimeScaleConversionWarningCode::Type code) noexcept
 {
     warningCodeMask |= BitFlagSetOperations::bit(code);
 }

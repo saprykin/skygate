@@ -4,21 +4,26 @@
 
 namespace skygate::ephemeris {
 
-enum class TimeScaleConversionWarningCode : std::uint8_t {
-    LeapSecondTableMissing,
-    LeapSecondTableStale,
-    EpochOutsideLeapSecondTable,
-    LeapSecondFallbackApplied,
-    UnsupportedConversion,
-    InvalidInput,
-    TdbApproximationApplied,
-    EarthOrientationDataMissing,
-    EarthOrientationDataStale,
-    EarthOrientationDataPredicted,
-    EpochOutsideEarthOrientationData,
-    DeltaTFallbackApplied,
-    DeltaTUnavailable,
-    EarthOrientationDataEstimated
+class TimeScaleConversionWarningCode {
+public:
+    enum class Type : std::uint8_t {
+        LeapSecondTableMissing,
+        LeapSecondTableStale,
+        EpochOutsideLeapSecondTable,
+        LeapSecondFallbackApplied,
+        UnsupportedConversion,
+        InvalidInput,
+        TdbApproximationApplied,
+        EarthOrientationDataMissing,
+        EarthOrientationDataStale,
+        EarthOrientationDataPredicted,
+        EpochOutsideEarthOrientationData,
+        DeltaTFallbackApplied,
+        DeltaTUnavailable,
+        EarthOrientationDataEstimated
+    };
+
+    TimeScaleConversionWarningCode() = delete;
 };
 
 }  // namespace skygate::ephemeris

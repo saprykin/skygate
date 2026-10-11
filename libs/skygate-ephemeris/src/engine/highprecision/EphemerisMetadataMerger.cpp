@@ -48,106 +48,51 @@ void addDegradedWarning(EphemerisEngineQueryResult& metadata, const EphemerisEng
     metadata.addWarning(warningCode);
 }
 
-[[nodiscard]] EphemerisEngineWarning::Code warningCodeFor(const TimeScaleConversionWarningCode code) noexcept
-{
-    switch (code) {
-    case TimeScaleConversionWarningCode::LeapSecondTableMissing:
-        return EphemerisEngineWarning::Code::LeapSecondTableMissing;
-    case TimeScaleConversionWarningCode::LeapSecondTableStale:
-        return EphemerisEngineWarning::Code::LeapSecondTableStale;
-    case TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable:
-        return EphemerisEngineWarning::Code::EpochOutsideLeapSecondTable;
-    case TimeScaleConversionWarningCode::LeapSecondFallbackApplied:
-        return EphemerisEngineWarning::Code::LeapSecondFallbackApplied;
-    case TimeScaleConversionWarningCode::UnsupportedConversion:
-        return EphemerisEngineWarning::Code::UnsupportedTimeScaleConversion;
-    case TimeScaleConversionWarningCode::InvalidInput:
-        return EphemerisEngineWarning::Code::InvalidTimeScaleInput;
-    case TimeScaleConversionWarningCode::TdbApproximationApplied:
-        return EphemerisEngineWarning::Code::TdbApproximationApplied;
-    case TimeScaleConversionWarningCode::EarthOrientationDataMissing:
-        return EphemerisEngineWarning::Code::EarthOrientationDataMissing;
-    case TimeScaleConversionWarningCode::EarthOrientationDataStale:
-        return EphemerisEngineWarning::Code::EarthOrientationDataStale;
-    case TimeScaleConversionWarningCode::EarthOrientationDataPredicted:
-        return EphemerisEngineWarning::Code::EarthOrientationDataPredicted;
-    case TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData:
-        return EphemerisEngineWarning::Code::EpochOutsideEarthOrientationData;
-    case TimeScaleConversionWarningCode::DeltaTFallbackApplied:
-        return EphemerisEngineWarning::Code::DeltaTFallbackApplied;
-    case TimeScaleConversionWarningCode::DeltaTUnavailable:
-        return EphemerisEngineWarning::Code::DeltaTUnavailable;
-    case TimeScaleConversionWarningCode::EarthOrientationDataEstimated:
-        return EphemerisEngineWarning::Code::EarthOrientationDataEstimated;
-    }
-
-    return EphemerisEngineWarning::Code::AccuracyDegraded;
-}
-
-[[nodiscard]] EphemerisEngineWarning::Code
-warningCodeFor(const EarthOrientationSampler::Sample::WarningCode code) noexcept
-{
-    switch (code) {
-    case EarthOrientationSampler::Sample::WarningCode::StaleData:
-        return EphemerisEngineWarning::Code::EarthOrientationStaleData;
-    case EarthOrientationSampler::Sample::WarningCode::PredictedData:
-        return EphemerisEngineWarning::Code::EarthOrientationPredictedData;
-    case EarthOrientationSampler::Sample::WarningCode::MissingData:
-        return EphemerisEngineWarning::Code::EarthOrientationMissingData;
-    case EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange:
-        return EphemerisEngineWarning::Code::EarthOrientationEpochOutsideRange;
-    case EarthOrientationSampler::Sample::WarningCode::InvalidInput:
-        return EphemerisEngineWarning::Code::EarthOrientationInvalidInput;
-    case EarthOrientationSampler::Sample::WarningCode::EstimatedData:
-        return EphemerisEngineWarning::Code::EarthOrientationEstimatedData;
-    }
-
-    return EphemerisEngineWarning::Code::AccuracyDegraded;
-}
-
 void mergeTimeScaleWarningCodes(
     EphemerisEngineQueryResult& metadata, const TimeScaleConversionResult& conversion
 ) noexcept
 {
     const auto addWarning = [&metadata, &conversion](
-                                const TimeScaleConversionWarningCode sourceCode,
+                                const TimeScaleConversionWarningCode::Type sourceCode,
                                 const std::optional<EphemerisEngineWarning::Code> aggregateCode = std::nullopt
                             ) noexcept {
         if (!conversion.hasWarning(sourceCode)) {
             return;
         }
 
-        metadata.addWarning(warningCodeFor(sourceCode), conversion.diagnosticText);
+        metadata.addWarning(EphemerisEngineWarning::fromTimeScaleWarning(sourceCode), conversion.diagnosticText);
         if (aggregateCode.has_value()) {
             metadata.addWarning(*aggregateCode);
         }
     };
 
     addWarning(
-        TimeScaleConversionWarningCode::LeapSecondTableMissing, EphemerisEngineWarning::Code::TimeScaleDataUnavailable
-    );
-    addWarning(TimeScaleConversionWarningCode::LeapSecondTableStale);
-    addWarning(
-        TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable, EphemerisEngineWarning::Code::DataOutOfRange
-    );
-    addWarning(TimeScaleConversionWarningCode::LeapSecondFallbackApplied);
-    addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
-    addWarning(TimeScaleConversionWarningCode::InvalidInput);
-    addWarning(TimeScaleConversionWarningCode::TdbApproximationApplied);
-    addWarning(
-        TimeScaleConversionWarningCode::EarthOrientationDataMissing,
+        TimeScaleConversionWarningCode::Type::LeapSecondTableMissing,
         EphemerisEngineWarning::Code::TimeScaleDataUnavailable
     );
-    addWarning(TimeScaleConversionWarningCode::EarthOrientationDataStale);
-    addWarning(TimeScaleConversionWarningCode::EarthOrientationDataPredicted);
+    addWarning(TimeScaleConversionWarningCode::Type::LeapSecondTableStale);
     addWarning(
-        TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData, EphemerisEngineWarning::Code::DataOutOfRange
+        TimeScaleConversionWarningCode::Type::EpochOutsideLeapSecondTable, EphemerisEngineWarning::Code::DataOutOfRange
     );
-    addWarning(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
+    addWarning(TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied);
+    addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
+    addWarning(TimeScaleConversionWarningCode::Type::InvalidInput);
+    addWarning(TimeScaleConversionWarningCode::Type::TdbApproximationApplied);
     addWarning(
-        TimeScaleConversionWarningCode::DeltaTUnavailable, EphemerisEngineWarning::Code::TimeScaleDataUnavailable
+        TimeScaleConversionWarningCode::Type::EarthOrientationDataMissing,
+        EphemerisEngineWarning::Code::TimeScaleDataUnavailable
     );
-    addWarning(TimeScaleConversionWarningCode::EarthOrientationDataEstimated);
+    addWarning(TimeScaleConversionWarningCode::Type::EarthOrientationDataStale);
+    addWarning(TimeScaleConversionWarningCode::Type::EarthOrientationDataPredicted);
+    addWarning(
+        TimeScaleConversionWarningCode::Type::EpochOutsideEarthOrientationData,
+        EphemerisEngineWarning::Code::DataOutOfRange
+    );
+    addWarning(TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied);
+    addWarning(
+        TimeScaleConversionWarningCode::Type::DeltaTUnavailable, EphemerisEngineWarning::Code::TimeScaleDataUnavailable
+    );
+    addWarning(TimeScaleConversionWarningCode::Type::EarthOrientationDataEstimated);
 }
 
 void mergeEarthOrientationWarningCodes(
@@ -162,7 +107,7 @@ void mergeEarthOrientationWarningCodes(
             return;
         }
 
-        metadata.addWarning(warningCodeFor(sourceCode), sample.diagnosticText);
+        metadata.addWarning(EarthOrientationSampler::Sample::engineWarningCode(sourceCode), sample.diagnosticText);
         if (aggregateCode.has_value()) {
             metadata.addWarning(*aggregateCode);
         }
@@ -240,7 +185,7 @@ void EphemerisMetadataMerger::mergeTimeScale(
     const EphemerisMetadataFailurePolicy failurePolicy
 ) noexcept
 {
-    if (conversion.status == TimeScaleConversionStatus::Failed) {
+    if (conversion.status == TimeScaleConversionStatus::Type::Failed) {
         if (failurePolicy == EphemerisMetadataFailurePolicy::MarkFailed) {
             metadata.status = EphemerisEngineQueryStatus::Type::Failed;
         } else {
@@ -250,7 +195,7 @@ void EphemerisMetadataMerger::mergeTimeScale(
         mergeTimeScaleWarningCodes(metadata, conversion);
         return;
     }
-    if (conversion.status == TimeScaleConversionStatus::Degraded) {
+    if (conversion.status == TimeScaleConversionStatus::Type::Degraded) {
         addDegradedWarning(metadata, EphemerisEngineWarning::Code::AccuracyDegraded);
         mergeTimeScaleWarningCodes(metadata, conversion);
     }
