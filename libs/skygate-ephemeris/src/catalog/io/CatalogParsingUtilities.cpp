@@ -49,6 +49,18 @@ std::string CatalogParsingUtilities::toUtf8String(const QString& text)
     return std::string(utf8.constData(), static_cast<std::size_t>(utf8.size()));
 }
 
+QString CatalogParsingUtilities::normalizedLabelText(QString text)
+{
+    text = text.trimmed();
+    if (text.isEmpty()) {
+        return {};
+    }
+
+    text.replace('_', ' ');
+    text.replace('-', ' ');
+    return text.simplified();
+}
+
 std::optional<double> CatalogParsingUtilities::parseFiniteDouble(const QStringView text)
 {
     QString trimmed = text.trimmed().toString();

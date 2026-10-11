@@ -20,10 +20,7 @@ namespace {
 
 QString prettifyConstellationId(QString id)
 {
-    id = id.trimmed();
-    id.replace('_', ' ');
-    id.replace('-', ' ');
-    id = id.simplified();
+    id = CatalogParsingUtilities::normalizedLabelText(id);
     if (id.isEmpty()) {
         return {};
     }
