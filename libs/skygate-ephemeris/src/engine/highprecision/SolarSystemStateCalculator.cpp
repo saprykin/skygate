@@ -4,8 +4,8 @@
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
 #include "ICalcephKernel.hpp"
-#include "StringUtilities.hpp"
 #include "NaifBodyIds.hpp"
+#include "PlanetIdentity.hpp"
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
 #include "math/Vector3d.hpp"
@@ -44,31 +44,9 @@ struct TargetKernelState {
         return std::nullopt;
     }
 
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "mercury")) {
-        return NaifBodyIds::kMercury;
+    if (const std::optional<PlanetIdentity> planet = PlanetIdentity::fromBodyId(body.id); planet.has_value()) {
+        return planet->naifBodyCenterId();
     }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "venus")) {
-        return NaifBodyIds::kVenus;
-    }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "mars")) {
-        return NaifBodyIds::kMars;
-    }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "jupiter")) {
-        return NaifBodyIds::kJupiter;
-    }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "saturn")) {
-        return NaifBodyIds::kSaturn;
-    }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "uranus")) {
-        return NaifBodyIds::kUranus;
-    }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "neptune")) {
-        return NaifBodyIds::kNeptune;
-    }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "pluto")) {
-        return NaifBodyIds::kPluto;
-    }
-
     return std::nullopt;
 }
 
@@ -78,38 +56,16 @@ struct TargetKernelState {
         return std::nullopt;
     }
 
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "mercury")) {
-        return NaifBodyIds::kMercuryBarycenter;
+    if (const std::optional<PlanetIdentity> planet = PlanetIdentity::fromBodyId(body.id); planet.has_value()) {
+        return planet->naifBarycenterId();
     }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "venus")) {
-        return NaifBodyIds::kVenusBarycenter;
-    }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "mars")) {
-        return NaifBodyIds::kMarsBarycenter;
-    }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "jupiter")) {
-        return NaifBodyIds::kJupiterBarycenter;
-    }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "saturn")) {
-        return NaifBodyIds::kSaturnBarycenter;
-    }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "uranus")) {
-        return NaifBodyIds::kUranusBarycenter;
-    }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "neptune")) {
-        return NaifBodyIds::kNeptuneBarycenter;
-    }
-    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "pluto")) {
-        return NaifBodyIds::kPlutoBarycenter;
-    }
-
     return std::nullopt;
 }
 
 [[nodiscard]] bool de440sHasPlanetBodyCenter(const BaseCelestialBody& body) noexcept
 {
-    return StringUtilities::equalsIgnoreAsciiCase(body.id, "mercury")
-           || StringUtilities::equalsIgnoreAsciiCase(body.id, "venus");
+    const std::optional<PlanetIdentity> planet = PlanetIdentity::fromBodyId(body.id);
+    return planet.has_value() && planet->hasDe440sBodyCenter();
 }
 
 [[nodiscard]] bool shouldPreferPlanetarySystemBarycenter(
