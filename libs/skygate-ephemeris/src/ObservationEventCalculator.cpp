@@ -21,7 +21,6 @@ namespace skygate::ephemeris {
 namespace {
 
 constexpr int kSampleStepSeconds = 10 * 60;
-constexpr int kSearchHorizonSeconds = 72 * 60 * 60;
 constexpr auto kRefinementTolerance = std::chrono::seconds(1);
 constexpr auto kGuidedRefinementTolerance = std::chrono::seconds(60);
 constexpr double kAltitudeClassificationToleranceDeg = 1e-9;
@@ -161,9 +160,10 @@ std::vector<AltitudeSample> EventSearch::sampleAltitudes(
 )
 {
     std::vector<AltitudeSample> samples;
-    samples.reserve((kSearchHorizonSeconds / kSampleStepSeconds) + 1);
+    samples.reserve((ObservationEventCalculator::kSearchHorizonSeconds / kSampleStepSeconds) + 1);
 
-    for (int offsetSeconds = 0; offsetSeconds <= kSearchHorizonSeconds; offsetSeconds += kSampleStepSeconds) {
+    for (int offsetSeconds = 0; offsetSeconds <= ObservationEventCalculator::kSearchHorizonSeconds;
+         offsetSeconds += kSampleStepSeconds) {
         const skygate::core::UtcTimePoint utcTime = request.context.utcTime + std::chrono::seconds(offsetSeconds);
         const auto sampleRequest = EphemerisRequestFactory::atUtcTime(request, utcTime);
         const auto state = engine.computeBodyState(sampleRequest, static_cast<std::size_t>(bodyIndex));
