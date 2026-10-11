@@ -286,6 +286,7 @@ add_library(skygate-ephemeris STATIC
     src/OwnGalaxyCelestialBody.hpp
     src/StringUtilities.hpp
     src/NumericParsingUtilities.hpp
+    src/PlanetIdentity.hpp
     src/catalog/CatalogStarAstrometry.hpp
     src/catalog/CatalogCoordinateModel.hpp
     src/catalog/normalize/CatalogBodyNormalization.hpp
@@ -319,6 +320,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/zip/ZipEntryMetadata.hpp
     src/StringUtilities.cpp
     src/NumericParsingUtilities.cpp
+    src/PlanetIdentity.cpp
     src/BaseCelestialBody.cpp
     src/CelestialBodyCatalog.cpp
     src/CelestialBodyState.cpp

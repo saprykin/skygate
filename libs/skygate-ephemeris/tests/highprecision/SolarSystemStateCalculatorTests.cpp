@@ -327,6 +327,7 @@ void SolarSystemStateCalculatorTests::mapsSupportedBodiesToNaifIds()
         Case{.body = makeSunBody(), .naifId = 10},
         Case{.body = makePlanetBody("mercury"), .naifId = 199},
         Case{.body = makePlanetBody("venus"), .naifId = 299},
+        Case{.body = makePlanetBody("MARS"), .naifId = 499},
         Case{.body = makePlanetBody("jupiter"), .naifId = 599},
         Case{.body = makePlanetBody("saturn"), .naifId = 699},
         Case{.body = makePlanetBody("uranus"), .naifId = 799},

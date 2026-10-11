@@ -1,5 +1,6 @@
 #include "PlanetEquatorialCalculator.hpp"
 #include "EclipticToEquatorialCalculator.hpp"
+#include "PlanetIdentity.hpp"
 #include "math/AngleMath.hpp"
 #include "time/AstronomicalTime.hpp"
 #include "time/EpochCodec.hpp"
@@ -62,20 +63,25 @@ std::optional<skygate::core::EquatorialCoordinate> PlanetEquatorialCalculator::c
     const std::string_view bodyId, const skygate::core::UtcTimePoint& utcTime
 ) const noexcept
 {
+    const std::optional<PlanetIdentity> planet = PlanetIdentity::fromBodyId(bodyId);
+    if (!planet.has_value()) {
+        return std::nullopt;
+    }
+
     const double daysSinceJ2000 = skygate::core::EpochCodec::daysSinceJ2000(utcTime);
     const double obliquityDeg = skygate::core::AstronomicalTime::meanObliquityDeg(daysSinceJ2000);
 
-    for (const PlanetApproximateOrbit& planet : kPlanetApproximateOrbits) {
-        if (bodyId != planet.id) {
+    for (const PlanetApproximateOrbit& orbit : kPlanetApproximateOrbits) {
+        if (planet->canonicalId() != orbit.id) {
             continue;
         }
 
         const double eclipticLongitudeDeg = skygate::core::AngleMath::normalizeDegrees(
-            planet.meanLongitudeDegAtJ2000 + planet.meanMotionDegPerDay * daysSinceJ2000
+            orbit.meanLongitudeDegAtJ2000 + orbit.meanMotionDegPerDay * daysSinceJ2000
         );
         const double eclipticLatitudeDeg =
-            planet.latitudeAmplitudeDeg
-            * std::sin(skygate::core::AngleMath::toRadians(eclipticLongitudeDeg + planet.latitudePhaseDeg));
+            orbit.latitudeAmplitudeDeg
+            * std::sin(skygate::core::AngleMath::toRadians(eclipticLongitudeDeg + orbit.latitudePhaseDeg));
 
         return EclipticToEquatorialCalculator::compute(eclipticLongitudeDeg, eclipticLatitudeDeg, obliquityDeg);
     }
