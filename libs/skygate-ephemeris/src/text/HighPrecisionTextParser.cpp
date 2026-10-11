@@ -1,8 +1,8 @@
 #include "HighPrecisionTextParser.hpp"
+#include "StringUtilities.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <algorithm>
-#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <string>
@@ -10,11 +10,6 @@
 namespace skygate::ephemeris {
 
 namespace {
-
-[[nodiscard]] bool isAsciiWhitespace(const char character) noexcept
-{
-    return std::isspace(static_cast<unsigned char>(character)) != 0;
-}
 
 template <typename Integer>
 [[nodiscard]] bool
@@ -35,13 +30,7 @@ parseInteger(const HighPrecisionTextParser& parser, const std::string_view text,
 
 std::string_view HighPrecisionTextParser::trimAsciiWhitespace(std::string_view text) const noexcept
 {
-    while (!text.empty() && isAsciiWhitespace(text.front())) {
-        text.remove_prefix(1U);
-    }
-    while (!text.empty() && isAsciiWhitespace(text.back())) {
-        text.remove_suffix(1U);
-    }
-    return text;
+    return StringUtilities::trimAsciiWhitespace(text);
 }
 
 bool HighPrecisionTextParser::startsWith(const std::string_view text, const std::string_view prefix) const noexcept
@@ -82,7 +71,7 @@ std::vector<std::string_view> HighPrecisionTextParser::splitAsciiWhitespace(std:
         }
 
         std::size_t end = 0U;
-        while (end < text.size() && !isAsciiWhitespace(text[end])) {
+        while (end < text.size() && !StringUtilities::isAsciiWhitespace(text[end])) {
             ++end;
         }
         tokens.push_back(text.substr(0U, end));
@@ -181,7 +170,7 @@ HighPrecisionTextParser::metadataValue(const std::string_view line, const std::s
     if (!startsWith(line, prefix)) {
         return std::nullopt;
     }
-    if (line.size() > prefix.size() && !isAsciiWhitespace(line[prefix.size()])) {
+    if (line.size() > prefix.size() && !StringUtilities::isAsciiWhitespace(line[prefix.size()])) {
         return std::nullopt;
     }
 

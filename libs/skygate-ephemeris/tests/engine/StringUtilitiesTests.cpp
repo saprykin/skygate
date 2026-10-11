@@ -11,6 +11,7 @@ class StringUtilitiesTests final : public QObject {
 
 private slots:
     void normalizesAsciiStrings();
+    void recognizesAsciiWhitespaceCharacters();
     void appendsUniqueValuesIgnoringAsciiCase();
 };
 
@@ -24,6 +25,20 @@ void StringUtilitiesTests::normalizesAsciiStrings()
     QVERIFY(StringUtilities::containsIgnoreAsciiCase("Name;Type;RA;Dec", "type"));
     QCOMPARE(StringUtilities::normalizedLookupKey("  ORION  "), std::string("orion"));
     QCOMPARE(StringUtilities::normalizedAlnumKey("NGC 0224"), std::string("ngc0224"));
+}
+
+void StringUtilitiesTests::recognizesAsciiWhitespaceCharacters()
+{
+    using namespace skygate::ephemeris;
+
+    QVERIFY(StringUtilities::isAsciiWhitespace(' '));
+    QVERIFY(StringUtilities::isAsciiWhitespace('\t'));
+    QVERIFY(StringUtilities::isAsciiWhitespace('\n'));
+    QVERIFY(StringUtilities::isAsciiWhitespace('\r'));
+    QVERIFY(StringUtilities::isAsciiWhitespace('\v'));
+    QVERIFY(StringUtilities::isAsciiWhitespace('\f'));
+    QVERIFY(!StringUtilities::isAsciiWhitespace('A'));
+    QVERIFY(!StringUtilities::isAsciiWhitespace('\0'));
 }
 
 void StringUtilitiesTests::appendsUniqueValuesIgnoringAsciiCase()
