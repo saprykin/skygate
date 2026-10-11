@@ -16,6 +16,7 @@ add_library(skygate-core STATIC
     src/UtcTimePoint.hpp
     src/NaifBodyIds.hpp
     src/time/AstronomicalEpoch.hpp
+    src/time/AstronomicalEpochRange.hpp
     src/time/AstronomicalTime.hpp
     src/time/CalendarTime.hpp
     src/time/CivilDateTime.hpp
@@ -51,6 +52,7 @@ add_library(skygate-core STATIC
     src/SystemTimeSource.cpp
     src/UtcTimeCodec.cpp
     src/time/AstronomicalEpoch.cpp
+    src/time/AstronomicalEpochRange.cpp
     src/time/AstronomicalTime.cpp
     src/time/CalendarTime.cpp
     src/time/EpochCodec.cpp
