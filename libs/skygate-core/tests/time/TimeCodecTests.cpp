@@ -53,6 +53,7 @@ private slots:
     void calendarTimeMapsJ2000CivilDateToJulianDate();
     void calendarTimeRoundTripsCivilDateAndEpoch();
     void calendarTimeRejectsInvalidCivilDate();
+    void civilDateFromUtcPartsValidatesInput();
     void epochCodecMapsJ2000UtcToJulianDate();
     void epochCodecRoundTripsUtcAndEpoch();
     void epochCodecDaysSinceJ2000FromEpoch();
@@ -96,6 +97,34 @@ void TimeCodecTests::calendarTimeRejectsInvalidCivilDate()
 
     QVERIFY(!skygate::core::CalendarTime::isValidCivilDateTime(invalid));
     QVERIFY(!skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(invalid).has_value());
+}
+
+void TimeCodecTests::civilDateFromUtcPartsValidatesInput()
+{
+    const auto yearZeroLeapDay = skygate::core::CalendarTime::civilDateFromUtcParts(0, 2, 29);
+    QVERIFY(yearZeroLeapDay.has_value());
+    QCOMPARE(yearZeroLeapDay->astronomicalYear, 0);
+    QCOMPARE(yearZeroLeapDay->month, 2);
+    QCOMPARE(yearZeroLeapDay->day, 29);
+    QCOMPARE(yearZeroLeapDay->hour, 0);
+    QCOMPARE(yearZeroLeapDay->minute, 0);
+    QCOMPARE(yearZeroLeapDay->second, 0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(yearZeroLeapDay->timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Utc)
+    );
+
+    const auto negativeYear = skygate::core::CalendarTime::civilDateFromUtcParts(-44, 3, 15);
+    QVERIFY(negativeYear.has_value());
+    QCOMPARE(negativeYear->astronomicalYear, -44);
+    QCOMPARE(negativeYear->month, 3);
+    QCOMPARE(negativeYear->day, 15);
+
+    QVERIFY(skygate::core::CalendarTime::civilDateFromUtcParts(2024, 12, 31).has_value());
+    QVERIFY(!skygate::core::CalendarTime::civilDateFromUtcParts(2024, 13, 1).has_value());
+    QVERIFY(!skygate::core::CalendarTime::civilDateFromUtcParts(2024, 0, 1).has_value());
+    QVERIFY(!skygate::core::CalendarTime::civilDateFromUtcParts(2024, 2, 30).has_value());
+    QVERIFY(!skygate::core::CalendarTime::civilDateFromUtcParts(1900, 2, 29).has_value());
+    QVERIFY(!skygate::core::CalendarTime::civilDateFromUtcParts(2024, 1, 0).has_value());
 }
 
 void TimeCodecTests::epochCodecMapsJ2000UtcToJulianDate()

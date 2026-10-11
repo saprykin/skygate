@@ -135,7 +135,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
         return false;
     }
 
-    skygate::core::CivilDateTime effectiveDate;
+    skygate::core::CivilDateTimeResult effectiveDate;
     double deltaTSeconds = 0.0;
     const std::optional<int> year = NumericParsingUtilities::parseInt(columns[0]);
     const std::optional<int> month = NumericParsingUtilities::parseInt(columns[1]);
@@ -147,19 +147,13 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     if (columns.size() >= 4U && year.has_value() && month.has_value() && day.has_value() && *month >= 1 && *month <= 12
         && fourthColumnSeconds.has_value()) {
         deltaTSeconds = *fourthColumnSeconds;
-        effectiveDate.astronomicalYear = *year;
-        effectiveDate.month = *month;
-        effectiveDate.day = *day;
-        effectiveDate.timeScale = skygate::core::TimeScale::Utc;
+        effectiveDate = skygate::core::CalendarTime::civilDateFromUtcParts(*year, *month, *day);
     } else if (
         columns.size() >= 3U && year.has_value() && month.has_value() && *month >= 1 && *month <= 12
         && thirdColumnSeconds.has_value()
     ) {
         deltaTSeconds = *thirdColumnSeconds;
-        effectiveDate.astronomicalYear = *year;
-        effectiveDate.month = *month;
-        effectiveDate.day = 1;
-        effectiveDate.timeScale = skygate::core::TimeScale::Utc;
+        effectiveDate = skygate::core::CalendarTime::civilDateFromUtcParts(*year, *month, 1);
     } else {
         const std::optional<double> decimalYear = NumericParsingUtilities::parseFiniteDouble(columns[0]);
         const std::optional<double> seconds = NumericParsingUtilities::parseFiniteDouble(columns[1]);
@@ -170,12 +164,12 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
         effectiveDate = skygate::core::CalendarTime::civilDateFromDecimalYear(*decimalYear);
     }
 
-    if (!skygate::core::CalendarTime::isValidCivilDateTime(effectiveDate)) {
+    if (!effectiveDate.has_value()) {
         return false;
     }
 
     const std::optional<skygate::core::AstronomicalEpoch> effectiveEpoch =
-        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(effectiveDate);
+        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*effectiveDate);
     if (!effectiveEpoch.has_value()) {
         return false;
     }

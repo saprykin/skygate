@@ -18,6 +18,8 @@ public:
     [[nodiscard]] static CivilDateTimeResult
     civilDateTimeFromAstronomicalEpoch(const AstronomicalEpoch& epoch) noexcept;
 
+    [[nodiscard]] static CivilDateTimeResult civilDateFromUtcParts(int astronomicalYear, int month, int day) noexcept;
+
     [[nodiscard]] static std::optional<int> astronomicalYearFromHistoricalYear(int historicalYear) noexcept;
     [[nodiscard]] static int historicalYearFromAstronomicalYear(int astronomicalYear) noexcept;
 

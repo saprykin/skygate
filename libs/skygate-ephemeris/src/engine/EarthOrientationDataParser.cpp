@@ -136,17 +136,14 @@ constexpr double kFinalsTwoDigitYearPivotMjd = 51543.0;
         return false;
     }
 
-    skygate::core::CivilDateTime effectiveDate;
-    effectiveDate.astronomicalYear = *year;
-    effectiveDate.month = month;
-    effectiveDate.day = day;
-    effectiveDate.timeScale = skygate::core::TimeScale::Utc;
-    if (!skygate::core::CalendarTime::isValidCivilDateTime(effectiveDate)) {
+    const skygate::core::CivilDateTimeResult effectiveDate =
+        skygate::core::CalendarTime::civilDateFromUtcParts(*year, month, day);
+    if (!effectiveDate.has_value()) {
         return false;
     }
 
     const std::optional<skygate::core::AstronomicalEpoch> effectiveEpoch =
-        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(effectiveDate);
+        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*effectiveDate);
     if (!effectiveEpoch.has_value()) {
         return false;
     }
@@ -259,17 +256,14 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
         return false;
     }
 
-    skygate::core::CivilDateTime effectiveDate;
-    effectiveDate.astronomicalYear = *year;
-    effectiveDate.month = *month;
-    effectiveDate.day = *day;
-    effectiveDate.timeScale = skygate::core::TimeScale::Utc;
-    if (!skygate::core::CalendarTime::isValidCivilDateTime(effectiveDate)) {
+    const skygate::core::CivilDateTimeResult effectiveDate =
+        skygate::core::CalendarTime::civilDateFromUtcParts(*year, *month, *day);
+    if (!effectiveDate.has_value()) {
         return false;
     }
 
     const std::optional<skygate::core::AstronomicalEpoch> effectiveEpoch =
-        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(effectiveDate);
+        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*effectiveDate);
     if (!effectiveEpoch.has_value()) {
         return false;
     }
