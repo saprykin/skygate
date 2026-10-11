@@ -9,15 +9,8 @@
 #include "SkyLogging.hpp"
 #include "SkyObjectSearchModel.hpp"
 #include "SkyOverlayLayerSettings.hpp"
-#include "SkyQtTimeCodec.hpp"
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
-#include "UtcTimeCodec.hpp"
-#include "composition/EphemerisBackendResourceCache.hpp"
-#include "composition/EphemerisGuidanceComposition.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
-#include "factory/EphemerisEngineReplacementPolicy.hpp"
-#include "time/CalendarTime.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "engine/EphemerisEngineDescriptorRegistry.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
@@ -26,10 +19,8 @@
 #include <QLoggingCategory>
 
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -65,43 +56,6 @@ using skygate::ephemeris::EphemerisEngineKind;
         {QStringLiteral("Custom star catalog URL"), SkyCatalogPresets::starCategory()},
         {QStringLiteral("Custom deep-sky catalog URL"), SkyCatalogPresets::deepSkyCategory()},
     };
-}
-
-[[nodiscard]] qint64 floorMod(const qint64 numerator, const qint64 denominator) noexcept
-{
-    qint64 remainder = numerator % denominator;
-    if (remainder < 0) {
-        remainder += denominator;
-    }
-    return remainder;
-}
-
-[[nodiscard]] std::optional<skygate::core::AstronomicalEpoch>
-astronomicalEpochFromUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcept
-{
-    const QDateTime normalizedUtcDateTime = SkyQtTimeCodec::toQDateTimeUtc(utcTime);
-    const QDate date = normalizedUtcDateTime.date();
-    const QTime time = normalizedUtcDateTime.time();
-    const auto astronomicalYear = skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(date.year());
-    if (!astronomicalYear.has_value()) {
-        return std::nullopt;
-    }
-
-    return skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::core::CivilDateTime{
-            .astronomicalYear = *astronomicalYear,
-            .month = date.month(),
-            .day = date.day(),
-            .hour = time.hour(),
-            .minute = time.minute(),
-            .second = time.second(),
-            .nanosecond = static_cast<std::uint32_t>(floorMod(
-                              static_cast<qint64>(skygate::core::UtcTimeCodec::toEpochMicros(utcTime)), 1'000'000
-                          ))
-                          * 1000U,
-            .timeScale = skygate::core::TimeScale::Utc,
-        }
-    );
 }
 
 [[nodiscard]] EphemerisEngineKind::Type engineKindFromIndex(const int index) noexcept
@@ -204,63 +158,6 @@ correctionFlagsWithRefraction(const EphemerisCorrectionFlags baseFlags, const bo
     return value;
 }
 
-void appendRevisionComponent(std::uint64_t& revision, const std::string_view value) noexcept
-{
-    constexpr std::uint64_t kFnvPrime = 1'099'511'628'211ULL;
-    for (const char character : value) {
-        revision ^= static_cast<unsigned char>(character);
-        revision *= kFnvPrime;
-    }
-    revision ^= 0xffU;
-    revision *= kFnvPrime;
-}
-
-[[nodiscard]] std::uint64_t textDataAssetRevision(
-    const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>& snapshot,
-    const std::uint64_t dataRevision,
-    const bool earthOrientation
-) noexcept
-{
-    if (snapshot == nullptr) {
-        return 0U;
-    }
-
-    const std::optional<skygate::ephemeris::EphemerisTextDataAsset> asset =
-        earthOrientation ? snapshot->earthOrientationDataAsset() : snapshot->leapSecondTableAsset();
-    if (!asset.has_value()) {
-        return dataRevision;
-    }
-
-    constexpr std::uint64_t kFnvOffsetBasis = 14'695'981'039'346'656'037ULL;
-    std::uint64_t revision = kFnvOffsetBasis;
-    revision ^= dataRevision;
-    revision *= 1'099'511'628'211ULL;
-    appendRevisionComponent(revision, asset->id);
-    appendRevisionComponent(revision, asset->version);
-    appendRevisionComponent(revision, asset->provenance);
-    return revision;
-}
-
-[[nodiscard]] std::optional<skygate::ephemeris::EphemerisDateRange> activeTextAssetRange(
-    const skygate::ephemeris::EphemerisDataManifest* manifest,
-    const skygate::ephemeris::EphemerisDataManifest::AssetKind kind,
-    const QString& activeVersion
-)
-{
-    if (manifest == nullptr || activeVersion.trimmed().isEmpty()) {
-        return std::nullopt;
-    }
-
-    const std::string version = activeVersion.trimmed().toStdString();
-    for (const skygate::ephemeris::EphemerisDataManifest::Asset& asset : manifest->assets) {
-        if (asset.kind == kind && asset.version == version) {
-            return asset.validityRange;
-        }
-    }
-
-    return std::nullopt;
-}
-
 }  // namespace
 
 SkyContextController::SkyContextController(
@@ -294,21 +191,20 @@ SkyContextController::SkyContextController(
       m_overlayLayerSettings(std::make_unique<SkyOverlayLayerSettings>(this)),
       m_settingsStore(std::make_unique<SkySettingsStore>()),
       m_ephemerisDataManager(std::make_unique<SkyEphemerisDataManager>(m_settingsStore.get(), this)),
-      m_ephemerisEngine(std::move(ephemerisEngine)),
-      m_ephemerisGuidanceStrategy(skygate::ephemeris::EphemerisGuidanceComposition::defaultGuidanceStrategy()),
-      m_ephemerisDatasetManifest(initializationOptions.ephemerisFactoryInputs.datasetManifest),
-      m_ephemerisBackendResourceCache(
-          std::make_unique<skygate::ephemeris::EphemerisBackendResourceCache>(
-              skygate::ephemeris::EphemerisBackendResourceCache::InitialProviders{
+      m_ephemerisSession(
+          std::make_unique<SkyEphemerisSession>(
+              std::shared_ptr<const skygate::ephemeris::IEphemerisEngine>(std::move(ephemerisEngine)),
+              SkyEphemerisSession::FactoryInputs{
+                  .datasetManifest = initializationOptions.ephemerisFactoryInputs.datasetManifest,
                   .timeScaleService = std::move(initializationOptions.ephemerisFactoryInputs.timeScaleService),
                   .earthOrientationProvider =
                       std::move(initializationOptions.ephemerisFactoryInputs.earthOrientationProvider),
                   .calcephKernelProvider =
                       std::move(initializationOptions.ephemerisFactoryInputs.calcephKernelProvider),
+                  .diagnosticsSink = initializationOptions.ephemerisFactoryInputs.diagnosticsSink,
               }
           )
       ),
-      m_ephemerisDiagnosticsSink(initializationOptions.ephemerisFactoryInputs.diagnosticsSink),
       m_catalogManager(std::make_unique<SkyCatalogManager>(m_settingsStore.get(), std::move(starCatalog), this)),
       m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this)),
       m_catalogSourcePresetModel(
@@ -321,18 +217,15 @@ SkyContextController::SkyContextController(
     m_logFilePath = skygate::ui::SkyLogging::defaultLogFilePath();
     m_location.setPositionSource(initializationOptions.positionSource);
     m_location.setRequestLocationPermission(initializationOptions.requestLocationPermission);
-    if (m_ephemerisEngine != nullptr) {
-        m_ephemerisEngineKind = m_ephemerisEngine->kind();
-        m_ephemerisEngineOptions = m_ephemerisEngine->options();
-    }
-    m_ephemerisUserSettings.engineKind = m_ephemerisEngineKind;
-    m_ephemerisUserSettings.correctionFlags = m_ephemerisEngineOptions.correctionFlags();
-    m_ephemerisUserSettings.fallbackToSimpleEngine = m_ephemerisEngineOptions.fallbackToSimpleEngine();
-    m_ephemerisUserSettings.refractionEnabled = m_ephemerisEngineOptions.enableAtmosphericRefraction();
-    m_ephemerisUserSettings.atmosphericPressureHpa = m_ephemerisEngineOptions.atmosphericPressureHpa();
-    m_ephemerisUserSettings.atmosphericTemperatureC = m_ephemerisEngineOptions.atmosphericTemperatureC();
-    m_ephemerisUserSettings.relativeHumidity = m_ephemerisEngineOptions.relativeHumidity();
-    m_ephemerisUserSettings.observingWavelengthMicrometers = m_ephemerisEngineOptions.observingWavelengthMicrometers();
+    m_ephemerisUserSettings.engineKind = m_ephemerisSession->engineKind();
+    m_ephemerisUserSettings.correctionFlags = m_ephemerisSession->engineOptions().correctionFlags();
+    m_ephemerisUserSettings.fallbackToSimpleEngine = m_ephemerisSession->engineOptions().fallbackToSimpleEngine();
+    m_ephemerisUserSettings.refractionEnabled = m_ephemerisSession->engineOptions().enableAtmosphericRefraction();
+    m_ephemerisUserSettings.atmosphericPressureHpa = m_ephemerisSession->engineOptions().atmosphericPressureHpa();
+    m_ephemerisUserSettings.atmosphericTemperatureC = m_ephemerisSession->engineOptions().atmosphericTemperatureC();
+    m_ephemerisUserSettings.relativeHumidity = m_ephemerisSession->engineOptions().relativeHumidity();
+    m_ephemerisUserSettings.observingWavelengthMicrometers =
+        m_ephemerisSession->engineOptions().observingWavelengthMicrometers();
     if (m_ephemerisDataManager != nullptr) {
         m_ephemerisDataManager->setBundledFallbackData(
             initializationOptions.ephemerisFactoryInputs.dataManifest,
@@ -647,7 +540,7 @@ QString SkyContextController::logFilePath() const
 
 int SkyContextController::ephemerisEngineKindIndex() const noexcept
 {
-    return engineKindIndex(m_ephemerisEngineKind);
+    return engineKindIndex(m_ephemerisSession->engineKind());
 }
 
 QStringList SkyContextController::ephemerisEngineLabels() const
@@ -699,32 +592,32 @@ bool SkyContextController::ephemerisEngineDefaultRefractionEnabled(const int eng
 
 int SkyContextController::ephemerisCorrectionPresetIndex() const noexcept
 {
-    return correctionPresetIndex(m_ephemerisEngineOptions.correctionFlags());
+    return correctionPresetIndex(m_ephemerisSession->engineOptions().correctionFlags());
 }
 
 bool SkyContextController::ephemerisRefractionEnabled() const noexcept
 {
-    return m_ephemerisEngineOptions.enableAtmosphericRefraction();
+    return m_ephemerisSession->engineOptions().enableAtmosphericRefraction();
 }
 
 QString SkyContextController::ephemerisAtmosphericPressureText() const
 {
-    return decimalText(m_ephemerisEngineOptions.atmosphericPressureHpa(), 2);
+    return decimalText(m_ephemerisSession->engineOptions().atmosphericPressureHpa(), 2);
 }
 
 QString SkyContextController::ephemerisAtmosphericTemperatureText() const
 {
-    return decimalText(m_ephemerisEngineOptions.atmosphericTemperatureC(), 1);
+    return decimalText(m_ephemerisSession->engineOptions().atmosphericTemperatureC(), 1);
 }
 
 QString SkyContextController::ephemerisRelativeHumidityText() const
 {
-    return decimalText(m_ephemerisEngineOptions.relativeHumidity() * 100.0, 1);
+    return decimalText(m_ephemerisSession->engineOptions().relativeHumidity() * 100.0, 1);
 }
 
 QString SkyContextController::ephemerisWavelengthText() const
 {
-    return decimalText(m_ephemerisEngineOptions.observingWavelengthMicrometers(), 2);
+    return decimalText(m_ephemerisSession->engineOptions().observingWavelengthMicrometers(), 2);
 }
 
 const SkyOverlayLayerVisibility& SkyContextController::overlayLayerVisibility() const noexcept
@@ -915,24 +808,18 @@ std::uint64_t SkyContextController::catalogRevision() const noexcept
 
 const skygate::ephemeris::IEphemerisEngine* SkyContextController::ephemerisEngine() const noexcept
 {
-    return m_ephemerisEngine.get();
+    return m_ephemerisSession->engine();
 }
 
 std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> SkyContextController::ephemerisEngineHandle() const
 {
-    const std::lock_guard<std::mutex> lock(m_ephemerisEngineMutex);
-    return m_ephemerisEngine;
+    return m_ephemerisSession->engineHandle();
 }
 
 std::shared_ptr<skygate::ephemeris::IEphemerisGuidanceStrategy>
 SkyContextController::ephemerisGuidanceStrategy() const noexcept
 {
-    return m_ephemerisGuidanceStrategy;
-}
-
-skygate::ephemeris::EphemerisEngineKind::Type SkyContextController::activeEphemerisEngineKind() const noexcept
-{
-    return m_ephemerisEngine != nullptr ? m_ephemerisEngine->kind() : m_ephemerisEngineKind;
+    return m_ephemerisSession->guidanceStrategy();
 }
 
 std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>
@@ -954,43 +841,20 @@ SkyContextController::EphemerisRequestContext SkyContextController::ephemerisReq
 SkyContextController::EphemerisRequestContext
 SkyContextController::ephemerisRequestContextFor(const skygate::core::ObservationContext& skyContext) const
 {
-    EphemerisRequestContext context;
-    context.request.context = skyContext;
-    context.request.options = m_ephemerisEngineOptions;
-    context.request.options.setEngineKind(m_ephemerisEngineKind);
-    context.activeDataSnapshot = activeEphemerisDataSnapshot();
-    context.engineOptionsRevision = m_ephemerisOptionsRevision;
-    context.ephemerisDataRevision = ephemerisDataRevision();
-    context.earthOrientationDataRevision =
-        textDataAssetRevision(context.activeDataSnapshot, context.ephemerisDataRevision, true);
-    context.leapSecondDataRevision =
-        textDataAssetRevision(context.activeDataSnapshot, context.ephemerisDataRevision, false);
-    context.catalogRevision = catalogRevision();
+    SkyEphemerisSession::RequestInputs inputs;
+    inputs.observationContext = skyContext;
+    inputs.activeDataSnapshot = activeEphemerisDataSnapshot();
+    inputs.dataManifest = activeEphemerisDataManifest();
+    inputs.ephemerisDataRevision = ephemerisDataRevision();
+    inputs.catalogRevision = catalogRevision();
     if (m_ephemerisDataManager != nullptr) {
         const SkySettingsStore::EphemerisDataCacheSnapshot activeCache = m_ephemerisDataManager->activeCacheSnapshot();
-        const skygate::ephemeris::EphemerisDataManifest* manifest = activeEphemerisDataManifest();
-        context.earthOrientationDataRange = activeTextAssetRange(
-            manifest,
-            skygate::ephemeris::EphemerisDataManifest::AssetKind::EarthOrientationData,
-            activeCache.installedEarthOrientationVersion
-        );
-        context.leapSecondTableRange = activeTextAssetRange(
-            manifest,
-            skygate::ephemeris::EphemerisDataManifest::AssetKind::LeapSecondTable,
-            activeCache.installedLeapSecondTableVersion
-        );
-        context.deltaTDataRange = activeTextAssetRange(
-            manifest,
-            skygate::ephemeris::EphemerisDataManifest::AssetKind::DeltaTData,
-            activeCache.installedDeltaTDataVersion
-        );
+        inputs.installedEarthOrientationVersion = activeCache.installedEarthOrientationVersion;
+        inputs.installedLeapSecondTableVersion = activeCache.installedLeapSecondTableVersion;
+        inputs.installedDeltaTDataVersion = activeCache.installedDeltaTDataVersion;
     }
 
-    if (const auto epoch = astronomicalEpochFromUtcTime(skyContext.utcTime); epoch.has_value()) {
-        context.request.epoch = *epoch;
-    }
-
-    return context;
+    return m_ephemerisSession->requestContext(inputs);
 }
 
 std::span<const skygate::ephemeris::BaseCelestialBody* const> SkyContextController::catalogBodies() const noexcept
@@ -1002,50 +866,21 @@ std::span<const skygate::ephemeris::BaseCelestialBody* const> SkyContextControll
 
 void SkyContextController::rebuildEphemerisEngine()
 {
-    const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot =
-        activeEphemerisDataSnapshot();
-    const skygate::ephemeris::EphemerisDataManifest* dataManifest = activeEphemerisDataManifest();
-    const auto* selectedDescriptor = EphemerisEngineDescriptorRegistry::findByKind(m_ephemerisEngineKind);
-    if (selectedDescriptor != nullptr && selectedDescriptor->requiresBackendResources) {
-        m_ephemerisBackendResourceCache->refresh(activeDataSnapshot, dataManifest, ephemerisDataRevision());
-    }
-
-    skygate::ephemeris::EphemerisEngineFactoryRequest request;
-    request.engineKind = m_ephemerisEngineKind;
-    const auto* starCatalog = m_catalogManager != nullptr ? m_catalogManager->starCatalog() : nullptr;
-    if (starCatalog != nullptr) {
-        request.catalog = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(starCatalog->bodies());
-    }
-    request.options = m_ephemerisEngineOptions;
-    request.options.setEngineKind(m_ephemerisEngineKind);
-    request.datasetManifest = dataManifest != nullptr ? &dataManifest->dataSetInfo : m_ephemerisDatasetManifest;
-    request.dataManifest = dataManifest;
-    request.activeDataSnapshot = activeDataSnapshot;
-    m_ephemerisBackendResourceCache->applyProviderFields(request);
-    request.diagnosticsSink = m_ephemerisDiagnosticsSink;
-
-    auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
-    if (result.hasDiagnostics()) {
-        QStringList diagnostics;
-        for (const skygate::ephemeris::EphemerisFactoryCreationDiagnostic& diagnostic : result.diagnostics) {
-            diagnostics.append(QString::fromStdString(std::string{diagnostic.displayText()}));
+    m_ephemerisSession->rebuild(
+        SkyEphemerisSession::RebuildInputs{
+            .starCatalog = m_catalogManager != nullptr ? m_catalogManager->starCatalog() : nullptr,
+            .activeDataSnapshot = activeEphemerisDataSnapshot(),
+            .dataManifest = activeEphemerisDataManifest(),
+            .ephemerisDataRevision = ephemerisDataRevision(),
+        },
+        [this](const std::vector<skygate::ephemeris::EphemerisFactoryCreationDiagnostic>& diagnostics) {
+            QStringList diagnosticsText;
+            for (const skygate::ephemeris::EphemerisFactoryCreationDiagnostic& diagnostic : diagnostics) {
+                diagnosticsText.append(QString::fromStdString(std::string{diagnostic.displayText()}));
+            }
+            setEphemerisEngineStatusText(diagnosticsText.join(QStringLiteral("; ")));
         }
-        setEphemerisEngineStatusText(diagnostics.join(QStringLiteral("; ")));
-    } else {
-        setEphemerisEngineStatusText({});
-    }
-
-    const std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> currentEngine = ephemerisEngineHandle();
-    if (currentEngine != nullptr
-        && skygate::ephemeris::EphemerisEngineReplacementPolicy::shouldKeepCurrentEngine(
-            m_ephemerisEngineKind, result, currentEngine->kind()
-        )) {
-        return;
-    }
-    if (result.engine != nullptr) {
-        const std::lock_guard<std::mutex> lock(m_ephemerisEngineMutex);
-        m_ephemerisEngine = std::move(result.engine);
-    }
+    );
 }
 
 QHash<QString, QString> SkyContextController::catalogSourceTitles() const
@@ -1214,7 +1049,7 @@ void SkyContextController::setLogFilePath(const QString& logFilePath)
 
 void SkyContextController::applyEphemerisUserSettings(const SkySettingsStore::EphemerisUserSettingsSnapshot& settings)
 {
-    skygate::ephemeris::EphemerisEngineOptions nextOptions = m_ephemerisEngineOptions;
+    skygate::ephemeris::EphemerisEngineOptions nextOptions = m_ephemerisSession->engineOptions();
     nextOptions.setEngineKind(settings.engineKind);
     nextOptions.setCorrectionFlags(settings.correctionFlags);
     nextOptions.setFallbackToSimpleEngine(settings.fallbackToSimpleEngine);
@@ -1224,15 +1059,11 @@ void SkyContextController::applyEphemerisUserSettings(const SkySettingsStore::Ep
     nextOptions.setRelativeHumidity(settings.relativeHumidity);
     nextOptions.setObservingWavelengthMicrometers(settings.observingWavelengthMicrometers);
 
-    if (m_ephemerisEngineKind == settings.engineKind && m_ephemerisEngineOptions == nextOptions) {
-        m_ephemerisUserSettings = settings;
+    m_ephemerisUserSettings = settings;
+    if (!m_ephemerisSession->applyOptions(settings.engineKind, nextOptions)) {
         return;
     }
 
-    m_ephemerisUserSettings = settings;
-    m_ephemerisEngineKind = settings.engineKind;
-    m_ephemerisEngineOptions = nextOptions;
-    ++m_ephemerisOptionsRevision;
     rebuildEphemerisEngine();
     emit ephemerisSettingsChanged();
     emit skyContextChanged();
@@ -1249,7 +1080,7 @@ void SkyContextController::setEphemerisEngineKindIndex(const int engineKindIndex
     auto settings = m_ephemerisUserSettings;
     const EphemerisEngineKind::Type targetKind = engineKindFromIndex(engineKindIndex);
     settings.engineKind = targetKind;
-    if (targetKind != m_ephemerisEngineKind) {
+    if (targetKind != m_ephemerisSession->engineKind()) {
         const auto* descriptor = EphemerisEngineDescriptorRegistry::findByKind(targetKind);
         if (descriptor != nullptr) {
             const auto& defaults = descriptor->defaultOptions;

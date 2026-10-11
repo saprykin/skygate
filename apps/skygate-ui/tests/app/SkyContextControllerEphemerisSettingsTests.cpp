@@ -259,6 +259,7 @@ private slots:
     void requestContextConvertsBceUtcToAstronomicalEpoch();
     void ephemerisEngineKindIndexRejectsOutOfRangeValues();
     void engineSwitchResetsCorrectionPresetToDefaults();
+    void oldHandleStaysUsableAfterReplacement();
     void unchangedSettingsKeepOptionsRevision();
     void optionFieldChangeBumpsOptionsRevision();
     void engineModelExposesRegistryLabelsAndCapabilities();
@@ -537,6 +538,23 @@ void SkyContextControllerEphemerisSettingsTests::engineSwitchResetsCorrectionPre
     QCOMPARE(controller->ephemerisEngineKindIndex(), 1);
     QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 3);
     QVERIFY(controller->ephemerisRefractionEnabled());
+}
+
+void SkyContextControllerEphemerisSettingsTests::oldHandleStaysUsableAfterReplacement()
+{
+    const auto controller = createController(false);
+    const std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> retainedHandle =
+        controller->ephemerisEngineHandle();
+    QVERIFY(retainedHandle != nullptr);
+    QVERIFY(controller->ephemerisEngine() == retainedHandle.get());
+
+    // Switching to the high-precision engine without providers falls back to a
+    // simple engine, which replaces the retained one.
+    controller->setEphemerisEngineKindIndex(1);
+
+    QVERIFY(controller->ephemerisEngine() != retainedHandle.get());
+    const skygate::ephemeris::EphemerisSnapshot snapshot = retainedHandle->compute(controller->skyContext());
+    QVERIFY(!snapshot.states.empty());
 }
 
 void SkyContextControllerEphemerisSettingsTests::unchangedSettingsKeepOptionsRevision()

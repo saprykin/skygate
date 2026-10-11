@@ -33,6 +33,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/ephemeris/SkyEphemerisDataManager.hpp
     src/ephemeris/SkyEphemerisDownloadService.cpp
     src/ephemeris/SkyEphemerisDownloadService.hpp
+    src/ephemeris/SkyEphemerisSession.cpp
+    src/ephemeris/SkyEphemerisSession.hpp
     src/ephemeris/SkyEphemerisSnapshotAdapter.cpp
     src/ephemeris/SkyEphemerisSnapshotAdapter.hpp
     src/ephemeris/SkyEphemerisUpdateWorkflow.cpp
