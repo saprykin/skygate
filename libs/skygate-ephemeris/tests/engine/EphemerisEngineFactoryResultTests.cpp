@@ -42,7 +42,7 @@ void EphemerisEngineFactoryResultTests::fallbackEffectiveKindSurvivesEngineMove(
 {
     EphemerisEngineFactoryResult result = EphemerisEngineFactoryResult::success(
         std::make_unique<FixedAltitudeEngine>(0.0),
-        EphemerisFactoryCreationStatus::CreatedSimpleFallback,
+        EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback,
         {},
         EphemerisEngineKind::Type::HighPrecision
     );
@@ -67,7 +67,7 @@ void EphemerisEngineFactoryResultTests::requestedEffectiveKindSurvivesEngineMove
 
     EphemerisEngineFactoryResult result = EphemerisEngineFactoryResult::success(
         std::move(highPrecisionEngine),
-        EphemerisFactoryCreationStatus::CreatedRequestedEngine,
+        EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine,
         {},
         EphemerisEngineKind::Type::HighPrecision
     );
@@ -87,7 +87,7 @@ void EphemerisEngineFactoryResultTests::requestedEffectiveKindSurvivesEngineMove
 void EphemerisEngineFactoryResultTests::failedResultWithoutEngineUsesRequestedKind()
 {
     const EphemerisEngineFactoryResult result = EphemerisEngineFactoryResult::failure(
-        EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable,
+        EphemerisFactoryCreationStatus::Type::FailedStrictHighPrecisionUnavailable,
         {},
         EphemerisEngineKind::Type::HighPrecision
     );
@@ -100,29 +100,33 @@ void EphemerisEngineFactoryResultTests::failedResultWithoutEngineUsesRequestedKi
 void EphemerisEngineFactoryResultTests::constructsFactoryResultAndCreationDiagnostics()
 {
     constexpr std::array factoryStatuses{
-        skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedRequestedEngine,
-        skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback,
-        skygate::ephemeris::EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable,
-        skygate::ephemeris::EphemerisFactoryCreationStatus::FailedInvalidRequest,
-        skygate::ephemeris::EphemerisFactoryCreationStatus::FailedCreationError,
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine,
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback,
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedStrictHighPrecisionUnavailable,
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedInvalidRequest,
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedCreationError,
     };
 
-    for (const skygate::ephemeris::EphemerisFactoryCreationStatus status : factoryStatuses) {
+    for (const skygate::ephemeris::EphemerisFactoryCreationStatus::Type status : factoryStatuses) {
         QVERIFY(!skygate::ephemeris::EphemerisEngineFactory::displayName(status).empty());
+        QCOMPARE(
+            skygate::ephemeris::EphemerisEngineFactory::displayName(status),
+            skygate::ephemeris::EphemerisFactoryCreationStatus::displayName(status)
+        );
     }
 
     QVERIFY(
         skygate::ephemeris::EphemerisEngineFactory::isCreationSuccess(
-            skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedRequestedEngine
+            skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine
         )
     );
     QVERIFY(
         skygate::ephemeris::EphemerisEngineFactory::isCreationSuccess(
-            skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback
+            skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback
         )
     );
     QVERIFY(!skygate::ephemeris::EphemerisEngineFactory::isCreationSuccess(
-        skygate::ephemeris::EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedStrictHighPrecisionUnavailable
     ));
 
     const std::array diagnosticCodes{
@@ -136,6 +140,10 @@ void EphemerisEngineFactoryResultTests::constructsFactoryResultAndCreationDiagno
 
     for (const skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode code : diagnosticCodes) {
         QVERIFY(!skygate::ephemeris::EphemerisEngineFactory::diagnosticText(code).empty());
+        QCOMPARE(
+            skygate::ephemeris::EphemerisEngineFactory::diagnosticText(code),
+            skygate::ephemeris::EphemerisFactoryCreationDiagnostic::text(code)
+        );
     }
 
     skygate::ephemeris::EphemerisFactoryCreationDiagnostic fallbackDiagnostic{
@@ -175,7 +183,7 @@ void EphemerisEngineFactoryResultTests::constructsFactoryResultAndCreationDiagno
     auto fallbackEngine = skygate::ephemeris::EphemerisEngineFactory::create();
     auto fallbackResult = skygate::ephemeris::EphemerisEngineFactoryResult::success(
         std::move(fallbackEngine.engine),
-        skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback,
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback,
         {fallbackDiagnostic},
         skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
     );
@@ -195,7 +203,7 @@ void EphemerisEngineFactoryResultTests::constructsFactoryResultAndCreationDiagno
     QCOMPARE(fallbackResult.diagnostics.size(), std::size_t{1});
 
     auto strictFailureResult = skygate::ephemeris::EphemerisEngineFactoryResult::failure(
-        skygate::ephemeris::EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable,
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedStrictHighPrecisionUnavailable,
         {strictFailureDiagnostic},
         skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
     );
@@ -247,7 +255,7 @@ void EphemerisEngineFactoryResultTests::resultHelpersDistinguishOutcomesAndDiagn
     auto fallbackEngine = skygate::ephemeris::EphemerisEngineFactory::create();
     auto fallback = skygate::ephemeris::EphemerisEngineFactoryResult::success(
         std::move(fallbackEngine.engine),
-        skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback,
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback,
         {warning},
         skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
     );
@@ -267,7 +275,7 @@ void EphemerisEngineFactoryResultTests::resultHelpersDistinguishOutcomesAndDiagn
 
     constexpr auto invalidRequestedKind = static_cast<skygate::ephemeris::EphemerisEngineKind::Type>(std::uint8_t{255});
     auto failure = skygate::ephemeris::EphemerisEngineFactoryResult::failure(
-        skygate::ephemeris::EphemerisFactoryCreationStatus::FailedInvalidRequest, {error}, invalidRequestedKind
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedInvalidRequest, {error}, invalidRequestedKind
     );
     QVERIFY(!failure.isSuccess());
     QVERIFY(failure.isFailure());

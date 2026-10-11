@@ -90,7 +90,7 @@ public:
                 .timeScale = targetScale,
             }
                 .normalized();
-        result.status = TimeScaleConversionStatus::Valid;
+        result.status = TimeScaleConversionStatus::Type::Valid;
         return result;
     }
 
@@ -102,8 +102,8 @@ public:
             skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
         if (!epoch.has_value()) {
             TimeScaleConversionResult result;
-            result.status = TimeScaleConversionStatus::Failed;
-            result.addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
+            result.status = TimeScaleConversionStatus::Type::Failed;
+            result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
             return result;
         }
         return convert(*epoch, targetScale);

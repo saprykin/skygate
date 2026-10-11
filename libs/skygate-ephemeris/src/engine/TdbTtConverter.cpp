@@ -60,8 +60,8 @@ using skygate::core::PhysicalConstants;
 
 void addTdbApproximationWarning(TimeScaleConversionResult& result) noexcept
 {
-    result.status = TimeScaleConversionStatus::Degraded;
-    result.addWarning(TimeScaleConversionWarningCode::TdbApproximationApplied);
+    result.status = TimeScaleConversionStatus::Type::Degraded;
+    result.addWarning(TimeScaleConversionWarningCode::Type::TdbApproximationApplied);
 }
 
 }  // namespace
@@ -73,14 +73,14 @@ TimeScaleConversionResult TdbTtConverter::ttToTdb(const skygate::core::Astronomi
         TimeScaleConversionResult result = TimeScaleConversionResult::failure(
             terrestrialTime, skygate::core::TimeScale::Tdb, "TT to TDB conversion input is invalid."
         );
-        result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
+        result.addWarning(TimeScaleConversionWarningCode::Type::InvalidInput);
         return result;
     }
 
     TimeScaleConversionResult result = TimeScaleConversionResult::success(
         terrestrialTime.addSeconds(*tdbMinusTt, skygate::core::TimeScale::Tdb),
-        TimeScaleConversionStatus::Degraded,
-        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::TdbApproximationApplied),
+        TimeScaleConversionStatus::Type::Degraded,
+        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::Type::TdbApproximationApplied),
         "TT to TDB conversion used the configured high-precision approximation."
     );
     addTdbApproximationWarning(result);
@@ -97,7 +97,7 @@ TimeScaleConversionResult TdbTtConverter::tdbToTt(const skygate::core::Astronomi
             TimeScaleConversionResult result = TimeScaleConversionResult::failure(
                 tdbEpoch, skygate::core::TimeScale::Tt, "TDB to TT conversion input is invalid."
             );
-            result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
+            result.addWarning(TimeScaleConversionWarningCode::Type::InvalidInput);
             return result;
         }
         tt = tdbEpoch.addSeconds(-*tdbMinusTt, skygate::core::TimeScale::Tt);
@@ -105,8 +105,8 @@ TimeScaleConversionResult TdbTtConverter::tdbToTt(const skygate::core::Astronomi
 
     TimeScaleConversionResult result = TimeScaleConversionResult::success(
         tt,
-        TimeScaleConversionStatus::Degraded,
-        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::TdbApproximationApplied),
+        TimeScaleConversionStatus::Type::Degraded,
+        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::Type::TdbApproximationApplied),
         "TDB to TT conversion used the configured high-precision approximation."
     );
     addTdbApproximationWarning(result);

@@ -13,8 +13,8 @@ void EphemerisTimeScaleMetadataMerger::mergeKernelEpochTimeScaleMetadata(
 ) noexcept
 {
     constexpr std::uint32_t kTdbApproximationWarning =
-        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::TdbApproximationApplied);
-    if (conversion.status == TimeScaleConversionStatus::Degraded
+        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::Type::TdbApproximationApplied);
+    if (conversion.status == TimeScaleConversionStatus::Type::Degraded
         && (conversion.warningCodeMask & ~kTdbApproximationWarning) == 0U) {
         return;
     }

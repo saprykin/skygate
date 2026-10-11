@@ -37,7 +37,7 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convert(
     if (!epoch.isFinite()) {
         TimeScaleConversionResult result =
             TimeScaleConversionResult::failure(epoch, targetScale, "Time-scale conversion input is invalid.");
-        result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
+        result.addWarning(TimeScaleConversionWarningCode::Type::InvalidInput);
         return result;
     }
 
@@ -83,7 +83,7 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convert(
             TimeScaleConversionResult result = TimeScaleConversionResult::failure(
                 epoch, targetScale, "Only UTC to TAI, TT, or TDB conversion is currently supported."
             );
-            result.addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
+            result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
             return result;
         }
 
@@ -209,7 +209,7 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convert(
 
     TimeScaleConversionResult result =
         TimeScaleConversionResult::failure(epoch, targetScale, "The requested time-scale conversion is not supported.");
-    result.addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
+    result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
     return result;
 }
 
@@ -222,7 +222,7 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convertCivilDateTime(
         epoch.timeScale = targetScale;
         TimeScaleConversionResult result =
             TimeScaleConversionResult::failure(epoch, targetScale, "Civil date/time input is invalid.");
-        result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
+        result.addWarning(TimeScaleConversionWarningCode::Type::InvalidInput);
         return result;
     }
 
@@ -245,7 +245,7 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convertCivilDateTime(
         TimeScaleConversionResult result = TimeScaleConversionResult::failure(
             failedEpoch, targetScale, "Civil date/time input could not be converted to an epoch."
         );
-        result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
+        result.addWarning(TimeScaleConversionWarningCode::Type::InvalidInput);
         return result;
     }
 
@@ -260,7 +260,7 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convertCivilDateTime(
     if (!precedingEpoch.has_value()) {
         TimeScaleConversionResult result =
             TimeScaleConversionResult::failure(*epoch, targetScale, "Leap-second civil date/time input is invalid.");
-        result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
+        result.addWarning(TimeScaleConversionWarningCode::Type::InvalidInput);
         return result;
     }
 
@@ -273,7 +273,7 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convertCivilDateTime(
             *epoch, targetScale, "Civil date/time does not identify a configured positive leap second."
         );
         result.warningCodeMask = precedingLookup.warningCodeMask | nextLookup.warningCodeMask;
-        result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
+        result.addWarning(TimeScaleConversionWarningCode::Type::InvalidInput);
         return result;
     }
 
@@ -285,7 +285,7 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convertCivilDateTime(
         TimeScaleConversionResult result = TimeScaleConversionResult::failure(
             *epoch, targetScale, "Only UTC leap-second conversion to TAI, TT, or TDB is currently supported."
         );
-        result.addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
+        result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
         return result;
     }
 

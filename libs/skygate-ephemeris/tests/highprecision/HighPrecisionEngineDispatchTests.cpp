@@ -316,7 +316,7 @@ public:
         TimeScaleConversionResult result;
         result.epoch = epoch;
         result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Valid;
+        result.status = TimeScaleConversionStatus::Type::Valid;
         return result;
     }
 
@@ -328,8 +328,8 @@ public:
 
         TimeScaleConversionResult result;
         result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Failed;
-        result.addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
+        result.status = TimeScaleConversionStatus::Type::Failed;
+        result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
         return result;
     }
 

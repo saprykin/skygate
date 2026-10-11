@@ -105,7 +105,7 @@ public:
             .julianDatePart2 = 53'736.0,
             .timeScale = targetScale,
         };
-        result.status = skygate::ephemeris::TimeScaleConversionStatus::Valid;
+        result.status = skygate::ephemeris::TimeScaleConversionStatus::Type::Valid;
         return result;
     }
 
@@ -119,8 +119,8 @@ public:
         }
 
         skygate::ephemeris::TimeScaleConversionResult result;
-        result.status = skygate::ephemeris::TimeScaleConversionStatus::Failed;
-        result.addWarning(skygate::ephemeris::TimeScaleConversionWarningCode::InvalidInput);
+        result.status = skygate::ephemeris::TimeScaleConversionStatus::Type::Failed;
+        result.addWarning(skygate::ephemeris::TimeScaleConversionWarningCode::Type::InvalidInput);
         return result;
     }
 
@@ -419,7 +419,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestRequiresDatasetInf
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
     request.options.setFallbackToSimpleEngine(false);
-    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
     request.timeScaleService = std::make_shared<TestTimeScaleService>();
     request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
     request.calcephKernelProvider =
@@ -450,7 +450,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestHandlesNullKernelP
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
     request.options.setFallbackToSimpleEngine(false);
-    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
     request.datasetManifest = &datasetManifest;
     request.timeScaleService = std::make_shared<TestTimeScaleService>();
     request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
@@ -462,7 +462,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestHandlesNullKernelP
     QVERIFY(result.hasErrors());
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::FailedCreationError)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedCreationError)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.diagnostics.front().code),
@@ -645,7 +645,7 @@ void EphemerisEngineFactoryBehaviorTests::defaultProviderReportsUnavailableBuild
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
     request.options.setFallbackToSimpleEngine(false);
-    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
     const skygate::ephemeris::EphemerisDataManifest manifest =
         makeFactoryManifest(kernelPayload, static_cast<std::uint64_t>(kernelPayload.size()));
     request.dataManifest = &manifest;

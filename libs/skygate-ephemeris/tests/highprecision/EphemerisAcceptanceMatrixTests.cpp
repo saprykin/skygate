@@ -374,7 +374,7 @@ public:
         TimeScaleConversionResult result;
         result.epoch = epoch;
         result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Valid;
+        result.status = TimeScaleConversionStatus::Type::Valid;
         return result;
     }
 
@@ -387,7 +387,8 @@ public:
             skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
         result.epoch = epoch.value_or(skygate::core::AstronomicalEpoch{});
         result.epoch.timeScale = targetScale;
-        result.status = epoch.has_value() ? TimeScaleConversionStatus::Valid : TimeScaleConversionStatus::Failed;
+        result.status =
+            epoch.has_value() ? TimeScaleConversionStatus::Type::Valid : TimeScaleConversionStatus::Type::Failed;
         return result;
     }
 };
@@ -570,7 +571,7 @@ void EphemerisAcceptanceMatrixTests::factoryStrictFailureAndFallbackRemainExplic
     strictRequest.catalog = makeCatalogHandle(bodies);
     strictRequest.options = makeOptions(EphemerisCorrectionFlags::apparentTopocentric());
     strictRequest.options.setFallbackToSimpleEngine(false);
-    strictRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    strictRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
     const EphemerisEngineFactoryResult strictResult = skygate::ephemeris::EphemerisEngineFactory::create(strictRequest);
     QVERIFY(strictResult.isFailure());
     QVERIFY(strictResult.engine == nullptr);
@@ -588,7 +589,8 @@ void EphemerisAcceptanceMatrixTests::factoryStrictFailureAndFallbackRemainExplic
 
     EphemerisEngineFactoryRequest fallbackRequest = strictRequest;
     fallbackRequest.options.setFallbackToSimpleEngine(true);
-    fallbackRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+    fallbackRequest.fallbackPolicy =
+        skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::AllowSimpleEngineFallback;
     const EphemerisEngineFactoryResult fallbackResult =
         skygate::ephemeris::EphemerisEngineFactory::create(fallbackRequest);
     QVERIFY(fallbackResult.isSuccess());

@@ -7,6 +7,26 @@
 
 namespace skygate::ephemeris {
 
+EphemerisEngineWarning::Code EarthOrientationSampler::Sample::engineWarningCode(const WarningCode code) noexcept
+{
+    switch (code) {
+    case WarningCode::StaleData:
+        return EphemerisEngineWarning::Code::EarthOrientationStaleData;
+    case WarningCode::PredictedData:
+        return EphemerisEngineWarning::Code::EarthOrientationPredictedData;
+    case WarningCode::MissingData:
+        return EphemerisEngineWarning::Code::EarthOrientationMissingData;
+    case WarningCode::EpochOutsideRange:
+        return EphemerisEngineWarning::Code::EarthOrientationEpochOutsideRange;
+    case WarningCode::InvalidInput:
+        return EphemerisEngineWarning::Code::EarthOrientationInvalidInput;
+    case WarningCode::EstimatedData:
+        return EphemerisEngineWarning::Code::EarthOrientationEstimatedData;
+    }
+
+    return EphemerisEngineWarning::Code::AccuracyDegraded;
+}
+
 namespace {
 
 constexpr double kEpochKeyEqualityToleranceDays = 1.0e-9;

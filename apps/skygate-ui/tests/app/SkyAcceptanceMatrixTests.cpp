@@ -362,7 +362,7 @@ public:
         skygate::ephemeris::TimeScaleConversionResult result;
         result.epoch = epoch;
         result.epoch.timeScale = targetScale;
-        result.status = skygate::ephemeris::TimeScaleConversionStatus::Valid;
+        result.status = skygate::ephemeris::TimeScaleConversionStatus::Type::Valid;
         return result;
     }
 
@@ -375,8 +375,8 @@ public:
             skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
         result.epoch = epoch.value_or(skygate::core::AstronomicalEpoch{});
         result.epoch.timeScale = targetScale;
-        result.status = epoch.has_value() ? skygate::ephemeris::TimeScaleConversionStatus::Valid
-                                          : skygate::ephemeris::TimeScaleConversionStatus::Failed;
+        result.status = epoch.has_value() ? skygate::ephemeris::TimeScaleConversionStatus::Type::Valid
+                                          : skygate::ephemeris::TimeScaleConversionStatus::Type::Failed;
         return result;
     }
 };
@@ -425,7 +425,7 @@ skygate::ephemeris::EphemerisEngineFactoryResult createAcceptanceHighPrecisionEn
     request.activeDataSnapshot = std::move(activeDataSnapshot);
     request.timeScaleService = std::make_shared<AcceptanceTimeScaleService>();
     request.earthOrientationProvider = std::make_shared<AcceptanceEarthOrientationProvider>();
-    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
     return skygate::ephemeris::EphemerisEngineFactory::create(request);
 }
 

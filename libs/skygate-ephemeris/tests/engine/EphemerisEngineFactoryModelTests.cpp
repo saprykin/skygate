@@ -85,7 +85,7 @@ void EphemerisEngineFactoryModelTests::constructsFactoryRequestDefaults()
     );
     QCOMPARE(
         static_cast<std::uint8_t>(request.fallbackPolicy),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::AllowSimpleEngineFallback)
     );
     QVERIFY(skygate::ephemeris::EphemerisEngineFactory::allowsSimpleEngineFallback(request.fallbackPolicy));
     QVERIFY(request.datasetManifest == nullptr);
@@ -124,7 +124,7 @@ void EphemerisEngineFactoryModelTests::constructsSimpleAndHighPrecisionFactoryRe
     highPrecisionRequest.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     highPrecisionRequest.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
     highPrecisionRequest.datasetManifest = &manifest;
-    highPrecisionRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    highPrecisionRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
 
     QCOMPARE(
         static_cast<std::uint8_t>(highPrecisionRequest.engineKind),
@@ -163,7 +163,7 @@ void EphemerisEngineFactoryModelTests::requestCarriesCatalogOptionsAndOpaqueInpu
     request.timeScaleService = makeOpaqueHandle<skygate::ephemeris::ITimeScaleService>(opaqueOwner);
     request.earthOrientationProvider = makeOpaqueHandle<skygate::ephemeris::IEarthOrientationProvider>(opaqueOwner);
     request.diagnosticsSink = reinterpret_cast<skygate::ephemeris::IEphemerisDiagnosticsSink*>(opaqueOwner.get());
-    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::AllowSimpleEngineFallback;
 
     QCOMPARE(
         static_cast<std::uint8_t>(request.engineKind),

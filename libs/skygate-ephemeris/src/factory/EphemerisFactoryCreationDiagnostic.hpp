@@ -23,6 +23,8 @@ struct EphemerisFactoryCreationDiagnostic {
 
     [[nodiscard]] std::string_view displayText() const noexcept;
 
+    [[nodiscard]] static std::string_view text(EphemerisFactoryCreationDiagnosticCode code) noexcept;
+
     [[nodiscard]] bool isError() const noexcept;
 };
 

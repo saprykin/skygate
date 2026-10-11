@@ -6,7 +6,7 @@ namespace skygate::ephemeris {
 
 EphemerisEngineFactoryResult EphemerisEngineFactoryResult::success(
     std::unique_ptr<IEphemerisEngine> createdEngine,
-    const EphemerisFactoryCreationStatus creationStatus,
+    const EphemerisFactoryCreationStatus::Type creationStatus,
     std::vector<EphemerisFactoryCreationDiagnostic> creationDiagnostics,
     const EphemerisEngineKind::Type requestedKind
 )
@@ -23,7 +23,7 @@ EphemerisEngineFactoryResult EphemerisEngineFactoryResult::success(
 }
 
 EphemerisEngineFactoryResult EphemerisEngineFactoryResult::failure(
-    const EphemerisFactoryCreationStatus creationStatus,
+    const EphemerisFactoryCreationStatus::Type creationStatus,
     std::vector<EphemerisFactoryCreationDiagnostic> creationDiagnostics,
     const EphemerisEngineKind::Type requestedKind
 )
@@ -38,8 +38,8 @@ EphemerisEngineFactoryResult EphemerisEngineFactoryResult::failure(
 bool EphemerisEngineFactoryResult::isSuccess() const noexcept
 {
     return engine != nullptr
-           && (status == EphemerisFactoryCreationStatus::CreatedRequestedEngine
-               || status == EphemerisFactoryCreationStatus::CreatedSimpleFallback);
+           && (status == EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine
+               || status == EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback);
 }
 
 bool EphemerisEngineFactoryResult::isFailure() const noexcept
@@ -49,7 +49,7 @@ bool EphemerisEngineFactoryResult::isFailure() const noexcept
 
 bool EphemerisEngineFactoryResult::usedSimpleEngineFallback() const noexcept
 {
-    return status == EphemerisFactoryCreationStatus::CreatedSimpleFallback;
+    return status == EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback;
 }
 
 EphemerisEngineKind::Type EphemerisEngineFactoryResult::requestedKind() const noexcept

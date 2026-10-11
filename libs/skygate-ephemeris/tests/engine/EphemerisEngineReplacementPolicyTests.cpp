@@ -23,7 +23,7 @@ constexpr EphemerisEngineKind::Type kNonEnumeratedEngineKind = static_cast<Ephem
     auto created = EphemerisEngineFactory::create();
     Q_ASSERT(created.isSuccess());
     return EphemerisEngineFactoryResult::success(
-        std::move(created.engine), EphemerisFactoryCreationStatus::CreatedSimpleFallback, {}, requestedKind
+        std::move(created.engine), EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback, {}, requestedKind
     );
 }
 
@@ -32,7 +32,7 @@ constexpr EphemerisEngineKind::Type kNonEnumeratedEngineKind = static_cast<Ephem
     auto created = EphemerisEngineFactory::create();
     Q_ASSERT(created.isSuccess());
     return EphemerisEngineFactoryResult::success(
-        std::move(created.engine), EphemerisFactoryCreationStatus::CreatedRequestedEngine, {}, requestedKind
+        std::move(created.engine), EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine, {}, requestedKind
     );
 }
 

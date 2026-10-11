@@ -42,8 +42,8 @@ public:
         TimeScaleConversionResult result;
         result.epoch = epoch;
         result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Failed;
-        result.addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
+        result.status = TimeScaleConversionStatus::Type::Failed;
+        result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
         return result;
     }
 
@@ -54,7 +54,7 @@ public:
         static_cast<void>(dateTime);
         TimeScaleConversionResult result;
         result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Failed;
+        result.status = TimeScaleConversionStatus::Type::Failed;
         return result;
     }
 

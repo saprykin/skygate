@@ -34,9 +34,9 @@ private slots:
 void EphemerisMetadataMergeTests::degradedTimeScaleConversionMapsWarningCodes()
 {
     TimeScaleConversionResult conversion;
-    conversion.status = TimeScaleConversionStatus::Degraded;
-    conversion.addWarning(TimeScaleConversionWarningCode::LeapSecondTableMissing);
-    conversion.addWarning(TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData);
+    conversion.status = TimeScaleConversionStatus::Type::Degraded;
+    conversion.addWarning(TimeScaleConversionWarningCode::Type::LeapSecondTableMissing);
+    conversion.addWarning(TimeScaleConversionWarningCode::Type::EpochOutsideEarthOrientationData);
 
     EphemerisEngineQueryResult metadata;
     EphemerisMetadataMerger::mergeTimeScale(metadata, conversion);
@@ -53,10 +53,10 @@ void EphemerisMetadataMergeTests::degradedTimeScaleConversionMapsWarningCodes()
 void EphemerisMetadataMergeTests::degradedTimeScalePreservesCodesAndText()
 {
     TimeScaleConversionResult conversion;
-    conversion.status = TimeScaleConversionStatus::Degraded;
+    conversion.status = TimeScaleConversionStatus::Type::Degraded;
     conversion.diagnosticText = "degraded leap-second lookup";
-    conversion.addWarning(TimeScaleConversionWarningCode::LeapSecondTableStale);
-    conversion.addWarning(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
+    conversion.addWarning(TimeScaleConversionWarningCode::Type::LeapSecondTableStale);
+    conversion.addWarning(TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied);
 
     EphemerisEngineQueryResult metadata;
     EphemerisMetadataMerger::mergeTimeScale(metadata, conversion);
@@ -79,8 +79,8 @@ void EphemerisMetadataMergeTests::degradedTimeScalePreservesCodesAndText()
 void EphemerisMetadataMergeTests::failedTimeScaleConversionHonorsFailurePolicy()
 {
     TimeScaleConversionResult conversion;
-    conversion.status = TimeScaleConversionStatus::Failed;
-    conversion.addWarning(TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable);
+    conversion.status = TimeScaleConversionStatus::Type::Failed;
+    conversion.addWarning(TimeScaleConversionWarningCode::Type::EpochOutsideLeapSecondTable);
 
     EphemerisEngineQueryResult degradedMetadata;
     EphemerisMetadataMerger::mergeTimeScale(degradedMetadata, conversion, EphemerisMetadataFailurePolicy::MarkDegraded);

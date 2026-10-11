@@ -15,10 +15,10 @@ namespace skygate::ephemeris {
 
 class EphemerisEngineFactory final {
 public:
-    [[nodiscard]] static bool allowsSimpleEngineFallback(EphemerisFactoryFallbackPolicy policy) noexcept;
-    [[nodiscard]] static std::string_view displayName(EphemerisFactoryFallbackPolicy policy) noexcept;
-    [[nodiscard]] static std::string_view displayName(EphemerisFactoryCreationStatus status) noexcept;
-    [[nodiscard]] static bool isCreationSuccess(EphemerisFactoryCreationStatus status) noexcept;
+    [[nodiscard]] static bool allowsSimpleEngineFallback(EphemerisFactoryFallbackPolicy::Type policy) noexcept;
+    [[nodiscard]] static std::string_view displayName(EphemerisFactoryFallbackPolicy::Type policy) noexcept;
+    [[nodiscard]] static std::string_view displayName(EphemerisFactoryCreationStatus::Type status) noexcept;
+    [[nodiscard]] static bool isCreationSuccess(EphemerisFactoryCreationStatus::Type status) noexcept;
     [[nodiscard]] static std::string_view diagnosticText(EphemerisFactoryCreationDiagnosticCode code) noexcept;
 
     [[nodiscard]] static EphemerisEngineFactoryResult create(const EphemerisEngineFactoryRequest& request);

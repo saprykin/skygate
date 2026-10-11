@@ -191,7 +191,7 @@ public:
     convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         TimeScaleConversionResult result;
-        result.status = TimeScaleConversionStatus::Valid;
+        result.status = TimeScaleConversionStatus::Type::Valid;
         result.diagnosticText = "unit test fixed UTC conversion";
         result.epoch = epoch;
         result.epoch.timeScale = targetScale;

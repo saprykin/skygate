@@ -13,18 +13,19 @@ namespace skygate::ephemeris {
 
 struct EphemerisEngineFactoryResult {
     std::unique_ptr<IEphemerisEngine> engine;
-    EphemerisFactoryCreationStatus status = EphemerisFactoryCreationStatus::FailedCreationError;
+    EphemerisFactoryCreationStatus::Type status = EphemerisFactoryCreationStatus::Type::FailedCreationError;
     std::vector<EphemerisFactoryCreationDiagnostic> diagnostics;
 
     [[nodiscard]] static EphemerisEngineFactoryResult success(
         std::unique_ptr<IEphemerisEngine> createdEngine,
-        EphemerisFactoryCreationStatus creationStatus = EphemerisFactoryCreationStatus::CreatedRequestedEngine,
+        EphemerisFactoryCreationStatus::Type creationStatus =
+            EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine,
         std::vector<EphemerisFactoryCreationDiagnostic> creationDiagnostics = {},
         EphemerisEngineKind::Type requestedKind = EphemerisEngineKind::Type::Simple
     );
 
     [[nodiscard]] static EphemerisEngineFactoryResult failure(
-        EphemerisFactoryCreationStatus creationStatus,
+        EphemerisFactoryCreationStatus::Type creationStatus,
         std::vector<EphemerisFactoryCreationDiagnostic> creationDiagnostics,
         EphemerisEngineKind::Type requestedKind = EphemerisEngineKind::Type::Simple
     );
