@@ -34,14 +34,10 @@ std::optional<CatalogIdentifier> recognizedDesignation(const QString& text)
 
 QString normalizedCatalogAlias(QString text)
 {
-    text = text.trimmed();
+    text = CatalogParsingUtilities::normalizedLabelText(text);
     if (text.isEmpty()) {
         return {};
     }
-
-    text.replace('_', ' ');
-    text.replace('-', ' ');
-    text = text.simplified();
 
     const auto normalizePrefix = [&text](const QString& prefix) {
         if (!text.startsWith(prefix, Qt::CaseInsensitive)) {

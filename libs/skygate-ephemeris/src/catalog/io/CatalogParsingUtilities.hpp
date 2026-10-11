@@ -11,6 +11,9 @@ namespace skygate::ephemeris {
 class CatalogParsingUtilities final {
 public:
     [[nodiscard]] static std::string toUtf8String(const QString& text);
+    // Normalizes a display label: trims, turns `_` and `-` separators into
+    // single spaces, and collapses whitespace runs.
+    [[nodiscard]] static QString normalizedLabelText(QString text);
     [[nodiscard]] static std::optional<double> parseFiniteDouble(QStringView text);
     [[nodiscard]] static std::optional<double> parseFiniteDouble(const QString& text);
     [[nodiscard]] static std::optional<double> parsePositiveDouble(QStringView text);

@@ -101,6 +101,7 @@ class CatalogSnapshotValidatorTests final : public QObject {
 
 private slots:
     void vectorFactoryNormalizesSunAndMoonIdentities();
+    void trimsWhitespaceBeforeSunAndMoonReclassification();
     void existingCatalogFactoryAcceptsValidSnapshot();
     void catalogFactoryNormalizesSunAndIdentifiers();
     void validatorRejectsOutOfRangeAndUnknownOrderEntries();
@@ -137,6 +138,28 @@ void CatalogSnapshotValidatorTests::vectorFactoryNormalizesSunAndMoonIdentities(
         QString::fromStdString(normalizedStar.identity.externalIdentifiers[0].namespaceName), QStringLiteral("hip")
     );
     QCOMPARE(QString::fromStdString(normalizedStar.identity.externalIdentifiers[0].value), QStringLiteral("31"));
+}
+
+void CatalogSnapshotValidatorTests::trimsWhitespaceBeforeSunAndMoonReclassification()
+{
+    OwnGalaxyCelestialBody sun;
+    sun.id = " sun";
+    sun.displayName = "Sun";
+    sun.kind = BaseCelestialBody::Kind::Star;
+
+    OwnGalaxyCelestialBody moon;
+    moon.id = "MOON ";
+    moon.displayName = "Moon";
+    moon.kind = BaseCelestialBody::Kind::Star;
+
+    const auto catalog =
+        skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(std::vector<OwnGalaxyCelestialBody>{sun, moon});
+    QVERIFY(catalog != nullptr);
+
+    const auto bodies = catalog->bodies();
+    QCOMPARE(bodies.size(), std::size_t{2});
+    QCOMPARE(bodies[0]->kind, BaseCelestialBody::Kind::Sun);
+    QCOMPARE(bodies[1]->kind, BaseCelestialBody::Kind::Moon);
 }
 
 void CatalogSnapshotValidatorTests::existingCatalogFactoryAcceptsValidSnapshot()

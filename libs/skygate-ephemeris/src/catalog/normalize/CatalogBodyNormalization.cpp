@@ -5,7 +5,7 @@ namespace skygate::ephemeris {
 
 void CatalogBodyNormalization::apply(OwnGalaxyCelestialBody& body)
 {
-    const std::string normalizedId = StringUtilities::toLowerAscii(body.id);
+    const std::string normalizedId = StringUtilities::normalizedLookupKey(body.id);
     if (normalizedId == "sun") {
         body.kind = BaseCelestialBody::Kind::Sun;
         return;
@@ -14,8 +14,6 @@ void CatalogBodyNormalization::apply(OwnGalaxyCelestialBody& body)
         body.kind = BaseCelestialBody::Kind::Moon;
         return;
     }
-
-    (void)body;
 }
 
 void CatalogBodyNormalization::apply(std::vector<OwnGalaxyCelestialBody>& bodies)
