@@ -4,6 +4,7 @@
 #include "CatalogFactory.hpp"
 #include "CatalogIdentity.hpp"
 #include "StringUtilities.hpp"
+#include "catalog/CatalogCompositionPolicyRules.hpp"
 
 #include <QLoggingCategory>
 #include <QString>
@@ -136,8 +137,7 @@ CatalogCompositionResult CatalogComposer::composeCollection(const CatalogComposi
             if (!source.enabled || source.catalog == nullptr) {
                 continue;
             }
-            if (source.policy == CatalogCompositionPolicy::DeepSkyOnly
-                || source.policy == CatalogCompositionPolicy::DeepSkyFallback) {
+            if (CatalogCompositionPolicyRules::contributesDeepSkyObjects(source.policy)) {
                 result.foundDeepSkyObjectCount += countDeepSkyObjects(source.catalog);
             }
         }

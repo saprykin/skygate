@@ -1,6 +1,7 @@
 #include "CatalogCompositionMerger.hpp"
 
 #include "StringUtilities.hpp"
+#include "catalog/CatalogCompositionPolicyRules.hpp"
 #include "catalog/CatalogCoordinateModel.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogIdentityIndex.hpp"
@@ -1267,21 +1268,6 @@ std::size_t appendDeduped(
     return position;
 }
 
-bool participates(const CatalogCompositionPolicy policy, const BaseCelestialBody& body)
-{
-    switch (policy) {
-    case CatalogCompositionPolicy::DeepSkyOnly:
-        return body.kind == BaseCelestialBody::Kind::DeepSkyObject;
-    case CatalogCompositionPolicy::AugmentCore:
-        return body.kind != BaseCelestialBody::Kind::DeepSkyObject;
-    case CatalogCompositionPolicy::DeepSkyFallback:
-        return body.kind == BaseCelestialBody::Kind::DeepSkyObject;
-    case CatalogCompositionPolicy::Merge:
-        return true;
-    }
-    return true;
-}
-
 // Gap-fill policies never replace an existing survivor: a body whose shared
 // identity decision resolves it to an existing equivalent is preserved
 // instead of appended. AugmentCore and DeepSkyFallback differ in which bodies
@@ -1482,7 +1468,7 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
             }
 
             for (const BaseCelestialBody* body : source.catalog->bodies()) {
-                if (body == nullptr || !participates(source.policy, *body)) {
+                if (body == nullptr || !CatalogCompositionPolicyRules::participates(source.policy, *body)) {
                     continue;
                 }
                 if (body->kind == BaseCelestialBody::Kind::Star) {
@@ -1499,7 +1485,7 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
         MergeAccumulator sourceBodies;
         CatalogIdentityIndex sourceIndex;
         for (const BaseCelestialBody* body : source.catalog->bodies()) {
-            if (body == nullptr || !participates(source.policy, *body)) {
+            if (body == nullptr || !CatalogCompositionPolicyRules::participates(source.policy, *body)) {
                 continue;
             }
             if (body->kind == BaseCelestialBody::Kind::Star) {
