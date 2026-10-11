@@ -13,6 +13,38 @@
 
 namespace {
 
+// Widths are quantized to hundredths of a pixel so float rounding in computed
+// widths does not split one intended width across buckets.
+constexpr float kWidthKeyScale = 100.0F;
+
+// Buckets sort by the packed value ((rgba & 0x00ffffff) << 8) ^ widthKey
+// that previously ordered lines on its own. Alpha breaks ties between keys
+// that packed value merges, and the raw fields keep the order total.
+struct LineBucketKey final {
+    std::uint32_t rgba = 0U;
+    std::uint32_t widthKey = 0U;
+
+    [[nodiscard]] bool operator<(const LineBucketKey& other) const noexcept
+    {
+        const std::uint32_t packedKey = ((rgba & 0x00ffffffU) << 8U) ^ widthKey;
+        const std::uint32_t otherPackedKey = ((other.rgba & 0x00ffffffU) << 8U) ^ other.widthKey;
+        if (packedKey != otherPackedKey) {
+            return packedKey < otherPackedKey;
+        }
+
+        const std::uint32_t alpha = rgba >> 24U;
+        const std::uint32_t otherAlpha = other.rgba >> 24U;
+        if (alpha != otherAlpha) {
+            return alpha < otherAlpha;
+        }
+
+        if (rgba != other.rgba) {
+            return rgba < other.rgba;
+        }
+        return widthKey < other.widthKey;
+    }
+};
+
 struct VertexBucket final {
     QColor color;
     float widthPx = 1.0F;
@@ -89,11 +121,12 @@ void syncSkyViewportLineNodes(QSGNode* rootNode, const std::span<const SkyViewpo
         return;
     }
 
-    std::map<std::uint32_t, VertexBucket> buckets;
+    std::map<LineBucketKey, VertexBucket> buckets;
     for (const auto& lineSegment : lineSegments) {
-        const std::uint32_t colorKey = static_cast<std::uint32_t>(lineSegment.color.rgba());
-        const std::uint32_t widthKey = static_cast<std::uint32_t>(lineSegment.widthPx * 100.0F);
-        const std::uint32_t bucketKey = (colorKey << 8U) ^ widthKey;
+        const LineBucketKey bucketKey{
+            .rgba = static_cast<std::uint32_t>(lineSegment.color.rgba()),
+            .widthKey = static_cast<std::uint32_t>(lineSegment.widthPx * kWidthKeyScale)
+        };
         auto& bucket = buckets[bucketKey];
         bucket.color = lineSegment.color;
         bucket.widthPx = lineSegment.widthPx;

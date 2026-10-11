@@ -57,6 +57,8 @@ class SkyViewportInternalsTests final : public QObject {
 private slots:
     void geometryAppendsFrameLinesAndDeepSkyGlyphSegments();
     void sceneGraphBucketsAndSkipsDegenerateLines();
+    void sceneGraphKeepsDistinctAlphaLineBuckets();
+    void sceneGraphPreservesLegacyPackedKeyOrder();
     void sceneGraphBucketsPointsByColor();
     void sceneRootOwnsSeparateLineAndPointRoots();
 };
@@ -138,6 +140,60 @@ void SkyViewportInternalsTests::sceneGraphBucketsAndSkipsDegenerateLines()
 
     skygate::ui::internal::clearSkyViewportChildNodes(&root);
     QCOMPARE(childCount(root), 0);
+}
+
+void SkyViewportInternalsTests::sceneGraphKeepsDistinctAlphaLineBuckets()
+{
+    QColor lowAlphaColor = QColor("#3366ff");
+    lowAlphaColor.setAlpha(50);
+    QColor highAlphaColor = QColor("#3366ff");
+    highAlphaColor.setAlpha(200);
+
+    QSGNode root;
+    const std::vector<skygate::ui::internal::SkyViewportLineSegment> segments{
+        {.x1 = 0.0F, .y1 = 10.0F, .x2 = 20.0F, .y2 = 10.0F, .widthPx = 1.5F, .color = lowAlphaColor},
+        {.x1 = 0.0F, .y1 = 30.0F, .x2 = 20.0F, .y2 = 30.0F, .widthPx = 1.5F, .color = highAlphaColor},
+    };
+
+    skygate::ui::internal::syncSkyViewportLineNodes(&root, segments);
+
+    QCOMPARE(childCount(root), 2);
+    std::vector<QColor> nodeColors;
+    int totalVertices = 0;
+    for (const QSGNode* child = root.firstChild(); child != nullptr; child = child->nextSibling()) {
+        QVERIFY(child->type() == QSGNode::GeometryNodeType);
+        const auto* geometryNode = static_cast<const QSGGeometryNode*>(child);
+        QCOMPARE(geometryNode->geometry()->vertexCount(), 6);
+        totalVertices += geometryNode->geometry()->vertexCount();
+        nodeColors.push_back(static_cast<const QSGFlatColorMaterial*>(geometryNode->material())->color());
+    }
+
+    QCOMPARE(totalVertices, 12);
+    QCOMPARE(nodeColors.size(), 2U);
+    QCOMPARE(nodeColors.front(), lowAlphaColor);
+    QCOMPARE(nodeColors.back(), highAlphaColor);
+}
+
+void SkyViewportInternalsTests::sceneGraphPreservesLegacyPackedKeyOrder()
+{
+    QColor translucentRed = QColor("#ff0000");
+    translucentRed.setAlpha(50);
+    const QColor opaqueBlue = QColor("#0000ff");
+
+    QSGNode root;
+    const std::vector<skygate::ui::internal::SkyViewportLineSegment> segments{
+        {.x1 = 0.0F, .y1 = 10.0F, .x2 = 20.0F, .y2 = 10.0F, .widthPx = 1.5F, .color = translucentRed},
+        {.x1 = 0.0F, .y1 = 30.0F, .x2 = 20.0F, .y2 = 30.0F, .widthPx = 1.5F, .color = opaqueBlue},
+    };
+
+    skygate::ui::internal::syncSkyViewportLineNodes(&root, segments);
+
+    QCOMPARE(childCount(root), 2);
+    const QSGGeometryNode* firstNode = firstGeometryChild(root);
+    QVERIFY(firstNode != nullptr);
+    const auto* secondNode = static_cast<const QSGGeometryNode*>(firstNode->nextSibling());
+    QCOMPARE(static_cast<const QSGFlatColorMaterial*>(firstNode->material())->color(), opaqueBlue);
+    QCOMPARE(static_cast<const QSGFlatColorMaterial*>(secondNode->material())->color(), translucentRed);
 }
 
 void SkyViewportInternalsTests::sceneGraphBucketsPointsByColor()
