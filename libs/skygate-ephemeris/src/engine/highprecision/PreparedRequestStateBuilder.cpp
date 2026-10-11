@@ -73,36 +73,15 @@ PreparedRequestStateBuilder::build(const EphemerisRequest& request) const
     if (requestsTopocentricState(request) && m_dependencies.timeScaleService != nullptr) {
         preparedState->topocentricStatePrepared = true;
         preparedState->observerItrsPositionAu = ObserverGeodesy::observerItrsPositionAu(request.context.observer);
-        const TimeScaleConversionResult utcConversion =
-            m_dependencies.timeScaleService->convert(request.epoch, skygate::core::TimeScale::Utc);
-        EphemerisMetadataMerger::mergeTimeScale(
-            preparedState->topocentricMetadata, utcConversion, EphemerisMetadataFailurePolicy::MarkFailed
+        preparedState->earthOrientationSample = EphemerisMetadataMerger::prepareEarthOrientation(
+            request.epoch,
+            m_dependencies.timeScaleService.get(),
+            m_dependencies.earthOrientationProvider.get(),
+            preparedState->topocentricMetadata,
+            EphemerisMetadataFailurePolicy::MarkFailed,
+            EarthOrientationSampler::Options::tolerantFallback()
         );
-        if (!utcConversion.isSuccess()) {
-            preparedState->topocentricStateAvailable = false;
-            EphemerisMetadataMerger::markCorrectionUnavailable(
-                preparedState->topocentricMetadata, EphemerisCorrectionFlags::earthOrientation()
-            );
-        } else {
-            preparedState->earthOrientationSample = EarthOrientationSampler::sample(
-                m_dependencies.earthOrientationProvider,
-                utcConversion.epoch,
-                EarthOrientationSampler::Options{
-                    .allowOutOfRangeNearestSampleFallback = true,
-                    .allowMissingDataZeroFallback = true,
-                    .degradePredictedData = false,
-                }
-            );
-            EphemerisMetadataMerger::mergeEarthOrientation(
-                preparedState->topocentricMetadata, *preparedState->earthOrientationSample
-            );
-            if (!preparedState->earthOrientationSample->isSuccess()) {
-                preparedState->topocentricStateAvailable = false;
-                EphemerisMetadataMerger::markCorrectionUnavailable(
-                    preparedState->topocentricMetadata, EphemerisCorrectionFlags::earthOrientation()
-                );
-            }
-        }
+        preparedState->topocentricStateAvailable = preparedState->earthOrientationSample.has_value();
     }
 
     return preparedState;
