@@ -49,9 +49,7 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/CalcephKernelProvider.hpp
     src/engine/highprecision/CalcephKernelProvider.cpp
     src/engine/highprecision/CalcephKernelStatusNames.hpp
-    src/engine/highprecision/CalcephKernelStatusNames.cpp
     src/engine/highprecision/CelestialFrameTransformRequest.hpp
-    src/engine/highprecision/CelestialFrameTransformRequest.cpp
     src/engine/highprecision/CelestialFrameTransformResult.hpp
     src/engine/highprecision/CelestialFrameTransformResult.cpp
     src/engine/highprecision/CelestialReferenceFrame.hpp
@@ -63,15 +61,11 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/HighPrecisionEphemerisEngine.hpp
     src/engine/highprecision/HighPrecisionEphemerisEngine.cpp
     src/engine/highprecision/HighPrecisionComputationInput.hpp
-    src/engine/highprecision/HighPrecisionComputationInput.cpp
     src/engine/highprecision/HighPrecisionCalculatorResult.hpp
-    src/engine/highprecision/HighPrecisionCalculatorResult.cpp
     src/engine/highprecision/PreparedEphemerisRequestState.hpp
-    src/engine/highprecision/PreparedEphemerisRequestState.cpp
     src/engine/highprecision/PreparedRequestStateBuilder.hpp
     src/engine/highprecision/PreparedRequestStateBuilder.cpp
     src/engine/highprecision/StarAstrometryBatchResult.hpp
-    src/engine/highprecision/StarAstrometryBatchResult.cpp
     src/engine/highprecision/IApparentPlaceCalculator.hpp
     src/engine/highprecision/IAtmosphericRefractionCalculator.hpp
     src/engine/highprecision/ICalcephKernel.hpp
@@ -95,9 +89,7 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/EarthOrientationSampler.hpp
     src/engine/EarthOrientationSampler.cpp
     src/engine/EphemerisDataActivation.cpp
-    src/engine/EphemerisDataActivationRequest.cpp
     src/engine/EphemerisDataActivationResult.cpp
-    src/engine/EphemerisDataActivationStatus.cpp
     src/engine/EphemerisDataFileUtilities.hpp
     src/engine/EphemerisDataFileUtilities.cpp
     src/engine/EphemerisDataStaleness.hpp
@@ -106,9 +98,7 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/EphemerisTableMetadata.cpp
     src/engine/EphemerisDataPayloadReader.cpp
     src/engine/EphemerisStagedUpdateVerification.cpp
-    src/engine/EphemerisStagedUpdateVerificationRequest.cpp
     src/engine/EphemerisStagedUpdateVerificationResult.cpp
-    src/engine/EphemerisStagedUpdateVerificationStatus.cpp
     src/engine/EphemerisDataManifest.cpp
     src/engine/highprecision/EphemerisComputationCache.hpp
     src/engine/highprecision/EphemerisComputationCache.cpp
@@ -139,17 +129,13 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/TableInterpolation.hpp
     src/engine/TableInterpolation.cpp
     src/engine/TimeScaleConversionStatus.hpp
-    src/engine/TimeScaleConversionStatus.cpp
     src/engine/TimeScaleConversionWarningCode.hpp
-    src/engine/TimeScaleConversionWarningCode.cpp
     src/engine/TimeScaleConversionDiagnostics.hpp
-    src/engine/TimeScaleConversionDiagnostics.cpp
     src/engine/TimeScaleConversionResult.hpp
     src/engine/TimeScaleConversionResult.cpp
     src/engine/TimeScaleProviderLoader.hpp
     src/engine/TimeScaleProviderLoader.cpp
     src/engine/TimeScaleServiceOptions.hpp
-    src/engine/TimeScaleServiceOptions.cpp
     src/engine/ITimeScaleService.hpp
     src/engine/LeapSecondTimeScaleService.hpp
     src/engine/LeapSecondTimeScaleService.cpp
@@ -160,15 +146,10 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/Ut1OffsetResolver.hpp
     src/engine/Ut1OffsetResolver.cpp
     src/engine/highprecision/EphemerisMetadataStatusMergePolicy.hpp
-    src/engine/highprecision/EphemerisMetadataStatusMergePolicy.cpp
     src/engine/highprecision/EphemerisMetadataFailurePolicy.hpp
-    src/engine/highprecision/EphemerisMetadataFailurePolicy.cpp
     src/engine/highprecision/EphemerisMetadataMergeOptions.hpp
-    src/engine/highprecision/EphemerisMetadataMergeOptions.cpp
     src/engine/EphemerisTextDataAsset.hpp
-    src/engine/EphemerisTextDataAsset.cpp
     src/engine/EphemerisKernelDataAsset.hpp
-    src/engine/EphemerisKernelDataAsset.cpp
     src/engine/IEphemerisDataSnapshot.hpp
 )
 
@@ -333,8 +314,6 @@ add_library(skygate-ephemeris STATIC
     src/PlanetIdentity.cpp
     src/BaseCelestialBody.cpp
     src/CelestialBodyCatalog.cpp
-    src/CelestialBodyState.cpp
-    src/DeepSkyObjectInfo.cpp
     src/DistantCelestialBody.cpp
     src/EphemerisSnapshot.cpp
     src/OwnGalaxyCelestialBody.cpp
@@ -346,48 +325,32 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogIdentifier.cpp
     src/catalog/CatalogIdentity.cpp
     src/catalog/CatalogIdentityIndex.cpp
-    src/catalog/CatalogObjectIdentity.cpp
     src/catalog/CatalogComposer.cpp
-    src/catalog/CatalogCompositionPolicy.cpp
     src/catalog/CatalogCompositionPolicyRules.cpp
-    src/catalog/CatalogCompositionSourceEntry.cpp
-    src/catalog/CatalogCompositionRequest.cpp
     src/catalog/CatalogCompositionResult.cpp
-    src/catalog/CatalogCompositionMergeResult.cpp
     src/catalog/CatalogCompositionMerger.cpp
-    src/catalog/CatalogSelectionMode.cpp
     src/catalog/CatalogSelectionOptions.cpp
-    src/catalog/CatalogSourceRequest.cpp
-    src/catalog/CatalogSourceType.cpp
-    src/catalog/CatalogSchemaDescriptor.cpp
     src/catalog/CatalogSchemaRegistry.cpp
     src/catalog/io/CatalogParsingUtilities.cpp
     src/catalog/CatalogBinaryCodec.cpp
     src/catalog/CatalogFactory.cpp
-    src/catalog/CatalogLoadDiagnostics.cpp
     src/catalog/CatalogLoader.cpp
     src/catalog/io/CatalogHeaderPolicy.cpp
     src/catalog/io/CatalogPayloadFormatDetector.cpp
-    src/catalog/CatalogParseRequest.cpp
     src/catalog/CatalogPayloadParser.cpp
     src/catalog/io/CatalogZipEntrySelection.cpp
     src/catalog/io/CatalogZipEntrySelector.cpp
     src/catalog/io/CompressedDataInflater.cpp
-    src/catalog/io/CompressedDataInflateOptions.cpp
     src/catalog/io/DelimitedCatalogParser.cpp
-    src/catalog/io/DelimitedCatalogParserOptions.cpp
-    src/catalog/io/RowParseOutcome.cpp
     src/catalog/constellation/ConstellationDataCodec.cpp
     src/catalog/constellation/ConstellationReferenceResolver.cpp
     src/catalog/composition/CoreBodyCatalogAugmenter.cpp
     src/catalog/io/DelimitedCatalogReader.cpp
-    src/catalog/io/DelimitedCatalogReaderOptions.cpp
     src/catalog/io/DelimitedCatalogRow.cpp
     src/catalog/io/CsvRowTokenizer.hpp
     src/catalog/hyg/HygCatalogParser.hpp
     src/catalog/InMemoryStarCatalog.hpp
     src/catalog/opengc/OpenNgcObjectMapper.cpp
-    src/catalog/opengc/OpenNgcObjectMapping.cpp
     src/catalog/opengc/OpenNgcCatalogParser.hpp
     src/catalog/io/zip/ZipCodec.hpp
     src/catalog/io/zip/ZipDirectoryReader.cpp
@@ -405,45 +368,22 @@ add_library(skygate-ephemeris STATIC
     src/composition/EphemerisGuidanceComposition.cpp
     src/ConstellationReferenceCalculator.cpp
     src/factory/EphemerisEngineFactory.cpp
-    src/factory/EphemerisFactoryCreationDiagnosticCode.cpp
-    src/factory/EphemerisFactoryCreationDiagnosticSeverity.cpp
-    src/factory/EphemerisFactoryCreationStatus.cpp
-    src/factory/EphemerisFactoryFallbackPolicy.cpp
-    src/factory/EphemerisEngineFactoryRequest.cpp
     src/factory/EphemerisEngineFactoryResult.cpp
     src/factory/EphemerisEngineReplacementPolicy.cpp
     src/factory/EphemerisFactoryCreationDiagnostic.cpp
     src/engine/EphemerisEngineQueries.cpp
-    src/engine/EphemerisPrecisionPolicy.cpp
-    src/engine/BitFlagSetOperations.cpp
-    src/engine/EphemerisCapabilities.cpp
-    src/engine/EphemerisCorrectionFlags.cpp
-    src/engine/EphemerisDataSourceProvenance.cpp
     src/time/EphemerisDateRange.cpp
-    src/engine/EphemerisDatasetInfo.cpp
-    src/engine/EphemerisEngineKind.cpp
-    src/engine/EphemerisEngineDescriptor.cpp
     src/engine/EphemerisEngineDescriptorRegistry.cpp
     src/engine/EphemerisEngineOptions.cpp
-    src/engine/EphemerisEngineTraits.cpp
     src/engine/EphemerisComputationPolicy.cpp
     src/engine/EphemerisLogging.hpp
     src/engine/EphemerisLogging.cpp
-    src/engine/EphemerisEngineQueryResult.cpp
-    src/engine/EphemerisEngineWarning.cpp
-    src/engine/EphemerisEngineQueryStatus.cpp
     src/EphemerisRequest.cpp
     src/EphemerisRequestFactory.cpp
     src/FixedBodyAltitudeRange.cpp
-    src/MoonPhase.cpp
     src/MoonPhaseCalculator.cpp
-    src/NightConditions.cpp
     src/NightConditionsCalculator.cpp
-    src/SolarAltitudeThresholds.cpp
-    src/ObservationEvent.cpp
     src/ObservationEventCalculator.cpp
-    src/ObservationEventStatus.cpp
-    src/ObservationEventSummary.cpp
     src/catalog/bundled/BundledCatalogParser.cpp
     src/catalog/io/CsvRowTokenizer.cpp
     src/catalog/hyg/HygCatalogParser.cpp
@@ -451,8 +391,6 @@ add_library(skygate-ephemeris STATIC
     src/catalog/opengc/OpenNgcCatalogParser.cpp
     src/catalog/io/zip/ZipCodec.cpp
     src/trail/BodyTrailCalculator.cpp
-    src/trail/BodyTrailOptions.cpp
-    src/trail/BodyTrailSample.cpp
 )
 
 target_include_directories(skygate-ephemeris
