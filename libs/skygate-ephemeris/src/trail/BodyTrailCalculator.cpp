@@ -1,8 +1,10 @@
 #include "BodyTrailCalculator.hpp"
+#include "CelestialBodyState.hpp"
 #include "math/TimeConstants.hpp"
 
 #include <chrono>
 #include <cstddef>
+#include <optional>
 
 namespace skygate::ephemeris {
 
@@ -28,6 +30,26 @@ namespace {
     return samples;
 }
 
+template <typename SampleBuilder>
+[[nodiscard]] std::vector<BodyTrailSample>
+collectSamples(const BodyTrailOptions& options, SampleBuilder&& sampleBuilder)
+{
+    std::vector<BodyTrailSample> samples = makeEmptySampleSet(options);
+    if (!validateOptions(options)) {
+        return samples;
+    }
+
+    const int startOffsetMinutes = -options.pastHours * static_cast<int>(TimeConstants::kMinutesPerHour);
+    const int endOffsetMinutes = options.futureHours * static_cast<int>(TimeConstants::kMinutesPerHour);
+
+    for (int offsetMinutes = startOffsetMinutes; offsetMinutes <= endOffsetMinutes;
+         offsetMinutes += options.sampleStepMinutes) {
+        samples.push_back(BodyTrailSample{.offsetMinutes = offsetMinutes, .horizontal = sampleBuilder(offsetMinutes)});
+    }
+
+    return samples;
+}
+
 }  // namespace
 
 std::vector<BodyTrailSample> BodyTrailCalculator::sample(
@@ -37,30 +59,17 @@ std::vector<BodyTrailSample> BodyTrailCalculator::sample(
     const BodyTrailOptions& options
 ) const
 {
-    std::vector<BodyTrailSample> samples = makeEmptySampleSet(options);
-    if (!validateOptions(options)) {
-        return samples;
-    }
-
-    const int startOffsetMinutes = -options.pastHours * static_cast<int>(TimeConstants::kMinutesPerHour);
-    const int endOffsetMinutes = options.futureHours * static_cast<int>(TimeConstants::kMinutesPerHour);
-
-    for (int offsetMinutes = startOffsetMinutes; offsetMinutes <= endOffsetMinutes;
-         offsetMinutes += options.sampleStepMinutes) {
+    return collectSamples(options, [&engine, &context, bodyIndex](const int offsetMinutes) {
         skygate::core::ObservationContext sampleContext = context;
         sampleContext.utcTime += std::chrono::minutes(offsetMinutes);
 
-        BodyTrailSample sample{.offsetMinutes = offsetMinutes, .horizontal = std::nullopt};
-
-        const auto bodyState = engine.computeBodyState(sampleContext, bodyIndex);
+        const std::optional<CelestialBodyState> bodyState = engine.computeBodyState(sampleContext, bodyIndex);
         if (bodyState.has_value() && bodyState->horizontal.isFinite()) {
-            sample.horizontal = bodyState->horizontal;
+            return std::optional<skygate::core::HorizontalCoordinate>{bodyState->horizontal};
         }
 
-        samples.push_back(sample);
-    }
-
-    return samples;
+        return std::optional<skygate::core::HorizontalCoordinate>{};
+    });
 }
 
 std::vector<BodyTrailSample> BodyTrailCalculator::sample(
@@ -70,31 +79,19 @@ std::vector<BodyTrailSample> BodyTrailCalculator::sample(
     const BodyTrailOptions& options
 ) const
 {
-    std::vector<BodyTrailSample> samples = makeEmptySampleSet(options);
-    if (!validateOptions(options)) {
-        return samples;
-    }
-
-    const int startOffsetMinutes = -options.pastHours * static_cast<int>(TimeConstants::kMinutesPerHour);
-    const int endOffsetMinutes = options.futureHours * static_cast<int>(TimeConstants::kMinutesPerHour);
-
-    for (int offsetMinutes = startOffsetMinutes; offsetMinutes <= endOffsetMinutes;
-         offsetMinutes += options.sampleStepMinutes) {
+    return collectSamples(options, [&engine, &request, bodyIndex](const int offsetMinutes) {
         EphemerisRequest sampleRequest = request;
         sampleRequest.context.utcTime += std::chrono::minutes(offsetMinutes);
         sampleRequest.epoch = request.epoch.addMinutes(offsetMinutes);
 
-        BodyTrailSample sample{.offsetMinutes = offsetMinutes, .horizontal = std::nullopt};
-
-        const auto bodyState = engine.computeBodyState(sampleRequest, static_cast<std::size_t>(bodyIndex));
+        const std::optional<CelestialBodyState> bodyState =
+            engine.computeBodyState(sampleRequest, static_cast<std::size_t>(bodyIndex));
         if (bodyState.has_value() && bodyState->horizontal.isFinite()) {
-            sample.horizontal = bodyState->horizontal;
+            return std::optional<skygate::core::HorizontalCoordinate>{bodyState->horizontal};
         }
 
-        samples.push_back(sample);
-    }
-
-    return samples;
+        return std::optional<skygate::core::HorizontalCoordinate>{};
+    });
 }
 
 }  // namespace skygate::ephemeris

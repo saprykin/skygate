@@ -239,6 +239,10 @@ add_skygate_ephemeris_qtest(
     engine/EphemerisDataStalenessTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-table-interpolation-tests
+    engine/TableInterpolationTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-api-model-tests
     engine/EphemerisApiModelTests.cpp
 )

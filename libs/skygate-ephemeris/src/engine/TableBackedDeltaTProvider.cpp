@@ -1,4 +1,5 @@
 #include "TableBackedDeltaTProvider.hpp"
+#include "TableInterpolation.hpp"
 
 #include <algorithm>
 #include <string>
@@ -68,16 +69,16 @@ IDeltaTProvider::Estimate TableBackedDeltaTProvider::deltaTSeconds(const skygate
 
         const TableEntry& before = *(upper - 1);
         const TableEntry& after = *upper;
-        const double beforeKey = before.effectiveUtcEpoch.sortKey();
-        const double afterKey = after.effectiveUtcEpoch.sortKey();
-        if (!(afterKey > beforeKey)) {
+        const std::optional<double> ratio = TableInterpolation::ratio(
+            requestedEpochKey, before.effectiveUtcEpoch.sortKey(), after.effectiveUtcEpoch.sortKey()
+        );
+        if (!ratio.has_value()) {
             return unavailableEstimate("Delta T data contains duplicate or non-monotonic effective UTC epochs.");
         }
 
-        const double ratio = (requestedEpochKey - beforeKey) / (afterKey - beforeKey);
         return Estimate{
             .status = EstimateStatus::Available,
-            .deltaTSeconds = before.deltaTSeconds + (after.deltaTSeconds - before.deltaTSeconds) * ratio,
+            .deltaTSeconds = before.deltaTSeconds + (after.deltaTSeconds - before.deltaTSeconds) * *ratio,
             .diagnosticText = "Delta T estimate interpolated from table.",
             .provenance = m_dataInfo.provenance,
         };
