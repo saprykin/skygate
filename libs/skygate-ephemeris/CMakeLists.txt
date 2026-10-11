@@ -96,6 +96,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/EphemerisDataActivationRequest.cpp
     src/engine/EphemerisDataActivationResult.cpp
     src/engine/EphemerisDataActivationStatus.cpp
+    src/engine/EphemerisDataFileUtilities.hpp
+    src/engine/EphemerisDataFileUtilities.cpp
     src/engine/EphemerisDataPayloadReader.cpp
     src/engine/EphemerisStagedUpdateVerification.cpp
     src/engine/EphemerisStagedUpdateVerificationRequest.cpp

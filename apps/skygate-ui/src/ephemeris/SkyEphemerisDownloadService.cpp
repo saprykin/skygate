@@ -1,4 +1,5 @@
 #include "SkyEphemerisDownloadService.hpp"
+#include "engine/EphemerisDataFileUtilities.hpp"
 
 #include <QByteArray>
 #include <QDir>
@@ -24,6 +25,7 @@ namespace {
 
 Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
 
+using skygate::ephemeris::EphemerisDataFileUtilities;
 using skygate::ephemeris::EphemerisDataManifest;
 using StagedUpdateDownloadRequest = SkyEphemerisDownloadService::StagedUpdateDownloadRequest;
 using StagedUpdateDownloadResult = SkyEphemerisDownloadService::StagedUpdateDownloadResult;
@@ -36,11 +38,6 @@ constexpr std::uint64_t kNetworkStagingFallbackByteCap = 4ULL << 30U;
 std::filesystem::path pathFromQString(const QString& path)
 {
     return std::filesystem::path(path.toStdString());
-}
-
-QString pathToQString(const std::filesystem::path& path)
-{
-    return QString::fromStdString(path.generic_string());
 }
 
 QString stringToQString(const std::string& value)
@@ -153,21 +150,6 @@ void cleanupCanceledDownload(const StagedUpdateDownloadRequest& request, const S
     return true;
 }
 
-[[nodiscard]] bool hasUnsafePathComponent(const std::filesystem::path& path)
-{
-    if (path.empty() || path.is_absolute()) {
-        return true;
-    }
-
-    for (const std::filesystem::path& component : path) {
-        if (component.empty() || component == "." || component == "..") {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 [[nodiscard]] std::uint64_t networkStagingByteCap(const StagedUpdateDownloadRequest& request)
 {
     std::optional<std::uint64_t> declaredBytes;
@@ -253,7 +235,7 @@ void SkyEphemerisDownloadService::stageInternal(
     }
 
     const std::filesystem::path relativePath(request.asset->relativePath);
-    if (hasUnsafePathComponent(relativePath)) {
+    if (EphemerisDataFileUtilities::hasUnsafePathComponent(relativePath)) {
         StagedUpdateDownloadResult result;
         addDiagnostic(result, QStringLiteral("Ephemeris update download requires a safe relative asset path."));
         completionHandler(std::move(result));
@@ -262,7 +244,7 @@ void SkyEphemerisDownloadService::stageInternal(
 
     if (!request.sourceResourceRoot.trimmed().isEmpty()) {
         const std::filesystem::path sourcePath = pathFromQString(request.sourceResourceRoot) / relativePath;
-        completionHandler(stageLocalFile(request, pathToQString(sourcePath)));
+        completionHandler(stageLocalFile(request, EphemerisDataFileUtilities::pathToQString(sourcePath)));
         return;
     }
 
@@ -313,7 +295,8 @@ SkyEphemerisDownloadService::stageLocalFile(const StagedUpdateDownloadRequest& r
     const auto isCanceled = [&request] { return cancellationRequested(request.cancellationRequested); };
 
     const std::filesystem::path relativePath(request.asset->relativePath);
-    result.stagedPath = pathToQString(pathFromQString(request.stagedResourceRoot) / relativePath);
+    result.stagedPath =
+        EphemerisDataFileUtilities::pathToQString(pathFromQString(request.stagedResourceRoot) / relativePath);
 
     QFile sourceFile(sourcePath);
     if (!sourceFile.open(QIODevice::ReadOnly)) {
@@ -361,7 +344,8 @@ void SkyEphemerisDownloadService::stageNetworkUrl(
     state->completionHandler = std::move(completionHandler);
 
     const std::filesystem::path relativePath(request.asset->relativePath);
-    state->result.stagedPath = pathToQString(pathFromQString(request.stagedResourceRoot) / relativePath);
+    state->result.stagedPath =
+        EphemerisDataFileUtilities::pathToQString(pathFromQString(request.stagedResourceRoot) / relativePath);
 
     if (!prepareStagedFileDirectory(state->result.stagedPath, state->result)) {
         state->completionHandler(std::move(state->result));

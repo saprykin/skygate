@@ -1,4 +1,5 @@
 #include "SkyEphemerisSnapshotAdapter.hpp"
+#include "engine/EphemerisDataFileUtilities.hpp"
 
 #include <QFile>
 #include <QFileInfo>
@@ -16,6 +17,7 @@ namespace {
 Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
 
 using EphemerisDataCacheSnapshot = SkySettingsStore::EphemerisDataCacheSnapshot;
+using skygate::ephemeris::EphemerisDataFileUtilities;
 using skygate::ephemeris::EphemerisDataManifest;
 using skygate::ephemeris::EphemerisKernelDataAsset;
 using skygate::ephemeris::EphemerisTextDataAsset;
@@ -23,11 +25,6 @@ using skygate::ephemeris::EphemerisTextDataAsset;
 std::filesystem::path pathFromQString(const QString& path)
 {
     return std::filesystem::path(path.toStdString());
-}
-
-QString pathToQString(const std::filesystem::path& path)
-{
-    return QString::fromStdString(path.generic_string());
 }
 
 const EphemerisDataManifest::Profile*
@@ -170,7 +167,7 @@ SkyEphemerisSnapshotAdapter::solarSystemKernelAsset(const std::string_view asset
 
         const std::filesystem::path activePath =
             pathFromQString(m_bundledFallbackResourceRoot) / std::filesystem::path(manifestAsset->relativePath);
-        const QFileInfo activeFileInfo(pathToQString(activePath));
+        const QFileInfo activeFileInfo(EphemerisDataFileUtilities::pathToQString(activePath));
         if (!activeFileInfo.exists() || !activeFileInfo.isFile()) {
             return std::nullopt;
         }
@@ -182,7 +179,7 @@ SkyEphemerisSnapshotAdapter::solarSystemKernelAsset(const std::string_view asset
             .provenance = m_bundledFallbackManifest->dataSetInfo.provenance.empty()
                               ? "Bundled ephemeris fallback"
                               : m_bundledFallbackManifest->dataSetInfo.provenance,
-            .activePath = pathToQString(activePath).toStdString(),
+            .activePath = EphemerisDataFileUtilities::pathToQString(activePath).toStdString(),
         };
     }
 
