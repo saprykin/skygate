@@ -14,7 +14,6 @@ namespace skygate::ephemeris {
 class HighPrecisionTextParser final {
 public:
     [[nodiscard]] std::string_view trimAsciiWhitespace(std::string_view text) const noexcept;
-    [[nodiscard]] bool startsWith(std::string_view text, std::string_view prefix) const noexcept;
     [[nodiscard]] bool parseBool(std::string_view text, bool& value) const noexcept;
     [[nodiscard]] bool parseInt(std::string_view text, int& value) const noexcept;
     [[nodiscard]] bool parseUint64(std::string_view text, std::uint64_t& value) const noexcept;
@@ -27,6 +26,8 @@ public:
     fixedColumn(std::string_view text, std::size_t offset, std::size_t length) const noexcept;
     // Consumes one LF-delimited line, removing a trailing CR but preserving other whitespace.
     [[nodiscard]] std::string_view takeLine(std::string_view& remaining) const noexcept;
+    // Parses an English three-letter month abbreviation such as "Jan".
+    [[nodiscard]] static std::optional<int> parseEnglishMonthAbbreviation(std::string_view text) noexcept;
     [[nodiscard]] std::optional<skygate::core::CivilDateTime> parseUtcDate(std::string_view text) const noexcept;
     [[nodiscard]] std::optional<std::string> metadataValue(std::string_view line, std::string_view key) const;
 };

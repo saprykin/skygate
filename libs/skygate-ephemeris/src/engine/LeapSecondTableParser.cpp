@@ -25,48 +25,6 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
     return parser;
 }
 
-[[nodiscard]] std::optional<int> monthFromEnglishAbbreviation(const std::string_view text) noexcept
-{
-    if (text == "Jan") {
-        return 1;
-    }
-    if (text == "Feb") {
-        return 2;
-    }
-    if (text == "Mar") {
-        return 3;
-    }
-    if (text == "Apr") {
-        return 4;
-    }
-    if (text == "May") {
-        return 5;
-    }
-    if (text == "Jun") {
-        return 6;
-    }
-    if (text == "Jul") {
-        return 7;
-    }
-    if (text == "Aug") {
-        return 8;
-    }
-    if (text == "Sep") {
-        return 9;
-    }
-    if (text == "Oct") {
-        return 10;
-    }
-    if (text == "Nov") {
-        return 11;
-    }
-    if (text == "Dec") {
-        return 12;
-    }
-
-    return std::nullopt;
-}
-
 [[nodiscard]] std::optional<skygate::core::CivilDateTime> parseIanaCommentDate(const std::string_view text) noexcept
 {
     const std::vector<std::string_view> tokens = textParser().splitAsciiWhitespace(text);
@@ -76,7 +34,7 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
 
     int day = 0;
     int year = 0;
-    const std::optional<int> month = monthFromEnglishAbbreviation(tokens[1]);
+    const std::optional<int> month = HighPrecisionTextParser::parseEnglishMonthAbbreviation(tokens[1]);
     if (!textParser().parseInt(tokens[0], day) || !month.has_value() || !textParser().parseInt(tokens[2], year)) {
         return std::nullopt;
     }
@@ -125,7 +83,7 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
         info.expiresAt = *expiresEpoch;
         return std::nullopt;
     }
-    if (textParser().startsWith(line, "#@")) {
+    if (line.starts_with("#@")) {
         std::uint64_t ntpExpiration = 0U;
         if (!textParser().parseUint64(line.substr(2U), ntpExpiration)) {
             return "Leap-second table contains malformed expiration metadata at line " + std::to_string(lineNumber)
@@ -140,14 +98,14 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
 
 [[nodiscard]] bool parseCsvEntryLine(std::string_view line, ILeapSecondProvider::TableEntry& entry) noexcept
 {
-    const std::size_t comma = line.find(',');
-    if (comma == std::string_view::npos) {
+    const std::vector<std::string_view> columns = textParser().splitCommaSeparated(line);
+    if (columns.size() != 2U) {
         return false;
     }
 
-    const std::optional<skygate::core::CivilDateTime> effectiveDate = textParser().parseUtcDate(line.substr(0U, comma));
+    const std::optional<skygate::core::CivilDateTime> effectiveDate = textParser().parseUtcDate(columns[0]);
     int taiMinusUtcSeconds = 0;
-    if (!effectiveDate.has_value() || !textParser().parseInt(line.substr(comma + 1U), taiMinusUtcSeconds)) {
+    if (!effectiveDate.has_value() || !textParser().parseInt(columns[1], taiMinusUtcSeconds)) {
         return false;
     }
 
@@ -203,7 +161,7 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
 
 [[nodiscard]] bool isHeaderLine(const std::string_view line) noexcept
 {
-    return textParser().startsWith(line, "effective_utc_date");
+    return line.starts_with("effective_utc_date");
 }
 
 [[nodiscard]] EphemerisDateRange makeValidityRange(
@@ -251,7 +209,7 @@ LeapSecondTableParser::Result LeapSecondTableParser::parse(const EphemerisTextDa
         if (line.empty()) {
             continue;
         }
-        if (textParser().startsWith(line, "#@")) {
+        if (line.starts_with("#@")) {
             if (std::optional<std::string> diagnosticText = applyMetadataLine(info, line, lineNumber);
                 diagnosticText.has_value()) {
                 return failureResult(
@@ -260,7 +218,7 @@ LeapSecondTableParser::Result LeapSecondTableParser::parse(const EphemerisTextDa
             }
             continue;
         }
-        if (textParser().startsWith(line, "#")) {
+        if (line.starts_with("#")) {
             continue;
         }
         if (isHeaderLine(line)) {

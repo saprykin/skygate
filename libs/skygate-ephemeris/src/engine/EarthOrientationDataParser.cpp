@@ -398,7 +398,7 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
 
 [[nodiscard]] bool isHeaderLine(const std::string_view line) noexcept
 {
-    return textParser().startsWith(line, "effective_utc_date");
+    return line.starts_with("effective_utc_date");
 }
 
 [[nodiscard]] bool isIgnorableHeaderLine(const std::string_view line) noexcept
@@ -446,7 +446,7 @@ EarthOrientationDataParser::Result EarthOrientationDataParser::parse(const Ephem
         if (trimmedLine.empty()) {
             continue;
         }
-        if (textParser().startsWith(trimmedLine, "#@ ")) {
+        if (trimmedLine.starts_with("#@ ")) {
             if (std::optional<std::string> diagnosticText =
                     applyMetadataLine(info, trimmedLine, lineNumber, hasPredictionStart, hasPredictionEnd);
                 diagnosticText.has_value()) {
@@ -456,7 +456,7 @@ EarthOrientationDataParser::Result EarthOrientationDataParser::parse(const Ephem
             }
             continue;
         }
-        if (textParser().startsWith(trimmedLine, "#")) {
+        if (trimmedLine.starts_with("#")) {
             continue;
         }
         if (isFinals2000ADateOnlyLine(line)) {
