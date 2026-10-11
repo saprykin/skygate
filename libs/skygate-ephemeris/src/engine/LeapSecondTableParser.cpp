@@ -1,4 +1,5 @@
 #include "LeapSecondTableParser.hpp"
+#include "EphemerisTableMetadata.hpp"
 #include "text/HighPrecisionTextParser.hpp"
 #include "IEphemerisDataSnapshot.hpp"
 #include "time/CalendarTime.hpp"
@@ -21,8 +22,7 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
 
 [[nodiscard]] const HighPrecisionTextParser& textParser() noexcept
 {
-    static const HighPrecisionTextParser parser;
-    return parser;
+    return EphemerisTableMetadata::textParser();
 }
 
 [[nodiscard]] std::optional<skygate::core::CivilDateTime> parseIanaCommentDate(const std::string_view text) noexcept
@@ -54,34 +54,9 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
 [[nodiscard]] std::optional<std::string>
 applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view line, const std::size_t lineNumber)
 {
-    if (std::optional<std::string> value = textParser().metadataValue(line, "version"); value.has_value()) {
-        if (!value->empty()) {
-            info.version = std::move(*value);
-        }
-        return std::nullopt;
-    }
-    if (std::optional<std::string> value = textParser().metadataValue(line, "source"); value.has_value()) {
-        if (!value->empty()) {
-            info.provenance = std::move(*value);
-        }
-        return std::nullopt;
-    }
-    if (std::optional<std::string> value = textParser().metadataValue(line, "expires"); value.has_value()) {
-        const std::optional<skygate::core::CivilDateTime> expiresDate = textParser().parseUtcDate(*value);
-        if (!expiresDate.has_value()) {
-            return "Leap-second table contains malformed expiration metadata at line " + std::to_string(lineNumber)
-                   + ".";
-        }
-
-        const std::optional<skygate::core::AstronomicalEpoch> expiresEpoch =
-            skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*expiresDate);
-        if (!expiresEpoch.has_value()) {
-            return "Leap-second table contains unusable expiration metadata at line " + std::to_string(lineNumber)
-                   + ".";
-        }
-
-        info.expiresAt = *expiresEpoch;
-        return std::nullopt;
+    std::optional<std::string> diagnosticText;
+    if (EphemerisTableMetadata::applyCommonLine(info, line, "Leap-second table", lineNumber, diagnosticText)) {
+        return diagnosticText;
     }
     if (line.starts_with("#@")) {
         std::uint64_t ntpExpiration = 0U;
@@ -159,25 +134,6 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
     return parseCsvEntryLine(line, entry) || parseIanaEntryLine(line, entry);
 }
 
-[[nodiscard]] bool isHeaderLine(const std::string_view line) noexcept
-{
-    return line.starts_with("effective_utc_date");
-}
-
-[[nodiscard]] EphemerisDateRange makeValidityRange(
-    const ILeapSecondProvider::TableEntry& firstEntry,
-    const ILeapSecondProvider::TableEntry& lastEntry,
-    const std::optional<skygate::core::AstronomicalEpoch>& expiresAt
-)
-{
-    EphemerisDateRange range;
-    range.id = kValidityRangeId;
-    range.displayName = kValidityRangeDisplayName;
-    range.start = firstEntry.effectiveUtcEpoch;
-    range.end = expiresAt.value_or(lastEntry.effectiveUtcEpoch);
-    return range;
-}
-
 [[nodiscard]] LeapSecondTableParser::Result failureResult(
     ILeapSecondProvider::TableInfo info, const ILeapSecondProvider::TableStatus status, std::string diagnosticText
 )
@@ -221,7 +177,7 @@ LeapSecondTableParser::Result LeapSecondTableParser::parse(const EphemerisTextDa
         if (line.starts_with("#")) {
             continue;
         }
-        if (isHeaderLine(line)) {
+        if (EphemerisTableMetadata::isHeaderLine(line)) {
             continue;
         }
 
@@ -253,7 +209,12 @@ LeapSecondTableParser::Result LeapSecondTableParser::parse(const EphemerisTextDa
         );
     }
 
-    info.validityRange = makeValidityRange(entries.front(), entries.back(), info.expiresAt);
+    info.validityRange = EphemerisTableMetadata::makeRange(
+        kValidityRangeId,
+        kValidityRangeDisplayName,
+        entries.front().effectiveUtcEpoch,
+        info.expiresAt.value_or(entries.back().effectiveUtcEpoch)
+    );
     info.status = ILeapSecondProvider::TableStatus::Available;
     info.diagnosticText = "Leap-second table loaded.";
 
