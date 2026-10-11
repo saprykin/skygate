@@ -70,6 +70,11 @@ public:
     std::vector<Profile> profiles;
     std::vector<Asset> assets;
 
+    [[nodiscard]] static std::optional<AssetKind> assetKindFromText(std::string_view text) noexcept;
+    [[nodiscard]] static std::string_view assetKindToText(AssetKind kind) noexcept;
+    [[nodiscard]] static std::optional<CompressionKind> compressionKindFromText(std::string_view text) noexcept;
+    [[nodiscard]] static std::string_view compressionKindToText(CompressionKind kind) noexcept;
+
     [[nodiscard]] const Profile* profile(std::string_view id) const noexcept;
     [[nodiscard]] const Asset* asset(std::string_view id) const noexcept;
     [[nodiscard]] static ParseResult parse(std::string_view payload);
