@@ -21,6 +21,29 @@ CelestialFrameMath::fromEquatorial(const skygate::core::EquatorialCoordinate& co
     };
 }
 
+skygate::core::Vector3d
+CelestialFrameMath::eastBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
+{
+    const double rightAscensionRad = coordinate.rightAscensionHours * skygate::core::MathConstants::kRadiansPerHour;
+    return {
+        .x = -std::sin(rightAscensionRad),
+        .y = std::cos(rightAscensionRad),
+        .z = 0.0,
+    };
+}
+
+skygate::core::Vector3d
+CelestialFrameMath::northBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
+{
+    const double rightAscensionRad = coordinate.rightAscensionHours * skygate::core::MathConstants::kRadiansPerHour;
+    const double declinationRad = skygate::core::AngleMath::toRadians(coordinate.declinationDeg);
+    return {
+        .x = -std::sin(declinationRad) * std::cos(rightAscensionRad),
+        .y = -std::sin(declinationRad) * std::sin(rightAscensionRad),
+        .z = std::cos(declinationRad),
+    };
+}
+
 std::optional<skygate::core::EquatorialCoordinate>
 CelestialFrameMath::toEquatorial(const skygate::core::Vector3d& vector) noexcept
 {
@@ -34,13 +57,10 @@ CelestialFrameMath::toEquatorial(const skygate::core::Vector3d& vector) noexcept
         return std::nullopt;
     }
 
-    double rightAscensionHours = std::atan2(vector.y, vector.x) * skygate::core::MathConstants::kHoursPerRadian;
-    if (rightAscensionHours < 0.0) {
-        rightAscensionHours += 24.0;
-    }
-
     return skygate::core::EquatorialCoordinate{
-        .rightAscensionHours = rightAscensionHours,
+        .rightAscensionHours = skygate::core::AngleMath::normalizeHours(
+            std::atan2(vector.y, vector.x) * skygate::core::MathConstants::kHoursPerRadian
+        ),
         .declinationDeg = skygate::core::AngleMath::toDegrees(std::atan2(vector.z, xyDistance)),
     };
 }

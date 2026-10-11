@@ -13,6 +13,10 @@ class CelestialFrameMath final {
 public:
     [[nodiscard]] static skygate::core::Vector3d
     fromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept;
+    [[nodiscard]] static skygate::core::Vector3d
+    eastBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept;
+    [[nodiscard]] static skygate::core::Vector3d
+    northBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept;
     [[nodiscard]] static std::optional<skygate::core::EquatorialCoordinate>
     toEquatorial(const skygate::core::Vector3d& vector) noexcept;
     [[nodiscard]] static std::optional<skygate::core::HorizontalCoordinate> horizontalFromItrsVector(

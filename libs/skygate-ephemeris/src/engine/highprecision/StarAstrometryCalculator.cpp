@@ -8,13 +8,11 @@
 #include "engine/ITimeScaleService.hpp"
 #include "PreparedEphemerisRequestState.hpp"
 #include "StarAstrometryBatchResult.hpp"
-#include "math/AngleMath.hpp"
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
 #include "math/TimeConstants.hpp"
 #include "math/Vector3d.hpp"
 
-#include <cmath>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -64,29 +62,6 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
     return result;
 }
 
-[[nodiscard]] skygate::core::Vector3d
-eastBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
-{
-    const double rightAscensionRad = coordinate.rightAscensionHours * MathConstants::kRadiansPerHour;
-    return {
-        .x = -std::sin(rightAscensionRad),
-        .y = std::cos(rightAscensionRad),
-        .z = 0.0,
-    };
-}
-
-[[nodiscard]] skygate::core::Vector3d
-northBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
-{
-    const double rightAscensionRad = coordinate.rightAscensionHours * MathConstants::kRadiansPerHour;
-    const double declinationRad = skygate::core::AngleMath::toRadians(coordinate.declinationDeg);
-    return {
-        .x = -std::sin(declinationRad) * std::cos(rightAscensionRad),
-        .y = -std::sin(declinationRad) * std::sin(rightAscensionRad),
-        .z = std::cos(declinationRad),
-    };
-}
-
 [[nodiscard]] std::optional<skygate::core::Vector3d> propagatedAstrometricVector(
     const CatalogStarAstrometry& astrometry, const EphemerisCorrectionFlags flags, const double years
 ) noexcept
@@ -109,8 +84,8 @@ northBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) 
             : 0.0;
 
     const skygate::core::Vector3d referenceUnit = CelestialFrameMath::fromEquatorial(reference);
-    const skygate::core::Vector3d east = eastBasisFromEquatorial(reference);
-    const skygate::core::Vector3d north = northBasisFromEquatorial(reference);
+    const skygate::core::Vector3d east = CelestialFrameMath::eastBasisFromEquatorial(reference);
+    const skygate::core::Vector3d north = CelestialFrameMath::northBasisFromEquatorial(reference);
     const double tangentialRaRadiansPerYear = properMotionRaMasPerYear * MathConstants::kMilliarcsecondsToRadians;
     const double tangentialDecRadiansPerYear = properMotionDecMasPerYear * MathConstants::kMilliarcsecondsToRadians;
     const bool needsDistance =
