@@ -393,6 +393,10 @@ target_compile_definitions(skygate-ui-context-controller-ephemeris-data-tests
         SKYGATE_UI_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/.."
 )
 add_skygate_ui_qtest(
+    skygate-ui-sky-ephemeris-update-workflow-tests
+    ephemeris/SkyEphemerisUpdateWorkflowTests.cpp
+)
+add_skygate_ui_qtest(
     skygate-ui-sky-catalog-runtime-transition-tests
     catalog/SkyCatalogRuntimeTransitionTests.cpp
 )

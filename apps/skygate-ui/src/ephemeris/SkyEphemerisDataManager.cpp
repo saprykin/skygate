@@ -159,9 +159,11 @@ combineActivationCancellation(StagedUpdateActivationRequest request, const SkyEp
 
 }  // namespace
 
-SkyEphemerisDataManager::SkyEphemerisDataManager(SkySettingsStore* settingsStore, QObject* parent)
+SkyEphemerisDataManager::SkyEphemerisDataManager(
+    SkySettingsStore* settingsStore, QObject* parent, QNetworkAccessManager* networkAccessManager
+)
     : QObject(parent), m_settingsStore(settingsStore),
-      m_downloadService(std::make_unique<SkyEphemerisDownloadService>(nullptr, this))
+      m_downloadService(std::make_unique<SkyEphemerisDownloadService>(networkAccessManager, this))
 {
     static_cast<void>(restoreFromSettings());
 }

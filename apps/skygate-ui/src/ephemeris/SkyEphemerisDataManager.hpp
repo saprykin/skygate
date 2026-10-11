@@ -14,6 +14,7 @@
 #include <functional>
 #include <memory>
 
+class QNetworkAccessManager;
 class SkySettingsStore;
 
 class SkyEphemerisDataManager final : public QObject {
@@ -27,7 +28,11 @@ public:
     using StagedUpdateActivationRequest = SkyEphemerisCacheController::StagedUpdateActivationRequest;
     using StagedUpdateActivationResult = SkyEphemerisCacheController::StagedUpdateActivationResult;
 
-    explicit SkyEphemerisDataManager(SkySettingsStore* settingsStore, QObject* parent = nullptr);
+    explicit SkyEphemerisDataManager(
+        SkySettingsStore* settingsStore,
+        QObject* parent = nullptr,
+        QNetworkAccessManager* networkAccessManager = nullptr
+    );
     ~SkyEphemerisDataManager() override;
 
     [[nodiscard]] QString statusText() const;

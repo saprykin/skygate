@@ -31,7 +31,6 @@
 #include <QVariantMap>
 
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -61,6 +60,7 @@ class QGeoPositionInfoSource;
 class LocationCatalogModel;
 class SkyCatalogManager;
 class SkyEphemerisDataManager;
+class SkyEphemerisUpdateWorkflow;
 class SkyObjectSearchModel;
 class SkyOverlayLayerSettings;
 
@@ -533,13 +533,8 @@ private:
     [[nodiscard]] EphemerisRequestContext
     ephemerisRequestContextFor(const skygate::core::ObservationContext& skyContext) const;
     void applyEphemerisUserSettings(const SkySettingsStore::EphemerisUserSettingsSnapshot& settings);
-    void setEphemerisDataOperationStatusText(QString statusText);
     void setEphemerisEngineStatusText(QString statusText);
-    void setEphemerisDataUpdateProgress(double progress) noexcept;
     [[nodiscard]] const skygate::ephemeris::EphemerisDataManifest* activeEphemerisDataManifest() const noexcept;
-    void refreshEphemerisDataManifestAsync(const QString& stagedRoot, std::function<void(bool)> completionHandler);
-    void finishEphemerisDataUpdate(bool success, QString statusText);
-    void continueEphemerisDataUpdate(const QString& profileId, const QString& stagedRoot);
     void rebuildEphemerisEngine();
 
 private:
@@ -559,6 +554,7 @@ private:
     std::unique_ptr<SkyOverlayLayerSettings> m_overlayLayerSettings;
     std::unique_ptr<SkySettingsStore> m_settingsStore;
     std::unique_ptr<SkyEphemerisDataManager> m_ephemerisDataManager;
+    std::unique_ptr<SkyEphemerisUpdateWorkflow> m_ephemerisUpdateWorkflow;
     std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
     std::shared_ptr<skygate::ephemeris::IEphemerisGuidanceStrategy> m_ephemerisGuidanceStrategy;
     mutable std::mutex m_ephemerisEngineMutex;
@@ -568,16 +564,7 @@ private:
     std::uint64_t m_ephemerisOptionsRevision = 1U;
     SkySettingsStore::EphemerisUserSettingsSnapshot m_ephemerisUserSettings;
     const skygate::ephemeris::EphemerisDatasetInfo* m_ephemerisDatasetManifest = nullptr;
-    const skygate::ephemeris::EphemerisDataManifest* m_ephemerisDataManifest = nullptr;
-    std::optional<skygate::ephemeris::EphemerisDataManifest> m_refreshedEphemerisDataManifest;
-    QString m_ephemerisUpdateResourceRoot;
-    QString m_ephemerisWritableCacheRoot;
-    QString m_ephemerisDataOperationStatusText;
     QString m_ephemerisEngineStatusText;
-    QString m_availableEarthOrientationVersion;
-    QString m_availableLeapSecondVersion;
-    QString m_availableDeltaTVersion;
-    bool m_ephemerisSupportDataUpdateChecked = false;
     std::unique_ptr<skygate::ephemeris::EphemerisBackendResourceCache> m_ephemerisBackendResourceCache;
     skygate::ephemeris::IEphemerisDiagnosticsSink* m_ephemerisDiagnosticsSink = nullptr;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
@@ -589,6 +576,4 @@ private:
     bool m_logToFile = false;
     QString m_logFilePath;
     QVariantMap m_nightConditions;
-    bool m_ephemerisDataUpdateInProgress = false;
-    double m_ephemerisDataUpdateProgress = 0.0;
 };

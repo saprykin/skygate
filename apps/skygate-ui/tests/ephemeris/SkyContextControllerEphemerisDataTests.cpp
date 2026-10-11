@@ -15,6 +15,7 @@
 #include <QSignalSpy>
 #include <QString>
 #include <QUrl>
+#include <QVector>
 #include <QtTest/QtTest>
 
 #include <cstddef>
@@ -230,6 +231,9 @@ private slots:
     void init();
     void controllerOwnsManagerAndExposesSnapshot();
     void updateRefreshesRemoteManifestAndReportsProgress();
+    void updateEmitsStatusSequenceInOrder();
+    void updatePersistsPreferredDataProfile();
+    void manifestFailureReportsUpdateStatus();
     void catalogChangePreservesDataSelection();
     void catalogChangePreservesEngineConfiguration();
     void activeDataChangePreservesEngineConfiguration();
@@ -305,6 +309,144 @@ void SkyContextControllerEphemerisDataTests::updateRefreshesRemoteManifestAndRep
         QString::fromStdString(kernel->activePath).endsWith(QStringLiteral("/de440s-short-range/kernels/de440s.bsp")),
         true
     );
+}
+
+void SkyContextControllerEphemerisDataTests::updateEmitsStatusSequenceInOrder()
+{
+    const QString initialKernelPath = m_settings.filePath(QStringLiteral("sequence-initial-kernel.bsp"));
+    const QString freshKernelPath = m_settings.filePath(QStringLiteral("sequence-fresh-kernel.bsp"));
+    const QString remoteManifestPath = m_settings.filePath(QStringLiteral("sequence-remote-manifest.json"));
+    QVERIFY(writeFile(initialKernelPath, QByteArray{}));
+    QVERIFY(writeFile(freshKernelPath, QByteArray{}));
+    QVERIFY(writeFile(
+        remoteManifestPath,
+        singleAssetManifestJson(QUrl::fromLocalFile(freshKernelPath).toString(), QStringLiteral("fresh")).toUtf8()
+    ));
+
+    SkySettingsStore::StateSnapshot savedSettings;
+    savedSettings.ephemerisSettingsPresent = true;
+    savedSettings.ephemeris.updateManifestUrl = QUrl::fromLocalFile(remoteManifestPath).toString();
+    SkySettingsStore settingsStore;
+    QVERIFY(settingsStore.saveState(savedSettings));
+
+    skygate::ephemeris::EphemerisDataManifest initialManifest =
+        parseSingleAssetManifest(QUrl::fromLocalFile(initialKernelPath).toString(), QStringLiteral("initial"));
+
+    SkyContextController::InitializationOptions options;
+    options.loadSettings = true;
+    options.initializeLocation = false;
+    options.ephemerisFactoryInputs.dataManifest = &initialManifest;
+    options.ephemerisFactoryInputs.updateResourceRoot = m_settings.path();
+    options.ephemerisFactoryInputs.writableCacheRoot = m_settings.path() + QStringLiteral("/sequence-cache");
+    SkyContextController controller(nullptr, nullptr, options, nullptr);
+
+    QVector<QString> statusSequence;
+    QObject::connect(
+        &controller,
+        &SkyContextController::ephemerisDataStatusTextChanged,
+        &controller,
+        [&controller, &statusSequence] { statusSequence.append(controller.ephemerisDataStatusText()); }
+    );
+
+    QVERIFY(controller.updateEphemerisDataProfile(QStringLiteral("de440s-short-range")));
+
+    const QVector<QString> expectedSequence{
+        QStringLiteral("Ephemeris data: Bundled fallback"),
+        QStringLiteral("Ephemeris data: Checking update manifest..."),
+        QStringLiteral("Ephemeris data: Downloading fresh..."),
+        QStringLiteral("Ephemeris data: Verifying fresh..."),
+        QStringLiteral("Ephemeris data: Verifying fresh..."),
+        QStringLiteral("Ephemeris data: Verifying fresh..."),
+        QStringLiteral("Ephemeris data: Verifying fresh..."),
+        QStringLiteral("Ephemeris data: Installed data active"),
+        QStringLiteral("Ephemeris data: Installed data active"),
+    };
+    QCOMPARE(statusSequence, expectedSequence);
+    QCOMPARE(controller.ephemerisDataUpdateProgress(), 1.0);
+    QVERIFY(!controller.ephemerisDataUpdateInProgress());
+}
+
+void SkyContextControllerEphemerisDataTests::updatePersistsPreferredDataProfile()
+{
+    const QString initialKernelPath = m_settings.filePath(QStringLiteral("profile-initial-kernel.bsp"));
+    const QString freshKernelPath = m_settings.filePath(QStringLiteral("profile-fresh-kernel.bsp"));
+    const QString remoteManifestPath = m_settings.filePath(QStringLiteral("profile-remote-manifest.json"));
+    QVERIFY(writeFile(initialKernelPath, QByteArray{}));
+    QVERIFY(writeFile(freshKernelPath, QByteArray{}));
+    QVERIFY(writeFile(
+        remoteManifestPath,
+        singleAssetManifestJson(QUrl::fromLocalFile(freshKernelPath).toString(), QStringLiteral("fresh")).toUtf8()
+    ));
+
+    SkySettingsStore::StateSnapshot savedSettings;
+    savedSettings.ephemerisSettingsPresent = true;
+    savedSettings.ephemeris.updateManifestUrl = QUrl::fromLocalFile(remoteManifestPath).toString();
+    savedSettings.ephemeris.preferredDataProfileId = QStringLiteral("previous-profile");
+    SkySettingsStore settingsStore;
+    QVERIFY(settingsStore.saveState(savedSettings));
+
+    skygate::ephemeris::EphemerisDataManifest initialManifest =
+        parseSingleAssetManifest(QUrl::fromLocalFile(initialKernelPath).toString(), QStringLiteral("initial"));
+
+    SkyContextController::InitializationOptions options;
+    options.loadSettings = true;
+    options.initializeLocation = false;
+    options.ephemerisFactoryInputs.dataManifest = &initialManifest;
+    options.ephemerisFactoryInputs.updateResourceRoot = m_settings.path();
+    options.ephemerisFactoryInputs.writableCacheRoot = m_settings.path() + QStringLiteral("/profile-cache");
+    SkyContextController controller(nullptr, nullptr, options, nullptr);
+
+    QVERIFY(controller.updateEphemerisDataProfile(QStringLiteral("de440s-short-range")));
+    QVERIFY(controller.saveSettings());
+
+    SkySettingsStore reloadedStore;
+    const std::optional<SkySettingsStore::StateSnapshot> reloaded = reloadedStore.loadState();
+    QVERIFY(reloaded.has_value());
+    QCOMPARE(reloaded->ephemeris.preferredDataProfileId, QString("de440s-short-range"));
+}
+
+void SkyContextControllerEphemerisDataTests::manifestFailureReportsUpdateStatus()
+{
+    const QString initialKernelPath = m_settings.filePath(QStringLiteral("failure-initial-kernel.bsp"));
+    const QString missingManifestPath = m_settings.filePath(QStringLiteral("failure-missing-manifest.json"));
+    QVERIFY(writeFile(initialKernelPath, QByteArray{}));
+
+    SkySettingsStore::StateSnapshot savedSettings;
+    savedSettings.ephemerisSettingsPresent = true;
+    savedSettings.ephemeris.updateManifestUrl = QUrl::fromLocalFile(missingManifestPath).toString();
+    SkySettingsStore settingsStore;
+    QVERIFY(settingsStore.saveState(savedSettings));
+
+    skygate::ephemeris::EphemerisDataManifest initialManifest =
+        parseSingleAssetManifest(QUrl::fromLocalFile(initialKernelPath).toString(), QStringLiteral("initial"));
+
+    SkyContextController::InitializationOptions options;
+    options.loadSettings = true;
+    options.initializeLocation = false;
+    options.ephemerisFactoryInputs.dataManifest = &initialManifest;
+    options.ephemerisFactoryInputs.updateResourceRoot = m_settings.path();
+    options.ephemerisFactoryInputs.writableCacheRoot = m_settings.path() + QStringLiteral("/failure-cache");
+    SkyContextController controller(nullptr, nullptr, options, nullptr);
+
+    QVector<QString> statusSequence;
+    QObject::connect(
+        &controller,
+        &SkyContextController::ephemerisDataStatusTextChanged,
+        &controller,
+        [&controller, &statusSequence] { statusSequence.append(controller.ephemerisDataStatusText()); }
+    );
+
+    QVERIFY(controller.updateEphemerisDataProfile(QStringLiteral("de440s-short-range")));
+
+    const QVector<QString> expectedSequence{
+        QStringLiteral("Ephemeris data: Bundled fallback"),
+        QStringLiteral("Ephemeris data: Checking update manifest..."),
+        QStringLiteral("Ephemeris data: Ephemeris update download source file is missing."),
+        QStringLiteral("Ephemeris data: Ephemeris update download source file is missing."),
+    };
+    QCOMPARE(statusSequence, expectedSequence);
+    QCOMPARE(controller.ephemerisDataUpdateProgress(), 0.0);
+    QVERIFY(!controller.ephemerisDataUpdateInProgress());
 }
 
 void SkyContextControllerEphemerisDataTests::catalogChangePreservesDataSelection()
