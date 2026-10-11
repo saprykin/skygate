@@ -292,6 +292,7 @@ add_library(skygate-ephemeris STATIC
     src/DeepSkyObjectInfo.hpp
     src/DistantCelestialBody.hpp
     src/EphemerisSnapshot.hpp
+    src/FixedBodyAltitudeRange.hpp
     src/OwnGalaxyCelestialBody.hpp
     src/StringUtilities.hpp
     src/NumericParsingUtilities.hpp
@@ -433,6 +434,7 @@ add_library(skygate-ephemeris STATIC
     src/engine/EphemerisEngineQueryStatus.cpp
     src/EphemerisRequest.cpp
     src/EphemerisRequestFactory.cpp
+    src/FixedBodyAltitudeRange.cpp
     src/MoonPhase.cpp
     src/MoonPhaseCalculator.cpp
     src/NightConditions.cpp

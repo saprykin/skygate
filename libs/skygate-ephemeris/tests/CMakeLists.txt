@@ -237,6 +237,10 @@ add_skygate_ephemeris_qtest(
     engine/EphemerisDateRangeTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-fixed-body-altitude-range-tests
+    engine/FixedBodyAltitudeRangeTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-data-staleness-tests
     engine/EphemerisDataStalenessTests.cpp
 )

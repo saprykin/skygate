@@ -1,11 +1,10 @@
 #include "CelestialReferenceCalculator.hpp"
+#include "FixedBodyAltitudeRange.hpp"
 #include "math/TimeConstants.hpp"
 #include "reference/EclipticToEquatorialCalculator.hpp"
 #include "reference/EquatorialToHorizontalCalculator.hpp"
 #include "time/AstronomicalTime.hpp"
 #include "time/EpochCodec.hpp"
-
-#include <cmath>
 
 namespace skygate::ephemeris {
 
@@ -60,7 +59,10 @@ skygate::core::HorizontalCoordinate CelestialReferenceCalculator::declinationCir
 double
 CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(const skygate::core::GeoLocation& observer) noexcept
 {
-    return (observer.latitudeDeg >= 0.0 ? 1.0 : -1.0) * (90.0 - std::abs(observer.latitudeDeg));
+    // The boundary declination equals the signed altitude a celestial-equator
+    // body reaches at culmination.
+    const double hemisphereSign = observer.latitudeDeg >= 0.0 ? 1.0 : -1.0;
+    return hemisphereSign * FixedBodyAltitudeRange::maxAltitudeDeg(observer.latitudeDeg, 0.0);
 }
 
 }  // namespace skygate::ephemeris
