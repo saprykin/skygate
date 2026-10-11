@@ -22,7 +22,7 @@ private slots:
     void generatedDistancesStaySymmetricAndNonNegative();
     void generatedRotationsPreserveOffsetLength();
     void generatedEllipseSamplesStayOnParametricEllipse();
-    void generatedPerpendicularOffsetsStayNormalToSourceSegment();
+    void generatedPerpendicularOffsetsStayNormalToSegment();
     void generatedGridCentersContainOriginalCoordinates();
     void generatedRectIntersectionIsSymmetric();
 };
@@ -88,7 +88,7 @@ void GeometryPropertyTests::generatedEllipseSamplesStayOnParametricEllipse()
     }
 }
 
-void GeometryPropertyTests::generatedPerpendicularOffsetsStayNormalToSourceSegment()
+void GeometryPropertyTests::generatedPerpendicularOffsetsStayNormalToSegment()
 {
     skygate::testsupport::DeterministicRng rng(0x600d0004U);
 

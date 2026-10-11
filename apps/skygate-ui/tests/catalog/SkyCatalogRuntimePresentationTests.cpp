@@ -41,9 +41,9 @@ class SkyCatalogRuntimePresentationTests final : public QObject {
 
 private slots:
     void bundledBrightStarsCarryDataProvenance();
-    void bundledDeepSkyFallbackKeepsConfiguredValuesAndFillsGaps();
-    void explicitReplacementSourcesKeepVisibleCollectionOrder();
-    void bundledDeepSkyFallbackParticipationFollowsSourceState();
+    void bundledDeepSkyFallbackKeepsValuesAndFillsGaps();
+    void explicitReplacementSourcesKeepVisibleOrder();
+    void bundledFallbackParticipationFollowsSourceState();
     void statusSummarizesEnabledCollectionParticipation();
     void bundledSourceNamesComeFromActiveParticipation();
 };
@@ -77,7 +77,7 @@ void SkyCatalogRuntimePresentationTests::bundledBrightStarsCarryDataProvenance()
     QVERIFY(!runtime.sourceTitles().contains(QStringLiteral("built-in-ephemeris")));
 }
 
-void SkyCatalogRuntimePresentationTests::bundledDeepSkyFallbackKeepsConfiguredValuesAndFillsGaps()
+void SkyCatalogRuntimePresentationTests::bundledDeepSkyFallbackKeepsValuesAndFillsGaps()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(CatalogRuntimeFixture::makeCatalog());
     static_cast<void>(
@@ -127,7 +127,7 @@ void SkyCatalogRuntimePresentationTests::bundledDeepSkyFallbackKeepsConfiguredVa
     QCOMPARE(runtime.sourceIds()[*marsIndex], QStringLiteral("bundled-core"));
 }
 
-void SkyCatalogRuntimePresentationTests::explicitReplacementSourcesKeepVisibleCollectionOrder()
+void SkyCatalogRuntimePresentationTests::explicitReplacementSourcesKeepVisibleOrder()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(CatalogRuntimeFixture::makeCatalog());
     static_cast<void>(
@@ -187,7 +187,7 @@ void SkyCatalogRuntimePresentationTests::explicitReplacementSourcesKeepVisibleCo
     QCOMPARE(runtime.sourceIds()[*m1Index], QStringLiteral("bundled-deep-sky"));
 }
 
-void SkyCatalogRuntimePresentationTests::bundledDeepSkyFallbackParticipationFollowsSourceState()
+void SkyCatalogRuntimePresentationTests::bundledFallbackParticipationFollowsSourceState()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(CatalogRuntimeFixture::makeCatalog());
     static_cast<void>(

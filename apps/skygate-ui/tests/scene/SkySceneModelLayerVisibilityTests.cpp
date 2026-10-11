@@ -18,7 +18,7 @@ private slots:
     void init();
     void themeChangesUpdateRenderedColors();
     void solarSystemLabelsCanBeHidden();
-    void constellationLabelsAndLinesCanBeHiddenIndependently();
+    void constellationLabelsAndLinesHiddenIndependently();
     void referenceLayerLabelsFollowVisibility();
 
 private:
@@ -103,7 +103,7 @@ void SkySceneModelLayerVisibilityTests::solarSystemLabelsCanBeHidden()
     QVERIFY(!overlayItemsContainText(sceneModel.overlayItems(), "Demo Planet"));
 }
 
-void SkySceneModelLayerVisibilityTests::constellationLabelsAndLinesCanBeHiddenIndependently()
+void SkySceneModelLayerVisibilityTests::constellationLabelsAndLinesHiddenIndependently()
 {
     QVERIFY(seedOrionConstellationCache());
     SkySceneModelTestHarness harness({

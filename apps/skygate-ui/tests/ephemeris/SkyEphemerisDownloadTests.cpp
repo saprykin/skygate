@@ -53,7 +53,7 @@ private slots:
     void asyncNetworkDownloadStagesWithoutBlocking();
     void rejectsPlainHttpSourceUrls();
     void rejectsOversizedNetworkStaging();
-    void cancellationDuringDownloadRetainsPartialStagingAndPreservesActiveData();
+    void cancelDuringDownloadKeepsStagingAndActiveData();
 
 private:
     SettingsTestFixture m_settings;
@@ -240,7 +240,7 @@ void SkyEphemerisDownloadTests::rejectsOversizedNetworkStaging()
     QCOMPARE(QFileInfo(result.stagedPath).size(), qint64{0});
 }
 
-void SkyEphemerisDownloadTests::cancellationDuringDownloadRetainsPartialStagingAndPreservesActiveData()
+void SkyEphemerisDownloadTests::cancelDuringDownloadKeepsStagingAndActiveData()
 {
     const QString oldKernelPath = m_settings.filePath(QStringLiteral("download-cancel-old-kernel.bsp"));
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));

@@ -12,12 +12,12 @@ class SkySceneModelSelectionInspectorTests final : public QObject {
 
 private slots:
     void showsSearchSelectionMarkerForFocusedBody();
-    void clickSelectionBuildsInspectorAndClearsOnEmptyClick();
+    void clickSelectionBuildsInspectorAndClearsOnEmpty();
     void searchSelectionBuildsInspectorNearMarker();
     void bceSelectionInspectorFormatsEventDatesWithSuffix();
     void circumpolarInspectorShowsObservationFallbacks();
     void inspectorFollowsObjectUnlessPinned();
-    void trackedBodyMarkerSurvivesClearedSearchSelectionAndRestoresInspector();
+    void trackedMarkerSurvivesClearAndRestoresInspector();
 };
 
 void SkySceneModelSelectionInspectorTests::showsSearchSelectionMarkerForFocusedBody()
@@ -37,7 +37,7 @@ void SkySceneModelSelectionInspectorTests::showsSearchSelectionMarkerForFocusedB
     QVERIFY(selectionMarker.contains("y"));
 }
 
-void SkySceneModelSelectionInspectorTests::clickSelectionBuildsInspectorAndClearsOnEmptyClick()
+void SkySceneModelSelectionInspectorTests::clickSelectionBuildsInspectorAndClearsOnEmpty()
 {
     SkySceneModelTestHarness harness({
         makeFixedBody("demo_star", "Demo Star", skygate::ephemeris::BaseCelestialBody::Kind::Star, 2.3, 1.5, 2.5),
@@ -200,7 +200,7 @@ void SkySceneModelSelectionInspectorTests::inspectorFollowsObjectUnlessPinned()
     );
 }
 
-void SkySceneModelSelectionInspectorTests::trackedBodyMarkerSurvivesClearedSearchSelectionAndRestoresInspector()
+void SkySceneModelSelectionInspectorTests::trackedMarkerSurvivesClearAndRestoresInspector()
 {
     SkySceneModelTestHarness harness({
         makeFixedBody("demo_target", "Demo Target", skygate::ephemeris::BaseCelestialBody::Kind::Star, 1.0, 1.5, 2.5),

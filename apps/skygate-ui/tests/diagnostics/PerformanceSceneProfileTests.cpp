@@ -27,7 +27,7 @@ class PerformanceSceneProfileTests final : public QObject {
 
 private slots:
     void buildsLargeSceneWithinGuardrail();
-    void buildsHighPrecisionLargeFixedCatalogWithinGuardrail();
+    void buildsHighPrecisionLargeCatalogWithinGuardrail();
     void profilesHighPrecisionLargeFixedCatalogSelection();
 };
 
@@ -118,7 +118,7 @@ void PerformanceSceneProfileTests::buildsLargeSceneWithinGuardrail()
     PerformanceGuardChecks::verifyElapsedBelow(elapsedMs, kLargeSceneBuildBudgetMs, "large scene build");
 }
 
-void PerformanceSceneProfileTests::buildsHighPrecisionLargeFixedCatalogWithinGuardrail()
+void PerformanceSceneProfileTests::buildsHighPrecisionLargeCatalogWithinGuardrail()
 {
     std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies =
         PerformanceGuardScenario::makeHighPrecisionGuardCatalog();

@@ -14,7 +14,7 @@ class SkyThemeRepositoryTests final : public QObject {
 private slots:
     void loadsBundledThemes();
     void missingThemeIdFallsBackToDefaultTheme();
-    void malformedThemeDefinitionFallsBackToBuiltInDefault();
+    void malformedThemeFallsBackToBuiltInDefault();
 };
 
 void SkyThemeRepositoryTests::loadsBundledThemes()
@@ -45,7 +45,7 @@ void SkyThemeRepositoryTests::missingThemeIdFallsBackToDefaultTheme()
     QCOMPARE(resolvedTheme.ui.windowBackground, defaultTheme.ui.windowBackground);
 }
 
-void SkyThemeRepositoryTests::malformedThemeDefinitionFallsBackToBuiltInDefault()
+void SkyThemeRepositoryTests::malformedThemeFallsBackToBuiltInDefault()
 {
     QTemporaryDir tempDir;
     QVERIFY(tempDir.isValid());

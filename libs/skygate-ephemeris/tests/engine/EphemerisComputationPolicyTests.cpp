@@ -101,14 +101,14 @@ class EphemerisComputationPolicyTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void correctionFlagsForAppliesScenePolicyOnlyForSupportedEngines();
+    void correctionFlagsForAppliesOnlyWhenSupported();
     void inspectorDetailRecomputeFollowsTraits();
     void inspectorEventSearchModeFollowsTraitsAndBody();
     void trailSamplingAndGuidanceFollowTraits();
     void liveRecomputeThrottleAppliesFollowsTraits();
 };
 
-void EphemerisComputationPolicyTests::correctionFlagsForAppliesScenePolicyOnlyForSupportedEngines()
+void EphemerisComputationPolicyTests::correctionFlagsForAppliesOnlyWhenSupported()
 {
     const skygate::ephemeris::tests::FixedAltitudeEngine noTraitsEngine(0.0);
     const skygate::ephemeris::tests::NonEnumeratedHighPrecisionTraitsEngine highPrecisionTraitsEngine;

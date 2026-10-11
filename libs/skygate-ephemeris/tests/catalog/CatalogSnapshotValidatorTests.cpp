@@ -102,13 +102,13 @@ class CatalogSnapshotValidatorTests final : public QObject {
 private slots:
     void vectorFactoryNormalizesSunAndMoonIdentities();
     void existingCatalogFactoryAcceptsValidSnapshot();
-    void existingCatalogFactoryNormalizesSunAndIdentifiers();
+    void catalogFactoryNormalizesSunAndIdentifiers();
     void validatorRejectsOutOfRangeAndUnknownOrderEntries();
     void validatorRejectsEmptyCanonicalIds();
     void validatorRejectsInvalidNumericDomains();
-    void validatorRejectsFixedPositionMixedWithUnrelatedAstrometry();
+    void validatorRejectsMixedFixedPositionAndAstrometry();
     void validatorAllowsAbsentOptionalMetadata();
-    void cacheDeserializationRejectsInvalidNumericAndIdentityData();
+    void cacheDecodingRejectsInvalidNumericAndIdentity();
 };
 
 void CatalogSnapshotValidatorTests::vectorFactoryNormalizesSunAndMoonIdentities()
@@ -152,7 +152,7 @@ void CatalogSnapshotValidatorTests::existingCatalogFactoryAcceptsValidSnapshot()
     QCOMPARE(QString::fromStdString(catalog->bodies()[1]->id), QStringLiteral("ngc_224"));
 }
 
-void CatalogSnapshotValidatorTests::existingCatalogFactoryNormalizesSunAndIdentifiers()
+void CatalogSnapshotValidatorTests::catalogFactoryNormalizesSunAndIdentifiers()
 {
     OwnGalaxyCelestialBody sun;
     sun.id = "SUN";
@@ -239,7 +239,7 @@ void CatalogSnapshotValidatorTests::validatorRejectsInvalidNumericDomains()
     QVERIFY(!extentReport.ok);
 }
 
-void CatalogSnapshotValidatorTests::validatorRejectsFixedPositionMixedWithUnrelatedAstrometry()
+void CatalogSnapshotValidatorTests::validatorRejectsMixedFixedPositionAndAstrometry()
 {
     // The astrometry declares no reference epoch, so its reference position
     // claims the same epoch as the fixed position; a different direction is
@@ -306,7 +306,7 @@ void CatalogSnapshotValidatorTests::validatorAllowsAbsentOptionalMetadata()
     QVERIFY(dsoReport.ok);
 }
 
-void CatalogSnapshotValidatorTests::cacheDeserializationRejectsInvalidNumericAndIdentityData()
+void CatalogSnapshotValidatorTests::cacheDecodingRejectsInvalidNumericAndIdentity()
 {
     std::vector<OwnGalaxyCelestialBody> infiniteMagnitudeBodies{makeStar("hip_inf_mag")};
     infiniteMagnitudeBodies[0].visualMagnitude = std::numeric_limits<double>::infinity();

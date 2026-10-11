@@ -37,9 +37,9 @@ class ProjectionPipelineBoundaryTests final : public QObject {
 
 private slots:
     void finishCircularRejectsInvalidScaleInputs();
-    void finishCircularCullsOutsideRadiusAndAllowsVisiblePoints();
+    void finishCircularCullsOutsideRadiusKeepsVisible();
     void finishRectangularRejectsInvalidScaleInputs();
-    void finishRectangularCullsOutsideBoundsAndAllowsVisiblePoints();
+    void finishRectangularCullsOutsideBoundsKeepsVisible();
 };
 
 void ProjectionPipelineBoundaryTests::finishCircularRejectsInvalidScaleInputs()
@@ -62,7 +62,7 @@ void ProjectionPipelineBoundaryTests::finishCircularRejectsInvalidScaleInputs()
     );
 }
 
-void ProjectionPipelineBoundaryTests::finishCircularCullsOutsideRadiusAndAllowsVisiblePoints()
+void ProjectionPipelineBoundaryTests::finishCircularCullsOutsideRadiusKeepsVisible()
 {
     using skygate::core::ProjectionPipeline;
 
@@ -98,7 +98,7 @@ void ProjectionPipelineBoundaryTests::finishRectangularRejectsInvalidScaleInputs
     );
 }
 
-void ProjectionPipelineBoundaryTests::finishRectangularCullsOutsideBoundsAndAllowsVisiblePoints()
+void ProjectionPipelineBoundaryTests::finishRectangularCullsOutsideBoundsKeepsVisible()
 {
     using skygate::core::ProjectionPipeline;
 

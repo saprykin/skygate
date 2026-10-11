@@ -30,14 +30,14 @@ class SkySettingsCodecsTests final : public QObject {
 
 private slots:
     void boolCodecAcceptsStrictBooleanSpellings();
-    void primitiveReadersUseFallbacksForMissingMalformedAndNonFiniteValues();
+    void primitiveReadersFallBackForMissingInvalidValues();
     void splitAndMergeStateSnapshotPreservesTypedDomains();
-    void stateSnapshotLoadRequiresVersionAndAppliesDefaults();
-    void stateSnapshotLoadMigratesLegacyShortRangeProfileId();
+    void stateSnapshotLoadRequiresVersionAppliesDefaults();
+    void stateSnapshotMigratesLegacyShortRangeProfileId();
     void savingBlankLogPathStoresDefaultPath();
     void ephemerisEngineKindRoundTripsBothStableIds();
-    void ephemerisEngineKindParsesLegacyAliasesAndCaseInsensitive();
-    void ephemerisEngineKindUnknownIdFallsBackToDefaultDescriptor();
+    void engineKindParsesLegacyAliasesAndCaseInsensitive();
+    void engineKindUnknownIdFallsBackToDefaultDescriptor();
 };
 
 void SkySettingsCodecsTests::boolCodecAcceptsStrictBooleanSpellings()
@@ -53,7 +53,7 @@ void SkySettingsCodecsTests::boolCodecAcceptsStrictBooleanSpellings()
     QVERIFY(!boolFromSettingValue(QVariant("maybe")).has_value());
 }
 
-void SkySettingsCodecsTests::primitiveReadersUseFallbacksForMissingMalformedAndNonFiniteValues()
+void SkySettingsCodecsTests::primitiveReadersFallBackForMissingInvalidValues()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
@@ -158,7 +158,7 @@ void SkySettingsCodecsTests::splitAndMergeStateSnapshotPreservesTypedDomains()
     QCOMPARE(merged.ephemerisSettingsPresent, true);
 }
 
-void SkySettingsCodecsTests::stateSnapshotLoadRequiresVersionAndAppliesDefaults()
+void SkySettingsCodecsTests::stateSnapshotLoadRequiresVersionAppliesDefaults()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
@@ -188,7 +188,7 @@ void SkySettingsCodecsTests::stateSnapshotLoadRequiresVersionAndAppliesDefaults(
     QCOMPARE(loaded->ephemerisSettingsPresent, false);
 }
 
-void SkySettingsCodecsTests::stateSnapshotLoadMigratesLegacyShortRangeProfileId()
+void SkySettingsCodecsTests::stateSnapshotMigratesLegacyShortRangeProfileId()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
@@ -253,7 +253,7 @@ void SkySettingsCodecsTests::ephemerisEngineKindRoundTripsBothStableIds()
     );
 }
 
-void SkySettingsCodecsTests::ephemerisEngineKindParsesLegacyAliasesAndCaseInsensitive()
+void SkySettingsCodecsTests::engineKindParsesLegacyAliasesAndCaseInsensitive()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
@@ -286,7 +286,7 @@ void SkySettingsCodecsTests::ephemerisEngineKindParsesLegacyAliasesAndCaseInsens
     );
 }
 
-void SkySettingsCodecsTests::ephemerisEngineKindUnknownIdFallsBackToDefaultDescriptor()
+void SkySettingsCodecsTests::engineKindUnknownIdFallsBackToDefaultDescriptor()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());

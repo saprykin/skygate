@@ -340,22 +340,22 @@ private slots:
     void init();
     void activatesVerifiedStagedUpdateSetAtomically();
     void activatesFullLongRangeProfileUpdateSet();
-    void supportDataActivationPreservesInstalledKernelSelection();
+    void supportDataActivationPreservesInstalledKernel();
     void activatesLiveSupportDataUpdateWithDriftedPayload();
     void clearPlanetaryKernelCachePreservesSupportData();
     void clearSupportDataCachePreservesInstalledKernel();
     void activationFailurePreservesActiveDataAndSettings();
-    void sameRevisionActivationFailurePreservesActiveFilesAndSettings();
+    void sameRevisionFailureKeepsActiveFilesAndSettings();
     void metadataPersistenceFailurePreservesActiveData();
-    void cancellationBeforeVerificationPreservesActiveDataAndRetainsStaging();
-    void cancellationDuringVerificationCanCleanStagingAndPreservesActiveData();
-    void cancellationBeforeActivationPreservesVerifiedStagingAndActiveData();
-    void cancellationDuringActivationCleansPartialCacheAndPreservesActiveData();
-    void updateFlowHarnessActivatesSuccessfullyAndSignalsRevision();
+    void cancelBeforeVerificationKeepsDataAndStaging();
+    void cancelDuringVerificationCleansStagingKeepsData();
+    void cancelBeforeActivationKeepsStagingAndActiveData();
+    void cancelDuringActivationCleansCacheKeepsActiveData();
+    void updateFlowHarnessActivatesAndSignalsRevision();
     void updateFlowHarnessRestartsAfterPartialDownload();
-    void updateFlowHarnessInjectsVerificationFailureAndPreservesActiveData();
-    void updateFlowHarnessInjectsActivationFailureAndPreservesActiveData();
-    void updateFlowHarnessInjectsActivationCancellationAndPreservesActiveData();
+    void updateFlowHarnessVerificationFailureKeepsData();
+    void updateFlowHarnessActivationFailureKeepsData();
+    void updateFlowHarnessActivationCancelKeepsData();
 
 private:
     SettingsTestFixture m_settings;
@@ -485,7 +485,7 @@ void SkyEphemerisActivationTests::activatesFullLongRangeProfileUpdateSet()
     QVERIFY(snapshot->deltaTDataAsset().has_value());
 }
 
-void SkyEphemerisActivationTests::supportDataActivationPreservesInstalledKernelSelection()
+void SkyEphemerisActivationTests::supportDataActivationPreservesInstalledKernel()
 {
     const QString oldKernelPath = m_settings.filePath(QStringLiteral("old-kernel.bsp"));
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
@@ -682,7 +682,7 @@ void SkyEphemerisActivationTests::activationFailurePreservesActiveDataAndSetting
     QCOMPARE(store.loadEphemerisDataCache().installedKernelPath, oldKernelPath);
 }
 
-void SkyEphemerisActivationTests::sameRevisionActivationFailurePreservesActiveFilesAndSettings()
+void SkyEphemerisActivationTests::sameRevisionFailureKeepsActiveFilesAndSettings()
 {
     const QString activeRoot = m_settings.filePath(QStringLiteral("updates/installed-rev"));
     const QString oldKernelPath = activeRoot + QStringLiteral("/de440s-short-range/kernels/de440s.bsp");
@@ -754,7 +754,7 @@ void SkyEphemerisActivationTests::metadataPersistenceFailurePreservesActiveData(
     QVERIFY(!QFileInfo::exists(m_settings.filePath(QStringLiteral("updates/installed-rev-2"))));
 }
 
-void SkyEphemerisActivationTests::cancellationBeforeVerificationPreservesActiveDataAndRetainsStaging()
+void SkyEphemerisActivationTests::cancelBeforeVerificationKeepsDataAndStaging()
 {
     const QString oldKernelPath = m_settings.filePath(QStringLiteral("cancel-old-kernel.bsp"));
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
@@ -793,7 +793,7 @@ void SkyEphemerisActivationTests::cancellationBeforeVerificationPreservesActiveD
     QVERIFY(!manager.updateCancellationRequested());
 }
 
-void SkyEphemerisActivationTests::cancellationDuringVerificationCanCleanStagingAndPreservesActiveData()
+void SkyEphemerisActivationTests::cancelDuringVerificationCleansStagingKeepsData()
 {
     const QString oldKernelPath = m_settings.filePath(QStringLiteral("verify-cancel-old-kernel.bsp"));
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
@@ -833,7 +833,7 @@ void SkyEphemerisActivationTests::cancellationDuringVerificationCanCleanStagingA
     QVERIFY(!QFileInfo::exists(stagedPath));
 }
 
-void SkyEphemerisActivationTests::cancellationBeforeActivationPreservesVerifiedStagingAndActiveData()
+void SkyEphemerisActivationTests::cancelBeforeActivationKeepsStagingAndActiveData()
 {
     const QString oldKernelPath = m_settings.filePath(QStringLiteral("pre-activate-cancel-old-kernel.bsp"));
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
@@ -882,7 +882,7 @@ void SkyEphemerisActivationTests::cancellationBeforeActivationPreservesVerifiedS
     QVERIFY(!QFileInfo::exists(m_settings.filePath(QStringLiteral("updates/installed-rev-2"))));
 }
 
-void SkyEphemerisActivationTests::cancellationDuringActivationCleansPartialCacheAndPreservesActiveData()
+void SkyEphemerisActivationTests::cancelDuringActivationCleansCacheKeepsActiveData()
 {
     const QString oldKernelPath = m_settings.filePath(QStringLiteral("install-cancel-old-kernel.bsp"));
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
@@ -921,7 +921,7 @@ void SkyEphemerisActivationTests::cancellationDuringActivationCleansPartialCache
     QVERIFY(QFileInfo::exists(stagedRoot.path() + QStringLiteral("/kernels/de440s.bsp")));
 }
 
-void SkyEphemerisActivationTests::updateFlowHarnessActivatesSuccessfullyAndSignalsRevision()
+void SkyEphemerisActivationTests::updateFlowHarnessActivatesAndSignalsRevision()
 {
     EphemerisUpdateFlowHarness harness(m_settings);
     harness.initializeInstalledManager(QStringLiteral("harness-success"));
@@ -979,7 +979,7 @@ void SkyEphemerisActivationTests::updateFlowHarnessRestartsAfterPartialDownload(
     harness.verifyActiveDataPreserved();
 }
 
-void SkyEphemerisActivationTests::updateFlowHarnessInjectsVerificationFailureAndPreservesActiveData()
+void SkyEphemerisActivationTests::updateFlowHarnessVerificationFailureKeepsData()
 {
     EphemerisUpdateFlowHarness harness(m_settings);
     harness.initializeInstalledManager(QStringLiteral("harness-verification-failure"));
@@ -1002,7 +1002,7 @@ void SkyEphemerisActivationTests::updateFlowHarnessInjectsVerificationFailureAnd
     QVERIFY(QFileInfo::exists(stagedKernelPath));
 }
 
-void SkyEphemerisActivationTests::updateFlowHarnessInjectsActivationFailureAndPreservesActiveData()
+void SkyEphemerisActivationTests::updateFlowHarnessActivationFailureKeepsData()
 {
     EphemerisUpdateFlowHarness harness(m_settings);
     harness.initializeInstalledManager(QStringLiteral("harness-activation-failure"));
@@ -1035,7 +1035,7 @@ void SkyEphemerisActivationTests::updateFlowHarnessInjectsActivationFailureAndPr
     QVERIFY(QFileInfo::exists(harness.stagedRoot().path() + QStringLiteral("/kernels/de440s.bsp")));
 }
 
-void SkyEphemerisActivationTests::updateFlowHarnessInjectsActivationCancellationAndPreservesActiveData()
+void SkyEphemerisActivationTests::updateFlowHarnessActivationCancelKeepsData()
 {
     EphemerisUpdateFlowHarness harness(m_settings);
     harness.initializeInstalledManager(QStringLiteral("harness-activation-cancel"));

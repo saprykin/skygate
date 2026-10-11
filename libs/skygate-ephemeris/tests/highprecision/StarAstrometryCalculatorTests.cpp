@@ -259,23 +259,23 @@ class StarAstrometryCalculatorTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void propagatesFullAstrometryWhenCorrectionsAreEnabled();
-    void leavesReferenceCoordinateWhenCorrectionsAreDisabled();
-    void treatsRightAscensionProperMotionAsTangentPlaneComponent();
+    void propagatesFullAstrometryWhenCorrectionsEnabled();
+    void keepsReferenceCoordinateWithoutCorrections();
+    void treatsRaProperMotionAsTangentPlaneComponent();
     void appliesAnnualParallaxWithEarthBarycentricState();
-    void batchMatchesSingleStarPropagationForFullPartialAndFixedStars();
+    void batchMatchesSingleStarForFullPartialFixedStars();
     void batchMatchesSingleStarWhenCorrectionsAreDisabled();
-    void batchMatchesSingleStarForInvalidOptionalAstrometry();
+    void batchMatchesSingleStarForInvalidAstrometry();
     void batchMatchesSingleStarAnnualParallaxCorrections();
-    void degradesAnnualParallaxWhenKernelProviderIsMissing();
-    void degradesAnnualParallaxWhenSourceParallaxIsMissing();
-    void degradesRadialVelocityWhenStellarParallaxIsDisabled();
-    void degradesPartialAstrometryAndReportsProperMotionUnavailable();
-    void degradesFixedOnlyStarsWhenAstrometryCorrectionsAreRequested();
+    void degradesAnnualParallaxWhenKernelProviderMissing();
+    void degradesAnnualParallaxWhenSourceParallaxMissing();
+    void degradesRadialVelocityWhenParallaxDisabled();
+    void partialAstrometryReportsProperMotionUnavailable();
+    void degradesFixedOnlyStarsWhenCorrectionsRequested();
     void failsWhenNoCoordinateFallbackExists();
 };
 
-void StarAstrometryCalculatorTests::propagatesFullAstrometryWhenCorrectionsAreEnabled()
+void StarAstrometryCalculatorTests::propagatesFullAstrometryWhenCorrectionsEnabled()
 {
     const OwnGalaxyCelestialBody body = makeAstrometricStar();
     const EphemerisRequest request = makeRequest(
@@ -314,7 +314,7 @@ void StarAstrometryCalculatorTests::propagatesFullAstrometryWhenCorrectionsAreEn
     );
 }
 
-void StarAstrometryCalculatorTests::leavesReferenceCoordinateWhenCorrectionsAreDisabled()
+void StarAstrometryCalculatorTests::keepsReferenceCoordinateWithoutCorrections()
 {
     const OwnGalaxyCelestialBody body = makeAstrometricStar();
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::noCorrections(), 10.0);
@@ -328,7 +328,7 @@ void StarAstrometryCalculatorTests::leavesReferenceCoordinateWhenCorrectionsAreD
     QCOMPARE(result.metadata.appliedCorrections, EphemerisCorrectionFlags::noCorrections());
 }
 
-void StarAstrometryCalculatorTests::treatsRightAscensionProperMotionAsTangentPlaneComponent()
+void StarAstrometryCalculatorTests::treatsRaProperMotionAsTangentPlaneComponent()
 {
     OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.fixedEquatorial = EquatorialCoordinate{
@@ -398,7 +398,7 @@ void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricSta
     );
 }
 
-void StarAstrometryCalculatorTests::batchMatchesSingleStarPropagationForFullPartialAndFixedStars()
+void StarAstrometryCalculatorTests::batchMatchesSingleStarForFullPartialFixedStars()
 {
     const std::vector<OwnGalaxyCelestialBody> bodies{
         makePlanet(),
@@ -448,7 +448,7 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarWhenCorrectionsAreDisa
     }
 }
 
-void StarAstrometryCalculatorTests::batchMatchesSingleStarForInvalidOptionalAstrometry()
+void StarAstrometryCalculatorTests::batchMatchesSingleStarForInvalidAstrometry()
 {
     const std::vector<OwnGalaxyCelestialBody> bodies{
         makeStarWithInvalidOptionalAstrometry(),
@@ -525,7 +525,7 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrecti
     QCOMPARE(kernel->lastCenterNaifId(), 0);
 }
 
-void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenKernelProviderIsMissing()
+void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenKernelProviderMissing()
 {
     const OwnGalaxyCelestialBody body = makeAstrometricStar();
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
@@ -547,7 +547,7 @@ void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenKernelProviderIsMi
     ));
 }
 
-void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxIsMissing()
+void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxMissing()
 {
     OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.starAstrometry->stellarParallaxMas = std::nullopt;
@@ -572,7 +572,7 @@ void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxIsMi
     QCOMPARE(kernel->callCount(), 0);
 }
 
-void StarAstrometryCalculatorTests::degradesRadialVelocityWhenStellarParallaxIsDisabled()
+void StarAstrometryCalculatorTests::degradesRadialVelocityWhenParallaxDisabled()
 {
     OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.starAstrometry->properMotionRightAscensionMasPerYear = 0.0;
@@ -600,7 +600,7 @@ void StarAstrometryCalculatorTests::degradesRadialVelocityWhenStellarParallaxIsD
     ));
 }
 
-void StarAstrometryCalculatorTests::degradesPartialAstrometryAndReportsProperMotionUnavailable()
+void StarAstrometryCalculatorTests::partialAstrometryReportsProperMotionUnavailable()
 {
     OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.starAstrometry->properMotionDeclinationMasPerYear = std::nullopt;
@@ -624,7 +624,7 @@ void StarAstrometryCalculatorTests::degradesPartialAstrometryAndReportsProperMot
     ));
 }
 
-void StarAstrometryCalculatorTests::degradesFixedOnlyStarsWhenAstrometryCorrectionsAreRequested()
+void StarAstrometryCalculatorTests::degradesFixedOnlyStarsWhenCorrectionsRequested()
 {
     OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.starAstrometry = std::nullopt;

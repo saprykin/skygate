@@ -202,17 +202,17 @@ class CatalogStarAstrometryArraysTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void buildsCacheFriendlyArraysFromFullPartialAndFixedStars();
+    void buildsCacheFriendlyArraysFromFullPartialFixed();
     void batchesFixedCoordinateNonStarBodies();
-    void preservesMixedCatalogOrderingAndFiltersUnsupportedBodies();
+    void preservesCatalogOrderAndFiltersUnsupported();
     void masksOnlyUsableNumericAstrometryValues();
-    void mergedConflictingCoordinatesExposeOnlyTheWinningPosition();
-    void mergedCompatibleAstrometryKeepsOneReferencePosition();
+    void mergedConflictExposesOnlyWinningPosition();
+    void mergedCompatibleAstrometryKeepsOnePosition();
     void optionalAccessorsHandleOutOfRangeIndexes();
-    void copiesCatalogDataAndSurvivesSourceLifetimeChanges();
+    void copiesCatalogDataBeyondSourceLifetime();
 };
 
-void CatalogStarAstrometryArraysTests::buildsCacheFriendlyArraysFromFullPartialAndFixedStars()
+void CatalogStarAstrometryArraysTests::buildsCacheFriendlyArraysFromFullPartialFixed()
 {
     const std::vector<OwnGalaxyCelestialBody> bodies{
         makePlanet(),
@@ -311,7 +311,7 @@ void CatalogStarAstrometryArraysTests::batchesFixedCoordinateNonStarBodies()
     QCOMPARE(arrays.referenceEquatorial(0).declinationDeg, 41.3);
 }
 
-void CatalogStarAstrometryArraysTests::preservesMixedCatalogOrderingAndFiltersUnsupportedBodies()
+void CatalogStarAstrometryArraysTests::preservesCatalogOrderAndFiltersUnsupported()
 {
     const CelestialBodyCatalog catalog(
         std::vector<OwnGalaxyCelestialBody>{
@@ -372,7 +372,7 @@ void CatalogStarAstrometryArraysTests::masksOnlyUsableNumericAstrometryValues()
     QVERIFY(std::isinf(arrays.radialVelocityKmPerSecondValues()[0]));
 }
 
-void CatalogStarAstrometryArraysTests::mergedConflictingCoordinatesExposeOnlyTheWinningPosition()
+void CatalogStarAstrometryArraysTests::mergedConflictExposesOnlyWinningPosition()
 {
     // The later source fixes the shared HIP 1 object at RA 10 while the
     // earlier source offers astrometry at RA 1. The winning fixed position and
@@ -421,7 +421,7 @@ void CatalogStarAstrometryArraysTests::mergedConflictingCoordinatesExposeOnlyThe
     QCOMPARE(calculation.equatorial->declinationDeg, 20.0);
 }
 
-void CatalogStarAstrometryArraysTests::mergedCompatibleAstrometryKeepsOneReferencePosition()
+void CatalogStarAstrometryArraysTests::mergedCompatibleAstrometryKeepsOnePosition()
 {
     // Compatible losing astrometry enriches the winning fixed position, and
     // the consumer then sees the same direction through both the reference
@@ -485,7 +485,7 @@ void CatalogStarAstrometryArraysTests::optionalAccessorsHandleOutOfRangeIndexes(
     QVERIFY(!arrays.validityRange(outOfRangeIndex).has_value());
 }
 
-void CatalogStarAstrometryArraysTests::copiesCatalogDataAndSurvivesSourceLifetimeChanges()
+void CatalogStarAstrometryArraysTests::copiesCatalogDataBeyondSourceLifetime()
 {
     CatalogStarAstrometryArrays arrays;
     {

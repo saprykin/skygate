@@ -24,13 +24,13 @@ class CatalogRowOriginTests final : public QObject {
 private slots:
     void bridgesWithinOneSourceKeepFirstRowName();
     void bridgesWithinOneSourceKeepFirstRowDeepSkyValues();
-    void withinSourceBridgeFieldsResolveByEarliestSupplyingRow();
+    void withinSourceBridgeFieldsResolveByEarliestRow();
     void secondWithinSourceBridgeKeepsEarliestRowValues();
-    void sameSourcePassKeepsEarliestRowNameAcrossALocalBridge();
+    void sameSourcePassKeepsEarliestRowNameAcrossBridge();
     void sameSourcePassKeepsEarliestRowDeepSkyValues();
-    void sameSourcePassMatchResolvesEachFieldByItsSupplyingRow();
-    void secondBridgeSurvivorKeepsRowOriginsUnderLaterReplacement();
-    void withinSourceBridgeSurvivorKeepsRowOrderAcrossCrossSourceBridge();
+    void sameSourcePassMatchResolvesFieldsBySupplyingRow();
+    void secondBridgeSurvivorKeepsOriginsUnderReplacement();
+    void withinSourceSurvivorKeepsRowOrderAcrossBridges();
 };
 
 void CatalogRowOriginTests::bridgesWithinOneSourceKeepFirstRowName()
@@ -113,7 +113,7 @@ void CatalogRowOriginTests::bridgesWithinOneSourceKeepFirstRowDeepSkyValues()
     QCOMPARE(*deepSkyInfo->minorAxisArcmin, 5.0);
 }
 
-void CatalogRowOriginTests::withinSourceBridgeFieldsResolveByEarliestSupplyingRow()
+void CatalogRowOriginTests::withinSourceBridgeFieldsResolveByEarliestRow()
 {
     // The first row names the object and supplies the major axis, the second
     // row supplies the position angle and its own values, and the bridge
@@ -209,7 +209,7 @@ void CatalogRowOriginTests::secondWithinSourceBridgeKeepsEarliestRowValues()
     QVERIFY(CatalogMergeTestSupport::hasRetainedCanonicalId(*survivor, "c_hip_3"));
 }
 
-void CatalogRowOriginTests::sameSourcePassKeepsEarliestRowNameAcrossALocalBridge()
+void CatalogRowOriginTests::sameSourcePassKeepsEarliestRowNameAcrossBridge()
 {
     // Source A links HIP 1 and HYG 2. Source B names the object in its first
     // row, names HYG 2 in its second row, and bridges HIP 1 with HIP 3 in its
@@ -352,7 +352,7 @@ void CatalogRowOriginTests::sameSourcePassKeepsEarliestRowDeepSkyValues()
     QVERIFY(CatalogMergeTestSupport::hasRetainedCanonicalId(*survivor, "b_bridge_dso"));
 }
 
-void CatalogRowOriginTests::sameSourcePassMatchResolvesEachFieldByItsSupplyingRow()
+void CatalogRowOriginTests::sameSourcePassMatchResolvesFieldsBySupplyingRow()
 {
     // The rows are reversed: HYG 2 names the object in the first row, while
     // HIP 1 supplies its own name and coordinates in the second row, which the
@@ -408,7 +408,7 @@ void CatalogRowOriginTests::sameSourcePassMatchResolvesEachFieldByItsSupplyingRo
     QVERIFY(CatalogMergeTestSupport::hasRetainedCanonicalId(*survivor, "b_bridge"));
 }
 
-void CatalogRowOriginTests::secondBridgeSurvivorKeepsRowOriginsUnderLaterReplacement()
+void CatalogRowOriginTests::secondBridgeSurvivorKeepsOriginsUnderReplacement()
 {
     // Source A links HIP 1 and HYG 2, and source B bridges its own rows twice
     // inside its dedup pass, the second bridge absorbing the HYG 2 survivor.
@@ -481,7 +481,7 @@ void CatalogRowOriginTests::secondBridgeSurvivorKeepsRowOriginsUnderLaterReplace
     QVERIFY(CatalogMergeTestSupport::hasRetainedCanonicalId(*survivor, "b_bridge_all"));
 }
 
-void CatalogRowOriginTests::withinSourceBridgeSurvivorKeepsRowOrderAcrossCrossSourceBridge()
+void CatalogRowOriginTests::withinSourceSurvivorKeepsRowOrderAcrossBridges()
 {
     // The first source deduplicates three rows into one bridged survivor whose
     // name still comes from its first row. A later source bridges that

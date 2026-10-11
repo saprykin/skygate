@@ -108,7 +108,7 @@ class CatalogContainerDecodingTests final : public QObject {
 private slots:
     void hygProducesEquivalentBodiesAcrossContainers();
     void openNgcProducesEquivalentBodiesAcrossContainers();
-    void reportsUnknownInnerSchemaAfterSuccessfulContainerDecode();
+    void reportsUnknownInnerSchemaAfterContainerDecode();
     void rejectsNestedArchivesWithoutRecursiveDecoding();
     void rejectsArchiveEntriesBeyondDecompressionLimits();
     void unrelatedCsvBeforeCatalogIsIgnored();
@@ -168,7 +168,7 @@ void CatalogContainerDecodingTests::openNgcProducesEquivalentBodiesAcrossContain
     QVERIFY2(zipError.empty(), zipError.c_str());
 }
 
-void CatalogContainerDecodingTests::reportsUnknownInnerSchemaAfterSuccessfulContainerDecode()
+void CatalogContainerDecodingTests::reportsUnknownInnerSchemaAfterContainerDecode()
 {
     using namespace skygate::ephemeris;
 

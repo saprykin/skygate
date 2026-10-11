@@ -194,12 +194,12 @@ class ApparentPlaceCorrectionRoutingTests final : public QObject {
 private slots:
     void routesGeometricRequestsToGcrs();
     void routesRequestsWithoutPrecessionNutationToGcrs();
-    void routesAstrometricRequestsWithUnsupportedRefractionToGcrs();
+    void routesAstrometricToGcrsWhenRefractionUnsupported();
     void routesApparentRequestsToTrueEquatorAndEquinox();
     void appliesPrecessionNutationWhenRequested();
-    void singleItemApplyAndApplyBatchProduceEquivalentResults();
-    void propagatesDegradedTransformMetadataForPrecessionNutation();
-    void propagatesDegradedRealFrameTransformMetadataForPrecessionNutation();
+    void singleApplyAndBatchApplyProduceSameResults();
+    void propagatesDegradedMetadataForPrecessionNutation();
+    void propagatesDegradedRealFrameMetadataForNutation();
     void failsMissingApparentTransformResults();
 };
 
@@ -241,7 +241,7 @@ void ApparentPlaceCorrectionRoutingTests::routesRequestsWithoutPrecessionNutatio
     );
 }
 
-void ApparentPlaceCorrectionRoutingTests::routesAstrometricRequestsWithUnsupportedRefractionToGcrs()
+void ApparentPlaceCorrectionRoutingTests::routesAstrometricToGcrsWhenRefractionUnsupported()
 {
     auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
     const ApparentPlaceCalculator calculator(frameTransformer, nullptr, nullptr);
@@ -336,7 +336,7 @@ void ApparentPlaceCorrectionRoutingTests::appliesPrecessionNutationWhenRequested
     );
 }
 
-void ApparentPlaceCorrectionRoutingTests::singleItemApplyAndApplyBatchProduceEquivalentResults()
+void ApparentPlaceCorrectionRoutingTests::singleApplyAndBatchApplyProduceSameResults()
 {
     const OwnGalaxyCelestialBody body = ApparentPlaceTestFixture::sunBody();
     const CelestialBodyCatalog catalog(std::vector<OwnGalaxyCelestialBody>{body});
@@ -441,7 +441,7 @@ void ApparentPlaceCorrectionRoutingTests::singleItemApplyAndApplyBatchProduceEqu
     }
 }
 
-void ApparentPlaceCorrectionRoutingTests::propagatesDegradedTransformMetadataForPrecessionNutation()
+void ApparentPlaceCorrectionRoutingTests::propagatesDegradedMetadataForPrecessionNutation()
 {
     auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
     EphemerisEngineQueryResult transformMetadata;
@@ -475,7 +475,7 @@ void ApparentPlaceCorrectionRoutingTests::propagatesDegradedTransformMetadataFor
     );
 }
 
-void ApparentPlaceCorrectionRoutingTests::propagatesDegradedRealFrameTransformMetadataForPrecessionNutation()
+void ApparentPlaceCorrectionRoutingTests::propagatesDegradedRealFrameMetadataForNutation()
 {
     const ErfaFrameTransformer availabilityTransformer(nullptr);
     const CelestialFrameTransformResult availabilityResult = ApparentPlaceTestFixture::transformSingleVector(

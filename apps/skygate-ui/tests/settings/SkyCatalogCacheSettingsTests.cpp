@@ -32,10 +32,10 @@ private slots:
     void initTestCase();
     void savesLoadsAndClearsCatalogCachesIndependently();
     void savesLoadsAndClearsCatalogCollectionCache();
-    void clearCatalogSourceCacheEvictsPayloadAndKeepsConfiguration();
-    void unreadableSourcePayloadIsReportedDistinctlyFromEviction();
-    void partialCatalogCacheSavePreservesConfiguredPeerPath();
-    void missingCacheFilesAndMalformedCacheMetadataAreTolerated();
+    void clearSourceCacheEvictsPayloadKeepsConfiguration();
+    void unreadablePayloadIsReportedDistinctFromEviction();
+    void partialCacheSavePreservesConfiguredPeerPath();
+    void missingCacheFilesAndMalformedMetadataTolerated();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -126,7 +126,7 @@ void SkyCatalogCacheSettingsTests::savesLoadsAndClearsCatalogCollectionCache()
     QCOMPARE(afterClear.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
 }
 
-void SkyCatalogCacheSettingsTests::clearCatalogSourceCacheEvictsPayloadAndKeepsConfiguration()
+void SkyCatalogCacheSettingsTests::clearSourceCacheEvictsPayloadKeepsConfiguration()
 {
     const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
 
@@ -178,7 +178,7 @@ void SkyCatalogCacheSettingsTests::clearCatalogSourceCacheEvictsPayloadAndKeepsC
     QVERIFY(evicted.unreadablePayloadInstanceIds.isEmpty());
 }
 
-void SkyCatalogCacheSettingsTests::unreadableSourcePayloadIsReportedDistinctlyFromEviction()
+void SkyCatalogCacheSettingsTests::unreadablePayloadIsReportedDistinctFromEviction()
 {
     const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
 
@@ -213,7 +213,7 @@ void SkyCatalogCacheSettingsTests::unreadableSourcePayloadIsReportedDistinctlyFr
     QCOMPARE(evicted.unreadablePayloadInstanceIds, QStringList{QStringLiteral("preset:hyg_v42")});
 }
 
-void SkyCatalogCacheSettingsTests::partialCatalogCacheSavePreservesConfiguredPeerPath()
+void SkyCatalogCacheSettingsTests::partialCacheSavePreservesConfiguredPeerPath()
 {
     const QString starCachePath = m_settings.filePath(QStringLiteral("partial-star-cache.txt"));
     const QString deepSkyCachePath = m_settings.filePath(QStringLiteral("partial-deep-sky-cache.txt"));
@@ -238,7 +238,7 @@ void SkyCatalogCacheSettingsTests::partialCatalogCacheSavePreservesConfiguredPee
     QVERIFY(QFileInfo::exists(deepSkyCachePath));
 }
 
-void SkyCatalogCacheSettingsTests::missingCacheFilesAndMalformedCacheMetadataAreTolerated()
+void SkyCatalogCacheSettingsTests::missingCacheFilesAndMalformedMetadataTolerated()
 {
     m_settings.clearSettings();
     m_settings.setCatalogCachePaths(

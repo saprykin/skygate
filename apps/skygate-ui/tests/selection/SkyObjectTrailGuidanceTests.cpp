@@ -198,17 +198,17 @@ class SkyObjectTrailGuidanceTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void highPrecisionFixedTargetTrailSamplesThroughEngine();
-    void highPrecisionRequestTrailUsesSparseInterpolatedSamples();
-    void thirdIdentityHighPrecisionTraitsTrailUsesSparseInterpolatedSamples();
-    void highPrecisionNonFixedTargetTrailUsesGuidanceEngine();
-    void adaptiveTrailWithoutGuidanceApprovalUsesDirectSamplingForNonFixedTarget();
-    void adaptiveTrailWithoutGuidanceApprovalSkipsFixedEquatorialShortcut();
+    void highPrecisionFixedTrailSamplesThroughEngine();
+    void highPrecisionRequestTrailUsesSparseSamples();
+    void thirdIdentityTraitsTrailUsesSparseSamples();
+    void highPrecisionNonFixedTrailUsesGuidanceEngine();
+    void adaptiveTrailWithoutApprovalUsesDirectSampling();
+    void adaptiveTrailWithoutApprovalSkipsFixedShortcut();
     void guidanceStrategyInjectionIsHonored();
     void highPrecisionTrailRefinesCurvedInterpolation();
 };
 
-void SkyObjectTrailGuidanceTests::highPrecisionFixedTargetTrailSamplesThroughEngine()
+void SkyObjectTrailGuidanceTests::highPrecisionFixedTrailSamplesThroughEngine()
 {
     const auto projection = TrailBuilderTestScenario::makeProjection();
     QVERIFY(projection.has_value());
@@ -255,7 +255,7 @@ void SkyObjectTrailGuidanceTests::highPrecisionFixedTargetTrailSamplesThroughEng
     QVERIFY(containsOffset(engine.requestOffsetMinutes(), 1090));
 }
 
-void SkyObjectTrailGuidanceTests::highPrecisionRequestTrailUsesSparseInterpolatedSamples()
+void SkyObjectTrailGuidanceTests::highPrecisionRequestTrailUsesSparseSamples()
 {
     const auto projection = TrailBuilderTestScenario::makeProjection();
     QVERIFY(projection.has_value());
@@ -306,7 +306,7 @@ void SkyObjectTrailGuidanceTests::highPrecisionRequestTrailUsesSparseInterpolate
     QCOMPARE(engine.requestBodyStateCalls(), 25);
 }
 
-void SkyObjectTrailGuidanceTests::thirdIdentityHighPrecisionTraitsTrailUsesSparseInterpolatedSamples()
+void SkyObjectTrailGuidanceTests::thirdIdentityTraitsTrailUsesSparseSamples()
 {
     const auto projection = TrailBuilderTestScenario::makeProjection();
     QVERIFY(projection.has_value());
@@ -336,7 +336,7 @@ void SkyObjectTrailGuidanceTests::thirdIdentityHighPrecisionTraitsTrailUsesSpars
     QCOMPARE(engine.contextBodyStateCalls(), 0);
 }
 
-void SkyObjectTrailGuidanceTests::highPrecisionNonFixedTargetTrailUsesGuidanceEngine()
+void SkyObjectTrailGuidanceTests::highPrecisionNonFixedTrailUsesGuidanceEngine()
 {
     const auto projection = TrailBuilderTestScenario::makeProjection();
     QVERIFY(projection.has_value());
@@ -413,7 +413,7 @@ void SkyObjectTrailGuidanceTests::highPrecisionNonFixedTargetTrailUsesGuidanceEn
     }));
 }
 
-void SkyObjectTrailGuidanceTests::adaptiveTrailWithoutGuidanceApprovalUsesDirectSamplingForNonFixedTarget()
+void SkyObjectTrailGuidanceTests::adaptiveTrailWithoutApprovalUsesDirectSampling()
 {
     const auto projection = TrailBuilderTestScenario::makeProjection();
     QVERIFY(projection.has_value());
@@ -461,7 +461,7 @@ void SkyObjectTrailGuidanceTests::adaptiveTrailWithoutGuidanceApprovalUsesDirect
     QVERIFY(!frame.lines.empty());
 }
 
-void SkyObjectTrailGuidanceTests::adaptiveTrailWithoutGuidanceApprovalSkipsFixedEquatorialShortcut()
+void SkyObjectTrailGuidanceTests::adaptiveTrailWithoutApprovalSkipsFixedShortcut()
 {
     const auto projection = TrailBuilderTestScenario::makeProjection();
     QVERIFY(projection.has_value());

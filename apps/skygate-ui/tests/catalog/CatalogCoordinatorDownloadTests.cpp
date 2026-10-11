@@ -20,7 +20,7 @@ class CatalogCoordinatorDownloadTests final : public QObject {
 private slots:
     void parsesSuccessfulDownloadedCatalog();
     void reportsParseFailureWithSourceUrl();
-    void gzipWithUnknownInnerSchemaUsesFormatNeutralWording();
+    void gzipUnknownInnerSchemaUsesFormatNeutralWording();
     void missingOpenNgcColumnsDoNotClaimHyg();
     void loadsArchiveMemberNamedByParseOptions();
     void reportsContradictorySchemaHintWithSourceUrl();
@@ -95,7 +95,7 @@ void CatalogCoordinatorDownloadTests::reportsParseFailureWithSourceUrl()
     QCOMPARE(statuses.back(), finalResult.errorText);
 }
 
-void CatalogCoordinatorDownloadTests::gzipWithUnknownInnerSchemaUsesFormatNeutralWording()
+void CatalogCoordinatorDownloadTests::gzipUnknownInnerSchemaUsesFormatNeutralWording()
 {
     // A gzip-compressed CSV that is missing the required HYG "mag" column, so
     // the decoded inner payload is not recognized as any supported schema.

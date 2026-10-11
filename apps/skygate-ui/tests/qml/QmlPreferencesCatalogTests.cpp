@@ -95,9 +95,9 @@ private slots:
     void catalogSectionShowsPresetsAndAddsSources();
     void catalogSectionManagesSourcesOrderingAndRemoval();
     void catalogSectionReportsErrorsAndRetries();
-    void catalogSectionRestoresCollectionAndPreservesIdentity();
-    void catalogSectionPresentsBundledFallbackParticipation();
-    void catalogSectionPresentsEnabledSourceRowsAndSummary();
+    void catalogSectionRestoresCollectionAndIdentity();
+    void catalogSectionPresentsFallbackParticipation();
+    void catalogSectionPresentsSourceRowsAndSummary();
 
 private:
     QmlSettingsFixture m_settings;
@@ -373,7 +373,7 @@ void QmlPreferencesCatalogTests::catalogSectionReportsErrorsAndRetries()
     QVERIFY2(unexpectedWarnings.isEmpty(), qPrintable(unexpectedWarnings.join('\n')));
 }
 
-void QmlPreferencesCatalogTests::catalogSectionRestoresCollectionAndPreservesIdentity()
+void QmlPreferencesCatalogTests::catalogSectionRestoresCollectionAndIdentity()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -495,7 +495,7 @@ void QmlPreferencesCatalogTests::catalogSectionRestoresCollectionAndPreservesIde
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlPreferencesCatalogTests::catalogSectionPresentsBundledFallbackParticipation()
+void QmlPreferencesCatalogTests::catalogSectionPresentsFallbackParticipation()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -561,7 +561,7 @@ void QmlPreferencesCatalogTests::catalogSectionPresentsBundledFallbackParticipat
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlPreferencesCatalogTests::catalogSectionPresentsEnabledSourceRowsAndSummary()
+void QmlPreferencesCatalogTests::catalogSectionPresentsSourceRowsAndSummary()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);

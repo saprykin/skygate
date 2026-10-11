@@ -116,14 +116,14 @@ private slots:
     void invalidYearZeroUtcDateTimeIsRejected();
     void manualUtcApplyPausesLivePlayback();
     void manualTimelineSteppingStillWorks();
-    void manualTimelineSteppingCrossesBceBoundaryWithoutYearZero();
+    void manualSteppingCrossesBceBoundaryWithoutYearZero();
     void livePlaybackUsesManualStepWhileCatchingUp();
-    void livePlaybackDoesNotOvershootCurrentUtcWhenCatchingUp();
-    void livePlaybackFallsBackToOneSecondTicksAfterCatchUp();
+    void livePlaybackDoesNotOvershootUtcWhileCatchingUp();
+    void livePlaybackFallsBackToSecondTicksAfterCatchUp();
     void throttledLivePlaybackAdvancesByElapsedWallTime();
     void throttledLivePlaybackKeepsDisplayedTimeTicking();
-    void throttledCatchUpPlaybackRecomputesForLargeTimelineSteps();
-    void fallbackSimpleEngineLivePlaybackUsesOneSecondTicks();
+    void throttledCatchUpRecomputesForLargeSteps();
+    void fallbackSimpleEngineUsesOneSecondTicks();
     void goLiveNowJumpsToCurrentUtcAndEnablesLive();
     void restoresLiveSettingsAtCurrentUtc();
     void restoresPausedSettingsAtSavedUtc();
@@ -236,7 +236,7 @@ void SkyContextControllerTimelineTests::manualTimelineSteppingStillWorks()
     QCOMPARE(afterStepBackwardSeconds, beforeSeconds);
 }
 
-void SkyContextControllerTimelineTests::manualTimelineSteppingCrossesBceBoundaryWithoutYearZero()
+void SkyContextControllerTimelineTests::manualSteppingCrossesBceBoundaryWithoutYearZero()
 {
     const auto controller = createController();
     controller->setLive(false);
@@ -271,7 +271,7 @@ void SkyContextControllerTimelineTests::livePlaybackUsesManualStepWhileCatchingU
     controller->setLive(false);
 }
 
-void SkyContextControllerTimelineTests::livePlaybackDoesNotOvershootCurrentUtcWhenCatchingUp()
+void SkyContextControllerTimelineTests::livePlaybackDoesNotOvershootUtcWhileCatchingUp()
 {
     FakeTimeSource timeSource;
     const auto controller = createControllerWithTimeSource(timeSource);
@@ -292,7 +292,7 @@ void SkyContextControllerTimelineTests::livePlaybackDoesNotOvershootCurrentUtcWh
     controller->setLive(false);
 }
 
-void SkyContextControllerTimelineTests::livePlaybackFallsBackToOneSecondTicksAfterCatchUp()
+void SkyContextControllerTimelineTests::livePlaybackFallsBackToSecondTicksAfterCatchUp()
 {
     FakeTimeSource timeSource;
     const auto controller = createControllerWithTimeSource(timeSource);
@@ -364,7 +364,7 @@ void SkyContextControllerTimelineTests::throttledLivePlaybackKeepsDisplayedTimeT
     controller->setLive(false);
 }
 
-void SkyContextControllerTimelineTests::throttledCatchUpPlaybackRecomputesForLargeTimelineSteps()
+void SkyContextControllerTimelineTests::throttledCatchUpRecomputesForLargeSteps()
 {
     FakeTimeSource timeSource;
     const auto controller = createControllerWithThrottledLiveEngine(timeSource);
@@ -384,7 +384,7 @@ void SkyContextControllerTimelineTests::throttledCatchUpPlaybackRecomputesForLar
     controller->setLive(false);
 }
 
-void SkyContextControllerTimelineTests::fallbackSimpleEngineLivePlaybackUsesOneSecondTicks()
+void SkyContextControllerTimelineTests::fallbackSimpleEngineUsesOneSecondTicks()
 {
     FakeTimeSource timeSource;
     const auto controller = createControllerWithTimeSource(timeSource);

@@ -66,13 +66,13 @@ class ProjectionPropertyTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void generatedPreparedProjectionsMatchDirectProjection();
+    void preparedProjectionsMatchDirectProjection();
     void generatedVisiblePointsAreFiniteAndWithinViewport();
     void addingFullAzimuthTurnsDoesNotChangeProjection();
     void invalidGeneratedCoordinatesNeverBecomeVisible();
 };
 
-void ProjectionPropertyTests::generatedPreparedProjectionsMatchDirectProjection()
+void ProjectionPropertyTests::preparedProjectionsMatchDirectProjection()
 {
     skygate::testsupport::DeterministicRng rng(0x9a700001U);
 

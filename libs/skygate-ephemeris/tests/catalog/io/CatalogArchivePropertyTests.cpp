@@ -103,12 +103,12 @@ class CatalogArchivePropertyTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void generatedStoredZipEntriesRoundTripThroughDirectoryAndCodec();
+    void storedEntriesRoundTripThroughDirectoryAndCodec();
     void mutatedZipStructuresFailClosedOrRemainBounded();
     void deflatedEntriesRejectMismatchedUncompressedSize();
 };
 
-void CatalogArchivePropertyTests::generatedStoredZipEntriesRoundTripThroughDirectoryAndCodec()
+void CatalogArchivePropertyTests::storedEntriesRoundTripThroughDirectoryAndCodec()
 {
     for (int scenario = 0; scenario < 48; ++scenario) {
         skygate::testsupport::DeterministicRng rng(0xa12c0000U + scenario);

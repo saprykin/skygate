@@ -266,19 +266,19 @@ class ObservationEventDirectSearchTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void normalObjectFindsOrderedEventsAndRefinedHorizonCrossings();
-    void circumpolarAndNeverRisingObjectsReportFallbacksButStillCulminate();
+    void normalObjectFindsOrderedRefinedCrossings();
+    void circumpolarNeverRisingFallbacksWithCulmination();
     void currentAboveHorizonSetsBeforeItRisesAgain();
     void currentBelowHorizonRisesBeforeItSetsAgain();
-    void configurableAltitudeThresholdFindsDifferentCrossings();
+    void configurableThresholdFindsDifferentCrossings();
     void invalidAndUnresolvedInputsReturnExplicitStatuses();
-    void unprovenWindowMissDoesNotReportAlwaysAboveOrBelow();
+    void unprovenWindowMissDoesNotReportAlwaysAboveBelow();
     void movingBodySamplesThroughEphemerisEngine();
     void requestOverloadPropagatesOptionsAndSampleEpochs();
     void contextOverloadSeedsRequestOptionsFromEngine();
 };
 
-void ObservationEventDirectSearchTests::normalObjectFindsOrderedEventsAndRefinedHorizonCrossings()
+void ObservationEventDirectSearchTests::normalObjectFindsOrderedRefinedCrossings()
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
     const auto context = makeContext();
@@ -304,7 +304,7 @@ void ObservationEventDirectSearchTests::normalObjectFindsOrderedEventsAndRefined
     verifyCrossingAltitude(*engine, context, *summary.nextSet.utcTime);
 }
 
-void ObservationEventDirectSearchTests::circumpolarAndNeverRisingObjectsReportFallbacksButStillCulminate()
+void ObservationEventDirectSearchTests::circumpolarNeverRisingFallbacksWithCulmination()
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
 
@@ -368,7 +368,7 @@ void ObservationEventDirectSearchTests::currentBelowHorizonRisesBeforeItSetsAgai
     QVERIFY(*summary.nextRise.utcTime < *summary.nextSet.utcTime);
 }
 
-void ObservationEventDirectSearchTests::configurableAltitudeThresholdFindsDifferentCrossings()
+void ObservationEventDirectSearchTests::configurableThresholdFindsDifferentCrossings()
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
     const auto context = makeContext(0.0, 0.0);
@@ -426,7 +426,7 @@ void ObservationEventDirectSearchTests::invalidAndUnresolvedInputsReturnExplicit
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Unresolved);
 }
 
-void ObservationEventDirectSearchTests::unprovenWindowMissDoesNotReportAlwaysAboveOrBelow()
+void ObservationEventDirectSearchTests::unprovenWindowMissDoesNotReportAlwaysAboveBelow()
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
     const skygate::ephemeris::tests::FixedAltitudeEngine belowHorizonEngine(-20.0);

@@ -143,23 +143,23 @@ class ApparentPlaceTopocentricTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void appliesTopocentricParallaxAndHorizontalCoordinates();
+    void appliesTopocentricParallaxAndHorizontal();
     void reportsInvalidObserverForTopocentricRequest();
-    void reportsMissingEarthOrientationForTopocentricRequest();
-    void reportsUnavailableCorrectionsWhenTopocentricPrimaryTransformFails();
-    void clearsCoordinatesWhenBatchTopocentricPrimaryTransformFails();
-    void failsMissingBatchTopocentricPrimaryTransformResultsAndClearsCoordinates();
-    void clearsEquatorialWhenTopocentricEquatorialTransformFails();
-    void clearsEquatorialWhenBatchTopocentricEquatorialTransformFails();
-    void reportsUnavailableParallaxWhenDistanceVectorIsMissing();
-    void leavesApparentRequestGeocentricWhenParallaxIsDisabled();
-    void changesTopocentricPositionWhenObserverElevationChanges();
-    void appliesAtmosphericRefractionToTopocentricHorizontalCoordinates();
+    void missingEarthOrientationForTopocentricRequest();
+    void unavailableCorrectionsWhenPrimaryTransformFails();
+    void clearsCoordinatesWhenBatchTransformFails();
+    void failsMissingBatchResultsAndClearsCoordinates();
+    void clearsEquatorialWhenEquatorialTransformFails();
+    void clearsEquatorialWhenBatchTransformFails();
+    void unavailableParallaxWhenDistanceVectorMissing();
+    void leavesApparentRequestGeocentricWithoutParallax();
+    void changesTopocentricPositionWithObserverElevation();
+    void appliesRefractionToTopocentricHorizontal();
     void reportsUnavailableRefractionMode();
     void skipsRefractionWhenEquatorialConversionFails();
 };
 
-void ApparentPlaceTopocentricTests::appliesTopocentricParallaxAndHorizontalCoordinates()
+void ApparentPlaceTopocentricTests::appliesTopocentricParallaxAndHorizontal()
 {
     auto frameTransformer = std::make_shared<PassThroughFrameTransformer>();
     auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
@@ -248,7 +248,7 @@ void ApparentPlaceTopocentricTests::reportsInvalidObserverForTopocentricRequest(
     );
 }
 
-void ApparentPlaceTopocentricTests::reportsMissingEarthOrientationForTopocentricRequest()
+void ApparentPlaceTopocentricTests::missingEarthOrientationForTopocentricRequest()
 {
     auto frameTransformer = std::make_shared<PassThroughFrameTransformer>();
     auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
@@ -281,7 +281,7 @@ void ApparentPlaceTopocentricTests::reportsMissingEarthOrientationForTopocentric
     );
 }
 
-void ApparentPlaceTopocentricTests::reportsUnavailableCorrectionsWhenTopocentricPrimaryTransformFails()
+void ApparentPlaceTopocentricTests::unavailableCorrectionsWhenPrimaryTransformFails()
 {
     auto frameTransformer = std::make_shared<FailingTopocentricFrameTransformer>(
         CelestialReferenceFrame::Type::Gcrs, CelestialReferenceFrame::Type::Itrs
@@ -322,7 +322,7 @@ void ApparentPlaceTopocentricTests::reportsUnavailableCorrectionsWhenTopocentric
     QVERIFY(!result.horizontal.has_value());
 }
 
-void ApparentPlaceTopocentricTests::clearsCoordinatesWhenBatchTopocentricPrimaryTransformFails()
+void ApparentPlaceTopocentricTests::clearsCoordinatesWhenBatchTransformFails()
 {
     auto frameTransformer = std::make_shared<FailingTopocentricFrameTransformer>(
         CelestialReferenceFrame::Type::Gcrs, CelestialReferenceFrame::Type::Itrs
@@ -370,7 +370,7 @@ void ApparentPlaceTopocentricTests::clearsCoordinatesWhenBatchTopocentricPrimary
     QVERIFY(!results[0].result.horizontal.has_value());
 }
 
-void ApparentPlaceTopocentricTests::failsMissingBatchTopocentricPrimaryTransformResultsAndClearsCoordinates()
+void ApparentPlaceTopocentricTests::failsMissingBatchResultsAndClearsCoordinates()
 {
     auto frameTransformer = std::make_shared<ShortBatchFrameTransformer>();
     auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
@@ -416,7 +416,7 @@ void ApparentPlaceTopocentricTests::failsMissingBatchTopocentricPrimaryTransform
     QVERIFY(!results[0].result.horizontal.has_value());
 }
 
-void ApparentPlaceTopocentricTests::clearsEquatorialWhenTopocentricEquatorialTransformFails()
+void ApparentPlaceTopocentricTests::clearsEquatorialWhenEquatorialTransformFails()
 {
     auto frameTransformer = std::make_shared<FailingTopocentricFrameTransformer>(
         CelestialReferenceFrame::Type::Itrs, CelestialReferenceFrame::Type::Gcrs
@@ -452,7 +452,7 @@ void ApparentPlaceTopocentricTests::clearsEquatorialWhenTopocentricEquatorialTra
     );
 }
 
-void ApparentPlaceTopocentricTests::clearsEquatorialWhenBatchTopocentricEquatorialTransformFails()
+void ApparentPlaceTopocentricTests::clearsEquatorialWhenBatchTransformFails()
 {
     auto frameTransformer = std::make_shared<FailingTopocentricFrameTransformer>(
         CelestialReferenceFrame::Type::Itrs, CelestialReferenceFrame::Type::Gcrs
@@ -495,7 +495,7 @@ void ApparentPlaceTopocentricTests::clearsEquatorialWhenBatchTopocentricEquatori
     );
 }
 
-void ApparentPlaceTopocentricTests::reportsUnavailableParallaxWhenDistanceVectorIsMissing()
+void ApparentPlaceTopocentricTests::unavailableParallaxWhenDistanceVectorMissing()
 {
     auto frameTransformer = std::make_shared<PassThroughFrameTransformer>();
     auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
@@ -517,7 +517,7 @@ void ApparentPlaceTopocentricTests::reportsUnavailableParallaxWhenDistanceVector
     ));
 }
 
-void ApparentPlaceTopocentricTests::leavesApparentRequestGeocentricWhenParallaxIsDisabled()
+void ApparentPlaceTopocentricTests::leavesApparentRequestGeocentricWithoutParallax()
 {
     auto frameTransformer = std::make_shared<PassThroughFrameTransformer>();
     auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
@@ -553,7 +553,7 @@ void ApparentPlaceTopocentricTests::leavesApparentRequestGeocentricWhenParallaxI
     );
 }
 
-void ApparentPlaceTopocentricTests::changesTopocentricPositionWhenObserverElevationChanges()
+void ApparentPlaceTopocentricTests::changesTopocentricPositionWithObserverElevation()
 {
     auto frameTransformer = std::make_shared<PassThroughFrameTransformer>();
     auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
@@ -589,7 +589,7 @@ void ApparentPlaceTopocentricTests::changesTopocentricPositionWhenObserverElevat
     );
 }
 
-void ApparentPlaceTopocentricTests::appliesAtmosphericRefractionToTopocentricHorizontalCoordinates()
+void ApparentPlaceTopocentricTests::appliesRefractionToTopocentricHorizontal()
 {
     auto frameTransformer = std::make_shared<PassThroughFrameTransformer>();
     auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();

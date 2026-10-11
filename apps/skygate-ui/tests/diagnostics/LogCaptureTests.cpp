@@ -63,12 +63,12 @@ class LogCaptureTests final : public QObject {
 
 private slots:
     void logCaptureFiltersByMinimumSeverity();
-    void nestedLogCaptureFanOutsAndRestoresPreviousHandler();
+    void nestedCaptureFanOutsAndRestoresPreviousHandler();
     void interleavedHelpersRestorePreviousHandler();
-    void temporaryHandlerReplacementInsideScopeRestoresDispatcher();
-    void nestedQmlWarningScopesForwardThroughEnabledScopes();
-    void recursiveForwardingHandlerDoesNotReenterDispatcher();
-    void disabledQmlWarningScopeStopsForwardingToOuterScopes();
+    void temporaryHandlerReplacementRestoresDispatcher();
+    void nestedQmlWarningScopesForwardToOuterScopes();
+    void recursiveHandlerDoesNotReenterDispatcher();
+    void disabledQmlWarningScopeStopsOuterForwarding();
 };
 
 void LogCaptureTests::logCaptureFiltersByMinimumSeverity()
@@ -87,7 +87,7 @@ void LogCaptureTests::logCaptureFiltersByMinimumSeverity()
     QVERIFY(infoMessages.contains(QStringLiteral("threshold-warning")));
 }
 
-void LogCaptureTests::nestedLogCaptureFanOutsAndRestoresPreviousHandler()
+void LogCaptureTests::nestedCaptureFanOutsAndRestoresPreviousHandler()
 {
     s_forwardedWarnings.clear();
     MessageHandlerGuard handlerGuard(&recordWarnings);
@@ -137,7 +137,7 @@ void LogCaptureTests::interleavedHelpersRestorePreviousHandler()
     QCOMPARE(s_forwardedWarnings, QStringList({QStringLiteral("after-interleaved-helpers")}));
 }
 
-void LogCaptureTests::temporaryHandlerReplacementInsideScopeRestoresDispatcher()
+void LogCaptureTests::temporaryHandlerReplacementRestoresDispatcher()
 {
     s_forwardedWarnings.clear();
     MessageHandlerGuard handlerGuard(&recordWarnings);
@@ -165,7 +165,7 @@ void LogCaptureTests::temporaryHandlerReplacementInsideScopeRestoresDispatcher()
     );
 }
 
-void LogCaptureTests::nestedQmlWarningScopesForwardThroughEnabledScopes()
+void LogCaptureTests::nestedQmlWarningScopesForwardToOuterScopes()
 {
     s_forwardedWarnings.clear();
     MessageHandlerGuard handlerGuard(&recordWarnings);
@@ -197,7 +197,7 @@ void LogCaptureTests::nestedQmlWarningScopesForwardThroughEnabledScopes()
     );
 }
 
-void LogCaptureTests::recursiveForwardingHandlerDoesNotReenterDispatcher()
+void LogCaptureTests::recursiveHandlerDoesNotReenterDispatcher()
 {
     s_forwardedWarnings.clear();
     s_recursiveHandlerCalls = 0;
@@ -216,7 +216,7 @@ void LogCaptureTests::recursiveForwardingHandlerDoesNotReenterDispatcher()
     QCOMPARE(s_recursiveHandlerCalls, 1);
 }
 
-void LogCaptureTests::disabledQmlWarningScopeStopsForwardingToOuterScopes()
+void LogCaptureTests::disabledQmlWarningScopeStopsOuterForwarding()
 {
     s_forwardedWarnings.clear();
     MessageHandlerGuard handlerGuard(&recordWarnings);

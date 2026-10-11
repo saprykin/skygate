@@ -248,10 +248,10 @@ class ApparentPlaceHorizonsValidationTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void validatesTopocentricMoonSunPlanetAgainstHorizonsFixtures();
+    void validatesMoonSunPlanetAgainstHorizonsFixture();
 };
 
-void ApparentPlaceHorizonsValidationTests::validatesTopocentricMoonSunPlanetAgainstHorizonsFixtures()
+void ApparentPlaceHorizonsValidationTests::validatesMoonSunPlanetAgainstHorizonsFixture()
 {
     QString errorText;
     const std::optional<TopocentricFixture> loadedFixture = loadTopocentricFixture(&errorText);

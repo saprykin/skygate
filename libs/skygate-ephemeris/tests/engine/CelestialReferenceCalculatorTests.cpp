@@ -14,7 +14,7 @@ class CelestialReferenceCalculatorTests final : public QObject {
 
 private slots:
     void computesFiniteEclipticAndEquatorialPoints();
-    void declinationCircleFallsBackForNonPositiveSampleCounts();
+    void declinationCircleFallsBackForNonPositiveCounts();
     void circumpolarBoundaryDeclinationFollowsHemisphere();
     void constellationAnchorCentroidAveragesAnchorVectors();
 };
@@ -45,7 +45,7 @@ void CelestialReferenceCalculatorTests::computesFiniteEclipticAndEquatorialPoint
     QVERIFY(equatorialPoint.azimuthDeg < 360.0);
 }
 
-void CelestialReferenceCalculatorTests::declinationCircleFallsBackForNonPositiveSampleCounts()
+void CelestialReferenceCalculatorTests::declinationCircleFallsBackForNonPositiveCounts()
 {
     skygate::core::GeoLocation observer;
     observer.latitudeDeg = 47.3769;

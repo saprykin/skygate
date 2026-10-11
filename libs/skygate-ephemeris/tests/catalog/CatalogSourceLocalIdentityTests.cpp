@@ -92,8 +92,8 @@ class CatalogSourceLocalIdentityTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void keepsAnonymousHygPayloadsFromIndependentSourcesDistinct();
-    void keepsEqualLocalRecordNumbersFromUnrelatedSourcesDistinct();
+    void keepsAnonymousHygPayloadsDistinctAcrossSources();
+    void keepsEqualLocalRecordNumbersDistinctBySource();
     void keepsObjectKeysStableAcrossSourceReloads();
     void keepsSourceLocalScopeThroughBinarySerialization();
     void mergesMatchingHipIdentifiersAcrossSources();
@@ -101,7 +101,7 @@ private slots:
     void rejectsDuplicateSourceIdentity();
 };
 
-void CatalogSourceLocalIdentityTests::keepsAnonymousHygPayloadsFromIndependentSourcesDistinct()
+void CatalogSourceLocalIdentityTests::keepsAnonymousHygPayloadsDistinctAcrossSources()
 {
     const CatalogLoadResult sourceA = loadHyg(kAnonymousPayloadA);
     const CatalogLoadResult sourceB = loadHyg(kAnonymousPayloadB);
@@ -136,7 +136,7 @@ void CatalogSourceLocalIdentityTests::keepsAnonymousHygPayloadsFromIndependentSo
     QCOMPARE(second->fixedEquatorialValue()->declinationDeg, 20.0);
 }
 
-void CatalogSourceLocalIdentityTests::keepsEqualLocalRecordNumbersFromUnrelatedSourcesDistinct()
+void CatalogSourceLocalIdentityTests::keepsEqualLocalRecordNumbersDistinctBySource()
 {
     // Two parses of the same payload produce the same hyg_auto_1 counter, the
     // same coordinates, and the same display name. Only the owning source

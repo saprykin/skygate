@@ -289,17 +289,17 @@ class EphemerisEngineFactoryBehaviorTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void highPrecisionRequestConstructsEngineWhenDependenciesAreAvailable();
-    void highPrecisionRequestUsesDatasetManifestWithoutDataManifest();
+    void highPrecisionRequestBuildsEngineWithDependencies();
+    void highPrecisionRequestUsesOnlyDatasetManifest();
     void highPrecisionRequestRequiresDatasetInfoSource();
-    void highPrecisionRequestHandlesNullKernelProviderResult();
-    void highPrecisionRequestOpensActiveKernelWithoutRehashingIt();
-    void highPrecisionDE441RequestUsesPlanetaryBarycentersIntentionally();
-    void highPrecisionRequestWiresApparentTopocentricCorrectionPath();
-    void highPrecisionDefaultProviderReportsUnavailableBuildBeforeDataErrors();
+    void highPrecisionRequestHandlesNullKernelProvider();
+    void highPrecisionRequestSkipsKernelRehash();
+    void highPrecisionDE441AvoidsBarycenterFallback();
+    void highPrecisionRequestWiresTopocentricPath();
+    void defaultProviderReportsUnavailableBuildFirst();
 };
 
-void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestConstructsEngineWhenDependenciesAreAvailable()
+void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestBuildsEngineWithDependencies()
 {
     const QByteArray kernelPayload("fake kernel payload");
     QTemporaryDir directory;
@@ -382,7 +382,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestConstructsEngineWh
     QCOMPARE(state->metadata.dataSourceProvenance, std::string{"snapshot provenance"});
 }
 
-void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestUsesDatasetManifestWithoutDataManifest()
+void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestUsesOnlyDatasetManifest()
 {
     const std::array bodies{makeFactoryBehaviorSun()};
     skygate::ephemeris::EphemerisDatasetInfo datasetManifest;
@@ -438,7 +438,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestRequiresDatasetInf
     );
 }
 
-void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestHandlesNullKernelProviderResult()
+void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestHandlesNullKernelProvider()
 {
     const std::array bodies{makeFactoryBehaviorSun()};
     skygate::ephemeris::EphemerisDatasetInfo datasetManifest;
@@ -470,7 +470,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestHandlesNullKernelP
     );
 }
 
-void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestOpensActiveKernelWithoutRehashingIt()
+void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestSkipsKernelRehash()
 {
     const QByteArray activatedKernelPayload("active kernel bytes");
     const QByteArray manifestChecksumPayload("other kernel bytes ");
@@ -511,7 +511,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestOpensActiveKernelW
     QCOMPARE(kernelProvider->openCount(), 1);
 }
 
-void EphemerisEngineFactoryBehaviorTests::highPrecisionDE441RequestUsesPlanetaryBarycentersIntentionally()
+void EphemerisEngineFactoryBehaviorTests::highPrecisionDE441AvoidsBarycenterFallback()
 {
     const QByteArray kernelPayload("fake de441 kernel payload");
     QTemporaryDir directory;
@@ -575,7 +575,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionDE441RequestUsesPlanetary
     QVERIFY(!state->metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::BarycenterFallback));
 }
 
-void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestWiresApparentTopocentricCorrectionPath()
+void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestWiresTopocentricPath()
 {
     const QByteArray kernelPayload("fake kernel payload");
     QTemporaryDir directory;
@@ -630,7 +630,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestWiresApparentTopoc
     QVERIFY(earthOrientationProvider->entriesCallCount() > std::size_t{0});
 }
 
-void EphemerisEngineFactoryBehaviorTests::highPrecisionDefaultProviderReportsUnavailableBuildBeforeDataErrors()
+void EphemerisEngineFactoryBehaviorTests::defaultProviderReportsUnavailableBuildFirst()
 {
     const QByteArray kernelPayload("fake kernel payload");
     QTemporaryDir directory;

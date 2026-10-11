@@ -29,18 +29,18 @@ class CatalogBridgeRetentionTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void bridgesIdentifiersAcquiredEarlierInTheSameSourcePass();
-    void bridgesAmbiguousAuthoritativeIdentifiersIntoSingleSurvivor();
-    void keepsIncompatibleKindsDistinctWhileBridgingSameKindSurvivors();
+    void bridgesIdentifiersAcquiredEarlierInSourcePass();
+    void bridgesAmbiguousIdentifiersIntoSingleSurvivor();
+    void keepsIncompatibleKindsDistinctWhenBridging();
     void bridgesDeepSkyObjectsWithMetadataUnion();
     void multiStageBridgesRetainEveryContributorOnce();
-    void retainsReplacedCanonicalIdentityAcrossLaterSources();
-    void retainsBridgedCanonicalIdentitiesAcrossLaterSources();
-    void retainedCanonicalIdentitySurvivesBinaryRoundTripAndRecomposition();
-    void combinedChainKeepsIdentityMetadataAndProvenanceAcrossSnapshotRecomposition();
+    void retainsReplacedCanonicalIdentityAcrossSources();
+    void retainsBridgedCanonicalIdentitiesAcrossSources();
+    void retainsCanonicalIdentityThroughBinaryRoundTrip();
+    void combinedChainKeepsIdentityAcrossRecomposition();
 };
 
-void CatalogBridgeRetentionTests::bridgesIdentifiersAcquiredEarlierInTheSameSourcePass()
+void CatalogBridgeRetentionTests::bridgesIdentifiersAcquiredEarlierInSourcePass()
 {
     // Source A establishes that HIP 1 and HD 2 are one object. Source B's
     // first record replaces A and acquires HD 2; its later record resolves
@@ -101,7 +101,7 @@ void CatalogBridgeRetentionTests::bridgesIdentifiersAcquiredEarlierInTheSameSour
     QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-b", "source-a"}));
 }
 
-void CatalogBridgeRetentionTests::bridgesAmbiguousAuthoritativeIdentifiersIntoSingleSurvivor()
+void CatalogBridgeRetentionTests::bridgesAmbiguousIdentifiersIntoSingleSurvivor()
 {
     // The bridging record carries both authoritative identifiers. It resolves
     // each of them to a different survivor of an earlier source, so it becomes
@@ -155,7 +155,7 @@ void CatalogBridgeRetentionTests::bridgesAmbiguousAuthoritativeIdentifiersIntoSi
     QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-b", "source-c", "source-a"}));
 }
 
-void CatalogBridgeRetentionTests::keepsIncompatibleKindsDistinctWhileBridgingSameKindSurvivors()
+void CatalogBridgeRetentionTests::keepsIncompatibleKindsDistinctWhenBridging()
 {
     const auto stars = CatalogMergeTestSupport::createCatalog(
         {CatalogMergeTestSupport::makeStar("star_a", {}, {CatalogIdentifier::make("hip", "123")}, {}, 1.0, 2.0)}, {}
@@ -335,7 +335,7 @@ void CatalogBridgeRetentionTests::multiStageBridgesRetainEveryContributorOnce()
     );
 }
 
-void CatalogBridgeRetentionTests::retainsReplacedCanonicalIdentityAcrossLaterSources()
+void CatalogBridgeRetentionTests::retainsReplacedCanonicalIdentityAcrossSources()
 {
     // A and B establish that both canonical keys identify the same object
     // because they carry the same HIP cross-identifier. B replaces A, then C
@@ -382,7 +382,7 @@ void CatalogBridgeRetentionTests::retainsReplacedCanonicalIdentityAcrossLaterSou
     QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-2", "source-1", "source-0"}));
 }
 
-void CatalogBridgeRetentionTests::retainsBridgedCanonicalIdentitiesAcrossLaterSources()
+void CatalogBridgeRetentionTests::retainsBridgedCanonicalIdentitiesAcrossSources()
 {
     // A bridge absorbs every same-kind survivor it resolves, and later
     // replacements keep every absorbed canonical id resolvable, including ids
@@ -450,7 +450,7 @@ void CatalogBridgeRetentionTests::retainsBridgedCanonicalIdentitiesAcrossLaterSo
     QVERIFY(CatalogMergeTestSupport::hasRetainedCanonicalId(*finalSurvivor, "b_hd2"));
 }
 
-void CatalogBridgeRetentionTests::retainedCanonicalIdentitySurvivesBinaryRoundTripAndRecomposition()
+void CatalogBridgeRetentionTests::retainsCanonicalIdentityThroughBinaryRoundTrip()
 {
     // The established equivalence survives binary
     // serialization, index reconstruction, and reuse of the already-composed
@@ -527,7 +527,7 @@ void CatalogBridgeRetentionTests::retainedCanonicalIdentitySurvivesBinaryRoundTr
     QVERIFY(CatalogMergeTestSupport::hasRetainedCanonicalId(*composedWinner, "original"));
 }
 
-void CatalogBridgeRetentionTests::combinedChainKeepsIdentityMetadataAndProvenanceAcrossSnapshotRecomposition()
+void CatalogBridgeRetentionTests::combinedChainKeepsIdentityAcrossRecomposition()
 {
     // A three-source chain whose bridge resolves two name owners, followed by a
     // replacement that carries the bridge's second key. The bridge inherits its

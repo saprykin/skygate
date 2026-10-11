@@ -88,8 +88,8 @@ private slots:
     void doesNotReturnNanForDuplicateProviderTable();
     void exposesAncientFallbackMetadata();
     void exposesValidityRangeMetadata();
-    void returnsUnavailableBetweenLastTableRowAndExpiration();
-    void rejectsAncientFallbackWithoutRepresentativeEstimate();
+    void unavailableBetweenLastRowAndExpiration();
+    void rejectsAncientFallbackWithoutEstimate();
     void rejectsPartialAncientFallbackRanges();
     void reportsStaleData();
 };
@@ -279,7 +279,7 @@ void DeltaTProviderTests::exposesValidityRangeMetadata()
     QCOMPARE(result.dataInfo.expiresAt->julianDatePart2, epochForDate(2027, 1, 1).julianDatePart2);
 }
 
-void DeltaTProviderTests::returnsUnavailableBetweenLastTableRowAndExpiration()
+void DeltaTProviderTests::unavailableBetweenLastRowAndExpiration()
 {
     const skygate::ephemeris::DeltaTDataLoader::Result result =
         skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(makeValidAsset());
@@ -298,7 +298,7 @@ void DeltaTProviderTests::returnsUnavailableBetweenLastTableRowAndExpiration()
     QVERIFY(!estimate.diagnosticText.empty());
 }
 
-void DeltaTProviderTests::rejectsAncientFallbackWithoutRepresentativeEstimate()
+void DeltaTProviderTests::rejectsAncientFallbackWithoutEstimate()
 {
     skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
     asset.content = "#@ version bad-fallback\n"

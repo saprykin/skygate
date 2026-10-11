@@ -30,14 +30,14 @@ class GeometryHelpersTests final : public QObject {
 private slots:
     void rectIntersectionAndViewportFit();
     void rectOccupancyGridDetectsCollisions();
-    void rectOccupancyGridHandlesEdgesAndNegativeCoordinates();
+    void rectOccupancyGridHandlesEdgesAndNegativeRects();
     void circleHitIndexReturnsNearestPayload();
     void circleHitIndexFiltersTargetsAndSupportsRebuild();
     void projectedPolylineSplitsGapsAndDropsLongJumps();
-    void projectedPolylineHandlesBoundaryAndDegenerateInputs();
-    void projectedPolylineSamplesInteriorOfOffscreenSegment();
+    void projectedPolylineHandlesBoundaryAndDegenerate();
+    void projectedPolylineSamplesOffscreenSegmentInterior();
     void dashedLineBuilderCreatesDashSegments();
-    void dashedLineBuilderHandlesDegeneratePatternsAndDiagonals();
+    void dashedLineBuilderHandlesDegenerateAndDiagonals();
     void coordinateFiniteQueriesDoNotChangeValidity();
 };
 
@@ -72,7 +72,7 @@ void GeometryHelpersTests::rectOccupancyGridDetectsCollisions()
     QVERIFY(!grid.collides(occupied));
 }
 
-void GeometryHelpersTests::rectOccupancyGridHandlesEdgesAndNegativeCoordinates()
+void GeometryHelpersTests::rectOccupancyGridHandlesEdgesAndNegativeRects()
 {
     skygate::core::RectOccupancyGrid grid(10.0);
     grid.add(skygate::core::Rect2d{.left = -20.0, .top = -20.0, .right = -10.0, .bottom = -10.0});
@@ -161,7 +161,7 @@ void GeometryHelpersTests::projectedPolylineSplitsGapsAndDropsLongJumps()
     QVERIFY(filteredSegments.empty());
 }
 
-void GeometryHelpersTests::projectedPolylineHandlesBoundaryAndDegenerateInputs()
+void GeometryHelpersTests::projectedPolylineHandlesBoundaryAndDegenerate()
 {
     const auto projection = skygate::core::PreparedProjection::create(
         skygate::core::ProjectionType::Stereographic,
@@ -204,7 +204,7 @@ void GeometryHelpersTests::projectedPolylineHandlesBoundaryAndDegenerateInputs()
     QVERIFY(builder.build(*projection, coordinatesWithGaps, 1'000'000.0).empty());
 }
 
-void GeometryHelpersTests::projectedPolylineSamplesInteriorOfOffscreenSegment()
+void GeometryHelpersTests::projectedPolylineSamplesOffscreenSegmentInterior()
 {
     const auto projection = skygate::core::PreparedProjection::create(
         skygate::core::ProjectionType::Stereographic,
@@ -250,7 +250,7 @@ void GeometryHelpersTests::dashedLineBuilderCreatesDashSegments()
     QVERIFY(builder.build(skygate::core::LineSegment2d{.x1 = 0.0, .y1 = 0.0, .x2 = 0.0, .y2 = 0.0}, 3.0, 2.0).empty());
 }
 
-void GeometryHelpersTests::dashedLineBuilderHandlesDegeneratePatternsAndDiagonals()
+void GeometryHelpersTests::dashedLineBuilderHandlesDegenerateAndDiagonals()
 {
     const skygate::core::DashedLineBuilder builder;
     const auto contiguousSegments =

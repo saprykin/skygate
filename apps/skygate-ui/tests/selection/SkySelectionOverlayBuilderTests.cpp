@@ -409,19 +409,19 @@ class SkySelectionOverlayBuilderTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void markerPriorityPrefersSelectedThenTrackedThenSearch();
+    void markerPrioritySelectedThenTrackedThenSearch();
     void constellationAnchorMarkerUsesAnchorGroups();
     void inspectorFormatsSourceAliasesAndFallbacks();
     void inspectorSurfacesEphemerisMetadataAndWarnings();
     void inspectorUsesHighPrecisionStateForSelectedObject();
     void inspectorIncludesObservationEventsAndFallbacks();
     void inspectorObservationEventsUseRequestOptions();
-    void inspectorAvoidsSynchronousHighPrecisionEventSamplingForNonFixedBodies();
+    void inspectorAvoidsHighPrecisionSamplingForNonFixed();
     void pinnedInspectorRendersForUnprojectableBody();
     void activeTrailTargetUsesExpectedPriority();
 };
 
-void SkySelectionOverlayBuilderTests::markerPriorityPrefersSelectedThenTrackedThenSearch()
+void SkySelectionOverlayBuilderTests::markerPrioritySelectedThenTrackedThenSearch()
 {
     const SkySelectionOverlayBuilder builder;
     const auto fixture = makeFixture();
@@ -658,7 +658,7 @@ void SkySelectionOverlayBuilderTests::inspectorObservationEventsUseRequestOption
     QVERIFY(overlayInspectorFieldValue(inspector, "Culmination").contains("deg"));
 }
 
-void SkySelectionOverlayBuilderTests::inspectorAvoidsSynchronousHighPrecisionEventSamplingForNonFixedBodies()
+void SkySelectionOverlayBuilderTests::inspectorAvoidsHighPrecisionSamplingForNonFixed()
 {
     const SkySelectionOverlayBuilder builder;
     auto fixture = makeFixture();

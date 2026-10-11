@@ -68,17 +68,17 @@ class SkyCatalogImportWorkflowTests final : public QObject {
 
 private slots:
     void parsesConstellationPayloads();
-    void doesNotCompleteConstellationAfterContextDestroyed();
+    void noConstellationCompletionAfterContextDestroyed();
     void fallsBackForMalformedConstellationPayload();
     void rejectsDeepSkyCatalogWithoutDsos();
     void reportsDeepSkyObjectCount();
     void unifiedDownloadSourceKeepsStarCatalogsUnfiltered();
-    void loadsDescriptorSelectedMemberFromMultiMemberArchive();
+    void multiMemberArchiveLoadsDescriptorSelectedMember();
     void reportsMissingDescriptorArchiveMember();
     void reportsContradictorySchemaHint();
     void reportsUnsupportedSchemaPayload();
-    void reportsAmbiguousArchiveWithoutDescriptorSelection();
-    void retainsExistingBehaviorForSingleMemberZipGzipAndPlain();
+    void reportsAmbiguousArchiveWithoutDescriptorChoice();
+    void retainsBehaviorForSingleMemberZipGzipAndPlain();
 
 private:
     void runSourceDownload(
@@ -144,7 +144,7 @@ void SkyCatalogImportWorkflowTests::parsesConstellationPayloads()
     QVERIFY(messages.contains(QStringLiteral("Constellation lines parsed: 2 segments 1 labels 1 constellations")));
 }
 
-void SkyCatalogImportWorkflowTests::doesNotCompleteConstellationAfterContextDestroyed()
+void SkyCatalogImportWorkflowTests::noConstellationCompletionAfterContextDestroyed()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
@@ -308,7 +308,7 @@ void SkyCatalogImportWorkflowTests::unifiedDownloadSourceKeepsStarCatalogsUnfilt
     QVERIFY(finalResult.errorText.isEmpty());
 }
 
-void SkyCatalogImportWorkflowTests::loadsDescriptorSelectedMemberFromMultiMemberArchive()
+void SkyCatalogImportWorkflowTests::multiMemberArchiveLoadsDescriptorSelectedMember()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse("https://example.test/catalogs.zip", {.payload = sampleTwoMemberCatalogZip()});
@@ -417,7 +417,7 @@ void SkyCatalogImportWorkflowTests::reportsUnsupportedSchemaPayload()
     QVERIFY(finalResult.errorText.contains("unsupported format"));
 }
 
-void SkyCatalogImportWorkflowTests::reportsAmbiguousArchiveWithoutDescriptorSelection()
+void SkyCatalogImportWorkflowTests::reportsAmbiguousArchiveWithoutDescriptorChoice()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse("https://example.test/catalogs.zip", {.payload = sampleTwoMemberCatalogZip()});
@@ -444,7 +444,7 @@ void SkyCatalogImportWorkflowTests::reportsAmbiguousArchiveWithoutDescriptorSele
     QVERIFY(finalResult.errorText.contains("multiple supported archive members"));
 }
 
-void SkyCatalogImportWorkflowTests::retainsExistingBehaviorForSingleMemberZipGzipAndPlain()
+void SkyCatalogImportWorkflowTests::retainsBehaviorForSingleMemberZipGzipAndPlain()
 {
     {
         FakeNetworkAccessManager networkAccessManager;

@@ -58,7 +58,7 @@ private slots:
     void mapsSupportedObjectKinds();
     void preservesValidGeometryFields();
     void normalizesAndDeduplicatesAliases();
-    void preservesPrimaryNameDesignationsWithoutOptionalColumns();
+    void preservesPrimaryNameDesignationsWithoutColumns();
 };
 
 void OpenNgcParserEdgeTests::rejectsMissingRequiredColumns()
@@ -218,7 +218,7 @@ void OpenNgcParserEdgeTests::normalizesAndDeduplicatesAliases()
     QCOMPARE(duplicateCount, 1);
 }
 
-void OpenNgcParserEdgeTests::preservesPrimaryNameDesignationsWithoutOptionalColumns()
+void OpenNgcParserEdgeTests::preservesPrimaryNameDesignationsWithoutColumns()
 {
     const skygate::ephemeris::CatalogPayloadParser parser;
     const auto result = parser.parseResult(

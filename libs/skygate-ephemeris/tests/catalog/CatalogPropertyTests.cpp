@@ -90,7 +90,7 @@ class CatalogPropertyTests final : public QObject {
 private slots:
     void randomUnknownPayloadsReturnExplicitFailures();
     void generatedHygPayloadsKeepExactlyTheFiniteRows();
-    void generatedOpenNgcPayloadsKeepExactlyTheValidMappedRows();
+    void generatedOpenNgcPayloadsKeepOnlyValidMappedRows();
 };
 
 void CatalogPropertyTests::randomUnknownPayloadsReturnExplicitFailures()
@@ -177,7 +177,7 @@ void CatalogPropertyTests::generatedHygPayloadsKeepExactlyTheFiniteRows()
     }
 }
 
-void CatalogPropertyTests::generatedOpenNgcPayloadsKeepExactlyTheValidMappedRows()
+void CatalogPropertyTests::generatedOpenNgcPayloadsKeepOnlyValidMappedRows()
 {
     const skygate::ephemeris::CatalogPayloadParser parser;
     constexpr const char* kHeader =

@@ -180,10 +180,10 @@ private slots:
     void selectsOptionalLongRangeProfileWhenRequested();
     void reportsMissingKernelAsset();
     void reportsMissingKernelFile();
-    void reportsMissingKernelWhenSnapshotDoesNotContainSelectedAsset();
-    void reportsMissingKernelWhenPreferredProfileAssetIsAbsent();
-    void usesActiveSnapshotKernelWhenDefaultProfileAssetIsAbsent();
-    void reportsMissingKernelWhenExplicitProfileSnapshotMismatches();
+    void missingKernelWhenSnapshotLacksSelectedAsset();
+    void missingKernelWhenPreferredProfileAssetAbsent();
+    void usesActiveSnapshotKernelWhenDefaultAssetAbsent();
+    void missingKernelWhenProfileSnapshotMismatches();
     void rejectsChecksumMismatchBeforeOpening();
     void acceptsUppercaseManifestChecksum();
     void reportsSelectedKernelOpenFailure();
@@ -297,7 +297,7 @@ void CalcephKernelProviderTests::reportsMissingKernelFile()
     QVERIFY(!kernel->diagnostics().empty());
 }
 
-void CalcephKernelProviderTests::reportsMissingKernelWhenSnapshotDoesNotContainSelectedAsset()
+void CalcephKernelProviderTests::missingKernelWhenSnapshotLacksSelectedAsset()
 {
     QTemporaryDir root;
     QVERIFY(root.isValid());
@@ -318,7 +318,7 @@ void CalcephKernelProviderTests::reportsMissingKernelWhenSnapshotDoesNotContainS
     QVERIFY(!kernel->diagnostics().empty());
 }
 
-void CalcephKernelProviderTests::reportsMissingKernelWhenPreferredProfileAssetIsAbsent()
+void CalcephKernelProviderTests::missingKernelWhenPreferredProfileAssetAbsent()
 {
     QTemporaryDir root;
     QVERIFY(root.isValid());
@@ -339,7 +339,7 @@ void CalcephKernelProviderTests::reportsMissingKernelWhenPreferredProfileAssetIs
     QVERIFY(!kernel->diagnostics().empty());
 }
 
-void CalcephKernelProviderTests::usesActiveSnapshotKernelWhenDefaultProfileAssetIsAbsent()
+void CalcephKernelProviderTests::usesActiveSnapshotKernelWhenDefaultAssetAbsent()
 {
     QTemporaryDir root;
     QVERIFY(root.isValid());
@@ -365,7 +365,7 @@ void CalcephKernelProviderTests::usesActiveSnapshotKernelWhenDefaultProfileAsset
     QVERIFY(kernel->kernelInfo()->longRange);
 }
 
-void CalcephKernelProviderTests::reportsMissingKernelWhenExplicitProfileSnapshotMismatches()
+void CalcephKernelProviderTests::missingKernelWhenProfileSnapshotMismatches()
 {
     QTemporaryDir root;
     QVERIFY(root.isValid());

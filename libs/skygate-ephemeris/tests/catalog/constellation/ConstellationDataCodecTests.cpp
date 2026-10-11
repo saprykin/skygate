@@ -10,7 +10,7 @@ class ConstellationDataCodecTests final : public QObject {
 
 private slots:
     void lineRowsRoundTripAndSkipMalformedRows();
-    void anchorGroupRowsRoundTripSanitizeAndSkipMalformedRows();
+    void anchorGroupRowsRoundTripSanitizeAndSkipMalformed();
 };
 
 void ConstellationDataCodecTests::lineRowsRoundTripAndSkipMalformedRows()
@@ -33,7 +33,7 @@ void ConstellationDataCodecTests::lineRowsRoundTripAndSkipMalformedRows()
     QVERIFY(parsed[1].second == "hip_5");
 }
 
-void ConstellationDataCodecTests::anchorGroupRowsRoundTripSanitizeAndSkipMalformedRows()
+void ConstellationDataCodecTests::anchorGroupRowsRoundTripSanitizeAndSkipMalformed()
 {
     const std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups{
         {"  Canis|Major\n ", {"hip_1", "", "hip_2"}},

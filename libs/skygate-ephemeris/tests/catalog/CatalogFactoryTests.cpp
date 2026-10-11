@@ -16,8 +16,8 @@ private slots:
     void loadsHygCatalogBySourceRequest();
     void loadsHygCatalogBySourceTypeWithProgress();
     void reportsDiagnosticsForSelectionAndErrors();
-    void leavesCatalogUntruncatedWhenSelectionIsDisabledOrLargerThanInput();
-    void rejectsEmptyBodyCatalogsAndUnsupportedSourceTypes();
+    void leavesCatalogUntruncatedForDisabledOrLargerInput();
+    void rejectsEmptyBodyCatalogsAndUnsupportedSources();
 };
 
 void CatalogFactoryTests::loadsBundledCatalogBySourceType()
@@ -106,7 +106,7 @@ void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
     QVERIFY(invalidCatalog.errorCode == skygate::ephemeris::CatalogLoadResult::ErrorCode::MissingRequiredColumns);
 }
 
-void CatalogFactoryTests::leavesCatalogUntruncatedWhenSelectionIsDisabledOrLargerThanInput()
+void CatalogFactoryTests::leavesCatalogUntruncatedForDisabledOrLargerInput()
 {
     const auto disabledSelection = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
@@ -140,7 +140,7 @@ void CatalogFactoryTests::leavesCatalogUntruncatedWhenSelectionIsDisabledOrLarge
     QCOMPARE(oversizedSelection.diagnostics.truncatedBodyCount, std::size_t(0));
 }
 
-void CatalogFactoryTests::rejectsEmptyBodyCatalogsAndUnsupportedSourceTypes()
+void CatalogFactoryTests::rejectsEmptyBodyCatalogsAndUnsupportedSources()
 {
     QVERIFY(skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({}) == nullptr);
 

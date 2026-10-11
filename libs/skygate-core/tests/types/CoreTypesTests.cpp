@@ -16,7 +16,7 @@ class CoreTypesTests final : public QObject {
 private slots:
     void defaultSkyContextStartsAtEpoch();
     void horizontalCoordinateNormalizesAzimuth();
-    void horizontalCoordinatePreservesNonFiniteAzimuthDuringNormalization();
+    void normalizedAzimuthPreservesNonFiniteAzimuth();
     void utcTimeCodecRoundTripsMicroseconds();
     void utcTimeCodecFloorsNegativeEpochSeconds();
     void systemTimeSourceUsesMicrosecondStorage();
@@ -44,7 +44,7 @@ void CoreTypesTests::horizontalCoordinateNormalizesAzimuth()
     QCOMPARE(normalized.azimuthDeg, 330.0);
 }
 
-void CoreTypesTests::horizontalCoordinatePreservesNonFiniteAzimuthDuringNormalization()
+void CoreTypesTests::normalizedAzimuthPreservesNonFiniteAzimuth()
 {
     const double nan = std::numeric_limits<double>::quiet_NaN();
     const skygate::core::HorizontalCoordinate coordinate{

@@ -171,7 +171,7 @@ private slots:
     void interpolatesUtcToUt1FromEopSamples();
     void convertsUt1ToUtcFromEopSamples();
     void reportsPredictedAndStaleEopWarnings();
-    void usesDeltaTFallbackForAncientUt1WhenEopIsOutOfRange();
+    void usesDeltaTFallbackForAncientUt1WhenOutOfRange();
     void reportsMissingEopWhenUt1FallbackIsDisallowed();
 };
 
@@ -512,7 +512,7 @@ void LeapSecondTimeScaleServiceTests::reportsPredictedAndStaleEopWarnings()
     QVERIFY(stale.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataStale));
 }
 
-void LeapSecondTimeScaleServiceTests::usesDeltaTFallbackForAncientUt1WhenEopIsOutOfRange()
+void LeapSecondTimeScaleServiceTests::usesDeltaTFallbackForAncientUt1WhenOutOfRange()
 {
     skygate::ephemeris::TimeScaleServiceOptions options;
     options.allowDegradedLeapSecondFallback = true;

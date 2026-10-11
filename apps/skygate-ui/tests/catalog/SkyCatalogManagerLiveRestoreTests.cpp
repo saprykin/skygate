@@ -36,9 +36,9 @@ class SkyCatalogManagerLiveRestoreTests final : public QObject {
 private slots:
     void initTestCase();
     void init();
-    void liveRestoreDropsOperationsOmittedFromTheRestoredCollection();
+    void liveRestoreDropsOperationsOmittedFromCollection();
     void liveRestoreSupersedesPendingImportReply();
-    void liveRestoreSupersedesPendingRelatedReplyForReusedInstanceId();
+    void reusedInstanceLiveRestoreSupersedesRelatedReply();
     void rejectedRestoreKeepsPendingImportWork();
 
 private:
@@ -60,7 +60,7 @@ void SkyCatalogManagerLiveRestoreTests::init()
     QDir(m_settings.filePath(QStringLiteral("catalog-collection-cache"))).removeRecursively();
 }
 
-void SkyCatalogManagerLiveRestoreTests::liveRestoreDropsOperationsOmittedFromTheRestoredCollection()
+void SkyCatalogManagerLiveRestoreTests::liveRestoreDropsOperationsOmittedFromCollection()
 {
     const QString catalogUrl = QStringLiteral("https://example.test/live-restore-stars.csv");
 
@@ -161,7 +161,7 @@ void SkyCatalogManagerLiveRestoreTests::liveRestoreSupersedesPendingImportReply(
     QVERIFY(persisted.snapshot.sources.isEmpty());
 }
 
-void SkyCatalogManagerLiveRestoreTests::liveRestoreSupersedesPendingRelatedReplyForReusedInstanceId()
+void SkyCatalogManagerLiveRestoreTests::reusedInstanceLiveRestoreSupersedesRelatedReply()
 {
     const QString catalogUrl = QStringLiteral("https://example.test/live-restore-reused-stars.csv");
     const QString relatedUrl = QStringLiteral("https://example.test/live-restore-reused-lines.json");

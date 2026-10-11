@@ -263,12 +263,12 @@ class EphemerisEngineContractTests final : public QObject {
 private slots:
     void simpleEngineHonorsHardenedContract();
     void testDoublesHonorHardenedContract();
-    void contextQueriesRouteThroughDirectSingleBodyOverloads();
+    void contextQueriesRouteThroughSingleBodyOverloads();
 #ifdef SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS
     void highPrecisionEngineHonorsHardenedContract();
-    void providerBackedHighPrecisionEngineHonorsHardenedContract();
-    void providerBackedHighPrecisionEngineReportsUnsupportedBodies();
-    void providerBackedHighPrecisionEngineReportsOutOfRangeData();
+    void providerBackedHighPrecisionHonorsContract();
+    void providerBackedHighPrecisionReportsUnsupported();
+    void providerBackedHighPrecisionReportsOutOfRange();
 #endif
 };
 
@@ -322,7 +322,7 @@ void EphemerisEngineContractTests::testDoublesHonorHardenedContract()
     verifyExplicitRequestAndConvenienceEquivalence(nonEnumeratedEngine, "target");
 }
 
-void EphemerisEngineContractTests::contextQueriesRouteThroughDirectSingleBodyOverloads()
+void EphemerisEngineContractTests::contextQueriesRouteThroughSingleBodyOverloads()
 {
     auto catalog = makeSingleBodyCatalog("target");
     QVERIFY(catalog != nullptr);
@@ -376,7 +376,7 @@ void EphemerisEngineContractTests::highPrecisionEngineHonorsHardenedContract()
     QVERIFY(!snapshot.states.front().metadata.isSuccessful());
 }
 
-void EphemerisEngineContractTests::providerBackedHighPrecisionEngineHonorsHardenedContract()
+void EphemerisEngineContractTests::providerBackedHighPrecisionHonorsContract()
 {
     const std::vector<OwnGalaxyCelestialBody> bodies{
         makeContractSunBody(),
@@ -436,7 +436,7 @@ void EphemerisEngineContractTests::providerBackedHighPrecisionEngineHonorsHarden
     QVERIFY(!engine.computeBodyState(context, std::size_t{1'000'000}).has_value());
 }
 
-void EphemerisEngineContractTests::providerBackedHighPrecisionEngineReportsUnsupportedBodies()
+void EphemerisEngineContractTests::providerBackedHighPrecisionReportsUnsupported()
 {
     CelestialBodyCatalog catalog(std::vector<OwnGalaxyCelestialBody>{makeContractUnsupportedBody()});
 
@@ -457,7 +457,7 @@ void EphemerisEngineContractTests::providerBackedHighPrecisionEngineReportsUnsup
     QVERIFY(!std::isfinite(state->equatorial.declinationDeg));
 }
 
-void EphemerisEngineContractTests::providerBackedHighPrecisionEngineReportsOutOfRangeData()
+void EphemerisEngineContractTests::providerBackedHighPrecisionReportsOutOfRange()
 {
     HighPrecisionCalculatorResult outOfRangeResult;
     outOfRangeResult.metadata.status = EphemerisEngineQueryStatus::Type::OutOfRange;

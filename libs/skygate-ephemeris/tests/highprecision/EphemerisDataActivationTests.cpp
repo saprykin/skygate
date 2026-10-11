@@ -249,7 +249,7 @@ private slots:
     void acceptsUppercaseManifestChecksum();
     void rejectsExpectedSizeMismatch();
     void rejectsCompressedAssetLargerThanDeclaredSize();
-    void preservesExistingCacheFileWhenReplacementCannotBeWritten();
+    void preservesExistingCacheWhenReplacementFails();
     void treatsExistingValidCacheFileAsAlreadyActive();
     void cancelsActivationBeforeWritingCacheFile();
     void cancelsActivationAfterPayloadCopyBeforeCommit();
@@ -257,7 +257,7 @@ private slots:
     void verifiesCompleteStagedUpdateSet();
     void verifiesStagedLiveAssetsWithoutIntegrityPins();
     void rejectsStagedLiveAssetWithEmptyPayload();
-    void verifiesCompressedStagedAssetWithoutChangingSource();
+    void verifiesCompressedStagedAssetWithoutExtracting();
     void cancelsStagedUpdateVerification();
     void rejectsStagedUpdateChecksumFailure();
     void acceptsUppercaseStagedUpdateChecksum();
@@ -470,7 +470,7 @@ void EphemerisDataActivationTests::rejectsExpectedSizeMismatch()
     QVERIFY(!containsFiles(cacheRoot.path()));
 }
 
-void EphemerisDataActivationTests::preservesExistingCacheFileWhenReplacementCannotBeWritten()
+void EphemerisDataActivationTests::preservesExistingCacheWhenReplacementFails()
 {
     QTemporaryDir bundledRoot;
     QTemporaryDir cacheRoot;
@@ -678,7 +678,7 @@ void EphemerisDataActivationTests::rejectsStagedLiveAssetWithEmptyPayload()
     QVERIFY(!result.diagnostics.empty());
 }
 
-void EphemerisDataActivationTests::verifiesCompressedStagedAssetWithoutChangingSource()
+void EphemerisDataActivationTests::verifiesCompressedStagedAssetWithoutExtracting()
 {
     QTemporaryDir stagedRoot;
     QVERIFY(stagedRoot.isValid());

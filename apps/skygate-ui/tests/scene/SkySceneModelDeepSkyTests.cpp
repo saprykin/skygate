@@ -18,7 +18,7 @@ class SkySceneModelDeepSkyTests final : public QObject {
 
 private slots:
     void deepSkyInspectorIncludesAliasesSizeAndSource();
-    void primaryDeepSkyObjectKeepsSourceWhenMergingDeepSkyCatalog();
+    void primaryObjectsKeepSourceWhenMergingDeepSky();
     void deepSkyObjectsRenderAndCanBeHidden();
     void denseDeepSkyLabelsAreBudgeted();
     void wideDeepSkyLabelsPreferNamedObjects();
@@ -58,7 +58,7 @@ void SkySceneModelDeepSkyTests::deepSkyInspectorIncludesAliasesSizeAndSource()
     QVERIFY(!overlayItemsContainKind(sceneModel.overlayItems(), "selectionLabel"));
 }
 
-void SkySceneModelDeepSkyTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSkyCatalog()
+void SkySceneModelDeepSkyTests::primaryObjectsKeepSourceWhenMergingDeepSky()
 {
     auto primaryCatalog = createTestCatalog({
         makeDeepSkyBody("primary_dso", "Primary DSO", 8.0, {"Primary DSO"}),

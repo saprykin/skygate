@@ -215,7 +215,7 @@ private slots:
     void init();
     void ephemerisEngineControlsBindDraftAndVisibility();
     void ephemerisDataControlsShowFallbackAndUpdateMode();
-    void ephemerisDataControlsShowInstalledStateAndClearCache();
+    void ephemerisControlsShowInstalledStateAndClearCache();
 
 private:
     QmlSettingsFixture m_settings;
@@ -389,7 +389,7 @@ void QmlPreferencesEphemerisTests::ephemerisDataControlsShowFallbackAndUpdateMod
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlPreferencesEphemerisTests::ephemerisDataControlsShowInstalledStateAndClearCache()
+void QmlPreferencesEphemerisTests::ephemerisControlsShowInstalledStateAndClearCache()
 {
     const QString kernelPath = m_settings.cachePath(QStringLiteral("de441.bsp"));
     const QString earthOrientationPath = m_settings.cachePath(QStringLiteral("eop.csv"));

@@ -31,11 +31,11 @@ class SkyCatalogRuntimeRelatedDataTests final : public QObject {
 
 private slots:
     void sourceConstellationDataIsOwnedAndComposed();
-    void resolvedRefsTrackIdentityAndInvalidateOnSourceChange();
+    void resolvedRefsTrackIdentityAndInvalidateOnChange();
     void ownedRelatedDataFollowsSourceLifecycle();
     void overlappingAnchorGroupsFollowVisibleOrder();
     void relatedDataDoesNotAffectOtherOwnersOrCatalogs();
-    void resolvedRefsUseActiveIdentitiesFromWinningCatalog();
+    void resolvedRefsUseIdentitiesFromWinningCatalog();
     void resolvedCacheInvalidatesWhenRelatedDataChanges();
 };
 
@@ -71,7 +71,7 @@ void SkyCatalogRuntimeRelatedDataTests::sourceConstellationDataIsOwnedAndCompose
     QCOMPARE(runtime.constellationLineRefs().size(), 1U);
 }
 
-void SkyCatalogRuntimeRelatedDataTests::resolvedRefsTrackIdentityAndInvalidateOnSourceChange()
+void SkyCatalogRuntimeRelatedDataTests::resolvedRefsTrackIdentityAndInvalidateOnChange()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(CatalogRuntimeFixture::makeCrossIdentifiedCatalog());
     static_cast<void>(runtime.initialize({}));
@@ -304,7 +304,7 @@ void SkyCatalogRuntimeRelatedDataTests::relatedDataDoesNotAffectOtherOwnersOrCat
     QCOMPARE(runtime.constellationLineRefs().size(), 1U);
 }
 
-void SkyCatalogRuntimeRelatedDataTests::resolvedRefsUseActiveIdentitiesFromWinningCatalog()
+void SkyCatalogRuntimeRelatedDataTests::resolvedRefsUseIdentitiesFromWinningCatalog()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalogWithoutHipCrossIds());
     static_cast<void>(runtime.initialize({}));

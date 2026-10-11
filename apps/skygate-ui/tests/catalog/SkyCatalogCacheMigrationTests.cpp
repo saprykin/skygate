@@ -35,17 +35,17 @@ private slots:
     void initTestCase();
     void init();
     void clearSourceCacheVersusClearCollectionCache();
-    void migratesLegacyBundledCustomAndMixedConfigurations();
+    void migratesLegacyBundledCustomMixedConfigurations();
     void repeatedMigrationIsIdempotent();
-    void emptyCollectionAfterMigrationDoesNotRestoreLegacySources();
+    void emptyMigratedCollectionDoesNotRestoreLegacy();
     void clearingPayloadCacheDoesNotReAddLegacySources();
     void failedMigrationCommitKeepsLegacyCacheReadable();
     void failedCollectionWritePreservesPriorData();
-    void missingCommittedManifestRejectsRestoreInsteadOfMigratingLegacy();
-    void truncatedCommittedManifestRejectsRestoreInsteadOfMigratingLegacy();
-    void restoreUsesCommittedGenerationRatherThanStagedNewerGeneration();
-    void missingManifestWithLegacyDataAndStagedGenerationRejectsRestore();
-    void interruptedGenerationStagingKeepsFlatCollectionInsteadOfMigratingLegacy();
+    void missingCommittedManifestRejectsLegacyMigration();
+    void truncatedCommittedManifestRejectsLegacyMigration();
+    void restoreUsesCommittedOverStagedGeneration();
+    void missingManifestStagedGenerationRejectsRestore();
+    void interruptedGenerationStagingKeepsFlatCollection();
     void logsCollectionLifecycleSummariesAtInfoLevel();
 
 private:
@@ -110,7 +110,7 @@ void SkyCatalogCacheMigrationTests::clearSourceCacheVersusClearCollectionCache()
     QVERIFY(!store.loadCatalogCollectionCache().isLoaded());
 }
 
-void SkyCatalogCacheMigrationTests::migratesLegacyBundledCustomAndMixedConfigurations()
+void SkyCatalogCacheMigrationTests::migratesLegacyBundledCustomMixedConfigurations()
 {
     // Bundled star + bundled deep-sky has no cached content to migrate.
     {
@@ -198,7 +198,7 @@ void SkyCatalogCacheMigrationTests::repeatedMigrationIsIdempotent()
     QCOMPARE(secondResult.sources[1].record.instanceId, firstResult.sources[1].record.instanceId);
 }
 
-void SkyCatalogCacheMigrationTests::emptyCollectionAfterMigrationDoesNotRestoreLegacySources()
+void SkyCatalogCacheMigrationTests::emptyMigratedCollectionDoesNotRestoreLegacy()
 {
     SkySettingsStore store;
     const SkyCatalogCacheController controller(&store);
@@ -400,7 +400,7 @@ void SkyCatalogCacheMigrationTests::failedCollectionWritePreservesPriorData()
     QCOMPARE(CatalogCacheFixture::firstBodyId(*restored.sources[1].record.catalog), QStringLiteral("ngc_22"));
 }
 
-void SkyCatalogCacheMigrationTests::missingCommittedManifestRejectsRestoreInsteadOfMigratingLegacy()
+void SkyCatalogCacheMigrationTests::missingCommittedManifestRejectsLegacyMigration()
 {
     SkySettingsStore store;
     // The retired pre-generation two-slot cache stays readable on disk for the
@@ -466,7 +466,7 @@ void SkyCatalogCacheMigrationTests::missingCommittedManifestRejectsRestoreInstea
     QVERIFY(recovered.sources.empty());
 }
 
-void SkyCatalogCacheMigrationTests::truncatedCommittedManifestRejectsRestoreInsteadOfMigratingLegacy()
+void SkyCatalogCacheMigrationTests::truncatedCommittedManifestRejectsLegacyMigration()
 {
     SkySettingsStore store;
     QVERIFY(store.saveCatalogCache(
@@ -503,7 +503,7 @@ void SkyCatalogCacheMigrationTests::truncatedCommittedManifestRejectsRestoreInst
     );
 }
 
-void SkyCatalogCacheMigrationTests::restoreUsesCommittedGenerationRatherThanStagedNewerGeneration()
+void SkyCatalogCacheMigrationTests::restoreUsesCommittedOverStagedGeneration()
 {
     SkySettingsStore store;
     QVERIFY(store.saveCatalogCollectionCache(CatalogCacheFixture::makeCollectionSnapshot()));
@@ -536,7 +536,7 @@ void SkyCatalogCacheMigrationTests::restoreUsesCommittedGenerationRatherThanStag
     QCOMPARE(result.sources[1].record.instanceId, QStringLiteral("preset:open_ngc"));
 }
 
-void SkyCatalogCacheMigrationTests::missingManifestWithLegacyDataAndStagedGenerationRejectsRestore()
+void SkyCatalogCacheMigrationTests::missingManifestStagedGenerationRejectsRestore()
 {
     SkySettingsStore store;
     // The retired pre-generation two-slot cache stays readable on disk for the
@@ -638,7 +638,7 @@ void SkyCatalogCacheMigrationTests::missingManifestWithLegacyDataAndStagedGenera
     QVERIFY(recovered.sources.empty());
 }
 
-void SkyCatalogCacheMigrationTests::interruptedGenerationStagingKeepsFlatCollectionInsteadOfMigratingLegacy()
+void SkyCatalogCacheMigrationTests::interruptedGenerationStagingKeepsFlatCollection()
 {
     SkySettingsStore store;
     // The retired pre-generation two-slot cache stays readable on disk, so a

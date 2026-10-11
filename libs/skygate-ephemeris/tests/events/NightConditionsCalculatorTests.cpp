@@ -294,14 +294,14 @@ private slots:
     void polarTwilightReportsStableUnavailableStatuses();
     void moonRiseSetAndIlluminationArePopulated();
     void lunarPhaseBucketsAreDeterministic();
-    void requestEpochControlsLunarPhaseWhenContextTimeDiffers();
+    void requestEpochControlsLunarPhaseWhenTimesDiffer();
     void highPrecisionNightConditionsUseGuidedEventSearch();
     void guidanceStrategyInjectionIsHonored();
     void nullGuidanceStrategyFallsBackToDirectSampling();
-    void approximateHighPrecisionSunMoonEventsUseSimpleEstimates();
-    void verifiedHighPrecisionNightConditionsUseSelectedEngineSamples();
-    void untrustedApproximateNightConditionsVerifyAgainstPrimaryEngine();
-    void trustedApproximateNightConditionsSkipPrimaryVerification();
+    void approximateHighPrecisionEventsUseSimpleEstimates();
+    void verifiedNightConditionsUseSelectedEngineSamples();
+    void untrustedApproximateVerifiesAgainstPrimary();
+    void trustedApproximateSkipPrimaryVerification();
 };
 
 void NightConditionsCalculatorTests::twilightEventsAreOrderedForOrdinaryLocation()
@@ -412,7 +412,7 @@ void NightConditionsCalculatorTests::lunarPhaseBucketsAreDeterministic()
     QCOMPARE(QString::fromStdString(conditions.moonPhaseName), QString("Last quarter"));
 }
 
-void NightConditionsCalculatorTests::requestEpochControlsLunarPhaseWhenContextTimeDiffers()
+void NightConditionsCalculatorTests::requestEpochControlsLunarPhaseWhenTimesDiffer()
 {
     const skygate::ephemeris::tests::FixedAltitudeEngine engine(
         std::vector<skygate::ephemeris::tests::FixedAltitudeBody>{
@@ -522,7 +522,7 @@ void NightConditionsCalculatorTests::nullGuidanceStrategyFallsBackToDirectSampli
     QCOMPARE(engine.contextSampleCount(), 0);
 }
 
-void NightConditionsCalculatorTests::approximateHighPrecisionSunMoonEventsUseSimpleEstimates()
+void NightConditionsCalculatorTests::approximateHighPrecisionEventsUseSimpleEstimates()
 {
     const auto bodies = makeSunMoonBodies();
     const auto approximateEngine = makeGuidedNightEngine(bodies);
@@ -554,7 +554,7 @@ void NightConditionsCalculatorTests::approximateHighPrecisionSunMoonEventsUseSim
     QVERIFY(verifiedEngine.requestSampleCount() > 300);
 }
 
-void NightConditionsCalculatorTests::verifiedHighPrecisionNightConditionsUseSelectedEngineSamples()
+void NightConditionsCalculatorTests::verifiedNightConditionsUseSelectedEngineSamples()
 {
     const auto bodies = makeCatalog({
         skygate::ephemeris::tests::makeFixedAltitudeBody("sun", 8.0, 20.0),
@@ -580,7 +580,7 @@ void NightConditionsCalculatorTests::verifiedHighPrecisionNightConditionsUseSele
     QCOMPARE(engine.contextSampleCount(), 0);
 }
 
-void NightConditionsCalculatorTests::untrustedApproximateNightConditionsVerifyAgainstPrimaryEngine()
+void NightConditionsCalculatorTests::untrustedApproximateVerifiesAgainstPrimary()
 {
     const auto bodies = makeCatalog({
         skygate::ephemeris::tests::makeFixedAltitudeBody("sun", 8.0, 20.0),
@@ -607,7 +607,7 @@ void NightConditionsCalculatorTests::untrustedApproximateNightConditionsVerifyAg
     QVERIFY(std::abs(sunriseState->horizontal.altitudeDeg - (-0.833)) < 0.5);
 }
 
-void NightConditionsCalculatorTests::trustedApproximateNightConditionsSkipPrimaryVerification()
+void NightConditionsCalculatorTests::trustedApproximateSkipPrimaryVerification()
 {
     const auto bodies = makeCatalog({
         skygate::ephemeris::tests::makeFixedAltitudeBody("sun", 8.0, 20.0),

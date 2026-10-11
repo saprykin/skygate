@@ -19,7 +19,7 @@ private slots:
     void init();
     void searchToolbarFiltersActivatesAndClearsResults();
     void searchToolbarToggleRequestsExpandAndClearsSearch();
-    void searchToolbarDelegateClickEmptyStateAndTrackingClearWork();
+    void searchToolbarDelegateEmptyStateAndTrackingClear();
     void timelineToolbarControlsUpdateController();
     void timelineToolbarToggleResetAndContextSyncWork();
 
@@ -144,7 +144,7 @@ void QmlToolbarTests::searchToolbarToggleRequestsExpandAndClearsSearch()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlToolbarTests::searchToolbarDelegateClickEmptyStateAndTrackingClearWork()
+void QmlToolbarTests::searchToolbarDelegateEmptyStateAndTrackingClear()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);

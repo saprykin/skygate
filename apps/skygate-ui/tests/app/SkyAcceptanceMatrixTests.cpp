@@ -464,8 +464,8 @@ private slots:
     void initTestCase();
     void init();
     void engineSelectionPersistsAcrossRestart();
-    void cleanInstallOfflineDE440sShortRangeDataActivatesAndClearReturnsToBundled();
-    void optionalLongRangeProfileActivationSelectsDe441Kernel();
+    void cleanInstallOfflineShortRangeDataAndClearRevert();
+    void optionalLongRangeProfileSelectsDe441Kernel();
     void ephemerisDataUpdateLeavesCatalogStateUnchanged();
 
 private:
@@ -510,7 +510,7 @@ void SkyAcceptanceMatrixTests::engineSelectionPersistsAcrossRestart()
     QCOMPARE(restoredSnapshot->ephemeris.preferredDataProfileId, QString("de441-long-range"));
 }
 
-void SkyAcceptanceMatrixTests::cleanInstallOfflineDE440sShortRangeDataActivatesAndClearReturnsToBundled()
+void SkyAcceptanceMatrixTests::cleanInstallOfflineShortRangeDataAndClearRevert()
 {
     SkySettingsStore store;
     SkyEphemerisDataManager manager(&store);
@@ -585,7 +585,7 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineDE440sShortRangeDataActivatesA
     verifyDE440sShortRangeBodyState(*bundledFallbackEngineResult.engine);
 }
 
-void SkyAcceptanceMatrixTests::optionalLongRangeProfileActivationSelectsDe441Kernel()
+void SkyAcceptanceMatrixTests::optionalLongRangeProfileSelectsDe441Kernel()
 {
     SkySettingsStore store;
     SkyEphemerisDataManager manager(&store);

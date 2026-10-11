@@ -149,9 +149,9 @@ private slots:
     void rejectsInvalidInputs();
     void repeatedKeysReportNoUpdate();
     void requestBasedSnapshotsUseSelectedEngineOptions();
-    void requestOptionChangesOnSameEngineRecomputeSnapshot();
+    void optionChangesOnSameEngineRecomputeSnapshot();
     void highPrecisionRevisionChangesRecomputeSnapshot();
-    void astronomicalEpochSubsecondChangesRecomputeSnapshot();
+    void astronomicalEpochSubsecondRecomputeSnapshot();
     void renderOnlyChangesAvoidSnapshotRecompute();
     void snapshotKeyChangesRecomputeSnapshot();
     void clearReportsWhetherStateWasPresent();
@@ -229,7 +229,7 @@ void SkySceneFramePipelineTests::requestBasedSnapshotsUseSelectedEngineOptions()
     QCOMPARE(result->snapshotGeneration, 2U);
 }
 
-void SkySceneFramePipelineTests::requestOptionChangesOnSameEngineRecomputeSnapshot()
+void SkySceneFramePipelineTests::optionChangesOnSameEngineRecomputeSnapshot()
 {
     CountingEngine engine;
     SkySceneFramePipeline pipeline;
@@ -322,7 +322,7 @@ void SkySceneFramePipelineTests::highPrecisionRevisionChangesRecomputeSnapshot()
     QCOMPARE(engine.requestComputeCount(), 6);
 }
 
-void SkySceneFramePipelineTests::astronomicalEpochSubsecondChangesRecomputeSnapshot()
+void SkySceneFramePipelineTests::astronomicalEpochSubsecondRecomputeSnapshot()
 {
     CountingEngine engine;
     SkySceneFramePipeline pipeline;

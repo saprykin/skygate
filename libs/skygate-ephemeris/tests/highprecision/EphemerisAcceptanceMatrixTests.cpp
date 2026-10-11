@@ -539,17 +539,17 @@ class EphemerisAcceptanceMatrixTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void factorySelectionStrictFailureAndFallbackRemainExplicit();
-    void calcephProviderBackedSolarSystemRaDecSupportsCorrectionOptions();
-    void realCalcephRuntimeComputesFixtureSolarSystemRaDecWhenAvailable();
-    void correctionMatrixRoutesAstrometricApparentAndTopocentricRequests();
-    void absentLongRangeKernelProducesDegradedFallbackMetadata();
-    void bundledAndOptionalLongRangeDataSetProfilesDriveProviderSelection();
+    void factoryStrictFailureAndFallbackRemainExplicit();
+    void calcephBackedSolarSystemRaDecSupportsCorrections();
+    void realCalcephRuntimeComputesFixtureRaDec();
+    void correctionMatrixRoutesEachCorrectionSet();
+    void absentLongRangeKernelProducesDegradedMetadata();
+    void bundledAndOptionalProfilesDriveProviderSelection();
     void deterministicSelfDerivedFixturesRemainReadable();
-    void fullFrameComputationCacheAvoidsPerObjectRecompute();
+    void fullFrameCacheAvoidsPerObjectRecompute();
 };
 
-void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRemainExplicit()
+void EphemerisAcceptanceMatrixTests::factoryStrictFailureAndFallbackRemainExplicit()
 {
     const std::array bodies{makeMarsBody()};
 
@@ -610,7 +610,7 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
     QVERIFY(!fallbackResult.hasErrors());
 }
 
-void EphemerisAcceptanceMatrixTests::calcephProviderBackedSolarSystemRaDecSupportsCorrectionOptions()
+void EphemerisAcceptanceMatrixTests::calcephBackedSolarSystemRaDecSupportsCorrections()
 {
     auto kernel = std::make_shared<AcceptanceKernel>();
     HighPrecisionEphemerisEngine::Dependencies dependencies;
@@ -652,7 +652,7 @@ void EphemerisAcceptanceMatrixTests::calcephProviderBackedSolarSystemRaDecSuppor
     QVERIFY(kernel->callCount() > 1);
 }
 
-void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureSolarSystemRaDecWhenAvailable()
+void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureRaDec()
 {
     const std::string kernelPath = std::string{SKYGATE_EPHEMERIS_TESTDATA_DIR} + "/ephemeris/kernels/de432s.bsp";
     if (isLfsPointerKernel(kernelPath)) {
@@ -705,7 +705,7 @@ void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureSolarSyste
     );
 }
 
-void EphemerisAcceptanceMatrixTests::correctionMatrixRoutesAstrometricApparentAndTopocentricRequests()
+void EphemerisAcceptanceMatrixTests::correctionMatrixRoutesEachCorrectionSet()
 {
     const std::array matrix{
         EphemerisCorrectionFlags::geometric(),
@@ -759,7 +759,7 @@ void EphemerisAcceptanceMatrixTests::correctionMatrixRoutesAstrometricApparentAn
     }
 }
 
-void EphemerisAcceptanceMatrixTests::absentLongRangeKernelProducesDegradedFallbackMetadata()
+void EphemerisAcceptanceMatrixTests::absentLongRangeKernelProducesDegradedMetadata()
 {
     HighPrecisionEphemerisEngine::Dependencies dependencies;
     dependencies.solarSystemStateCalculator = std::make_shared<DegradedSolarSystemCalculator>();
@@ -786,7 +786,7 @@ void EphemerisAcceptanceMatrixTests::absentLongRangeKernelProducesDegradedFallba
     QCOMPARE(state->metadata.effectiveDataValidityRange->id, std::string{"de440-modern"});
 }
 
-void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesDriveProviderSelection()
+void EphemerisAcceptanceMatrixTests::bundledAndOptionalProfilesDriveProviderSelection()
 {
     const std::string kernelPath = std::string{SKYGATE_EPHEMERIS_TESTDATA_DIR} + "/ephemeris/kernels/de432s.bsp";
     if (isLfsPointerKernel(kernelPath)) {
@@ -883,7 +883,7 @@ void EphemerisAcceptanceMatrixTests::deterministicSelfDerivedFixturesRemainReada
     QVERIFY(fixture->toleranceDegrees < (1.0 / 3600.0));
 }
 
-void EphemerisAcceptanceMatrixTests::fullFrameComputationCacheAvoidsPerObjectRecompute()
+void EphemerisAcceptanceMatrixTests::fullFrameCacheAvoidsPerObjectRecompute()
 {
     auto calculator = std::make_shared<CountingSolarSystemCalculator>();
     HighPrecisionEphemerisEngine::Dependencies dependencies;

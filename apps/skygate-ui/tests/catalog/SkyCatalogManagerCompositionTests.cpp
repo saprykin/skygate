@@ -368,13 +368,13 @@ class SkyCatalogManagerCompositionTests final : public QObject {
 private slots:
     void initTestCase();
     void init();
-    void interchangeabilityScenarioKeepsObjectsProvenanceAndOwnedRelatedData();
-    void sharedAliasNamesStayDistinctThroughManagerWorkflow();
-    void conflictingAstrometryKeepsOneCoherentModelThroughManager();
-    void bundledDeepSkyFallbackFillsGapsWithoutOverridingConfiguredChoice();
-    void crossSourceHipBridgesSurviveBinaryCollectionRestore();
-    void collectionLifecycleKeepsSnapshotAndIdentitiesAcrossRestart();
-    void combinedAcceptedFactsSurviveRelatedReplacementRejectionReorderAndRawRestart();
+    void interchangeabilityKeepsProvenanceAndRelatedData();
+    void sharedAliasNamesStayDistinctThroughManager();
+    void conflictingAstrometryKeepsOneCoherentModel();
+    void bundledFallbackFillsGapsKeepingConfiguredChoice();
+    void crossSourceHipBridgesSurviveBinaryRestore();
+    void collectionKeepsSnapshotAndIdentitiesOnRestart();
+    void combinedFactsSurviveRejectionReorderRawRestart();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -395,7 +395,7 @@ void SkyCatalogManagerCompositionTests::init()
     QDir(m_settings.filePath(QStringLiteral("catalog-collection-cache"))).removeRecursively();
 }
 
-void SkyCatalogManagerCompositionTests::interchangeabilityScenarioKeepsObjectsProvenanceAndOwnedRelatedData()
+void SkyCatalogManagerCompositionTests::interchangeabilityKeepsProvenanceAndRelatedData()
 {
     const std::vector<InterchangeabilityScenarioSource> sources = interchangeabilityScenarioSources();
     skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
@@ -515,7 +515,7 @@ void SkyCatalogManagerCompositionTests::interchangeabilityScenarioKeepsObjectsPr
     );
 }
 
-void SkyCatalogManagerCompositionTests::sharedAliasNamesStayDistinctThroughManagerWorkflow()
+void SkyCatalogManagerCompositionTests::sharedAliasNamesStayDistinctThroughManager()
 {
     const QString url = QStringLiteral("https://example.test/shared-alias.csv");
     skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
@@ -571,7 +571,7 @@ void SkyCatalogManagerCompositionTests::sharedAliasNamesStayDistinctThroughManag
     QCOMPARE(manager.contributorSourceIds()[*secondIndex], QStringList{source.instanceId});
 }
 
-void SkyCatalogManagerCompositionTests::conflictingAstrometryKeepsOneCoherentModelThroughManager()
+void SkyCatalogManagerCompositionTests::conflictingAstrometryKeepsOneCoherentModel()
 {
     const QString astrometricUrl = QStringLiteral("https://example.test/astrometric.csv");
     const QString fixedUrl = QStringLiteral("https://example.test/fixed-only.csv");
@@ -627,7 +627,7 @@ void SkyCatalogManagerCompositionTests::conflictingAstrometryKeepsOneCoherentMod
     QCOMPARE(manager.contributorSourceIds()[*bodyIndex], QStringList({fixedOnly.instanceId, astrometric.instanceId}));
 }
 
-void SkyCatalogManagerCompositionTests::bundledDeepSkyFallbackFillsGapsWithoutOverridingConfiguredChoice()
+void SkyCatalogManagerCompositionTests::bundledFallbackFillsGapsKeepingConfiguredChoice()
 {
     const QString configuredUrl = QStringLiteral("https://example.test/configured-m31.csv");
     skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
@@ -683,7 +683,7 @@ void SkyCatalogManagerCompositionTests::bundledDeepSkyFallbackFillsGapsWithoutOv
     QCOMPARE(restoredManager.sourceIds()[*restoredM31Index], configured.instanceId);
 }
 
-void SkyCatalogManagerCompositionTests::crossSourceHipBridgesSurviveBinaryCollectionRestore()
+void SkyCatalogManagerCompositionTests::crossSourceHipBridgesSurviveBinaryRestore()
 {
     const auto makeHipHdStar = [](std::string id,
                                   std::string displayName,
@@ -779,7 +779,7 @@ void SkyCatalogManagerCompositionTests::crossSourceHipBridgesSurviveBinaryCollec
     compareCollectionFingerprints(expected, collectionFingerprint(restoredManager));
 }
 
-void SkyCatalogManagerCompositionTests::collectionLifecycleKeepsSnapshotAndIdentitiesAcrossRestart()
+void SkyCatalogManagerCompositionTests::collectionKeepsSnapshotAndIdentitiesOnRestart()
 {
     std::vector<InterchangeabilityScenarioSource> configured = interchangeabilityScenarioSources();
     configured.push_back(interchangeabilityRemovableSource());
@@ -945,7 +945,7 @@ void SkyCatalogManagerCompositionTests::collectionLifecycleKeepsSnapshotAndIdent
     );
 }
 
-void SkyCatalogManagerCompositionTests::combinedAcceptedFactsSurviveRelatedReplacementRejectionReorderAndRawRestart()
+void SkyCatalogManagerCompositionTests::combinedFactsSurviveRejectionReorderRawRestart()
 {
     const QString cacheDirectory = m_settings.filePath(QStringLiteral("combined-accepted-facts-cache"));
     QDir(cacheDirectory).removeRecursively();

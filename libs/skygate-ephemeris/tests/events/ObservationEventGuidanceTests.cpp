@@ -152,7 +152,7 @@ class ObservationEventGuidanceTests final : public QObject {
 private slots:
     void guidanceStrategyInjectionIsHonored();
     void highPrecisionFixedBodyUsesGuidedCoarseSearch();
-    void linearGuidanceInterpolatesCrossingTimeInCorrectUnits();
+    void linearGuidanceInterpolationUsesCorrectUnits();
     void nullGuidanceStrategyFallsBackToDirectSampling();
 };
 
@@ -216,7 +216,7 @@ void ObservationEventGuidanceTests::highPrecisionFixedBodyUsesGuidedCoarseSearch
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
 }
 
-void ObservationEventGuidanceTests::linearGuidanceInterpolatesCrossingTimeInCorrectUnits()
+void ObservationEventGuidanceTests::linearGuidanceInterpolationUsesCorrectUnits()
 {
     constexpr double kSlopeDegPerSecond = 60.0 / 600.0;
     const auto context = makeContext();

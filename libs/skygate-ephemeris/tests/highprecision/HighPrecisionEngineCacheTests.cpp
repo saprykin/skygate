@@ -94,19 +94,19 @@ class HighPrecisionEngineCacheTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void reusesCachedFullFrameSnapshotsWithoutStaleResults();
-    void reusesPreparedRequestStateAcrossSingleBodyComputations();
-    void reusesCachedSingleBodyStatesWithoutFullFrameSnapshots();
+    void reusesFullFrameSnapshotsWithoutStaleResults();
+    void reusesPreparedRequestStateForSingleBodies();
+    void reusesCachedSingleBodyStatesWithoutFullSnapshots();
     void isolatesCachedSingleBodyStatesByBodyIndex();
     void servesConcurrentReadOnlyComputationsFromCache();
     void isolatesCachedSnapshotsByDataSetRevision();
     void isolatesCachedSnapshotsByMicrosecondUtc();
-    void isolatesCachedSnapshotsByDataSetDateRangeContents();
+    void isolatesCachedSnapshotsByDateRangeContents();
     void isolatesCachedSnapshotsByCatalogContents();
-    void findSnapshotBodyStateReturnsSingleBodyWithoutFullSnapshotCopy();
+    void findSnapshotBodyStateWithoutFullCopy();
 };
 
-void HighPrecisionEngineCacheTests::reusesCachedFullFrameSnapshotsWithoutStaleResults()
+void HighPrecisionEngineCacheTests::reusesFullFrameSnapshotsWithoutStaleResults()
 {
     const std::array bodies{HighPrecisionEngineFixture::sunBody()};
     auto solarSystemCalculator = std::make_shared<ThreadSafeEpochSolarSystemCalculator>(4.0);
@@ -149,7 +149,7 @@ void HighPrecisionEngineCacheTests::reusesCachedFullFrameSnapshotsWithoutStaleRe
     QCOMPARE(cachedStateById->equatorial.rightAscensionHours, 4.25);
 }
 
-void HighPrecisionEngineCacheTests::reusesPreparedRequestStateAcrossSingleBodyComputations()
+void HighPrecisionEngineCacheTests::reusesPreparedRequestStateForSingleBodies()
 {
     const std::array bodies{makeAstrometricStarBody("star-a", 2.0), makeAstrometricStarBody("star-b", 5.0)};
     auto kernel = HighPrecisionEngineFixture::longRangeFallbackKernel();
@@ -174,7 +174,7 @@ void HighPrecisionEngineCacheTests::reusesPreparedRequestStateAcrossSingleBodyCo
     QCOMPARE(kernel->callCount(), 1);
 }
 
-void HighPrecisionEngineCacheTests::reusesCachedSingleBodyStatesWithoutFullFrameSnapshots()
+void HighPrecisionEngineCacheTests::reusesCachedSingleBodyStatesWithoutFullSnapshots()
 {
     const std::array bodies{HighPrecisionEngineFixture::sunBody()};
     auto solarSystemCalculator = std::make_shared<ThreadSafeEpochSolarSystemCalculator>(9.0);
@@ -381,7 +381,7 @@ void HighPrecisionEngineCacheTests::isolatesCachedSnapshotsByMicrosecondUtc()
     QCOMPARE(cachedShiftedSnapshot->states[0].equatorial.rightAscensionHours, 3.0);
 }
 
-void HighPrecisionEngineCacheTests::isolatesCachedSnapshotsByDataSetDateRangeContents()
+void HighPrecisionEngineCacheTests::isolatesCachedSnapshotsByDateRangeContents()
 {
     EphemerisComputationCache computationCache;
     const std::vector<OwnGalaxyCelestialBody> bodies{HighPrecisionEngineFixture::sunBody()};
@@ -459,7 +459,7 @@ void HighPrecisionEngineCacheTests::isolatesCachedSnapshotsByCatalogContents()
     QVERIFY(!cachedSnapshot.has_value());
 }
 
-void HighPrecisionEngineCacheTests::findSnapshotBodyStateReturnsSingleBodyWithoutFullSnapshotCopy()
+void HighPrecisionEngineCacheTests::findSnapshotBodyStateWithoutFullCopy()
 {
     EphemerisComputationCache computationCache;
     const std::vector<OwnGalaxyCelestialBody> bodies{

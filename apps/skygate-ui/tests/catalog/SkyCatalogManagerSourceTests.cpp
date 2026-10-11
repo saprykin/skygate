@@ -42,11 +42,11 @@ private slots:
     void init();
     void unknownPresetsUpdateStatus();
     void bundledPresetResetsCatalogAndConstellationRefs();
-    void bundledReplacementDropsOwnerDataAndReportsFreshCounts();
+    void bundledReplacementDropsOwnerDataAndFreshCounts();
     void bundledDeepSkyPresetRebuildsActiveCatalog();
     void clearCacheReportsStatusAndSignals();
-    void collectionSourcesLoadEnableDisableAndRemoveIndependently();
-    void addSourceUrlAddsSameCategorySourcesWithStableIdentity();
+    void sourcesLoadEnableDisableAndRemoveIndependently();
+    void addSourceUrlAddsSameCategorySourcesWithStableIds();
     void addSourcePresetUsesDescriptorPolicy();
     void moveSourceReordersActiveSources();
     void sameDescriptorInstancesCoexistIndependently();
@@ -54,8 +54,8 @@ private slots:
     void editingSourceAsUpdatePreservesInstanceId();
     void missingConfigurationKeepsFirstUseDefaults();
     void removingSoleSourceLeavesEmptyCollection();
-    void presentationSummarizesEnabledCollectionParticipation();
-    void bundledFallbackPresentationFollowsParticipationAndRestart();
+    void presentationSummarizesEnabledParticipation();
+    void fallbackParticipationAndRestartDrivePresentation();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -109,7 +109,7 @@ void SkyCatalogManagerSourceTests::bundledPresetResetsCatalogAndConstellationRef
     QVERIFY(catalogSpy.count() >= 1);
 }
 
-void SkyCatalogManagerSourceTests::bundledReplacementDropsOwnerDataAndReportsFreshCounts()
+void SkyCatalogManagerSourceTests::bundledReplacementDropsOwnerDataAndFreshCounts()
 {
     const QString catalogUrl = QStringLiteral("https://example.test/bundled-replacement-stars.csv");
     const QString relatedUrl = QStringLiteral("https://example.test/bundled-replacement-lines.json");
@@ -173,7 +173,7 @@ void SkyCatalogManagerSourceTests::clearCacheReportsStatusAndSignals()
     QCOMPARE(statusSpy.count(), 2);
 }
 
-void SkyCatalogManagerSourceTests::collectionSourcesLoadEnableDisableAndRemoveIndependently()
+void SkyCatalogManagerSourceTests::sourcesLoadEnableDisableAndRemoveIndependently()
 {
     const auto writeSourceFile = [&](const QString& fileName, const char* properName, const int hip) -> QString {
         const QString path = m_settings.filePath(fileName);
@@ -234,7 +234,7 @@ void SkyCatalogManagerSourceTests::collectionSourcesLoadEnableDisableAndRemoveIn
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star C")));
 }
 
-void SkyCatalogManagerSourceTests::addSourceUrlAddsSameCategorySourcesWithStableIdentity()
+void SkyCatalogManagerSourceTests::addSourceUrlAddsSameCategorySourcesWithStableIds()
 {
     const auto writeSourceFile = [&](const QString& fileName, const char* properName, const int hip) -> QString {
         const QString path = m_settings.filePath(fileName);
@@ -676,7 +676,7 @@ void SkyCatalogManagerSourceTests::removingSoleSourceLeavesEmptyCollection()
     QVERIFY(persisted.snapshot.sources.isEmpty());
 }
 
-void SkyCatalogManagerSourceTests::presentationSummarizesEnabledCollectionParticipation()
+void SkyCatalogManagerSourceTests::presentationSummarizesEnabledParticipation()
 {
     const QString starAPath = m_settings.filePath(QStringLiteral("presentation-star-a.csv"));
     const QString starBPath = m_settings.filePath(QStringLiteral("presentation-star-b.csv"));
@@ -796,7 +796,7 @@ void SkyCatalogManagerSourceTests::presentationSummarizesEnabledCollectionPartic
     QCOMPARE(manager.sourceViewEntries().size(), 3);
 }
 
-void SkyCatalogManagerSourceTests::bundledFallbackPresentationFollowsParticipationAndRestart()
+void SkyCatalogManagerSourceTests::fallbackParticipationAndRestartDrivePresentation()
 {
     const QString starsPath = m_settings.filePath(QStringLiteral("fallback-stars.csv"));
     QVERIFY(

@@ -112,20 +112,20 @@ private slots:
     void emptyCatalogCollectionCacheIsExplicitlyPersisted();
     void failedCollectionSaveKeepsLegacyCacheUnmigrated();
     void legacyFlatCollectionRecordsStillLoad();
-    void interruptedGenerationStagingKeepsFlatCollectionLoaded();
-    void emptyLegacyCollectionStillLoadsWithoutGenerationArtifacts();
-    void missingManifestWithGenerationRecordsDoesNotLoadEmptyCollection();
-    void missingManifestWithGenerationSidecarsLogsManifestLoss();
-    void lostManifestAfterCommittedCollectionIsNotFirstUse();
+    void interruptedStagingKeepsFlatCollectionLoaded();
+    void emptyLegacyCollectionStillLoadsWithoutArtifacts();
+    void missingManifestWithRecordsSkipsEmptyCollection();
+    void missingManifestWithSidecarsLogsManifestLoss();
+    void lostManifestAfterCommittedCollectionNotFirstUse();
     void stageOnlyGenerationIsNotProofOfCommit();
     void truncatedManifestIsUnusableButRecoverable();
     void missingCommittedGenerationRecordsAreUnusable();
     void failedLaterSourceRawWriteKeepsCommittedSnapshot();
-    void failedLaterSourceBinaryWriteKeepsCommittedSnapshot();
+    void failedSourceBinaryWriteKeepsCommittedSnapshot();
     void failedMetadataPublicationKeepsCommittedSnapshot();
-    void failedManifestPublicationKeepsCommittedGenerationIntact();
-    void failedFirstCollectionPublicationKeepsLegacyCacheReadable();
-    void successfulCollectionUpdateReplacesCommittedGeneration();
+    void failedManifestPublicationKeepsGenerationIntact();
+    void failedFirstPublicationKeepsLegacyCacheReadable();
+    void successfulUpdateReplacesCommittedGeneration();
     void failedCollectionSaveLogsExplicitError();
 
 private:
@@ -274,7 +274,7 @@ void SkyCollectionGenerationTests::legacyFlatCollectionRecordsStillLoad()
     QVERIFY(!messages.contains(QStringLiteral("stale catalog collection version marker")));
 }
 
-void SkyCollectionGenerationTests::interruptedGenerationStagingKeepsFlatCollectionLoaded()
+void SkyCollectionGenerationTests::interruptedStagingKeepsFlatCollectionLoaded()
 {
     const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
     QVERIFY(QDir().mkpath(directory));
@@ -389,7 +389,7 @@ void SkyCollectionGenerationTests::interruptedGenerationStagingKeepsFlatCollecti
     QCOMPARE(stagedSidecar.readAll(), QByteArray("staged raw payload"));
 }
 
-void SkyCollectionGenerationTests::emptyLegacyCollectionStillLoadsWithoutGenerationArtifacts()
+void SkyCollectionGenerationTests::emptyLegacyCollectionStillLoadsWithoutArtifacts()
 {
     CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
 
@@ -412,7 +412,7 @@ void SkyCollectionGenerationTests::emptyLegacyCollectionStillLoadsWithoutGenerat
     QVERIFY(!capture.joinedMessages().contains(QStringLiteral("Catalog collection manifest is missing")));
 }
 
-void SkyCollectionGenerationTests::missingManifestWithGenerationRecordsDoesNotLoadEmptyCollection()
+void SkyCollectionGenerationTests::missingManifestWithRecordsSkipsEmptyCollection()
 {
     const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
 
@@ -500,7 +500,7 @@ void SkyCollectionGenerationTests::missingManifestWithGenerationRecordsDoesNotLo
     compareCollectionRecords(reloaded.snapshot, committed);
 }
 
-void SkyCollectionGenerationTests::missingManifestWithGenerationSidecarsLogsManifestLoss()
+void SkyCollectionGenerationTests::missingManifestWithSidecarsLogsManifestLoss()
 {
     const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
 
@@ -526,7 +526,7 @@ void SkyCollectionGenerationTests::missingManifestWithGenerationSidecarsLogsMani
     QVERIFY(capture.joinedMessages().contains(QStringLiteral("Catalog collection manifest is missing")));
 }
 
-void SkyCollectionGenerationTests::lostManifestAfterCommittedCollectionIsNotFirstUse()
+void SkyCollectionGenerationTests::lostManifestAfterCommittedCollectionNotFirstUse()
 {
     const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
 
@@ -707,7 +707,7 @@ void SkyCollectionGenerationTests::failedLaterSourceRawWriteKeepsCommittedSnapsh
     QVERIFY(loaded.snapshot.sources[0].payload != update.sources[0].payload);
 }
 
-void SkyCollectionGenerationTests::failedLaterSourceBinaryWriteKeepsCommittedSnapshot()
+void SkyCollectionGenerationTests::failedSourceBinaryWriteKeepsCommittedSnapshot()
 {
     const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
 
@@ -774,7 +774,7 @@ void SkyCollectionGenerationTests::failedMetadataPublicationKeepsCommittedSnapsh
     QVERIFY(loaded.snapshot.sources[0].title != update.sources[0].title);
 }
 
-void SkyCollectionGenerationTests::failedManifestPublicationKeepsCommittedGenerationIntact()
+void SkyCollectionGenerationTests::failedManifestPublicationKeepsGenerationIntact()
 {
     const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
 
@@ -813,7 +813,7 @@ void SkyCollectionGenerationTests::failedManifestPublicationKeepsCommittedGenera
     QVERIFY(!QFile::exists(stagedPath));
 }
 
-void SkyCollectionGenerationTests::failedFirstCollectionPublicationKeepsLegacyCacheReadable()
+void SkyCollectionGenerationTests::failedFirstPublicationKeepsLegacyCacheReadable()
 {
     const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
 
@@ -859,7 +859,7 @@ void SkyCollectionGenerationTests::failedFirstCollectionPublicationKeepsLegacyCa
     QVERIFY(store.loadCatalogCache().has_value());
 }
 
-void SkyCollectionGenerationTests::successfulCollectionUpdateReplacesCommittedGeneration()
+void SkyCollectionGenerationTests::successfulUpdateReplacesCommittedGeneration()
 {
     const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
 
