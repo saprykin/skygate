@@ -64,4 +64,9 @@ QString CsvRowTokenizer::decodeField(QStringView field)
     return decoded;
 }
 
+QString CsvRowTokenizer::decodeTrimmedField(const QStringView field)
+{
+    return decodeField(field).trimmed();
+}
+
 }  // namespace skygate::ephemeris

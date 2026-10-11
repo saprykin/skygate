@@ -42,16 +42,21 @@ std::string_view CatalogHeaderPolicy::findHeaderLine(std::string_view& remaining
     return {};
 }
 
+QString CatalogHeaderPolicy::decodeTrimmedLine(const std::string_view line)
+{
+    return QString::fromUtf8(line.data(), static_cast<qsizetype>(line.size())).trimmed();
+}
+
 QHash<QString, qsizetype>
 CatalogHeaderPolicy::decodeHeaderLine(const std::string_view headerLine, const QChar separator)
 {
-    const QString line = QString::fromUtf8(headerLine.data(), static_cast<qsizetype>(headerLine.size())).trimmed();
+    const QString line = decodeTrimmedLine(headerLine);
     const QVector<QStringView> columns = CsvRowTokenizer::splitColumns(QStringView{line}, separator);
 
     QHash<QString, qsizetype> headerIndex;
     headerIndex.reserve(columns.size());
     for (qsizetype index = 0; index < columns.size(); ++index) {
-        QString header = CsvRowTokenizer::decodeField(columns.at(index)).trimmed();
+        QString header = CsvRowTokenizer::decodeTrimmedField(columns.at(index));
         header = header.toLower();
         if (!header.isEmpty()) {
             headerIndex.insert(header, index);

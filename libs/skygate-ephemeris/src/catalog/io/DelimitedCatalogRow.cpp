@@ -23,7 +23,7 @@ QString DelimitedCatalogRow::decodeColumn(const qsizetype columnIndex) const
         return {};
     }
 
-    return CsvRowTokenizer::decodeField(m_columns.at(columnIndex)).trimmed();
+    return CsvRowTokenizer::decodeTrimmedField(m_columns.at(columnIndex));
 }
 
 qsizetype DelimitedCatalogRow::columnIndex(const QString& name) const

@@ -1,6 +1,7 @@
 #include "StellariumAnchorGroupExtractor.hpp"
 #include "StellariumHipParser.hpp"
 #include "StringUtilities.hpp"
+#include "catalog/io/CatalogParsingUtilities.hpp"
 
 #include <QJsonArray>
 #include <QJsonValue>
@@ -126,7 +127,8 @@ std::vector<ConstellationAnchorGroup> StellariumAnchorGroupExtractor::extract(co
         }
         std::sort(uniqueHips.begin(), uniqueHips.end());
 
-        const std::string labelKey = StringUtilities::normalizedLookupKey(labelText.toStdString());
+        const std::string labelKey =
+            StringUtilities::normalizedLookupKey(CatalogParsingUtilities::toUtf8String(labelText));
         auto indexIt = indexByLabelKey.find(labelKey);
         if (indexIt == indexByLabelKey.end()) {
             std::vector<std::string> hipIds;
@@ -135,7 +137,7 @@ std::vector<ConstellationAnchorGroup> StellariumAnchorGroupExtractor::extract(co
                 hipIds.push_back("hip_" + std::to_string(hip));
             }
             const std::size_t newIndex = anchorGroups.size();
-            anchorGroups.emplace_back(labelText.toStdString(), std::move(hipIds));
+            anchorGroups.emplace_back(CatalogParsingUtilities::toUtf8String(labelText), std::move(hipIds));
             indexByLabelKey.insert({labelKey, newIndex});
             return;
         }

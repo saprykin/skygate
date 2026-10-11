@@ -41,7 +41,7 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
     }
 
     for (const std::string_view rawLine : StringUtilities::splitView(remaining, '\n')) {
-        const QString line = QString::fromUtf8(rawLine.data(), static_cast<qsizetype>(rawLine.size())).trimmed();
+        const QString line = CatalogHeaderPolicy::decodeTrimmedLine(rawLine);
         if (line.isEmpty()) {
             continue;
         }

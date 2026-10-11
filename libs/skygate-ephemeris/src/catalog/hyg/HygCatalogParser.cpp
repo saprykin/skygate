@@ -36,7 +36,7 @@ constexpr double kHygMissingDistanceParsecs = 100'000.0;
 [[nodiscard]] std::optional<double> optionalFiniteDoubleColumn(const DelimitedCatalogRow& row, const QString& name)
 {
     const QString text = row.decodeColumn(name);
-    if (text.trimmed().isEmpty()) {
+    if (text.isEmpty()) {
         return std::nullopt;
     }
 
@@ -67,12 +67,11 @@ constexpr std::string_view kHygInvalidCategoryLabels[] = {
 
 void appendNonEmptyAlias(std::vector<std::string>& aliases, const QString& text)
 {
-    const QString trimmed = text.trimmed();
-    if (trimmed.isEmpty()) {
+    if (text.isEmpty()) {
         return;
     }
 
-    StringUtilities::appendUnique(aliases, CatalogParsingUtilities::toUtf8String(trimmed));
+    StringUtilities::appendUnique(aliases, CatalogParsingUtilities::toUtf8String(text));
 }
 
 }  // namespace
@@ -160,13 +159,13 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
                 body.identity.idScope = CatalogObjectIdentity::IdScope::SourceLocal;
             }
 
-            body.identity.sourceRecordId = CatalogParsingUtilities::toUtf8String(idField.trimmed());
-            if (!hip.trimmed().isEmpty()) {
+            body.identity.sourceRecordId = CatalogParsingUtilities::toUtf8String(idField);
+            if (!hip.isEmpty()) {
                 body.identity.externalIdentifiers.push_back(
                     CatalogIdentifier::make("hip", CatalogParsingUtilities::toUtf8String(hip))
                 );
             }
-            if (!idField.trimmed().isEmpty()) {
+            if (!idField.isEmpty()) {
                 body.identity.externalIdentifiers.push_back(
                     CatalogIdentifier::make("hyg", CatalogParsingUtilities::toUtf8String(idField))
                 );
