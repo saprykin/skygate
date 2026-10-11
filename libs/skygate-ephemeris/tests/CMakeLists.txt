@@ -255,6 +255,10 @@ add_skygate_ephemeris_qtest(
     engine/TimeScaleProviderLoaderTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-time-scale-conversion-result-tests
+    engine/TimeScaleConversionResultTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-backend-resource-cache-tests
     engine/EphemerisBackendResourceCacheTests.cpp
 )

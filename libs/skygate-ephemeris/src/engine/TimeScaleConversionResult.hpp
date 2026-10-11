@@ -19,6 +19,21 @@ struct TimeScaleConversionResult {
         return status == TimeScaleConversionStatus::Valid || status == TimeScaleConversionStatus::Degraded;
     }
 
+    [[nodiscard]] static TimeScaleConversionResult success(
+        skygate::core::AstronomicalEpoch epoch,
+        TimeScaleConversionStatus status = TimeScaleConversionStatus::Valid,
+        std::uint32_t warningCodeMask = 0U,
+        std::string diagnosticText = {}
+    );
+
+    [[nodiscard]] static TimeScaleConversionResult failure(
+        const skygate::core::AstronomicalEpoch& epoch, skygate::core::TimeScale targetScale, std::string diagnosticText
+    );
+
+    static void mergeWarnings(
+        TimeScaleConversionResult& result, TimeScaleConversionStatus sourceStatus, std::uint32_t sourceWarningCodeMask
+    ) noexcept;
+
     void addWarning(const TimeScaleConversionWarningCode code) noexcept
     {
         warningCodeMask |= TimeScaleConversionDiagnostics::warningMask(code);

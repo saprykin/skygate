@@ -4,47 +4,11 @@
 #include "math/TimeConstants.hpp"
 
 #include <array>
-#include <cstdint>
-#include <string>
 #include <utility>
 
 namespace skygate::ephemeris {
 
 namespace {
-
-[[nodiscard]] TimeScaleConversionResult successResult(
-    skygate::core::AstronomicalEpoch epoch,
-    const TimeScaleConversionStatus status = TimeScaleConversionStatus::Valid,
-    const std::uint32_t warningCodeMask = 0U,
-    std::string diagnosticText = {}
-)
-{
-    if (diagnosticText.empty()) {
-        diagnosticText = status == TimeScaleConversionStatus::Valid ? "Time-scale conversion succeeded."
-                                                                    : "Time-scale conversion degraded.";
-    }
-
-    return TimeScaleConversionResult{
-        .epoch = epoch.normalized(),
-        .status = status,
-        .warningCodeMask = warningCodeMask,
-        .diagnosticText = std::move(diagnosticText),
-    };
-}
-
-[[nodiscard]] TimeScaleConversionResult failureResult(
-    const skygate::core::AstronomicalEpoch& epoch,
-    const skygate::core::TimeScale targetScale,
-    std::string diagnosticText
-)
-{
-    TimeScaleConversionResult result;
-    result.epoch = epoch;
-    result.epoch.timeScale = targetScale;
-    result.status = TimeScaleConversionStatus::Failed;
-    result.diagnosticText = std::move(diagnosticText);
-    return result;
-}
 
 [[nodiscard]] TimeScaleConversionWarningCode
 timeScaleWarningFromEarthOrientationWarning(const EarthOrientationSampler::Sample::WarningCode code) noexcept
@@ -175,8 +139,9 @@ void mergeEarthOrientationSampleWarnings(
 )
 {
     if (!options.allowUt1DeltaTFallback || deltaTProvider == nullptr) {
-        TimeScaleConversionResult result =
-            failureResult(ut1Epoch, skygate::core::TimeScale::Utc, std::move(sourceFailure.diagnosticText));
+        TimeScaleConversionResult result = TimeScaleConversionResult::failure(
+            ut1Epoch, skygate::core::TimeScale::Utc, std::move(sourceFailure.diagnosticText)
+        );
         result.warningCodeMask = sourceFailure.warningCodeMask;
         if (deltaTProvider == nullptr) {
             result.addWarning(TimeScaleConversionWarningCode::DeltaTUnavailable);
@@ -188,7 +153,7 @@ void mergeEarthOrientationSampleWarnings(
     estimateEpoch.timeScale = skygate::core::TimeScale::Utc;
     const IDeltaTProvider::Estimate estimate = deltaTProvider->deltaTSeconds(estimateEpoch);
     if (!estimate.isUsable() || !estimate.deltaTSeconds.has_value()) {
-        TimeScaleConversionResult result = failureResult(
+        TimeScaleConversionResult result = TimeScaleConversionResult::failure(
             ut1Epoch,
             skygate::core::TimeScale::Utc,
             estimate.diagnosticText.empty() ? "UT1 conversion could not use Delta T fallback for the requested epoch."
@@ -206,12 +171,12 @@ void mergeEarthOrientationSampleWarnings(
     const LeapSecondOffsetResolver::Result taiOffset = leapSecondResolver.lookupTaiOffset(taiEpoch);
     if (!taiOffset.offsetSeconds.has_value()) {
         TimeScaleConversionResult result =
-            failureResult(taiEpoch, skygate::core::TimeScale::Utc, taiOffset.diagnosticText);
+            TimeScaleConversionResult::failure(taiEpoch, skygate::core::TimeScale::Utc, taiOffset.diagnosticText);
         result.warningCodeMask = sourceFailure.warningCodeMask | taiOffset.warningCodeMask;
         return result;
     }
 
-    TimeScaleConversionResult result = successResult(
+    TimeScaleConversionResult result = TimeScaleConversionResult::success(
         taiEpoch.addSeconds(-static_cast<double>(*taiOffset.offsetSeconds), skygate::core::TimeScale::Utc),
         TimeScaleConversionStatus::Degraded,
         sourceFailure.warningCodeMask | taiOffset.warningCodeMask,
@@ -266,17 +231,14 @@ TimeScaleConversionResult Ut1OffsetResolver::lookupUtcFromUt1(const skygate::cor
     }
 
     TimeScaleConversionResult result =
-        successResult(utcEpoch, lookup.status, lookup.warningCodeMask, lookup.diagnosticText);
+        TimeScaleConversionResult::success(utcEpoch, lookup.status, lookup.warningCodeMask, lookup.diagnosticText);
     mergeWarnings(result, lookup);
     return result;
 }
 
 void Ut1OffsetResolver::mergeWarnings(TimeScaleConversionResult& result, const Result& lookup) noexcept
 {
-    result.warningCodeMask |= lookup.warningCodeMask;
-    if (lookup.status == TimeScaleConversionStatus::Degraded && result.status == TimeScaleConversionStatus::Valid) {
-        result.status = TimeScaleConversionStatus::Degraded;
-    }
+    TimeScaleConversionResult::mergeWarnings(result, lookup.status, lookup.warningCodeMask);
 }
 
 }  // namespace skygate::ephemeris
