@@ -1,13 +1,12 @@
 #include "StellariumConstellationParser.hpp"
 #include "StellariumAnchorGroupExtractor.hpp"
+#include "StellariumHipParser.hpp"
 #include "StellariumLineRefExtractor.hpp"
 
 #include <QByteArray>
-#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
-#include <QJsonValue>
 
 namespace skygate::ephemeris {
 namespace {
@@ -22,16 +21,6 @@ bool looksLikeJsonPayload(const std::string_view payload)
     }
 
     return false;
-}
-
-std::size_t inferConstellationCountFromJson(const QJsonObject& rootObject)
-{
-    const QJsonValue constellationsValue = rootObject.value("constellations");
-    if (constellationsValue.isArray()) {
-        return static_cast<std::size_t>(constellationsValue.toArray().size());
-    }
-
-    return 0;
 }
 
 }  // namespace
@@ -57,7 +46,7 @@ StellariumConstellationParser::ParseResult StellariumConstellationParser::parse(
     const QJsonObject rootObject = document.object();
     result.lineRefs = StellariumLineRefExtractor::extract(rootObject);
     result.anchorGroups = StellariumAnchorGroupExtractor::extract(rootObject);
-    result.constellationCount = inferConstellationCountFromJson(rootObject);
+    result.constellationCount = StellariumHipParser::constellationArrayEntryCount(rootObject);
     return result;
 }
 
