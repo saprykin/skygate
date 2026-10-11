@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -264,6 +265,7 @@ private slots:
     void rejectsStagedUpdateWrongComponentKind();
     void rejectsStagedUpdateVersionMismatch();
     void rejectsStagedUpdateValidityRangeMismatch();
+    void rejectsStagedUpdateReversedValidityRange();
     void rejectsIncompleteStagedUpdateSet();
     void rejectsMalformedStagedMetadata();
     void rejectsMalformedStagedValidityRangeLabels();
@@ -815,6 +817,28 @@ void EphemerisDataActivationTests::rejectsStagedUpdateValidityRangeMismatch()
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::MismatchedMetadata)
+    );
+    QVERIFY(!result.diagnostics.empty());
+}
+
+void EphemerisDataActivationTests::rejectsStagedUpdateReversedValidityRange()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    skygate::ephemeris::EphemerisDataManifest manifest = makeStagedManifest();
+    writeAllStagedAssets(stagedRoot, manifest);
+    skygate::ephemeris::EphemerisStagedUpdateVerificationRequest request = verificationRequest(manifest, stagedRoot);
+    skygate::ephemeris::EphemerisDateRange reversed = makeValidityRange(1990, 2100);
+    std::swap(reversed.start, reversed.end);
+    request.expectedComponents[0].requiredValidityRange = reversed;
+
+    const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(request);
+
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::InvalidRequest)
     );
     QVERIFY(!result.diagnostics.empty());
 }

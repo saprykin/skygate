@@ -56,7 +56,7 @@ stagedSourcePath(const std::filesystem::path& stagedResourceRoot, const Ephemeri
 [[nodiscard]] bool
 validityRangeCovers(const EphemerisDateRange& availableRange, const EphemerisDateRange& requiredRange) noexcept
 {
-    return availableRange.contains(requiredRange.start) && availableRange.contains(requiredRange.end);
+    return availableRange.interval().contains(requiredRange.interval());
 }
 
 [[nodiscard]] bool hasKind(
