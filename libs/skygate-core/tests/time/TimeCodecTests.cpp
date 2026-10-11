@@ -56,6 +56,7 @@ private slots:
     void epochCodecMapsJ2000UtcToJulianDate();
     void epochCodecRoundTripsUtcAndEpoch();
     void epochCodecDaysSinceJ2000FromEpoch();
+    void epochCodecMapsNtpTimestamps();
     void astronomicalEpochAddsSecondsAndNormalizes();
     void astronomicalEpochComparesEqual();
     void astronomicalTimeReportsJ2000SiderealTime();
@@ -136,6 +137,20 @@ void TimeCodecTests::epochCodecDaysSinceJ2000FromEpoch()
         .timeScale = skygate::core::TimeScale::Tt,
     };
     QCOMPARE(skygate::core::EpochCodec::daysSinceJ2000(offsetEpoch), 1.25);
+}
+
+void TimeCodecTests::epochCodecMapsNtpTimestamps()
+{
+    const skygate::core::AstronomicalEpoch ntpEpoch = skygate::core::EpochCodec::epochFromNtpTimestamp(0U);
+    QCOMPARE(ntpEpoch.sortKey(), skygate::core::TimeConstants::kJulianDateNtpEpoch);
+    QCOMPARE(static_cast<std::uint8_t>(ntpEpoch.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Utc));
+
+    // 1900-01-01 00:00:00 plus 36524.5 days is noon on 2000-01-01.
+    const skygate::core::AstronomicalEpoch j2000Epoch =
+        skygate::core::EpochCodec::epochFromNtpTimestamp(3'155'716'800ULL);
+    QCOMPARE(j2000Epoch.julianDatePart1, skygate::core::TimeConstants::kJulianDateJ2000);
+    QCOMPARE(j2000Epoch.julianDatePart2, 0.0);
+    QCOMPARE(j2000Epoch.sortKey(), skygate::core::TimeConstants::kJulianDateJ2000);
 }
 
 void TimeCodecTests::astronomicalEpochAddsSecondsAndNormalizes()

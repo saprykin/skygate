@@ -1,8 +1,8 @@
 #include "LeapSecondTableParser.hpp"
 #include "text/HighPrecisionTextParser.hpp"
 #include "IEphemerisDataSnapshot.hpp"
-#include "math/TimeConstants.hpp"
 #include "time/CalendarTime.hpp"
+#include "time/EpochCodec.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -93,18 +93,6 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
     return dateTime;
 }
 
-[[nodiscard]] skygate::core::AstronomicalEpoch epochFromNtpTimestamp(const std::uint64_t ntpTimestamp) noexcept
-{
-    constexpr double kModifiedJulianDateEpoch = 2'400'000.5;
-    constexpr double kModifiedJulianDateAtNtpEpoch = 15'020.0;
-    return skygate::core::AstronomicalEpoch{
-        .julianDatePart1 = kModifiedJulianDateEpoch + kModifiedJulianDateAtNtpEpoch,
-        .julianDatePart2 = static_cast<double>(ntpTimestamp) / skygate::core::TimeConstants::kSecondsPerDay,
-        .timeScale = skygate::core::TimeScale::Utc,
-    }
-        .normalized();
-}
-
 [[nodiscard]] std::optional<std::string>
 applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view line, const std::size_t lineNumber)
 {
@@ -144,7 +132,7 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
                    + ".";
         }
 
-        info.expiresAt = epochFromNtpTimestamp(ntpExpiration);
+        info.expiresAt = skygate::core::EpochCodec::epochFromNtpTimestamp(ntpExpiration);
     }
 
     return std::nullopt;
@@ -191,7 +179,7 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
         return false;
     }
 
-    const skygate::core::AstronomicalEpoch epoch = epochFromNtpTimestamp(ntpTimestamp);
+    const skygate::core::AstronomicalEpoch epoch = skygate::core::EpochCodec::epochFromNtpTimestamp(ntpTimestamp);
     std::optional<skygate::core::CivilDateTime> effectiveDate;
     if (commentOffset != std::string_view::npos) {
         effectiveDate = parseIanaCommentDate(line.substr(commentOffset + 1U));

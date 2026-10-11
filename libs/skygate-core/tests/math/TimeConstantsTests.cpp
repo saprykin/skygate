@@ -28,6 +28,7 @@ private slots:
     void kJulianDaysPerYear_is365_25();
     void kSecondsPerJulianYear_isDaysTimesSecondsPerDay();
     void kJulianDateUnixEpoch_hasExpectedValue();
+    void kJulianDateNtpEpoch_hasExpectedValue();
     void kJulianDateJ2000_hasExpectedValue();
     void kJulianDateKnownNewMoon_hasExpectedValue();
     void kTtMinusTaiSeconds_hasExpectedValue();
@@ -95,6 +96,11 @@ void TimeConstantsTests::kSecondsPerJulianYear_isDaysTimesSecondsPerDay()
 void TimeConstantsTests::kJulianDateUnixEpoch_hasExpectedValue()
 {
     QCOMPARE(skygate::core::TimeConstants::kJulianDateUnixEpoch, 2'440'587.5);
+}
+
+void TimeConstantsTests::kJulianDateNtpEpoch_hasExpectedValue()
+{
+    QCOMPARE(skygate::core::TimeConstants::kJulianDateNtpEpoch, 2'415'020.5);
 }
 
 void TimeConstantsTests::kJulianDateJ2000_hasExpectedValue()
