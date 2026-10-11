@@ -48,6 +48,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/CalcephKernel.cpp
     src/engine/highprecision/CalcephKernelProvider.hpp
     src/engine/highprecision/CalcephKernelProvider.cpp
+    src/engine/highprecision/CalcephKernelStatusNames.hpp
+    src/engine/highprecision/CalcephKernelStatusNames.cpp
     src/engine/highprecision/CelestialFrameTransformRequest.hpp
     src/engine/highprecision/CelestialFrameTransformRequest.cpp
     src/engine/highprecision/CelestialFrameTransformResult.hpp

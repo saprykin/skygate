@@ -3,6 +3,7 @@
 #include "SkyContextControllerSupport.hpp"
 #include "SkySettingsSnapshotCodecs.hpp"
 #include "SkySettingsValueCodecs.hpp"
+#include "catalog/CatalogSchemaRegistry.hpp"
 
 #include <QCryptographicHash>
 #include <QDir>
@@ -95,11 +96,8 @@ skygate::ephemeris::CatalogSourceType readCatalogSourceSchemaHint(QSettings& set
     const int storedValue = settings.value(key).toInt(&ok);
     if (ok) {
         const auto storedType = static_cast<skygate::ephemeris::CatalogSourceType>(storedValue);
-        switch (storedType) {
-        case skygate::ephemeris::CatalogSourceType::Bundled:
-        case skygate::ephemeris::CatalogSourceType::HygCsv:
-        case skygate::ephemeris::CatalogSourceType::OpenNgcCsv:
-        case skygate::ephemeris::CatalogSourceType::Unknown:
+        if (storedType == skygate::ephemeris::CatalogSourceType::Unknown
+            || skygate::ephemeris::CatalogSchemaRegistry::find(storedType) != nullptr) {
             return storedType;
         }
     }

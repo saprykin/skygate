@@ -44,11 +44,6 @@ bool hasZipSignature(const std::string_view payload) noexcept
                || (thirdByte == 0x07U && fourthByte == 0x08U));
 }
 
-QString catalogSourceTypeText(const CatalogSourceType type)
-{
-    return QString::fromStdString(CatalogSchemaRegistry::diagnosticName(type));
-}
-
 CatalogLoadResult logSuccessfulParse(CatalogLoadResult result)
 {
     if (!result.isSuccess()) {
@@ -56,7 +51,8 @@ CatalogLoadResult logSuccessfulParse(CatalogLoadResult result)
     }
 
     qCInfo(skygateCatalogParseLog).noquote()
-        << "Catalog payload parsed: format" << catalogSourceTypeText(result.detectedFormat) << "parsed"
+        << "Catalog payload parsed: format"
+        << QString::fromStdString(CatalogSchemaRegistry::diagnosticName(result.detectedFormat)) << "parsed"
         << static_cast<qulonglong>(result.diagnostics.parsedBodyCount) << "selected"
         << static_cast<qulonglong>(result.diagnostics.selectedBodyCount) << "truncated"
         << static_cast<qulonglong>(result.diagnostics.truncatedBodyCount);
