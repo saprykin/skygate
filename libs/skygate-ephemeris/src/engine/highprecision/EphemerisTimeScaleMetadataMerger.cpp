@@ -1,6 +1,6 @@
 #include "EphemerisTimeScaleMetadataMerger.hpp"
-#include "BitFlagSetOperations.hpp"
 #include "EphemerisMetadataMerger.hpp"
+#include "engine/BitFlagSetOperations.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
 #include "engine/TimeScaleConversionResult.hpp"
 
