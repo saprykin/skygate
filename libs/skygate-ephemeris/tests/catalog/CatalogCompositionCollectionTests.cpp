@@ -1,10 +1,12 @@
 #include "catalog/CatalogComposer.hpp"
+#include "catalog/CatalogCompositionPolicyRules.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 
 #include <QtTest/QtTest>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -18,6 +20,7 @@ namespace {
 
 using skygate::ephemeris::BaseCelestialBody;
 using skygate::ephemeris::CatalogCompositionPolicy;
+using skygate::ephemeris::CatalogCompositionPolicyRules;
 using skygate::ephemeris::CatalogCompositionRequest;
 using skygate::ephemeris::CatalogCompositionResult;
 using skygate::ephemeris::CatalogCompositionSourceEntry;
@@ -197,6 +200,7 @@ private slots:
     void reorderedBridgeSourcesKeepWinnerAndContributors();
     void repeatedImportsKeepWinnerAndContributors();
     void reimportedDescriptorReplacesAbsorbedRecord();
+    void deepSkyPoliciesSelectAndCountConsistently();
 };
 
 void CatalogCompositionCollectionTests::starAndDsoSourcesWithOverlapsAndMixedSource()
@@ -985,6 +989,37 @@ void CatalogCompositionCollectionTests::reimportedDescriptorReplacesAbsorbedReco
     QCOMPARE(countBodiesById(bodies, "a_hip1"), std::size_t{1});
     QCOMPARE(*sourceIdFor(result, bodies, "a_hip1"), std::string("source-a-reload"));
     QCOMPARE(*contributorsFor(result, bodies, "a_hip1"), (std::vector<std::string>{"source-a-reload", "source-a"}));
+}
+
+void CatalogCompositionCollectionTests::deepSkyPoliciesSelectAndCountConsistently()
+{
+    const auto mixed = createCatalog(
+        {makeStar("policy_star", "Policy star", {}, 1.0, 2.0)},
+        {makeDeepSkyObject("policy_dso", "Policy deep sky", {"Policy DSO"}, {CatalogIdentifier::make("ngc", "1")})}
+    );
+    QVERIFY(mixed != nullptr);
+
+    const std::array policies{
+        CatalogCompositionPolicy::Merge,
+        CatalogCompositionPolicy::DeepSkyOnly,
+        CatalogCompositionPolicy::AugmentCore,
+        CatalogCompositionPolicy::DeepSkyFallback,
+    };
+    for (const CatalogCompositionPolicy policy : policies) {
+        const bool selectsDeepSky =
+            CatalogCompositionPolicyRules::participates(policy, BaseCelestialBody::Kind::DeepSkyObject);
+        QCOMPARE(CatalogCompositionPolicyRules::contributesDeepSkyObjects(policy), selectsDeepSky);
+
+        CatalogCompositionRequest request;
+        request.sources = {
+            {.sourceId = "policy-source", .enabled = true, .catalog = mixed.get(), .policy = policy},
+        };
+        const CatalogCompositionResult result = skygate::ephemeris::CatalogComposer::composeCollection(request);
+
+        QVERIFY(result.isSuccess());
+        QCOMPARE(result.deepSkyObjectCount, selectsDeepSky ? std::size_t{1} : std::size_t{0});
+        QCOMPARE(result.foundDeepSkyObjectCount, selectsDeepSky ? std::size_t{1} : std::size_t{0});
+    }
 }
 
 QTEST_APPLESS_MAIN(CatalogCompositionCollectionTests)
