@@ -516,8 +516,20 @@ add_skygate_ephemeris_qtest(
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
-    skygate-ephemeris-catalog-field-precedence-tests
-    catalog/CatalogFieldPrecedenceTests.cpp
+    skygate-ephemeris-catalog-source-precedence-tests
+    catalog/CatalogSourcePrecedenceTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-row-origin-tests
+    catalog/CatalogRowOriginTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-magnitude-precedence-tests
+    catalog/CatalogMagnitudePrecedenceTests.cpp
     LABELS integration
     TIMEOUT 45
 )
