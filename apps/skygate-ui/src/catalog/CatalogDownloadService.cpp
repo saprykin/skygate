@@ -64,10 +64,15 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
     qCInfo(skygateCatalogDownloadLog).noquote() << "Catalog download started: sources" << candidateUrls.size();
     const auto lastErrorText = std::make_shared<QString>("Catalog: Download failed");
     const auto tryDownloadNextUrl = std::make_shared<std::function<void(int)>>();
+    const std::weak_ptr<std::function<void(int)>> weakTryDownloadNextUrl = tryDownloadNextUrl;
     *tryDownloadNextUrl =
-        [this, candidateUrls, callbackContext, statusHandler, completionHandler, lastErrorText, tryDownloadNextUrl](
+        [this, candidateUrls, callbackContext, statusHandler, completionHandler, lastErrorText, weakTryDownloadNextUrl](
             const int index
         ) {
+            // The stored function refers to itself weakly; a pending reply holds
+            // the strong copy that keeps the retry chain alive.
+            const std::shared_ptr<std::function<void(int)>> downloadNextUrl = weakTryDownloadNextUrl.lock();
+
             if (index >= candidateUrls.size()) {
                 DownloadResult result;
                 result.errorText = *lastErrorText;
@@ -80,7 +85,7 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
                 *lastErrorText = QString("Catalog: Invalid source URL %1").arg(candidateUrls[index]);
                 qCWarning(skygateCatalogDownloadLog).noquote()
                     << "Skipping invalid catalog source URL" << candidateUrls[index];
-                (*tryDownloadNextUrl)(index + 1);
+                (*downloadNextUrl)(index + 1);
                 return;
             }
 
@@ -104,9 +109,7 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
                 reply,
                 &QNetworkReply::finished,
                 contextObject,
-                [reply, index, candidateUrls, statusHandler, completionHandler, lastErrorText, tryDownloadNextUrl]() {
-                    reply->deleteLater();
-
+                [reply, index, candidateUrls, statusHandler, completionHandler, lastErrorText, downloadNextUrl]() {
                     if (reply->error() != QNetworkReply::NoError) {
                         const int httpStatusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
                         *lastErrorText =
@@ -118,7 +121,7 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
                         if (statusHandler) {
                             statusHandler(*lastErrorText);
                         }
-                        (*tryDownloadNextUrl)(index + 1);
+                        (*downloadNextUrl)(index + 1);
                         return;
                     }
 
@@ -130,7 +133,7 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
                         if (statusHandler) {
                             statusHandler(*lastErrorText);
                         }
-                        (*tryDownloadNextUrl)(index + 1);
+                        (*downloadNextUrl)(index + 1);
                         return;
                     }
 
@@ -142,7 +145,7 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
                         if (statusHandler) {
                             statusHandler(*lastErrorText);
                         }
-                        (*tryDownloadNextUrl)(index + 1);
+                        (*downloadNextUrl)(index + 1);
                         return;
                     }
 
@@ -154,6 +157,8 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
                     completionHandler(std::move(result));
                 }
             );
+            // Reply deletion must not depend on the callback context surviving.
+            QObject::connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
         };
 
     (*tryDownloadNextUrl)(0);
