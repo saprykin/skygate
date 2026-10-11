@@ -29,24 +29,41 @@ struct FakeNetworkResponse final {
     // FakeNetworkReply::finishNow(), so a controlled reply can be delivered at
     // an exact point in a sequence instead of after a fixed delay.
     bool manualFinish = false;
+    // Bytes made readable per readyRead signal. Zero delivers the whole
+    // payload in one signal.
+    qsizetype chunkSize = 0;
+    // false omits the Content-Length header, as a server streaming an unknown
+    // amount of data would.
+    bool includeContentLength = true;
+    // Reported Content-Length when non-negative. Negative reports the real
+    // payload size.
+    qint64 declaredContentLength = -1;
 };
 
 class FakeNetworkReply final : public QNetworkReply {
 public:
     FakeNetworkReply(const QNetworkRequest& request, FakeNetworkResponse response, QObject* parent)
-        : QNetworkReply(parent), m_payload(std::move(response.payload))
+        : QNetworkReply(parent), m_payload(std::move(response.payload)), m_chunkSize(response.chunkSize)
     {
         setRequest(request);
         setUrl(request.url());
         setAttribute(QNetworkRequest::HttpStatusCodeAttribute, response.httpStatusCode);
-        setHeader(QNetworkRequest::ContentLengthHeader, m_payload.size());
+        if (response.includeContentLength) {
+            const qint64 declaredBytes = response.declaredContentLength >= 0 ? response.declaredContentLength
+                                                                             : static_cast<qint64>(m_payload.size());
+            setHeader(QNetworkRequest::ContentLengthHeader, declaredBytes);
+        }
         if (response.error != QNetworkReply::NoError) {
             setError(response.error, response.errorText);
         }
         open(QIODevice::ReadOnly | QIODevice::Unbuffered);
 
         if (!response.manualFinish) {
-            QTimer::singleShot(response.delayMs, this, [this] { finish(); });
+            if (m_chunkSize > 0) {
+                QTimer::singleShot(response.delayMs, this, [this] { produceNextChunk(); });
+            } else {
+                QTimer::singleShot(response.delayMs, this, [this] { finish(); });
+            }
         }
     }
 
@@ -65,8 +82,10 @@ public:
         }
 
         m_aborted = true;
+        m_producedBytesWhenAborted = m_producedBytes;
         m_payload.clear();
         m_offset = 0;
+        m_producedBytes = 0;
         setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 0);
         setError(QNetworkReply::OperationCanceledError, QStringLiteral("Operation canceled"));
         finish();
@@ -77,31 +96,64 @@ public:
         return m_aborted;
     }
 
+    // Bytes the fixture had made readable when the consumer aborted the
+    // reply. Zero for a reply that was never aborted.
+    [[nodiscard]] qsizetype producedBytesWhenAborted() const noexcept
+    {
+        return m_producedBytesWhenAborted;
+    }
+
     [[nodiscard]] qint64 bytesAvailable() const override
     {
-        return static_cast<qint64>(m_payload.size() - m_offset) + QNetworkReply::bytesAvailable();
+        return static_cast<qint64>(m_producedBytes - m_offset) + QNetworkReply::bytesAvailable();
     }
 
 protected:
     qint64 readData(char* data, const qint64 maxSize) override
     {
-        if (m_offset >= m_payload.size()) {
+        if (m_offset >= m_producedBytes) {
             return -1;
         }
 
-        const qint64 bytesToRead = std::min<qint64>(maxSize, static_cast<qint64>(m_payload.size() - m_offset));
+        const qint64 bytesToRead = std::min<qint64>(maxSize, static_cast<qint64>(m_producedBytes - m_offset));
         std::memcpy(data, m_payload.constData() + m_offset, static_cast<std::size_t>(bytesToRead));
         m_offset += bytesToRead;
         return bytesToRead;
     }
 
 private:
+    void produceNextChunk()
+    {
+        if (isFinished()) {
+            return;
+        }
+
+        const qsizetype remainingBytes = m_payload.size() - m_producedBytes;
+        const qsizetype chunkBytes = std::min(m_chunkSize, remainingBytes);
+        m_producedBytes += chunkBytes;
+        if (chunkBytes > 0) {
+            emit readyRead();
+        }
+        if (isFinished()) {
+            return;
+        }
+
+        if (m_producedBytes < m_payload.size()) {
+            QTimer::singleShot(0, this, [this] { produceNextChunk(); });
+        } else {
+            QTimer::singleShot(0, this, [this] { finish(); });
+        }
+    }
+
     void finish()
     {
         if (isFinished()) {
             return;
         }
 
+        if (!m_aborted) {
+            m_producedBytes = m_payload.size();
+        }
         setFinished(true);
         if (error() != QNetworkReply::NoError && !m_errorSignalEmitted) {
             m_errorSignalEmitted = true;
@@ -114,7 +166,10 @@ private:
     }
 
     QByteArray m_payload;
+    qsizetype m_chunkSize = 0;
     qsizetype m_offset = 0;
+    qsizetype m_producedBytes = 0;
+    qsizetype m_producedBytesWhenAborted = 0;
     bool m_aborted = false;
     bool m_errorSignalEmitted = false;
 };

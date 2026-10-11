@@ -1,21 +1,34 @@
 #include "CatalogDownloadService.hpp"
 #include "CatalogDownloadCancellation.hpp"
 
+#include <QLoggingCategory>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
-#include <QLoggingCategory>
 #include <QObject>
 #include <QUrl>
+#include <QVariant>
 
+#include <cstddef>
 #include <functional>
 #include <memory>
+#include <optional>
 
 namespace {
 
-constexpr std::size_t kMaxDownloadedCatalogBytes = 128U << 20;
+constexpr std::size_t kMaxDownloadedCatalogBytes = 128U << 20U;
+constexpr qint64 kCatalogReplyReadBufferBytes = 64 * 1024;
+constexpr int kCatalogTransferTimeoutMs = 300000;
 
 Q_LOGGING_CATEGORY(skygateCatalogDownloadLog, "skygate.catalog.download")
+
+// Byte accounting for one candidate URL. `receivedBytes` counts every byte
+// pulled off the reply, including a chunk dropped for crossing the cap.
+struct CatalogDownloadAttempt final {
+    QByteArray payload;
+    std::size_t receivedBytes = 0;
+    bool rejectedForSize = false;
+};
 
 QStringList normalizedCandidateUrls(const QStringList& urlTexts)
 {
@@ -29,6 +42,61 @@ QStringList normalizedCandidateUrls(const QStringList& urlTexts)
     }
 
     return candidateUrls;
+}
+
+std::optional<qlonglong> declaredContentLengthBytes(QNetworkReply* reply)
+{
+    const QVariant declaredLength = reply->header(QNetworkRequest::ContentLengthHeader);
+    if (!declaredLength.isValid()) {
+        return std::nullopt;
+    }
+
+    bool converted = false;
+    const qlonglong declaredBytes = declaredLength.toLongLong(&converted);
+    if (!converted) {
+        return std::nullopt;
+    }
+
+    return declaredBytes;
+}
+
+// The declared length is only a hint: a reply that already says it is too
+// large is rejected before its body is read. Missing or wrong headers fall
+// through to the actual byte count.
+bool rejectExcessiveDeclaredLength(QNetworkReply* reply, const QString& urlText, CatalogDownloadAttempt& attempt)
+{
+    if (attempt.rejectedForSize) {
+        return true;
+    }
+
+    const std::optional<qlonglong> declaredBytes = declaredContentLengthBytes(reply);
+    if (!declaredBytes.has_value() || *declaredBytes <= static_cast<qlonglong>(kMaxDownloadedCatalogBytes)) {
+        return false;
+    }
+
+    attempt.rejectedForSize = true;
+    qCWarning(skygateCatalogDownloadLog).noquote()
+        << "Catalog source declared size over limit" << urlText << *declaredBytes;
+    if (reply->isRunning()) {
+        reply->abort();
+    }
+    return true;
+}
+
+// Returns false when the chunk would push the payload past the cap; the
+// chunk is dropped and the attempt is marked rejected.
+bool appendChunkWithinBudget(CatalogDownloadAttempt& attempt, const QByteArray& chunk)
+{
+    const auto incomingBytes = static_cast<std::size_t>(chunk.size());
+    if (incomingBytes > kMaxDownloadedCatalogBytes - attempt.receivedBytes) {
+        attempt.receivedBytes += incomingBytes;
+        attempt.rejectedForSize = true;
+        return false;
+    }
+
+    attempt.payload.append(chunk);
+    attempt.receivedBytes += incomingBytes;
+    return true;
 }
 
 }  // namespace
@@ -105,16 +173,50 @@ std::shared_ptr<CatalogDownloadCancellation> CatalogDownloadService::downloadFir
 
         QNetworkRequest request(url);
         request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-        request.setTransferTimeout(300000);
+        request.setTransferTimeout(kCatalogTransferTimeoutMs);
         request.setRawHeader("User-Agent", "Skygate/1.0");
         request.setRawHeader(
             "Accept", "text/plain,text/csv,application/gzip,application/zip,application/octet-stream,*/*"
         );
 
         QNetworkReply* reply = m_networkAccessManager->get(request);
+        // Qt stops pulling from the socket once this many bytes wait unread,
+        // so unread data stays bounded between readyRead signals.
+        reply->setReadBufferSize(kCatalogReplyReadBufferBytes);
         cancellation->setActiveReply(reply);
         QObject* const contextObject =
             callbackContext != nullptr ? callbackContext : static_cast<QObject*>(m_networkAccessManager);
+
+        const QString urlText = candidateUrls[index];
+        const auto attempt = std::make_shared<CatalogDownloadAttempt>();
+
+        QObject::connect(
+            reply, &QNetworkReply::metaDataChanged, contextObject, [reply, urlText, attempt, cancellation]() {
+                if (cancellation->isCanceled()) {
+                    return;
+                }
+                rejectExcessiveDeclaredLength(reply, urlText, *attempt);
+            }
+        );
+
+        QObject::connect(reply, &QNetworkReply::readyRead, contextObject, [reply, urlText, attempt, cancellation]() {
+            if (cancellation->isCanceled() || attempt->rejectedForSize) {
+                return;
+            }
+            if (rejectExcessiveDeclaredLength(reply, urlText, *attempt)) {
+                return;
+            }
+
+            const QByteArray chunk = reply->readAll();
+            if (chunk.isEmpty()) {
+                return;
+            }
+            if (!appendChunkWithinBudget(*attempt, chunk)) {
+                qCWarning(skygateCatalogDownloadLog).noquote()
+                    << "Catalog source exceeded size limit" << urlText << attempt->receivedBytes;
+                reply->abort();
+            }
+        });
 
         QObject::connect(
             reply,
@@ -122,11 +224,12 @@ std::shared_ptr<CatalogDownloadCancellation> CatalogDownloadService::downloadFir
             contextObject,
             [reply,
              index,
-             candidateUrls,
+             urlText,
              statusHandler,
              completionHandler,
              lastErrorText,
              cancellation,
+             attempt,
              downloadNextUrl]() {
                 if (cancellation->isCanceled()) {
                     // The operation was already marked terminal before the
@@ -135,13 +238,25 @@ std::shared_ptr<CatalogDownloadCancellation> CatalogDownloadService::downloadFir
                     return;
                 }
 
+                const auto reportSizeRejection = [&]() {
+                    *lastErrorText = QString("Catalog: Source %1 file too large (max 128 MiB)").arg(urlText);
+                    if (statusHandler) {
+                        statusHandler(*lastErrorText);
+                    }
+                    (*downloadNextUrl)(index + 1);
+                };
+
+                if (attempt->rejectedForSize) {
+                    reportSizeRejection();
+                    return;
+                }
+
                 if (reply->error() != QNetworkReply::NoError) {
                     const int httpStatusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-                    *lastErrorText =
-                        QString("Catalog: Source %1 failed (%2, HTTP %3)")
-                            .arg(candidateUrls[index], reply->errorString(), QString::number(httpStatusCode));
-                    qCWarning(skygateCatalogDownloadLog).noquote() << "Catalog source failed" << candidateUrls[index]
-                                                                   << reply->errorString() << "HTTP" << httpStatusCode;
+                    *lastErrorText = QString("Catalog: Source %1 failed (%2, HTTP %3)")
+                                         .arg(urlText, reply->errorString(), QString::number(httpStatusCode));
+                    qCWarning(skygateCatalogDownloadLog).noquote()
+                        << "Catalog source failed" << urlText << reply->errorString() << "HTTP" << httpStatusCode;
                     if (statusHandler) {
                         statusHandler(*lastErrorText);
                     }
@@ -149,23 +264,22 @@ std::shared_ptr<CatalogDownloadCancellation> CatalogDownloadService::downloadFir
                     return;
                 }
 
-                const QByteArray payload = reply->readAll();
-                if (payload.isEmpty()) {
-                    *lastErrorText = QString("Catalog: Source %1 returned empty data").arg(candidateUrls[index]);
-                    qCWarning(skygateCatalogDownloadLog).noquote()
-                        << "Catalog source returned empty data" << candidateUrls[index];
-                    if (statusHandler) {
-                        statusHandler(*lastErrorText);
-                    }
-                    (*downloadNextUrl)(index + 1);
+                if (rejectExcessiveDeclaredLength(reply, urlText, *attempt)) {
+                    reportSizeRejection();
                     return;
                 }
 
-                if (static_cast<std::size_t>(payload.size()) > kMaxDownloadedCatalogBytes) {
-                    *lastErrorText =
-                        QString("Catalog: Source %1 file too large (max 128 MiB)").arg(candidateUrls[index]);
+                const QByteArray remainingChunk = reply->readAll();
+                if (!remainingChunk.isEmpty() && !appendChunkWithinBudget(*attempt, remainingChunk)) {
                     qCWarning(skygateCatalogDownloadLog).noquote()
-                        << "Catalog source exceeded size limit" << candidateUrls[index] << payload.size();
+                        << "Catalog source exceeded size limit" << urlText << attempt->receivedBytes;
+                    reportSizeRejection();
+                    return;
+                }
+
+                if (attempt->payload.isEmpty()) {
+                    *lastErrorText = QString("Catalog: Source %1 returned empty data").arg(urlText);
+                    qCWarning(skygateCatalogDownloadLog).noquote() << "Catalog source returned empty data" << urlText;
                     if (statusHandler) {
                         statusHandler(*lastErrorText);
                     }
@@ -174,10 +288,10 @@ std::shared_ptr<CatalogDownloadCancellation> CatalogDownloadService::downloadFir
                 }
 
                 DownloadResult result;
-                result.payload = payload;
-                result.sourceUrl = candidateUrls[index];
+                result.payload = std::move(attempt->payload);
+                result.sourceUrl = urlText;
                 qCInfo(skygateCatalogDownloadLog).noquote()
-                    << "Catalog download succeeded:" << candidateUrls[index] << "bytes" << payload.size();
+                    << "Catalog download succeeded:" << urlText << "bytes" << result.payload.size();
                 completionHandler(std::move(result));
             }
         );
