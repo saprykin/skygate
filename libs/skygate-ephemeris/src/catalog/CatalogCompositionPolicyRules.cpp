@@ -27,7 +27,7 @@ bool CatalogCompositionPolicyRules::participates(
 
 bool CatalogCompositionPolicyRules::contributesDeepSkyObjects(const CatalogCompositionPolicy policy) noexcept
 {
-    return participates(policy, BaseCelestialBody::Kind::DeepSkyObject);
+    return policy == CatalogCompositionPolicy::DeepSkyOnly || policy == CatalogCompositionPolicy::DeepSkyFallback;
 }
 
 }  // namespace skygate::ephemeris
