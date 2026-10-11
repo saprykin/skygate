@@ -1,4 +1,5 @@
 #include "SkyContextControllerTestSupport.hpp"
+#include "SkyDeviceLocationAcquisition.hpp"
 
 class SkyContextControllerViewLocationTests final : public QObject {
     Q_OBJECT
@@ -138,9 +139,7 @@ void SkyContextControllerViewLocationTests::currentDevicePositionSourceAppliesUp
 
     QCOMPARE(controller->locationSourceText(), QString("Current Device"));
     QCOMPARE(positionSource.requestCount(), 1);
-    QCOMPARE(
-        positionSource.lastTimeoutMs(), skygate::ui::internal::SkyContextControllerConstants::kLocationUpdateTimeoutMs
-    );
+    QCOMPARE(positionSource.lastTimeoutMs(), skygate::ui::internal::SkyDeviceLocationAcquisition::kUpdateTimeoutMs);
     QCOMPARE(controller->locationStatusText(), QString("Location: Locating"));
 
     positionSource.publishPosition(51.5074, -0.1278, 35.0);

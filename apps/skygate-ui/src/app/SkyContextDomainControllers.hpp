@@ -8,8 +8,6 @@
 
 #include <QString>
 
-class QGeoPositionInfoSource;
-
 namespace skygate::ui::internal {
 
 struct SkySelectedCityChange final {
@@ -67,13 +65,7 @@ public:
     [[nodiscard]] QString statusText() const;
     [[nodiscard]] QString selectedCityId() const;
     [[nodiscard]] QString selectedCityDisplayText() const;
-    [[nodiscard]] QGeoPositionInfoSource* positionSource() const noexcept;
-    [[nodiscard]] bool positionSourceConnected() const noexcept;
-    [[nodiscard]] bool requestLocationPermission() const noexcept;
 
-    void setPositionSource(QGeoPositionInfoSource* positionSource) noexcept;
-    void setPositionSourceConnected(bool positionSourceConnected) noexcept;
-    void setRequestLocationPermission(bool requestLocationPermission) noexcept;
     void setUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcept;
     void setObserver(const skygate::core::GeoLocation& observer) noexcept;
     [[nodiscard]] bool setSource(SkyContextLocationSource source) noexcept;

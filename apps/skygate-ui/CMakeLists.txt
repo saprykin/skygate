@@ -14,8 +14,13 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/CatalogCoordinator.hpp
     src/catalog/CatalogParseOptions.cpp
     src/catalog/CatalogParseOptions.hpp
+    src/location/ILocationPermissionGate.hpp
     src/location/LocationCatalogModel.cpp
     src/location/LocationCatalogModel.hpp
+    src/location/SkyDeviceLocationAcquisition.cpp
+    src/location/SkyDeviceLocationAcquisition.hpp
+    src/location/SkyLocationPermissionGate.cpp
+    src/location/SkyLocationPermissionGate.hpp
     src/search/SkyObjectSearchModel.cpp
     src/search/SkyObjectSearchModel.hpp
     src/theme/SkyOverlayLayerSettings.cpp

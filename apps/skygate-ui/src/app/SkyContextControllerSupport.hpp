@@ -34,7 +34,6 @@ class SkyContextControllerConstants final {
 public:
     static constexpr int kTickIntervalMs = 1000;
     static constexpr int kThrottledLiveRecomputeIntervalMs = 10000;
-    static constexpr int kLocationUpdateTimeoutMs = 5000;
     static constexpr int kSettingsVersion = 3;
     static constexpr int kConstellationLineCacheSchemaVersion = 4;
     // Collection cache record format. Version 3 stores each source record's

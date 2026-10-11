@@ -1,21 +1,13 @@
 #include "SkyContextController.hpp"
-#include "engine/EphemerisComputationPolicy.hpp"
 #include "SkyContextControllerSupport.hpp"
+#include "SkyDeviceLocationAcquisition.hpp"
 #include "SkyTimeController.hpp"
+#include "engine/EphemerisComputationPolicy.hpp"
 #include "math/ViewportMath.hpp"
-
-#include <QCoreApplication>
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-
-#if SKYGATE_HAS_POSITIONING
-#include <QGeoCoordinate>
-#include <QGeoPositionInfo>
-#include <QGeoPositionInfoSource>
-#include <QLocationPermission>
-#endif
 
 using namespace skygate::ui::internal;
 
@@ -439,130 +431,7 @@ void SkyContextController::refreshCurrentLocation()
         return;
     }
 
-    initializeCurrentLocation();
-}
-
-void SkyContextController::initializeCurrentLocation()
-{
-    if (m_location.source() != SkyContextLocationSource::CurrentDevice) {
-        updateLocationStatusText();
-        return;
-    }
-
-#if SKYGATE_HAS_POSITIONING
-    setLocationStatusText("Location: Initializing");
-
-    if (m_location.positionSource() == nullptr) {
-        m_location.setPositionSource(QGeoPositionInfoSource::createDefaultSource(this));
-    }
-    if (m_location.positionSource() == nullptr) {
-        setLocationStatusText("Location: Device source unavailable");
-        return;
-    }
-
-    if (!m_location.positionSourceConnected()) {
-        connect(
-            m_location.positionSource(),
-            &QGeoPositionInfoSource::positionUpdated,
-            this,
-            &SkyContextController::applyCurrentLocation
-        );
-        connect(
-            m_location.positionSource(),
-            &QGeoPositionInfoSource::errorOccurred,
-            this,
-            [this](QGeoPositionInfoSource::Error) {
-                if (m_location.source() != SkyContextLocationSource::CurrentDevice) {
-                    return;
-                }
-
-                setLocationStatusText("Location: Update failed");
-            }
-        );
-        m_location.setPositionSourceConnected(true);
-    }
-
-    QLocationPermission permission;
-    permission.setAccuracy(QLocationPermission::Precise);
-    permission.setAvailability(QLocationPermission::WhenInUse);
-
-    auto startLocationUpdate = [this] {
-        setLocationStatusText("Location: Locating");
-        m_location.positionSource()->requestUpdate(SkyContextControllerConstants::kLocationUpdateTimeoutMs);
-    };
-
-    if (!m_location.requestLocationPermission()) {
-        startLocationUpdate();
-        return;
-    }
-
-    QCoreApplication* app = QCoreApplication::instance();
-    if (app == nullptr) {
-        setLocationStatusText("Location: Positioning unavailable");
-        return;
-    }
-
-    const Qt::PermissionStatus permissionStatus = app->checkPermission(permission);
-    if (permissionStatus == Qt::PermissionStatus::Granted) {
-        startLocationUpdate();
-        return;
-    }
-
-    if (permissionStatus == Qt::PermissionStatus::Undetermined) {
-        setLocationStatusText("Location: Waiting for permission");
-        app->requestPermission(permission, this, [this, startLocationUpdate](const QPermission& requestPermission) {
-            if (m_location.source() != SkyContextLocationSource::CurrentDevice) {
-                return;
-            }
-
-            if (requestPermission.status() == Qt::PermissionStatus::Granted) {
-                startLocationUpdate();
-                return;
-            }
-
-            setLocationStatusText("Location: Permission denied");
-        });
-        return;
-    }
-
-    setLocationStatusText("Location: Permission denied");
-#else
-    setLocationStatusText("Location: Positioning unavailable");
-#endif
-}
-
-void SkyContextController::applyCurrentLocation(const QGeoPositionInfo& positionInfo)
-{
-#if SKYGATE_HAS_POSITIONING
-    if (m_location.source() != SkyContextLocationSource::CurrentDevice) {
-        return;
-    }
-
-    if (!positionInfo.isValid()) {
-        return;
-    }
-
-    const QGeoCoordinate coordinate = positionInfo.coordinate();
-    if (!coordinate.isValid()) {
-        return;
-    }
-
-    skygate::core::GeoLocation nextObserver = m_location.observer();
-    nextObserver.latitudeDeg = coordinate.latitude();
-    nextObserver.longitudeDeg = coordinate.longitude();
-    if (std::isfinite(coordinate.altitude())) {
-        nextObserver.elevationMeters = coordinate.altitude();
-    }
-
-    if (!nextObserver.isValid()) {
-        return;
-    }
-
-    applyObserverLocation(nextObserver);
-    setLocationStatusText("Location: Using current location");
-#else
-    (void)positionInfo;
-#endif
+    m_deviceLocationAcquisition->start();
 }
 
 void SkyContextController::setProjectionType(const skygate::core::ProjectionType projectionType)
