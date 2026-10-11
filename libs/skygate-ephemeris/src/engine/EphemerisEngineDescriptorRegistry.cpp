@@ -1,20 +1,13 @@
 #include "EphemerisEngineDescriptorRegistry.hpp"
 #include "EphemerisCorrectionFlags.hpp"
+#include "engine/simple/SimpleEphemerisEngine.hpp"
 
 #include <array>
 #include <optional>
+#include <string>
 
 namespace skygate::ephemeris {
 namespace {
-
-[[nodiscard]] EphemerisEngineOptions simpleDefaultOptions() noexcept
-{
-    EphemerisEngineOptions options;
-    options.setEngineKind(EphemerisEngineKind::Type::Simple);
-    options.setCorrectionFlags(EphemerisCorrectionFlags::noCorrections());
-    options.setEnableAtmosphericRefraction(false);
-    return options;
-}
 
 [[nodiscard]] EphemerisEngineOptions highPrecisionDefaultOptions() noexcept
 {
@@ -31,15 +24,15 @@ namespace {
         EphemerisEngineDescriptor{
             .id = "simple",
             .kind = EphemerisEngineKind::Type::Simple,
-            .displayName = "Simple",
-            .defaultOptions = simpleDefaultOptions(),
+            .displayName = std::string(EphemerisEngineKind::displayName(EphemerisEngineKind::Type::Simple)),
+            .defaultOptions = SimpleEphemerisEngine::defaultOptions(),
             .supportsCorrections = false,
             .supportsAtmosphereSettings = false,
         },
         EphemerisEngineDescriptor{
             .id = "highPrecision",
             .kind = EphemerisEngineKind::Type::HighPrecision,
-            .displayName = "High precision",
+            .displayName = std::string(EphemerisEngineKind::displayName(EphemerisEngineKind::Type::HighPrecision)),
             .defaultOptions = highPrecisionDefaultOptions(),
             .supportsCorrections = true,
             .supportsAtmosphereSettings = true,
