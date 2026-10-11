@@ -11,6 +11,7 @@
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogSourceType.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
+#include "catalog/SkyCatalogCollectionStore.hpp"
 
 #include <QByteArray>
 #include <QDir>
@@ -36,7 +37,7 @@ using skygate::ui::tests::CatalogCacheFixture;
 namespace {
 
 constexpr int kCurrentCollectionSchemaVersion =
-    skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
 
 const QString kArchiveSourceUrl = QStringLiteral("https://example.test/catalogs.zip");
 const QString kStarsMember = QStringLiteral("catalog/hyg.csv");

@@ -3,6 +3,7 @@
 #include "SkyPersistedStateSnapshot.hpp"
 #include "catalog/SkyCatalogCollectionCacheLoadResult.hpp"
 #include "catalog/SkyCatalogCollectionCacheSnapshot.hpp"
+#include "catalog/SkyCatalogCollectionStore.hpp"
 #include "catalog/SkyCatalogLegacyCacheSnapshot.hpp"
 #include "ephemeris/SkyEphemerisDataCacheSnapshot.hpp"
 
@@ -21,6 +22,8 @@ public:
     [[nodiscard]] bool clearDeepSkyCatalogCache() const;
     [[nodiscard]] bool saveCatalogCache(const SkyCatalogLegacyCacheSnapshot& snapshot) const;
     [[nodiscard]] std::optional<SkyCatalogLegacyCacheSnapshot> loadCatalogCache() const;
+    // Collection persistence is implemented by SkyCatalogCollectionStore;
+    // these entry points stay as forwarding methods for existing callers.
     [[nodiscard]] bool saveCatalogCollectionCache(const SkyCatalogCollectionCacheSnapshot& snapshot) const;
     [[nodiscard]] SkyCatalogCollectionCacheLoadResult loadCatalogCollectionCache() const;
     [[nodiscard]] bool clearCatalogCollectionCache() const;
@@ -34,4 +37,7 @@ public:
     [[nodiscard]] bool saveEphemerisDataCache(const SkyEphemerisDataCacheSnapshot& snapshot) const;
     [[nodiscard]] SkyEphemerisDataCacheSnapshot loadEphemerisDataCache() const;
     [[nodiscard]] bool clearEphemerisDataCache() const;
+
+private:
+    skygate::ui::internal::SkyCatalogCollectionStore m_catalogCollectionStore;
 };

@@ -2,6 +2,7 @@
 
 #include "CatalogParseOptions.hpp"
 #include "SkyCatalogCollectionCacheLoadResult.hpp"
+#include "SkyCatalogCollectionStore.hpp"
 #include "SkyCatalogPresets.hpp"
 #include "SkyContextControllerSupport.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
@@ -280,7 +281,7 @@ void SkyCatalogCacheController::appendRestoredSource(
 SkyCatalogCacheController::RelatedDataOwnership
 SkyCatalogCacheController::relatedDataOwnership(const SkyCatalogCollectionCacheSnapshot& snapshot)
 {
-    if (snapshot.schemaVersion >= SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion) {
+    if (snapshot.schemaVersion >= SkyCatalogCollectionStore::kCollectionSchemaVersion) {
         return RelatedDataOwnership::SourceOwned;
     }
 
@@ -313,8 +314,7 @@ SkyCatalogCacheController::restoreFromRecords(const SkyCatalogCollectionCacheSna
     result.restored = true;
     // Records written before the parse contract was persisted load with the
     // defined defaults and are rewritten once in the current format.
-    result.requiresRecordUpgrade =
-        snapshot.schemaVersion < SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    result.requiresRecordUpgrade = snapshot.schemaVersion < SkyCatalogCollectionStore::kCollectionSchemaVersion;
 
     const RelatedDataOwnership recordOwnership = SkyCatalogCacheController::relatedDataOwnership(snapshot);
     for (const SkyCatalogSourceCacheRecord& sourceRecord : snapshot.sources) {
@@ -490,7 +490,7 @@ void SkyCatalogCacheController::persistCollection(const SkyCatalogCollectionPers
     }
 
     SkyCatalogCollectionCacheSnapshot snapshot;
-    snapshot.schemaVersion = SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    snapshot.schemaVersion = SkyCatalogCollectionStore::kCollectionSchemaVersion;
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
 
     for (const SkyCatalogSourcePersistEntry& source : request.sources) {

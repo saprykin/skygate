@@ -11,6 +11,7 @@
 #include "SkyContextControllerSupport.hpp"
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
+#include "catalog/SkyCatalogCollectionStore.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -495,7 +496,7 @@ void SkyCatalogManagerPersistenceTests::rejectedRestoreKeepsCollectionAndReports
     const QString collidingUrl = QStringLiteral("https://example.test/colliding-stars.csv");
 
     SkyCatalogCollectionCacheSnapshot snapshot;
-    snapshot.schemaVersion = skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    snapshot.schemaVersion = skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
 
     SkyCatalogSourceCacheRecord colliding;
     colliding.instanceId = QStringLiteral("bundled-core");
