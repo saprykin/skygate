@@ -74,7 +74,7 @@ private:
         using skygate::ephemeris::ObservationEventStatus;
 
         switch (event.status) {
-        case ObservationEventStatus::Available:
+        case ObservationEventStatus::Type::Available:
             if (event.utcTime.has_value()) {
                 return m_timeController != nullptr
                            ? m_timeController->formatUtcTime(*event.utcTime, false)
@@ -82,14 +82,12 @@ private:
                                  .toString("HH:mm");
             }
             return "--";
-        case ObservationEventStatus::AlwaysAbove:
-            return "Always up";
-        case ObservationEventStatus::AlwaysBelow:
-            return "Always down";
-        case ObservationEventStatus::NoEventInSearchWindow:
-            return "No event";
-        case ObservationEventStatus::InvalidInput:
-        case ObservationEventStatus::Unresolved:
+        case ObservationEventStatus::Type::AlwaysAbove:
+        case ObservationEventStatus::Type::AlwaysBelow:
+        case ObservationEventStatus::Type::NoEventInSearchWindow:
+            return QString::fromUtf8(ObservationEventStatus::displayText(event.status));
+        case ObservationEventStatus::Type::InvalidInput:
+        case ObservationEventStatus::Type::Unresolved:
             return "--";
         }
 

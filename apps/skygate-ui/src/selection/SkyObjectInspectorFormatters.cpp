@@ -8,48 +8,21 @@
 
 #include <array>
 #include <cmath>
+#include <optional>
 #include <string_view>
 
 namespace skygate::ui::internal {
 
 QString celestialBodyTypeText(const skygate::ephemeris::BaseCelestialBody& body)
 {
-    if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject
-        && body.deepSkyObjectValue().has_value()) {
-        switch (body.deepSkyObjectValue()->kind) {
-        case skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy:
-            return "Galaxy";
-        case skygate::ephemeris::DeepSkyObjectInfo::Kind::OpenCluster:
-            return "Open cluster";
-        case skygate::ephemeris::DeepSkyObjectInfo::Kind::GlobularCluster:
-            return "Globular cluster";
-        case skygate::ephemeris::DeepSkyObjectInfo::Kind::Nebula:
-            return "Nebula";
-        case skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula:
-            return "Planetary nebula";
-        case skygate::ephemeris::DeepSkyObjectInfo::Kind::Asterism:
-            return "Asterism";
-        case skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown:
-            return "Deep sky object";
+    if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject) {
+        const std::optional<skygate::ephemeris::DeepSkyObjectInfo>& deepSkyObject = body.deepSkyObjectValue();
+        if (deepSkyObject.has_value() && deepSkyObject->kind != skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown) {
+            return QString::fromUtf8(skygate::ephemeris::DeepSkyObjectInfo::kindLabel(deepSkyObject->kind));
         }
     }
 
-    switch (body.kind) {
-    case skygate::ephemeris::BaseCelestialBody::Kind::Sun:
-        return "Sun";
-    case skygate::ephemeris::BaseCelestialBody::Kind::Moon:
-        return "Moon";
-    case skygate::ephemeris::BaseCelestialBody::Kind::Planet:
-        return "Planet";
-    case skygate::ephemeris::BaseCelestialBody::Kind::Star:
-        return "Star";
-    case skygate::ephemeris::BaseCelestialBody::Kind::Constellation:
-        return "Constellation";
-    case skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject:
-        return "Deep sky object";
-    }
-
-    return "Object";
+    return QString::fromUtf8(skygate::ephemeris::BaseCelestialBody::kindLabel(body.kind));
 }
 
 QString formatFiniteNumber(const double value, const int precision)
@@ -106,21 +79,20 @@ QString formatDeclination(const double declinationDeg)
         .arg(seconds, 2, 10, QChar('0'));
 }
 
-QString formatObservationStatus(const skygate::ephemeris::ObservationEventStatus status)
+QString formatObservationStatus(const skygate::ephemeris::ObservationEventStatus::Type status)
 {
     using skygate::ephemeris::ObservationEventStatus;
 
     switch (status) {
-    case ObservationEventStatus::Available:
+    case ObservationEventStatus::Type::Available:
         return {};
-    case ObservationEventStatus::AlwaysAbove:
-        return "Always above";
-    case ObservationEventStatus::AlwaysBelow:
-        return "Always below";
-    case ObservationEventStatus::NoEventInSearchWindow:
+    case ObservationEventStatus::Type::AlwaysAbove:
+    case ObservationEventStatus::Type::AlwaysBelow:
+        return QString::fromUtf8(ObservationEventStatus::displayText(status));
+    case ObservationEventStatus::Type::NoEventInSearchWindow:
         return "No event in next 72h";
-    case ObservationEventStatus::InvalidInput:
-    case ObservationEventStatus::Unresolved:
+    case ObservationEventStatus::Type::InvalidInput:
+    case ObservationEventStatus::Type::Unresolved:
         return "--";
     }
 
@@ -242,7 +214,7 @@ QString formatUtcTime(const skygate::core::UtcTimePoint& utcTime)
 
 QString formatObservationEvent(const skygate::ephemeris::ObservationEvent& event)
 {
-    if (event.status == skygate::ephemeris::ObservationEventStatus::Available && event.utcTime.has_value()) {
+    if (event.status == skygate::ephemeris::ObservationEventStatus::Type::Available && event.utcTime.has_value()) {
         return formatUtcTime(*event.utcTime);
     }
 
@@ -252,7 +224,7 @@ QString formatObservationEvent(const skygate::ephemeris::ObservationEvent& event
 QString
 formatObservationEvent(const skygate::ephemeris::ObservationEvent& event, const SkyTimeController* timeController)
 {
-    if (event.status == skygate::ephemeris::ObservationEventStatus::Available && event.utcTime.has_value()
+    if (event.status == skygate::ephemeris::ObservationEventStatus::Type::Available && event.utcTime.has_value()
         && timeController != nullptr) {
         return timeController->formatUtcTime(*event.utcTime);
     }
@@ -264,8 +236,8 @@ QString formatObservationCulmination(
     const skygate::ephemeris::ObservationEvent& culmination, const SkyTimeController* timeController
 )
 {
-    if (culmination.status == skygate::ephemeris::ObservationEventStatus::Available && culmination.utcTime.has_value()
-        && culmination.altitudeDeg.has_value()) {
+    if (culmination.status == skygate::ephemeris::ObservationEventStatus::Type::Available
+        && culmination.utcTime.has_value() && culmination.altitudeDeg.has_value()) {
         return QString("%1 at %2 deg")
             .arg(
                 timeController != nullptr ? timeController->formatUtcTime(*culmination.utcTime)

@@ -1,5 +1,6 @@
 #include "BaseCelestialBody.hpp"
 #include "CelestialBodyState.hpp"
+#include "ObservationEventStatus.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "UtcTimeCodec.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
@@ -51,6 +52,7 @@ private slots:
     void convertsCivilDatesAndDefinesNoYearZeroPolicy();
     void constructsResultStatusAndWarningModels();
     void engineWarningTextMatchesTimeScaleWarningTexts();
+    void bodyAndEventStatusLabelsAreCanonical();
     void keepsLegacyBodyStateFieldsReadableWithMetadata();
     void simpleEngineExposesMetadataDefaults();
     void distinguishesGeometricFromNoCorrections();
@@ -631,6 +633,61 @@ void EphemerisApiModelTests::engineWarningTextMatchesTimeScaleWarningTexts()
             skygate::ephemeris::TimeScaleConversionDiagnostics::warningText(aliasWarning.timeScaleCode)
         );
     }
+}
+
+void EphemerisApiModelTests::bodyAndEventStatusLabelsAreCanonical()
+{
+    using skygate::ephemeris::BaseCelestialBody;
+    using skygate::ephemeris::DeepSkyObjectInfo;
+    using skygate::ephemeris::ObservationEventStatus;
+
+    constexpr std::array bodyKinds{
+        BaseCelestialBody::Kind::Star,
+        BaseCelestialBody::Kind::Planet,
+        BaseCelestialBody::Kind::Moon,
+        BaseCelestialBody::Kind::Sun,
+        BaseCelestialBody::Kind::Constellation,
+        BaseCelestialBody::Kind::DeepSkyObject,
+    };
+
+    for (const BaseCelestialBody::Kind kind : bodyKinds) {
+        QVERIFY(!BaseCelestialBody::kindLabel(kind).empty());
+    }
+    QCOMPARE(BaseCelestialBody::kindLabel(BaseCelestialBody::Kind::DeepSkyObject), std::string_view("Deep sky object"));
+
+    constexpr std::array deepSkyKinds{
+        DeepSkyObjectInfo::Kind::Unknown,
+        DeepSkyObjectInfo::Kind::Galaxy,
+        DeepSkyObjectInfo::Kind::OpenCluster,
+        DeepSkyObjectInfo::Kind::GlobularCluster,
+        DeepSkyObjectInfo::Kind::Nebula,
+        DeepSkyObjectInfo::Kind::PlanetaryNebula,
+        DeepSkyObjectInfo::Kind::Asterism,
+    };
+
+    for (const DeepSkyObjectInfo::Kind kind : deepSkyKinds) {
+        QVERIFY(!DeepSkyObjectInfo::kindLabel(kind).empty());
+    }
+    QCOMPARE(DeepSkyObjectInfo::kindLabel(DeepSkyObjectInfo::Kind::Unknown), std::string_view("Deep sky object"));
+
+    constexpr std::array eventStatuses{
+        ObservationEventStatus::Type::Available,
+        ObservationEventStatus::Type::AlwaysAbove,
+        ObservationEventStatus::Type::AlwaysBelow,
+        ObservationEventStatus::Type::NoEventInSearchWindow,
+        ObservationEventStatus::Type::InvalidInput,
+        ObservationEventStatus::Type::Unresolved,
+    };
+
+    for (const ObservationEventStatus::Type status : eventStatuses) {
+        QVERIFY(!ObservationEventStatus::displayText(status).empty());
+    }
+    QCOMPARE(
+        ObservationEventStatus::displayText(ObservationEventStatus::Type::AlwaysAbove), std::string_view("Always up")
+    );
+    QCOMPARE(
+        ObservationEventStatus::displayText(ObservationEventStatus::Type::AlwaysBelow), std::string_view("Always down")
+    );
 }
 
 void EphemerisApiModelTests::keepsLegacyBodyStateFieldsReadableWithMetadata()

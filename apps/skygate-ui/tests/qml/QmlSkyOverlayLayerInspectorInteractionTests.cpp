@@ -67,8 +67,8 @@ void QmlSkyOverlayLayerInspectorInteractionTests::skyOverlayLayerInspectorAction
                     "targetId": "sun",
                     "fields": [
                         { "label": "Type", "value": "Star" },
-                        { "label": "Rise", "value": "Always above" },
-                        { "label": "Set", "value": "Always above" },
+                        { "label": "Rise", "value": "Always up" },
+                        { "label": "Set", "value": "Always up" },
                         { "label": "Culmination", "value": "2024-06-02 03:12:00 UTC at 84.0 deg" }
                     ]
                 })
@@ -86,8 +86,8 @@ void QmlSkyOverlayLayerInspectorInteractionTests::skyOverlayLayerInspectorAction
                         "targetId": "sun",
                         "fields": [
                             { "label": "Type", "value": "Star" },
-                            { "label": "Rise", "value": "Always above" },
-                            { "label": "Set", "value": "Always above" },
+                            { "label": "Rise", "value": "Always up" },
+                            { "label": "Set", "value": "Always up" },
                             { "label": "Culmination", "value": "2024-06-02 03:12:00 UTC at 84.0 deg" }
                         ]
                     }
@@ -104,8 +104,8 @@ void QmlSkyOverlayLayerInspectorInteractionTests::skyOverlayLayerInspectorAction
                         "targetId": "sun",
                         "fields": [
                             { "label": "Type", "value": "Star" },
-                            { "label": "Rise", "value": "Always above" },
-                            { "label": "Set", "value": "Always above" },
+                            { "label": "Rise", "value": "Always up" },
+                            { "label": "Set", "value": "Always up" },
                             { "label": "Culmination", "value": "2024-06-02 03:12:00 UTC at 84.0 deg" }
                         ]
                     }

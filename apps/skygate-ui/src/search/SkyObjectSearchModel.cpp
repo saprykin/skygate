@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace {
 
@@ -27,22 +28,7 @@ QString compactedKey(const QString& value)
 
 QString celestialBodyTypeText(const skygate::ephemeris::BaseCelestialBody::Kind type)
 {
-    switch (type) {
-    case skygate::ephemeris::BaseCelestialBody::Kind::Sun:
-        return "Sun";
-    case skygate::ephemeris::BaseCelestialBody::Kind::Moon:
-        return "Moon";
-    case skygate::ephemeris::BaseCelestialBody::Kind::Planet:
-        return "Planet";
-    case skygate::ephemeris::BaseCelestialBody::Kind::Star:
-        return "Star";
-    case skygate::ephemeris::BaseCelestialBody::Kind::Constellation:
-        return "Constellation";
-    case skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject:
-        return "Deep sky";
-    }
-
-    return "Object";
+    return QString::fromUtf8(skygate::ephemeris::BaseCelestialBody::kindLabel(type));
 }
 
 bool shouldShowBodyId(const skygate::ephemeris::BaseCelestialBody& body)
@@ -63,45 +49,21 @@ bool shouldShowBodyId(const skygate::ephemeris::BaseCelestialBody& body)
 
 QString bodyDetailText(const skygate::ephemeris::BaseCelestialBody& body)
 {
-    const QString typeText = celestialBodyTypeText(body.kind);
+    QString detailText = celestialBodyTypeText(body.kind);
     if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject) {
-        QString detailText = typeText;
-        if (body.deepSkyObjectValue().has_value()) {
-            switch (body.deepSkyObjectValue()->kind) {
-            case skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy:
-                detailText = "Deep sky • Galaxy";
-                break;
-            case skygate::ephemeris::DeepSkyObjectInfo::Kind::OpenCluster:
-                detailText = "Deep sky • Open cluster";
-                break;
-            case skygate::ephemeris::DeepSkyObjectInfo::Kind::GlobularCluster:
-                detailText = "Deep sky • Globular cluster";
-                break;
-            case skygate::ephemeris::DeepSkyObjectInfo::Kind::Nebula:
-                detailText = "Deep sky • Nebula";
-                break;
-            case skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula:
-                detailText = "Deep sky • Planetary nebula";
-                break;
-            case skygate::ephemeris::DeepSkyObjectInfo::Kind::Asterism:
-                detailText = "Deep sky • Asterism";
-                break;
-            case skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown:
-                break;
-            }
+        const std::optional<skygate::ephemeris::DeepSkyObjectInfo>& deepSkyObject = body.deepSkyObjectValue();
+        if (deepSkyObject.has_value() && deepSkyObject->kind != skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown) {
+            const QString objectKindText =
+                QString::fromUtf8(skygate::ephemeris::DeepSkyObjectInfo::kindLabel(deepSkyObject->kind));
+            detailText = QString("%1 • %2").arg(detailText, objectKindText);
         }
-
-        if (!shouldShowBodyId(body)) {
-            return detailText;
-        }
-        return QString("%1 • %2").arg(detailText, QString::fromStdString(body.id));
     }
 
     if (!shouldShowBodyId(body)) {
-        return typeText;
+        return detailText;
     }
 
-    return QString("%1 • %2").arg(typeText, QString::fromStdString(body.id));
+    return QString("%1 • %2").arg(detailText, QString::fromStdString(body.id));
 }
 
 }  // namespace

@@ -288,9 +288,9 @@ void ObservationEventDirectSearchTests::normalObjectFindsOrderedRefinedCrossings
     const auto request = makeRequest(context, *engine);
     const auto summary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
 
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.nextRise.utcTime.has_value());
     QVERIFY(summary.nextSet.utcTime.has_value());
     QVERIFY(summary.culmination.utcTime.has_value());
@@ -313,9 +313,9 @@ void ObservationEventDirectSearchTests::circumpolarNeverRisingFallbacksWithCulmi
     auto engine = makeEngineForBody(circumpolarBody);
     auto request = makeRequest(circumpolarContext, *engine);
     auto summary = calculator.compute(*engine, request, 0U, &circumpolarBody, 0.0, SearchMode::Guided);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::AlwaysAbove);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::AlwaysAbove);
-    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::AlwaysAbove);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::AlwaysAbove);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.culmination.altitudeDeg.has_value());
     QVERIFY(*summary.culmination.altitudeDeg > 65.0);
 
@@ -324,9 +324,9 @@ void ObservationEventDirectSearchTests::circumpolarNeverRisingFallbacksWithCulmi
     engine = makeEngineForBody(neverRisingBody);
     request = makeRequest(neverRisingContext, *engine);
     summary = calculator.compute(*engine, request, 0U, &neverRisingBody, 0.0, SearchMode::Guided);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::AlwaysBelow);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::AlwaysBelow);
-    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::AlwaysBelow);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::AlwaysBelow);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.culmination.altitudeDeg.has_value());
     QVERIFY(*summary.culmination.altitudeDeg < -25.0);
 }
@@ -342,8 +342,8 @@ void ObservationEventDirectSearchTests::currentAboveHorizonSetsBeforeItRisesAgai
     const auto request = makeRequest(context, *engine);
     const auto summary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
 
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.nextRise.utcTime.has_value());
     QVERIFY(summary.nextSet.utcTime.has_value());
     QVERIFY(*summary.nextSet.utcTime < *summary.nextRise.utcTime);
@@ -361,8 +361,8 @@ void ObservationEventDirectSearchTests::currentBelowHorizonRisesBeforeItSetsAgai
     const auto request = makeRequest(context, *engine);
     const auto summary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
 
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.nextRise.utcTime.has_value());
     QVERIFY(summary.nextSet.utcTime.has_value());
     QVERIFY(*summary.nextRise.utcTime < *summary.nextSet.utcTime);
@@ -381,8 +381,8 @@ void ObservationEventDirectSearchTests::configurableThresholdFindsDifferentCross
     const auto horizonSummary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
     const auto twilightSummary = calculator.compute(*engine, request, 0U, nullptr, -6.0, SearchMode::Guided);
 
-    QCOMPARE(horizonSummary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(twilightSummary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(horizonSummary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(twilightSummary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(horizonSummary.nextRise.utcTime.has_value());
     QVERIFY(twilightSummary.nextRise.utcTime.has_value());
     QVERIFY(*twilightSummary.nextRise.utcTime < *horizonSummary.nextRise.utcTime);
@@ -409,9 +409,9 @@ void ObservationEventDirectSearchTests::invalidAndUnresolvedInputsReturnExplicit
     context.observer.latitudeDeg = 120.0;
     auto request = makeRequest(context, *engine);
     auto summary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::InvalidInput);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::InvalidInput);
-    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::InvalidInput);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::InvalidInput);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::InvalidInput);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Type::InvalidInput);
 
     context = makeContext();
     skygate::ephemeris::OwnGalaxyCelestialBody unresolved;
@@ -421,9 +421,9 @@ void ObservationEventDirectSearchTests::invalidAndUnresolvedInputsReturnExplicit
     engine = makeEngineForBody(unresolved);
     request = makeRequest(context, *engine);
     summary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Unresolved);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Unresolved);
-    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Unresolved);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Unresolved);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Unresolved);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Type::Unresolved);
 }
 
 void ObservationEventDirectSearchTests::unprovenWindowMissDoesNotReportAlwaysAboveBelow()
@@ -435,15 +435,15 @@ void ObservationEventDirectSearchTests::unprovenWindowMissDoesNotReportAlwaysAbo
 
     auto request = makeRequest(context, belowHorizonEngine);
     auto summary = calculator.compute(belowHorizonEngine, request, 0U, nullptr, 0.0, SearchMode::Guided);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
-    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::NoEventInSearchWindow);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::NoEventInSearchWindow);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
 
     request = makeRequest(context, aboveHorizonEngine);
     summary = calculator.compute(aboveHorizonEngine, request, 0U, nullptr, 0.0, SearchMode::Guided);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
-    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::NoEventInSearchWindow);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::NoEventInSearchWindow);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
 }
 
 void ObservationEventDirectSearchTests::movingBodySamplesThroughEphemerisEngine()
@@ -458,9 +458,9 @@ void ObservationEventDirectSearchTests::movingBodySamplesThroughEphemerisEngine(
 
     QVERIFY(engine.sampleCount > 300);
     QVERIFY(engine.sampleCount < 500);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.culmination.altitudeDeg.has_value());
     QVERIFY(*summary.culmination.altitudeDeg > 34.9);
 }
@@ -486,8 +486,8 @@ void ObservationEventDirectSearchTests::requestOverloadPropagatesOptionsAndSampl
     engine.baseEpoch = request.epoch;
 
     auto summary = calculator.compute(engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::NoEventInSearchWindow);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::NoEventInSearchWindow);
 
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
     summary = calculator.compute(engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
@@ -496,9 +496,9 @@ void ObservationEventDirectSearchTests::requestOverloadPropagatesOptionsAndSampl
     QVERIFY(engine.requestSampleCount > 300);
     QVERIFY(engine.sawLightTimeRequest);
     QVERIFY(engine.sawSampleEpochUpdate);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
 }
 
 void ObservationEventDirectSearchTests::contextOverloadSeedsRequestOptionsFromEngine()
@@ -517,8 +517,8 @@ void ObservationEventDirectSearchTests::contextOverloadSeedsRequestOptionsFromEn
     QVERIFY(engine.requestSampleCount > 0);
     QVERIFY(engine.sawNoCorrectionsRequest);
     QVERIFY(!engine.sawLightTimeRequest);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::NoEventInSearchWindow);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::NoEventInSearchWindow);
 }
 
 QTEST_APPLESS_MAIN(ObservationEventDirectSearchTests)

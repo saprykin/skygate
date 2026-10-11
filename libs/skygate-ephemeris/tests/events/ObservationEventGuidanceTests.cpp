@@ -182,9 +182,9 @@ void ObservationEventGuidanceTests::guidanceStrategyInjectionIsHonored()
     QVERIFY(*strategy->m_sampleCount > 0);
     QCOMPARE(engine.requestSampleCount(), 0);
     QCOMPARE(engine.contextSampleCount(), 0);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
 }
 
 void ObservationEventGuidanceTests::highPrecisionFixedBodyUsesGuidedCoarseSearch()
@@ -211,9 +211,9 @@ void ObservationEventGuidanceTests::highPrecisionFixedBodyUsesGuidedCoarseSearch
 
     QCOMPARE(engine.contextSampleCount(), 0);
     QCOMPARE(engine.requestSampleCount(), 0);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
 }
 
 void ObservationEventGuidanceTests::linearGuidanceInterpolationUsesCorrectUnits()
@@ -242,7 +242,7 @@ void ObservationEventGuidanceTests::linearGuidanceInterpolationUsesCorrectUnits(
 
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
 
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
     QVERIFY(summary.nextRise.utcTime.has_value());
     QCOMPARE((*summary.nextRise.utcTime).time_since_epoch().count(), expectedRiseUtc.time_since_epoch().count());
     QVERIFY(*summary.nextRise.utcTime >= context.utcTime);
@@ -279,9 +279,9 @@ void ObservationEventGuidanceTests::nullGuidanceStrategyFallsBackToDirectSamplin
 
     QCOMPARE(engine.contextSampleCount(), 0);
     QVERIFY(engine.requestSampleCount() > 0);
-    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
-    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Type::Available);
 }
 
 QTEST_APPLESS_MAIN(ObservationEventGuidanceTests)
