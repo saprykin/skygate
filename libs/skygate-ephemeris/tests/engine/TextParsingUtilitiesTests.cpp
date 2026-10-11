@@ -3,7 +3,6 @@
 #include <QtTest/QtTest>
 
 #include <cstddef>
-#include <cstdint>
 #include <limits>
 #include <string>
 #include <string_view>
@@ -19,7 +18,6 @@ private slots:
     void preservesEmptyCommaSeparatedFields();
     void clipsFixedColumns();
     void parsesAstronomicalUtcDates();
-    void parsesIntegersStrictly();
 };
 
 void TextParsingUtilitiesTests::parsesBooleansStrictly()
@@ -82,26 +80,6 @@ void TextParsingUtilitiesTests::parsesAstronomicalUtcDates()
     for (const std::string_view text :
          {"1900-02-29", "2001-02-29", "2024-13-01", "2024-01-00", "2024-01-01x", "2024-01", ""}) {
         QVERIFY(!TextParsingUtilities::parseUtcDate(text).has_value());
-    }
-}
-
-void TextParsingUtilitiesTests::parsesIntegersStrictly()
-{
-    int value = 0;
-    QVERIFY(TextParsingUtilities::parseInt(" \t-42\n", value));
-    QCOMPARE(value, -42);
-    QVERIFY(TextParsingUtilities::parseInt(std::to_string(std::numeric_limits<int>::max()), value));
-    QCOMPARE(value, std::numeric_limits<int>::max());
-    QVERIFY(TextParsingUtilities::parseInt(std::to_string(std::numeric_limits<int>::min()), value));
-    QCOMPARE(value, std::numeric_limits<int>::min());
-    for (const std::string_view text : {"", " ", "+1", "1.0", "1x", "1 2", "999999999999999999999999"}) {
-        QVERIFY(!TextParsingUtilities::parseInt(text, value));
-    }
-    std::uint64_t unsignedValue = 0;
-    QVERIFY(TextParsingUtilities::parseUint64(" 18446744073709551615 ", unsignedValue));
-    QCOMPARE(unsignedValue, std::numeric_limits<std::uint64_t>::max());
-    for (const std::string_view text : {"", "-1", "+1", "12x", "18446744073709551616"}) {
-        QVERIFY(!TextParsingUtilities::parseUint64(text, unsignedValue));
     }
 }
 

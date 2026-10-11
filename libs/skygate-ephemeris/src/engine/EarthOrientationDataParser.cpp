@@ -26,8 +26,7 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
 [[nodiscard]] bool startsWithIntegerYear(const std::string_view line) noexcept
 {
     const std::vector<std::string_view> columns = TextParsingUtilities::splitAsciiWhitespace(line);
-    int year = 0;
-    return !columns.empty() && TextParsingUtilities::parseInt(columns.front(), year);
+    return !columns.empty() && NumericParsingUtilities::parseInt(columns.front()).has_value();
 }
 
 [[nodiscard]] std::optional<std::string> setPredictionStart(
@@ -169,23 +168,23 @@ constexpr double kFinalsTwoDigitYearPivotMjd = 51543.0;
         return false;
     }
 
-    int twoDigitYear = 0;
-    int month = 0;
-    int day = 0;
+    const std::optional<int> twoDigitYear = NumericParsingUtilities::parseInt(columns[0]);
+    const std::optional<int> month = NumericParsingUtilities::parseInt(columns[1]);
+    const std::optional<int> day = NumericParsingUtilities::parseInt(columns[2]);
     const std::optional<double> mjd = NumericParsingUtilities::parseFiniteDouble(columns[3]);
     const std::optional<double> polarMotionXArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[5]);
     const std::optional<double> polarMotionYArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[7]);
     const std::optional<double> ut1MinusUtcSeconds = NumericParsingUtilities::parseFiniteDouble(columns[10]);
-    if (!TextParsingUtilities::parseInt(columns[0], twoDigitYear) || !TextParsingUtilities::parseInt(columns[1], month)
-        || !TextParsingUtilities::parseInt(columns[2], day) || !mjd.has_value() || !polarMotionXArcseconds.has_value()
-        || !polarMotionYArcseconds.has_value() || !ut1MinusUtcSeconds.has_value()) {
+    if (!twoDigitYear.has_value() || !month.has_value() || !day.has_value() || !mjd.has_value()
+        || !polarMotionXArcseconds.has_value() || !polarMotionYArcseconds.has_value()
+        || !ut1MinusUtcSeconds.has_value()) {
         return false;
     }
 
     return assignFinals2000AEntry(
-        twoDigitYear,
-        month,
-        day,
+        *twoDigitYear,
+        *month,
+        *day,
         *mjd,
         columns[4].front(),
         columns[9].front(),
@@ -206,14 +205,13 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
         return true;
     }
 
-    int twoDigitYear = 0;
-    int month = 0;
-    int day = 0;
+    const std::optional<int> twoDigitYear =
+        NumericParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 0U, 2U));
+    const std::optional<int> month = NumericParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 2U, 2U));
+    const std::optional<int> day = NumericParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 4U, 2U));
     const std::optional<double> mjd =
         NumericParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 7U, 8U));
-    if (!TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 0U, 2U), twoDigitYear)
-        || !TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 2U, 2U), month)
-        || !TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 4U, 2U), day) || !mjd.has_value()) {
+    if (!twoDigitYear.has_value() || !month.has_value() || !day.has_value() || !mjd.has_value()) {
         return false;
     }
 
@@ -230,9 +228,9 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     }
 
     return assignFinals2000AEntry(
-        twoDigitYear,
-        month,
-        day,
+        *twoDigitYear,
+        *month,
+        *day,
         *mjd,
         polarMotionFlag,
         ut1Flag,
@@ -250,22 +248,21 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
         return false;
     }
 
-    int year = 0;
-    int month = 0;
-    int day = 0;
+    const std::optional<int> year = NumericParsingUtilities::parseInt(columns[0]);
+    const std::optional<int> month = NumericParsingUtilities::parseInt(columns[1]);
+    const std::optional<int> day = NumericParsingUtilities::parseInt(columns[2]);
     const std::optional<double> polarMotionXArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[4]);
     const std::optional<double> polarMotionYArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[5]);
     const std::optional<double> ut1MinusUtcSeconds = NumericParsingUtilities::parseFiniteDouble(columns[6]);
-    if (!TextParsingUtilities::parseInt(columns[0], year) || !TextParsingUtilities::parseInt(columns[1], month)
-        || !TextParsingUtilities::parseInt(columns[2], day) || !polarMotionXArcseconds.has_value()
+    if (!year.has_value() || !month.has_value() || !day.has_value() || !polarMotionXArcseconds.has_value()
         || !polarMotionYArcseconds.has_value() || !ut1MinusUtcSeconds.has_value()) {
         return false;
     }
 
     skygate::core::CivilDateTime effectiveDate;
-    effectiveDate.astronomicalYear = year;
-    effectiveDate.month = month;
-    effectiveDate.day = day;
+    effectiveDate.astronomicalYear = *year;
+    effectiveDate.month = *month;
+    effectiveDate.day = *day;
     effectiveDate.timeScale = skygate::core::TimeScale::Utc;
     if (!skygate::core::CalendarTime::isValidCivilDateTime(effectiveDate)) {
         return false;
@@ -335,24 +332,22 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
 {
     const std::vector<std::string_view> columns = TextParsingUtilities::splitAsciiWhitespace(line);
     if (columns.size() == 4U) {
-        int twoDigitYear = 0;
-        int month = 0;
-        int day = 0;
+        const std::optional<int> twoDigitYear = NumericParsingUtilities::parseInt(columns[0]);
+        const std::optional<int> month = NumericParsingUtilities::parseInt(columns[1]);
+        const std::optional<int> day = NumericParsingUtilities::parseInt(columns[2]);
         const std::optional<double> mjd = NumericParsingUtilities::parseFiniteDouble(columns[3]);
-        return TextParsingUtilities::parseInt(columns[0], twoDigitYear)
-               && TextParsingUtilities::parseInt(columns[1], month) && TextParsingUtilities::parseInt(columns[2], day)
-               && mjd.has_value() && finalsYearFromMjd(twoDigitYear, *mjd).has_value();
+        return twoDigitYear.has_value() && month.has_value() && day.has_value() && mjd.has_value()
+               && finalsYearFromMjd(*twoDigitYear, *mjd).has_value();
     }
 
-    int twoDigitYear = 0;
-    int month = 0;
-    int day = 0;
+    const std::optional<int> twoDigitYear =
+        NumericParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 0U, 2U));
+    const std::optional<int> month = NumericParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 2U, 2U));
+    const std::optional<int> day = NumericParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 4U, 2U));
     const std::optional<double> mjd =
         NumericParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 7U, 8U));
-    if (!TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 0U, 2U), twoDigitYear)
-        || !TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 2U, 2U), month)
-        || !TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 4U, 2U), day) || !mjd.has_value()
-        || !finalsYearFromMjd(twoDigitYear, *mjd).has_value()) {
+    if (!twoDigitYear.has_value() || !month.has_value() || !day.has_value() || !mjd.has_value()
+        || !finalsYearFromMjd(*twoDigitYear, *mjd).has_value()) {
         return false;
     }
 
