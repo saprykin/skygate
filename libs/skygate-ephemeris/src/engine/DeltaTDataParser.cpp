@@ -217,14 +217,17 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
 
 [[nodiscard]] bool parseEntryLine(std::string_view line, IDeltaTProvider::TableEntry& entry) noexcept
 {
-    const std::size_t comma = line.find(',');
-    if (comma == std::string_view::npos) {
+    const std::vector<std::string_view> columns = textParser().splitCommaSeparated(line);
+    if (columns.size() < 2U) {
         return parseUsnoEntryLine(line, entry);
     }
+    if (columns.size() > 2U) {
+        return false;
+    }
 
-    const std::optional<skygate::core::CivilDateTime> effectiveDate = textParser().parseUtcDate(line.substr(0U, comma));
+    const std::optional<skygate::core::CivilDateTime> effectiveDate = textParser().parseUtcDate(columns[0]);
     double deltaTSeconds = 0.0;
-    if (!effectiveDate.has_value() || !textParser().parseFiniteDouble(line.substr(comma + 1U), deltaTSeconds)) {
+    if (!effectiveDate.has_value() || !textParser().parseFiniteDouble(columns[1], deltaTSeconds)) {
         return false;
     }
 
@@ -241,7 +244,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
 
 [[nodiscard]] bool isHeaderLine(const std::string_view line) noexcept
 {
-    return textParser().startsWith(line, "effective_utc_date");
+    return line.starts_with("effective_utc_date");
 }
 
 [[nodiscard]] DeltaTDataParser::Result
@@ -276,7 +279,7 @@ DeltaTDataParser::Result DeltaTDataParser::parse(const EphemerisTextDataAsset& a
         if (line.empty()) {
             continue;
         }
-        if (textParser().startsWith(line, "#@ ")) {
+        if (line.starts_with("#@ ")) {
             if (std::optional<std::string> diagnosticText =
                     applyMetadataLine(info, line, lineNumber, hasFallbackStart, hasFallbackEnd);
                 diagnosticText.has_value()) {
@@ -286,7 +289,7 @@ DeltaTDataParser::Result DeltaTDataParser::parse(const EphemerisTextDataAsset& a
             }
             continue;
         }
-        if (textParser().startsWith(line, "#")) {
+        if (line.starts_with("#")) {
             continue;
         }
         if (isHeaderLine(line)) {

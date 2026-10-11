@@ -33,11 +33,6 @@ std::string_view HighPrecisionTextParser::trimAsciiWhitespace(std::string_view t
     return StringUtilities::trimAsciiWhitespace(text);
 }
 
-bool HighPrecisionTextParser::startsWith(const std::string_view text, const std::string_view prefix) const noexcept
-{
-    return text.size() >= prefix.size() && text.substr(0U, prefix.size()) == prefix;
-}
-
 bool HighPrecisionTextParser::parseInt(const std::string_view text, int& value) const noexcept
 {
     return parseInteger(*this, text, value);
@@ -123,10 +118,52 @@ std::string_view HighPrecisionTextParser::takeLine(std::string_view& remaining) 
     return StringUtilities::takeLine(remaining);
 }
 
+std::optional<int> HighPrecisionTextParser::parseEnglishMonthAbbreviation(const std::string_view text) noexcept
+{
+    if (text == "Jan") {
+        return 1;
+    }
+    if (text == "Feb") {
+        return 2;
+    }
+    if (text == "Mar") {
+        return 3;
+    }
+    if (text == "Apr") {
+        return 4;
+    }
+    if (text == "May") {
+        return 5;
+    }
+    if (text == "Jun") {
+        return 6;
+    }
+    if (text == "Jul") {
+        return 7;
+    }
+    if (text == "Aug") {
+        return 8;
+    }
+    if (text == "Sep") {
+        return 9;
+    }
+    if (text == "Oct") {
+        return 10;
+    }
+    if (text == "Nov") {
+        return 11;
+    }
+    if (text == "Dec") {
+        return 12;
+    }
+
+    return std::nullopt;
+}
+
 std::optional<skygate::core::CivilDateTime> HighPrecisionTextParser::parseUtcDate(std::string_view text) const noexcept
 {
     text = trimAsciiWhitespace(text);
-    const std::size_t yearSearchStart = startsWith(text, "-") ? 1U : 0U;
+    const std::size_t yearSearchStart = text.starts_with("-") ? 1U : 0U;
     const std::size_t firstDash = text.find('-', yearSearchStart);
     const std::size_t secondDash =
         firstDash == std::string_view::npos ? std::string_view::npos : text.find('-', firstDash + 1U);
@@ -159,7 +196,7 @@ std::optional<std::string>
 HighPrecisionTextParser::metadataValue(const std::string_view line, const std::string_view key) const
 {
     const std::string prefix = "#@ " + std::string(key);
-    if (!startsWith(line, prefix)) {
+    if (!line.starts_with(prefix)) {
         return std::nullopt;
     }
     if (line.size() > prefix.size() && !StringUtilities::isAsciiWhitespace(line[prefix.size()])) {
