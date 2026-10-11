@@ -1008,7 +1008,17 @@ void CatalogCompositionCollectionTests::deepSkyPoliciesSelectAndCountConsistentl
     for (const CatalogCompositionPolicy policy : policies) {
         const bool selectsDeepSky =
             CatalogCompositionPolicyRules::participates(policy, BaseCelestialBody::Kind::DeepSkyObject);
-        QCOMPARE(CatalogCompositionPolicyRules::contributesDeepSkyObjects(policy), selectsDeepSky);
+        const bool countsDeepSky = CatalogCompositionPolicyRules::contributesDeepSkyObjects(policy);
+
+        // A Merge source selects deep-sky rows but its deep-sky contribution
+        // does not feed the found-object estimate; only the dedicated
+        // deep-sky policies do.
+        if (policy == CatalogCompositionPolicy::Merge) {
+            QVERIFY(selectsDeepSky);
+            QVERIFY(!countsDeepSky);
+        } else {
+            QCOMPARE(countsDeepSky, selectsDeepSky);
+        }
 
         CatalogCompositionRequest request;
         request.sources = {
@@ -1018,7 +1028,7 @@ void CatalogCompositionCollectionTests::deepSkyPoliciesSelectAndCountConsistentl
 
         QVERIFY(result.isSuccess());
         QCOMPARE(result.deepSkyObjectCount, selectsDeepSky ? std::size_t{1} : std::size_t{0});
-        QCOMPARE(result.foundDeepSkyObjectCount, selectsDeepSky ? std::size_t{1} : std::size_t{0});
+        QCOMPARE(result.foundDeepSkyObjectCount, countsDeepSky ? std::size_t{1} : std::size_t{0});
     }
 }
 
