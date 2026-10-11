@@ -1,5 +1,4 @@
 #include "TextParsingUtilities.hpp"
-#include "NumericParsingUtilities.hpp"
 #include "StringUtilities.hpp"
 #include "time/CalendarTime.hpp"
 
@@ -27,11 +26,6 @@ template <typename Integer>
 
 }  // namespace
 
-std::string_view TextParsingUtilities::trimAsciiWhitespace(std::string_view text) noexcept
-{
-    return StringUtilities::trimAsciiWhitespace(text);
-}
-
 bool TextParsingUtilities::parseInt(const std::string_view text, int& value) noexcept
 {
     return parseInteger(text, value);
@@ -42,22 +36,11 @@ bool TextParsingUtilities::parseUint64(const std::string_view text, std::uint64_
     return parseInteger(text, value);
 }
 
-bool TextParsingUtilities::parseFiniteDouble(const std::string_view text, double& value) noexcept
-{
-    const std::optional<double> parsed = NumericParsingUtilities::parseFiniteDouble(text);
-    if (!parsed.has_value()) {
-        return false;
-    }
-
-    value = *parsed;
-    return true;
-}
-
 std::vector<std::string_view> TextParsingUtilities::splitAsciiWhitespace(std::string_view text)
 {
     std::vector<std::string_view> tokens;
     while (true) {
-        text = trimAsciiWhitespace(text);
+        text = StringUtilities::trimAsciiWhitespace(text);
         if (text.empty()) {
             break;
         }
@@ -74,7 +57,7 @@ std::vector<std::string_view> TextParsingUtilities::splitAsciiWhitespace(std::st
 
 bool TextParsingUtilities::parseBool(const std::string_view text, bool& value) noexcept
 {
-    const std::string_view trimmed = trimAsciiWhitespace(text);
+    const std::string_view trimmed = StringUtilities::trimAsciiWhitespace(text);
     if (trimmed == "true" || trimmed == "1") {
         value = true;
         return true;
@@ -92,7 +75,9 @@ std::vector<std::string_view> TextParsingUtilities::splitCommaSeparated(std::str
     std::vector<std::string_view> columns;
     while (true) {
         const std::size_t comma = line.find(',');
-        columns.push_back(trimAsciiWhitespace(comma == std::string_view::npos ? line : line.substr(0U, comma)));
+        columns.push_back(
+            StringUtilities::trimAsciiWhitespace(comma == std::string_view::npos ? line : line.substr(0U, comma))
+        );
         if (comma == std::string_view::npos) {
             break;
         }
@@ -109,12 +94,7 @@ std::string_view TextParsingUtilities::fixedColumn(
         return {};
     }
 
-    return trimAsciiWhitespace(line.substr(offset, std::min(length, line.size() - offset)));
-}
-
-std::string_view TextParsingUtilities::takeLine(std::string_view& remaining) noexcept
-{
-    return StringUtilities::takeLine(remaining);
+    return StringUtilities::trimAsciiWhitespace(line.substr(offset, std::min(length, line.size() - offset)));
 }
 
 std::optional<int> TextParsingUtilities::parseEnglishMonthAbbreviation(const std::string_view text) noexcept
@@ -161,7 +141,7 @@ std::optional<int> TextParsingUtilities::parseEnglishMonthAbbreviation(const std
 
 std::optional<skygate::core::CivilDateTime> TextParsingUtilities::parseUtcDate(std::string_view text) noexcept
 {
-    text = trimAsciiWhitespace(text);
+    text = StringUtilities::trimAsciiWhitespace(text);
     const std::size_t yearSearchStart = text.starts_with("-") ? 1U : 0U;
     const std::size_t firstDash = text.find('-', yearSearchStart);
     const std::size_t secondDash =
@@ -201,7 +181,7 @@ std::optional<std::string> TextParsingUtilities::metadataValue(const std::string
         return std::nullopt;
     }
 
-    return std::string(trimAsciiWhitespace(line.substr(prefix.size())));
+    return std::string(StringUtilities::trimAsciiWhitespace(line.substr(prefix.size())));
 }
 
 }  // namespace skygate::ephemeris
