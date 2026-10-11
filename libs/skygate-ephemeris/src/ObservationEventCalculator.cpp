@@ -3,6 +3,7 @@
 #include "CelestialBodyCatalog.hpp"
 #include "CelestialBodyState.hpp"
 #include "EphemerisRequestFactory.hpp"
+#include "FixedBodyAltitudeRange.hpp"
 #include "UtcTimeCodec.hpp"
 #include "engine/IEphemerisEngine.hpp"
 
@@ -187,8 +188,10 @@ std::optional<ObservationEventStatus::Type> EventSearch::fixedHorizonStatus() co
         return std::nullopt;
     }
 
-    const double maxAltitudeDeg = 90.0 - std::abs(m_request.context.observer.latitudeDeg - equatorial.declinationDeg);
-    const double minAltitudeDeg = std::abs(m_request.context.observer.latitudeDeg + equatorial.declinationDeg) - 90.0;
+    const double maxAltitudeDeg =
+        FixedBodyAltitudeRange::maxAltitudeDeg(m_request.context.observer.latitudeDeg, equatorial.declinationDeg);
+    const double minAltitudeDeg =
+        FixedBodyAltitudeRange::minAltitudeDeg(m_request.context.observer.latitudeDeg, equatorial.declinationDeg);
 
     if (minAltitudeDeg >= m_crossingAltitudeDeg - kAltitudeClassificationToleranceDeg) {
         return ObservationEventStatus::Type::AlwaysAbove;
