@@ -181,6 +181,22 @@ CivilDateTimeResult CalendarTime::civilDateTimeFromAstronomicalEpoch(const Astro
     return dateTime;
 }
 
+CivilDateTimeResult
+CalendarTime::civilDateFromUtcParts(const int astronomicalYear, const int month, const int day) noexcept
+{
+    const CivilDateTime dateTime{
+        .astronomicalYear = astronomicalYear,
+        .month = month,
+        .day = day,
+        .timeScale = TimeScale::Utc,
+    };
+    if (!isValidCivilDateTime(dateTime)) {
+        return std::nullopt;
+    }
+
+    return dateTime;
+}
+
 CivilDateTime CalendarTime::civilDateFromDecimalYear(const double decimalYear) noexcept
 {
     const int year = static_cast<int>(std::floor(decimalYear));

@@ -130,16 +130,7 @@ std::optional<skygate::core::CivilDateTime> TextParsingUtilities::parseUtcDate(s
         return std::nullopt;
     }
 
-    skygate::core::CivilDateTime dateTime;
-    dateTime.astronomicalYear = *year;
-    dateTime.month = *month;
-    dateTime.day = *day;
-    dateTime.timeScale = skygate::core::TimeScale::Utc;
-    if (!skygate::core::CalendarTime::isValidCivilDateTime(dateTime)) {
-        return std::nullopt;
-    }
-
-    return dateTime;
+    return skygate::core::CalendarTime::civilDateFromUtcParts(*year, *month, *day);
 }
 
 std::optional<std::string> TextParsingUtilities::metadataValue(const std::string_view line, const std::string_view key)
