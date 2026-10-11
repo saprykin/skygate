@@ -136,6 +136,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/TableBackedDeltaTProvider.cpp
     src/engine/TableBackedLeapSecondProvider.hpp
     src/engine/TableBackedLeapSecondProvider.cpp
+    src/engine/TableInterpolation.hpp
+    src/engine/TableInterpolation.cpp
     src/engine/TimeScaleConversionStatus.hpp
     src/engine/TimeScaleConversionStatus.cpp
     src/engine/TimeScaleConversionWarningCode.hpp

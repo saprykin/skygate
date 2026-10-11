@@ -1,4 +1,5 @@
 #include "EarthOrientationSampler.hpp"
+#include "TableInterpolation.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -86,10 +87,10 @@ missingDataSample(const skygate::core::AstronomicalEpoch& utcEpoch, const EarthO
     const IEarthOrientationProvider::TableEntry& upper
 )
 {
-    const double lowerKey = lower.effectiveUtcEpoch.sortKey();
-    const double upperKey = upper.effectiveUtcEpoch.sortKey();
-    const double denominator = upperKey - lowerKey;
-    if (denominator <= 0.0) {
+    const std::optional<double> ratio = TableInterpolation::ratio(
+        utcEpoch.sortKey(), lower.effectiveUtcEpoch.sortKey(), upper.effectiveUtcEpoch.sortKey()
+    );
+    if (!ratio.has_value()) {
         return failedSample(
             utcEpoch,
             EarthOrientationSampler::Sample::WarningCode::InvalidInput,
@@ -97,15 +98,14 @@ missingDataSample(const skygate::core::AstronomicalEpoch& utcEpoch, const EarthO
         );
     }
 
-    const double ratio = (utcEpoch.sortKey() - lowerKey) / denominator;
     EarthOrientationSampler::Sample sample;
     sample.requestedUtcEpoch = utcEpoch;
     sample.ut1MinusUtcSeconds =
-        lower.ut1MinusUtcSeconds + (upper.ut1MinusUtcSeconds - lower.ut1MinusUtcSeconds) * ratio;
+        lower.ut1MinusUtcSeconds + (upper.ut1MinusUtcSeconds - lower.ut1MinusUtcSeconds) * *ratio;
     sample.polarMotionXArcseconds =
-        lower.polarMotionXArcseconds + (upper.polarMotionXArcseconds - lower.polarMotionXArcseconds) * ratio;
+        lower.polarMotionXArcseconds + (upper.polarMotionXArcseconds - lower.polarMotionXArcseconds) * *ratio;
     sample.polarMotionYArcseconds =
-        lower.polarMotionYArcseconds + (upper.polarMotionYArcseconds - lower.polarMotionYArcseconds) * ratio;
+        lower.polarMotionYArcseconds + (upper.polarMotionYArcseconds - lower.polarMotionYArcseconds) * *ratio;
     sample.predicted = lower.predicted || upper.predicted;
     sample.estimated = lower.estimated || upper.estimated;
     sample.status = EarthOrientationSampler::Sample::Status::Valid;
