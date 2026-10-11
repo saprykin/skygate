@@ -194,8 +194,8 @@ to the factory; `effectiveKind()` is the kind of the returned engine (or
 the requested kind when creation fails). A high-precision request whose
 dependencies are unavailable therefore succeeds with
 `requestedKind() == EphemerisEngineKind::Type::HighPrecision`, a `Simple`
-engine, and `EphemerisFactoryCreationStatus::CreatedSimpleFallback`, which
-`usedSimpleEngineFallback()` reports.
+engine, and `EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback`,
+which `usedSimpleEngineFallback()` reports.
 
 `SkyContextController` uses that distinction when it rebuilds the active
 engine. If a rebuild would replace an active high-precision engine with a
