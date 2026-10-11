@@ -4,6 +4,7 @@
 #include "EphemerisMetadataFailurePolicy.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "ICalcephKernel.hpp"
+#include "NaifBodyIds.hpp"
 #include "engine/IEarthOrientationProvider.hpp"
 #include "engine/ITimeScaleService.hpp"
 #include "ObserverGeodesy.hpp"
@@ -17,8 +18,7 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-constexpr int kNaifEarth = 399;
-constexpr int kNaifSolarSystemBarycenter = 0;
+using skygate::core::NaifBodyIds;
 
 [[nodiscard]] bool requestsAnnualParallaxState(const EphemerisRequest& request) noexcept
 {
@@ -65,7 +65,7 @@ PreparedRequestStateBuilder::build(const EphemerisRequest& request) const
         if (requestsAnnualParallaxState(request) && preparedState->tdbKernelEpoch.has_value()
             && m_dependencies.calcephKernel != nullptr) {
             preparedState->annualParallaxEarthState = m_dependencies.calcephKernel->compute(
-                *preparedState->tdbKernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter
+                *preparedState->tdbKernelEpoch, NaifBodyIds::kEarth, NaifBodyIds::kSolarSystemBarycenter
             );
         }
     }

@@ -13,6 +13,7 @@ public:
     static constexpr double kDegreesPerHour = 15.0;
     static constexpr double kRadiansPerHour = kPi / 12.0;
     static constexpr double kHoursPerRadian = 12.0 / kPi;
+    static constexpr double kMilliarcsecondsPerArcsecond = 1'000.0;
     static constexpr double kArcsecondsToRadians = kPi / (180.0 * 3600.0);
     static constexpr double kMilliarcsecondsToRadians = kPi / (180.0 * 3'600'000.0);
     static constexpr double kEpsilon = 1e-12;

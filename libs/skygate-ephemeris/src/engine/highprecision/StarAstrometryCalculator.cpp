@@ -4,6 +4,7 @@
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
 #include "ICalcephKernel.hpp"
+#include "NaifBodyIds.hpp"
 #include "engine/ITimeScaleService.hpp"
 #include "PreparedEphemerisRequestState.hpp"
 #include "StarAstrometryBatchResult.hpp"
@@ -22,10 +23,9 @@ namespace skygate::ephemeris::highprecision {
 namespace {
 
 using skygate::core::MathConstants;
+using skygate::core::NaifBodyIds;
 using skygate::core::PhysicalConstants;
 using skygate::core::TimeConstants;
-constexpr int kNaifEarth = 399;
-constexpr int kNaifSolarSystemBarycenter = 0;
 
 [[nodiscard]] double
 yearsBetween(const skygate::core::AstronomicalEpoch& start, const skygate::core::AstronomicalEpoch& end) noexcept
@@ -134,7 +134,8 @@ northBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) 
                + (north * (tangentialDecRadiansPerYear * years));
     }
 
-    const double distanceAu = PhysicalConstants::kAuPerParsec * (1'000.0 / *astrometry.stellarParallaxMas);
+    const double distanceAu = PhysicalConstants::kAuPerParsec
+                              * (MathConstants::kMilliarcsecondsPerArcsecond / *astrometry.stellarParallaxMas);
     const double radialVelocityAuPerYear = hasEnabledPositiveParallax(astrometry, flags)
                                                ? radialVelocityKmPerSecond * TimeConstants::kSecondsPerJulianYear
                                                      / PhysicalConstants::kAstronomicalUnitKilometers
@@ -196,7 +197,7 @@ northBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) 
 )
 {
     if (preparedState == nullptr || !preparedState->annualParallaxEarthState.has_value()) {
-        return kernel->compute(kernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter);
+        return kernel->compute(kernelEpoch, NaifBodyIds::kEarth, NaifBodyIds::kSolarSystemBarycenter);
     }
 
     return *preparedState->annualParallaxEarthState;
@@ -403,8 +404,9 @@ std::vector<StarAstrometryBatchResult> StarAstrometryCalculator::calculateBatch(
         localPreparedState->tdbKernelEpoch =
             tdbEpochForKernel(localPreparedState->tdbKernelEpochMetadata, request.epoch, m_timeScaleService);
         if (localPreparedState->tdbKernelEpoch.has_value() && m_kernel != nullptr) {
-            localPreparedState->annualParallaxEarthState =
-                m_kernel->compute(*localPreparedState->tdbKernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter);
+            localPreparedState->annualParallaxEarthState = m_kernel->compute(
+                *localPreparedState->tdbKernelEpoch, NaifBodyIds::kEarth, NaifBodyIds::kSolarSystemBarycenter
+            );
         }
         preparedRequestState = localPreparedState;
     }
