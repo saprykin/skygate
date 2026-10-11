@@ -249,9 +249,7 @@ struct MergeAccumulator final {
         contributors.reserve(priorContributors.size() + 1U);
         contributors.push_back(sourceIds.back());
         for (std::string& prior : priorContributors) {
-            if (std::find(contributors.begin(), contributors.end(), prior) == contributors.end()) {
-                contributors.push_back(std::move(prior));
-            }
+            StringUtilities::appendUnique(contributors, std::move(prior));
         }
         contributorSourceIds.push_back(std::move(contributors));
         fieldOrigins.push_back(std::move(origins));
@@ -634,6 +632,91 @@ void takeHigherPrecedence(
     winnerOrigin = loserOrigin;
 }
 
+// How one losing astrometry entered the winning coordinate model, so each
+// caller can diagnose a rejection with the labels of the records it merges.
+enum class AstrometryMergeOutcome {
+    Adopted,
+    MergedFields,
+    RejectedAgainstFixed,
+    RejectedAgainstReference
+};
+
+// Fills the winner's coordinate model from one losing astrometry. The losing
+// astrometry only enters the model when it agrees with the surviving direction:
+// directly against a fixed position, or against the winning reference position
+// after the losing proper motion accounts for the reference-epoch difference.
+// Compatible losing astrometry replaces a missing astrometry or fills and
+// replaces its single fields under origin precedence; incompatible astrometry
+// is dropped so the survivor never combines two contradictory coordinate
+// descriptions.
+[[nodiscard]] AstrometryMergeOutcome mergeLosingAstrometry(
+    OwnGalaxyCelestialBody& winner,
+    FieldOrigins& winnerOrigins,
+    const CatalogStarAstrometry& loserAstrometry,
+    const FieldOrigins& loserOrigins,
+    const ValuePrecedence precedence
+)
+{
+    if (!winner.starAstrometry.has_value()) {
+        if (winner.fixedEquatorial.has_value()
+            && !CatalogCoordinateModel::sameDirection(*winner.fixedEquatorial, loserAstrometry.referenceEquatorial)) {
+            return AstrometryMergeOutcome::RejectedAgainstFixed;
+        }
+
+        winner.starAstrometry = loserAstrometry;
+        winnerOrigins.starAstrometry = loserOrigins.starAstrometry;
+        winnerOrigins.properMotionRightAscension = loserOrigins.properMotionRightAscension;
+        winnerOrigins.properMotionDeclination = loserOrigins.properMotionDeclination;
+        winnerOrigins.stellarParallax = loserOrigins.stellarParallax;
+        winnerOrigins.radialVelocity = loserOrigins.radialVelocity;
+        winnerOrigins.astrometryValidityRange = loserOrigins.astrometryValidityRange;
+        refreshCoordinateModelOrigin(winnerOrigins);
+        return AstrometryMergeOutcome::Adopted;
+    }
+
+    if (!CatalogCoordinateModel::sameAstrometry(*winner.starAstrometry, loserAstrometry)) {
+        return AstrometryMergeOutcome::RejectedAgainstReference;
+    }
+
+    CatalogStarAstrometry& merged = *winner.starAstrometry;
+    takeHigherPrecedence(
+        merged.properMotionRightAscensionMasPerYear,
+        winnerOrigins.properMotionRightAscension,
+        loserAstrometry.properMotionRightAscensionMasPerYear,
+        loserOrigins.properMotionRightAscension,
+        precedence
+    );
+    takeHigherPrecedence(
+        merged.properMotionDeclinationMasPerYear,
+        winnerOrigins.properMotionDeclination,
+        loserAstrometry.properMotionDeclinationMasPerYear,
+        loserOrigins.properMotionDeclination,
+        precedence
+    );
+    takeHigherPrecedence(
+        merged.stellarParallaxMas,
+        winnerOrigins.stellarParallax,
+        loserAstrometry.stellarParallaxMas,
+        loserOrigins.stellarParallax,
+        precedence
+    );
+    takeHigherPrecedence(
+        merged.radialVelocityKmPerSecond,
+        winnerOrigins.radialVelocity,
+        loserAstrometry.radialVelocityKmPerSecond,
+        loserOrigins.radialVelocity,
+        precedence
+    );
+    takeHigherPrecedence(
+        merged.validityRange,
+        winnerOrigins.astrometryValidityRange,
+        loserAstrometry.validityRange,
+        loserOrigins.astrometryValidityRange,
+        precedence
+    );
+    return AstrometryMergeOutcome::MergedFields;
+}
+
 // Replaces the winner's whole coordinate model with the loser's when the
 // loser's model anchor outranks the winner's: the higher-precedence model is
 // selected before any compatibility check, so the model the winner happened to
@@ -697,91 +780,39 @@ void replaceCoordinateModelInPlace(
     }
 
     if (replacedAstrometry.has_value()) {
-        if (!winner.starAstrometry.has_value()) {
-            if (winner.fixedEquatorial.has_value()
-                && CatalogCoordinateModel::sameDirection(
-                    *winner.fixedEquatorial, replacedAstrometry->referenceEquatorial
-                )) {
-                // The replaced astrometry agrees with the selected fixed
-                // position, so its measurements enrich the selected model.
-                winner.starAstrometry = *replacedAstrometry;
-                winnerOrigins.starAstrometry = replacedOrigins.starAstrometry;
-                winnerOrigins.properMotionRightAscension = replacedOrigins.properMotionRightAscension;
-                winnerOrigins.properMotionDeclination = replacedOrigins.properMotionDeclination;
-                winnerOrigins.stellarParallax = replacedOrigins.stellarParallax;
-                winnerOrigins.radialVelocity = replacedOrigins.radialVelocity;
-                winnerOrigins.astrometryValidityRange = replacedOrigins.astrometryValidityRange;
-            } else {
-                logRejectedAstrometry(loser, winner, QStringLiteral("fixed coordinates"));
-            }
-        } else if (!CatalogCoordinateModel::sameAstrometry(*winner.starAstrometry, *replacedAstrometry)) {
+        switch (mergeLosingAstrometry(winner, winnerOrigins, *replacedAstrometry, replacedOrigins, precedence)) {
+        case AstrometryMergeOutcome::RejectedAgainstFixed:
+            logRejectedAstrometry(loser, winner, QStringLiteral("fixed coordinates"));
+            break;
+        case AstrometryMergeOutcome::RejectedAgainstReference:
             logRejectedAstrometry(loser, winner, QStringLiteral("reference coordinates"));
-        } else {
-            CatalogStarAstrometry& merged = *winner.starAstrometry;
-            takeHigherPrecedence(
-                merged.properMotionRightAscensionMasPerYear,
-                winnerOrigins.properMotionRightAscension,
-                replacedAstrometry->properMotionRightAscensionMasPerYear,
-                replacedOrigins.properMotionRightAscension,
-                precedence
-            );
-            takeHigherPrecedence(
-                merged.properMotionDeclinationMasPerYear,
-                winnerOrigins.properMotionDeclination,
-                replacedAstrometry->properMotionDeclinationMasPerYear,
-                replacedOrigins.properMotionDeclination,
-                precedence
-            );
-            takeHigherPrecedence(
-                merged.stellarParallaxMas,
-                winnerOrigins.stellarParallax,
-                replacedAstrometry->stellarParallaxMas,
-                replacedOrigins.stellarParallax,
-                precedence
-            );
-            takeHigherPrecedence(
-                merged.radialVelocityKmPerSecond,
-                winnerOrigins.radialVelocity,
-                replacedAstrometry->radialVelocityKmPerSecond,
-                replacedOrigins.radialVelocity,
-                precedence
-            );
-            takeHigherPrecedence(
-                merged.validityRange,
-                winnerOrigins.astrometryValidityRange,
-                replacedAstrometry->validityRange,
-                replacedOrigins.astrometryValidityRange,
-                precedence
-            );
+            break;
+        case AstrometryMergeOutcome::Adopted:
+        case AstrometryMergeOutcome::MergedFields:
+            break;
         }
     }
 
     refreshCoordinateModelOrigin(winnerOrigins);
 }
 
-// Merges the losing fixed position into the winning coordinate model. A loser
-// whose coherent model anchor outranks the winner's replaces the whole model
-// before this per-component merge, so a position that disagrees with the model
-// whose origin loses never rejects the earlier model. Otherwise the position
-// supplied by the highest-precedence source wins, so a losing position
-// replaces a winning position only when the winning position was itself
-// inherited from a lower-precedence source. A losing position never enters a
-// model whose astrometry already anchors the object at a different direction.
-// A fixed position carries no reference epoch, so the comparison against a
-// reference position has no epoch conversion to apply.
-void mergeFixedEquatorialInPlace(
-    OwnGalaxyCelestialBody& winner,
+// Merges the losing fixed position into the winning fixed coordinate under
+// origin precedence. A losing position replaces a winning position only when
+// the winning position was itself inherited from a lower-precedence source,
+// and it never enters a model whose astrometry already anchors the object at a
+// different direction. A fixed position carries no reference epoch, so the
+// comparison against a reference position has no epoch conversion to apply.
+// A winner without astrometry reports no reference direction, so the same
+// helper serves both body domains.
+template <typename WinnerBody>
+void mergeLosingFixedPosition(
+    WinnerBody& winner,
     FieldOrigins& winnerOrigins,
     const BaseCelestialBody& loser,
     const FieldOrigins& loserOrigins,
     const ValuePrecedence precedence
 )
 {
-    if (loserCoordinateModelWins(loserOrigins, winnerOrigins, precedence)) {
-        replaceCoordinateModelInPlace(winner, winnerOrigins, loser, loserOrigins, precedence);
-        return;
-    }
-
     const skygate::core::EquatorialCoordinate* loserFixed = loser.fixedEquatorialCoordinate();
     if (loserFixed == nullptr) {
         return;
@@ -799,8 +830,9 @@ void mergeFixedEquatorialInPlace(
         return;
     }
 
-    if (winner.starAstrometry.has_value()
-        && !CatalogCoordinateModel::sameDirection(winner.starAstrometry->referenceEquatorial, *loserFixed)) {
+    const std::optional<CatalogStarAstrometry>& winnerAstrometry = winner.starAstrometryValue();
+    if (winnerAstrometry.has_value()
+        && !CatalogCoordinateModel::sameDirection(winnerAstrometry->referenceEquatorial, *loserFixed)) {
         logRejectedFixedCoordinates(winner, loser);
         return;
     }
@@ -811,6 +843,26 @@ void mergeFixedEquatorialInPlace(
     winner.fixedEquatorial = *loserFixed;
     winnerOrigins.fixedEquatorial = loserOrigins.fixedEquatorial;
     refreshCoordinateModelOrigin(winnerOrigins);
+}
+
+// Merges the losing fixed position into the winning coordinate model. A loser
+// whose coherent model anchor outranks the winner's replaces the whole model
+// before this per-component merge, so a position that disagrees with the model
+// whose origin loses never rejects the earlier model.
+void mergeFixedEquatorialInPlace(
+    OwnGalaxyCelestialBody& winner,
+    FieldOrigins& winnerOrigins,
+    const BaseCelestialBody& loser,
+    const FieldOrigins& loserOrigins,
+    const ValuePrecedence precedence
+)
+{
+    if (loserCoordinateModelWins(loserOrigins, winnerOrigins, precedence)) {
+        replaceCoordinateModelInPlace(winner, winnerOrigins, loser, loserOrigins, precedence);
+        return;
+    }
+
+    mergeLosingFixedPosition(winner, winnerOrigins, loser, loserOrigins, precedence);
 }
 
 // Merges the losing astrometry into the winning coordinate model. A loser
@@ -844,64 +896,17 @@ void mergeStarAstrometryInPlace(
         return;
     }
 
-    if (!winner.starAstrometry.has_value()) {
-        if (winner.fixedEquatorial.has_value()
-            && !CatalogCoordinateModel::sameDirection(*winner.fixedEquatorial, loserAstrometry->referenceEquatorial)) {
-            logRejectedAstrometry(winner, loser, QStringLiteral("fixed coordinates"));
-            return;
-        }
-        winner.starAstrometry = *loserAstrometry;
-        winnerOrigins.starAstrometry = loserOrigins.starAstrometry;
-        winnerOrigins.properMotionRightAscension = loserOrigins.properMotionRightAscension;
-        winnerOrigins.properMotionDeclination = loserOrigins.properMotionDeclination;
-        winnerOrigins.stellarParallax = loserOrigins.stellarParallax;
-        winnerOrigins.radialVelocity = loserOrigins.radialVelocity;
-        winnerOrigins.astrometryValidityRange = loserOrigins.astrometryValidityRange;
-        refreshCoordinateModelOrigin(winnerOrigins);
-        return;
-    }
-
-    if (!CatalogCoordinateModel::sameAstrometry(*winner.starAstrometry, *loserAstrometry)) {
+    switch (mergeLosingAstrometry(winner, winnerOrigins, *loserAstrometry, loserOrigins, precedence)) {
+    case AstrometryMergeOutcome::RejectedAgainstFixed:
+        logRejectedAstrometry(winner, loser, QStringLiteral("fixed coordinates"));
+        break;
+    case AstrometryMergeOutcome::RejectedAgainstReference:
         logRejectedAstrometry(winner, loser, QStringLiteral("reference coordinates"));
-        return;
+        break;
+    case AstrometryMergeOutcome::Adopted:
+    case AstrometryMergeOutcome::MergedFields:
+        break;
     }
-
-    CatalogStarAstrometry& merged = *winner.starAstrometry;
-    takeHigherPrecedence(
-        merged.properMotionRightAscensionMasPerYear,
-        winnerOrigins.properMotionRightAscension,
-        loserAstrometry->properMotionRightAscensionMasPerYear,
-        loserOrigins.properMotionRightAscension,
-        precedence
-    );
-    takeHigherPrecedence(
-        merged.properMotionDeclinationMasPerYear,
-        winnerOrigins.properMotionDeclination,
-        loserAstrometry->properMotionDeclinationMasPerYear,
-        loserOrigins.properMotionDeclination,
-        precedence
-    );
-    takeHigherPrecedence(
-        merged.stellarParallaxMas,
-        winnerOrigins.stellarParallax,
-        loserAstrometry->stellarParallaxMas,
-        loserOrigins.stellarParallax,
-        precedence
-    );
-    takeHigherPrecedence(
-        merged.radialVelocityKmPerSecond,
-        winnerOrigins.radialVelocity,
-        loserAstrometry->radialVelocityKmPerSecond,
-        loserOrigins.radialVelocity,
-        precedence
-    );
-    takeHigherPrecedence(
-        merged.validityRange,
-        winnerOrigins.astrometryValidityRange,
-        loserAstrometry->validityRange,
-        loserOrigins.astrometryValidityRange,
-        precedence
-    );
 }
 
 void mergeOwnGalaxyInPlace(
@@ -948,24 +953,7 @@ void mergeDistantInPlace(
         precedence
     );
 
-    const skygate::core::EquatorialCoordinate* loserFixed = loser.fixedEquatorialCoordinate();
-    if (loserFixed != nullptr) {
-        const bool winnerHasFixed = winner.fixedEquatorial.has_value();
-        const bool loserOutranks =
-            !winnerHasFixed
-            || (winnerOrigins.fixedEquatorial.has_value() && loserOrigins.fixedEquatorial.has_value()
-                && loserValueWins(*loserOrigins.fixedEquatorial, *winnerOrigins.fixedEquatorial, precedence));
-        if (loserOutranks) {
-            if (winnerHasFixed && coordinatesConflict(*winner.fixedEquatorial, *loserFixed)) {
-                logFixedCoordinateConflict(loser, winner);
-            }
-            winner.fixedEquatorial = *loserFixed;
-            winnerOrigins.fixedEquatorial = loserOrigins.fixedEquatorial;
-            refreshCoordinateModelOrigin(winnerOrigins);
-        } else if (winnerHasFixed && coordinatesConflict(*winner.fixedEquatorial, *loserFixed)) {
-            logFixedCoordinateConflict(winner, loser);
-        }
-    }
+    mergeLosingFixedPosition(winner, winnerOrigins, loser, loserOrigins, precedence);
 
     const DeepSkyObjectInfo* loserDeepSky = loser.deepSkyObjectInfo();
     if (loserDeepSky == nullptr) {
@@ -1061,9 +1049,7 @@ std::vector<std::string> collectContributors(
     std::vector<std::string> contributors;
     for (const std::size_t position : positions) {
         for (const std::string& sourceId : accumulator.contributorSourceIds[position]) {
-            if (std::find(contributors.begin(), contributors.end(), sourceId) == contributors.end()) {
-                contributors.push_back(sourceId);
-            }
+            StringUtilities::appendUnique(contributors, sourceId);
         }
     }
 
