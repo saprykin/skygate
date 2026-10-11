@@ -1,5 +1,9 @@
 #include "FakeReplyQuery.hpp"
 
+#include <QList>
+
+#include <algorithm>
+
 namespace skygate::ui::tests {
 
 FakeNetworkReply* FakeReplyQuery::findReplyForUrl(FakeNetworkAccessManager& networkAccessManager, const QString& url)
@@ -21,6 +25,14 @@ FakeReplyQuery::findPendingReplyForUrl(FakeNetworkAccessManager& networkAccessMa
         }
     }
     return nullptr;
+}
+
+bool FakeReplyQuery::allIssuedRepliesFinished(const FakeNetworkAccessManager& networkAccessManager)
+{
+    const QList<FakeNetworkReply*> replies = networkAccessManager.issuedReplies();
+    return std::all_of(replies.begin(), replies.end(), [](const FakeNetworkReply* reply) {
+        return reply == nullptr || reply->isFinished();
+    });
 }
 
 }  // namespace skygate::ui::tests
