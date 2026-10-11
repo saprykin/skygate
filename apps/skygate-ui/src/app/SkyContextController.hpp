@@ -50,10 +50,11 @@ class ICalcephKernelProvider;
 namespace skygate::ui::internal {
 class SkyCatalogSourceCollectionModel;
 class SkyCatalogSourcePresetModel;
+class SkyDeviceLocationAcquisition;
 }  // namespace skygate::ui::internal
 
 class QDateTime;
-class QGeoPositionInfo;
+class QGeoCoordinate;
 class QGeoPositionInfoSource;
 class LocationCatalogModel;
 class SkyCatalogManager;
@@ -503,8 +504,7 @@ private:
     [[nodiscard]] bool recenterTrackedTarget(bool emitSkyContextChangedWhenUnchanged = false);
     void setViewFieldOfViewDeg(double viewFieldOfViewDeg);
     void applyObserverLocation(const skygate::core::GeoLocation& observer);
-    void initializeCurrentLocation();
-    void applyCurrentLocation(const QGeoPositionInfo& positionInfo);
+    void applyCurrentLocation(const QGeoCoordinate& coordinate);
     void setLocationSource(skygate::ui::internal::SkyContextLocationSource locationSource);
     void clearSelectedCity();
     [[nodiscard]] bool applySelectedCityId(const QString& cityId);
@@ -529,6 +529,7 @@ private:
     skygate::ui::internal::SkyTimelineController m_timeline;
     skygate::ui::internal::SkyViewController m_view;
     skygate::ui::internal::SkyLocationController m_location;
+    std::unique_ptr<skygate::ui::internal::SkyDeviceLocationAcquisition> m_deviceLocationAcquisition;
     skygate::ui::internal::SkySearchController m_search;
     QTimer m_timer;
     std::optional<skygate::core::UtcTimePoint> m_lastLiveRecomputeUtc;

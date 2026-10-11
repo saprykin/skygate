@@ -4,6 +4,7 @@
 #include "SkyCatalogPresets.hpp"
 #include "SkyCatalogSourceCollectionModel.hpp"
 #include "SkyCatalogSourcePresetModel.hpp"
+#include "SkyDeviceLocationAcquisition.hpp"
 #include "SkyEphemerisDataManager.hpp"
 #include "SkyEphemerisUpdateWorkflow.hpp"
 #include "SkyLogging.hpp"
@@ -16,8 +17,12 @@
 #include "engine/IEphemerisDataSnapshot.hpp"
 
 #include <QDateTime>
+#if SKYGATE_HAS_POSITIONING
+#include <QGeoCoordinate>
+#endif
 #include <QLoggingCategory>
 
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <string>
@@ -184,6 +189,7 @@ SkyContextController::SkyContextController(
       m_timeSource(
           initializationOptions.timeSource != nullptr ? initializationOptions.timeSource : &m_systemTimeSource
       ),
+      m_deviceLocationAcquisition(std::make_unique<SkyDeviceLocationAcquisition>(this)),
       m_locationCatalogModel(std::make_unique<LocationCatalogModel>(this)),
       m_themePalette(std::make_unique<SkyThemePalette>(this)),
       m_themeRepository(std::make_unique<SkyThemeRepository>()),
@@ -215,8 +221,30 @@ SkyContextController::SkyContextController(
       m_catalogSourceCollectionModel(std::make_unique<SkyCatalogSourceCollectionModel>(this))
 {
     m_logFilePath = skygate::ui::SkyLogging::defaultLogFilePath();
-    m_location.setPositionSource(initializationOptions.positionSource);
-    m_location.setRequestLocationPermission(initializationOptions.requestLocationPermission);
+    if (initializationOptions.positionSource != nullptr) {
+        m_deviceLocationAcquisition->setPositionSource(initializationOptions.positionSource);
+    }
+    m_deviceLocationAcquisition->setPermissionRequestsEnabled(initializationOptions.requestLocationPermission);
+    connect(
+        m_deviceLocationAcquisition.get(),
+        &SkyDeviceLocationAcquisition::statusTextChanged,
+        this,
+        [this](const QString& locationStatusText) {
+            if (m_location.source() != SkyContextLocationSource::CurrentDevice) {
+                return;
+            }
+
+            setLocationStatusText(locationStatusText);
+        }
+    );
+#if SKYGATE_HAS_POSITIONING
+    connect(
+        m_deviceLocationAcquisition.get(),
+        &SkyDeviceLocationAcquisition::positionAcquired,
+        this,
+        &SkyContextController::applyCurrentLocation
+    );
+#endif
     m_ephemerisUserSettings.engineKind = m_ephemerisSession->engineKind();
     m_ephemerisUserSettings.correctionFlags = m_ephemerisSession->engineOptions().correctionFlags();
     m_ephemerisUserSettings.fallbackToSimpleEngine = m_ephemerisSession->engineOptions().fallbackToSimpleEngine();
@@ -357,7 +385,7 @@ SkyContextController::SkyContextController(
     m_timer.start();
 
     if (initializationOptions.initializeLocation && m_location.source() == SkyContextLocationSource::CurrentDevice) {
-        initializeCurrentLocation();
+        m_deviceLocationAcquisition->start();
     }
 }
 
@@ -656,6 +684,31 @@ void SkyContextController::updateLocationStatusText()
         setLocationStatusText("Location: Custom coordinates");
         return;
     }
+}
+
+void SkyContextController::applyCurrentLocation(const QGeoCoordinate& coordinate)
+{
+#if SKYGATE_HAS_POSITIONING
+    if (m_location.source() != SkyContextLocationSource::CurrentDevice) {
+        return;
+    }
+
+    skygate::core::GeoLocation nextObserver = m_location.observer();
+    nextObserver.latitudeDeg = coordinate.latitude();
+    nextObserver.longitudeDeg = coordinate.longitude();
+    if (std::isfinite(coordinate.altitude())) {
+        nextObserver.elevationMeters = coordinate.altitude();
+    }
+
+    if (!nextObserver.isValid()) {
+        return;
+    }
+
+    applyObserverLocation(nextObserver);
+    setLocationStatusText("Location: Using current location");
+#else
+    static_cast<void>(coordinate);
+#endif
 }
 
 void SkyContextController::setSelectedSearchTarget(const QString& targetKind, const QString& targetId)

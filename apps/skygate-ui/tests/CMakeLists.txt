@@ -162,6 +162,10 @@ add_skygate_ui_qtest(
     TIMEOUT 60
 )
 add_skygate_ui_qtest(skygate-ui-location-catalog-model-tests location/LocationCatalogModelTests.cpp)
+add_skygate_ui_qtest(
+    skygate-ui-device-location-acquisition-tests
+    location/SkyDeviceLocationAcquisitionTests.cpp
+)
 add_skygate_ui_qtest(skygate-ui-time-zone-catalog-model-tests time/TimeZoneCatalogModelTests.cpp)
 add_skygate_ui_qtest(skygate-ui-log-capture-tests diagnostics/LogCaptureTests.cpp)
 add_skygate_ui_qtest(

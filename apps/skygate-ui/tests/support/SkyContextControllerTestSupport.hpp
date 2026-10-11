@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DeviceLocationTestSupport.hpp"
 #include "ITimeSource.hpp"
 #include "SettingsTestFixture.hpp"
 #include "SkyContextController.hpp"
@@ -16,11 +17,6 @@
 #include <QSignalSpy>
 #include <QTimeZone>
 #include <QtTest>
-#if SKYGATE_HAS_POSITIONING
-#include <QGeoCoordinate>
-#include <QGeoPositionInfo>
-#include <QGeoPositionInfoSource>
-#endif
 
 #include <algorithm>
 #include <limits>
@@ -215,77 +211,5 @@ double azimuthDifferenceDeg(const double lhs, const double rhs)
     const double difference = std::abs(lhs - rhs);
     return std::min(difference, 360.0 - difference);
 }
-
-#if SKYGATE_HAS_POSITIONING
-class FakePositionSource final : public QGeoPositionInfoSource {
-public:
-    explicit FakePositionSource(QObject* parent = nullptr) : QGeoPositionInfoSource(parent) {}
-
-    [[nodiscard]] PositioningMethods supportedPositioningMethods() const override
-    {
-        return SatellitePositioningMethods;
-    }
-
-    [[nodiscard]] int minimumUpdateInterval() const override
-    {
-        return 0;
-    }
-
-    [[nodiscard]] Error error() const override
-    {
-        return m_error;
-    }
-
-    [[nodiscard]] QGeoPositionInfo lastKnownPosition(bool fromSatellitePositioningMethodsOnly = false) const override
-    {
-        (void)fromSatellitePositioningMethodsOnly;
-        return m_lastPosition;
-    }
-
-    void startUpdates() override {}
-    void stopUpdates() override {}
-
-    void requestUpdate(const int timeoutMs = 0) override
-    {
-        m_lastTimeoutMs = timeoutMs;
-        ++m_requestCount;
-    }
-
-    [[nodiscard]] int requestCount() const noexcept
-    {
-        return m_requestCount;
-    }
-
-    [[nodiscard]] int lastTimeoutMs() const noexcept
-    {
-        return m_lastTimeoutMs;
-    }
-
-    void publishPosition(const double latitudeDeg, const double longitudeDeg, const double altitudeMeters)
-    {
-        QGeoCoordinate coordinate(latitudeDeg, longitudeDeg, altitudeMeters);
-        QGeoPositionInfo positionInfo(coordinate, fixedNowUtc());
-        m_lastPosition = positionInfo;
-        emit positionUpdated(positionInfo);
-    }
-
-    void publishInvalidPosition()
-    {
-        emit positionUpdated(QGeoPositionInfo());
-    }
-
-    void publishError(const Error error)
-    {
-        m_error = error;
-        emit errorOccurred(error);
-    }
-
-private:
-    Error m_error = NoError;
-    QGeoPositionInfo m_lastPosition;
-    int m_requestCount = 0;
-    int m_lastTimeoutMs = 0;
-};
-#endif
 
 }  // namespace

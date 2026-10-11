@@ -10,8 +10,6 @@
 
 #include <memory>
 
-class QGeoPositionInfoSource;
-
 namespace skygate::ui::internal {
 
 struct SkyTimelineState final {
@@ -38,9 +36,6 @@ struct SkyLocationState final {
     QString statusText;
     QString selectedCityId;
     QString selectedCityDisplayText;
-    QGeoPositionInfoSource* positionSource = nullptr;
-    bool positionSourceConnected = false;
-    bool requestLocationPermission = true;
 };
 
 struct SkySearchState final {

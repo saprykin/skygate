@@ -231,36 +231,6 @@ QString SkyLocationController::selectedCityDisplayText() const
     return m_state.selectedCityDisplayText;
 }
 
-QGeoPositionInfoSource* SkyLocationController::positionSource() const noexcept
-{
-    return m_state.positionSource;
-}
-
-bool SkyLocationController::positionSourceConnected() const noexcept
-{
-    return m_state.positionSourceConnected;
-}
-
-bool SkyLocationController::requestLocationPermission() const noexcept
-{
-    return m_state.requestLocationPermission;
-}
-
-void SkyLocationController::setPositionSource(QGeoPositionInfoSource* positionSource) noexcept
-{
-    m_state.positionSource = positionSource;
-}
-
-void SkyLocationController::setPositionSourceConnected(const bool positionSourceConnected) noexcept
-{
-    m_state.positionSourceConnected = positionSourceConnected;
-}
-
-void SkyLocationController::setRequestLocationPermission(const bool requestLocationPermission) noexcept
-{
-    m_state.requestLocationPermission = requestLocationPermission;
-}
-
 void SkyLocationController::setUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcept
 {
     m_state.context.utcTime = utcTime;
