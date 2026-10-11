@@ -37,38 +37,41 @@ CatalogBodyParseResult DelimitedCatalogParser::run(
         categories.push_back(InvalidRowCategory{.logLabel = label});
     }
 
+    // Bookkeeping shared by every accepted row: progress emission and the
+    // order entry that points at the row's place in its body vector.
+    const auto appendAcceptedBody = [&](CatalogBodyParseResult& rowResult,
+                                        auto& bodies,
+                                        const CelestialBodyCatalog::BodyDomain domain,
+                                        auto&& body) {
+        ++parsedObjectCount;
+        if (progressCallback && (parsedObjectCount % runnerOptions.progressInterval) == 0U) {
+            progressCallback(parsedObjectCount);
+        }
+        rowResult.orderedBodyIndexes.push_back(
+            CelestialBodyCatalog::OrderEntry{.domain = domain, .bodyIndex = bodies.size()}
+        );
+        bodies.push_back(std::forward<decltype(body)>(body));
+    };
+
     CatalogBodyParseResult result = DelimitedCatalogReader::read(
         payload, readerOptions, [&](const DelimitedCatalogRow& row, CatalogBodyParseResult& rowResult) {
             ++dataRowNumber;
             const RowParseOutcome outcome = rowMapper(row, dataRowNumber);
 
             if (outcome.body.has_value()) {
-                ++parsedObjectCount;
-                if (progressCallback && (parsedObjectCount % runnerOptions.progressInterval) == 0U) {
-                    progressCallback(parsedObjectCount);
-                }
-                rowResult.orderedBodyIndexes.push_back(
-                    CelestialBodyCatalog::OrderEntry{
-                        .domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy,
-                        .bodyIndex = rowResult.bodies.size(),
-                    }
+                appendAcceptedBody(
+                    rowResult, rowResult.bodies, CelestialBodyCatalog::BodyDomain::OwnGalaxy, std::move(*outcome.body)
                 );
-                rowResult.bodies.push_back(std::move(*outcome.body));
                 return true;
             }
 
             if (outcome.distantBody.has_value()) {
-                ++parsedObjectCount;
-                if (progressCallback && (parsedObjectCount % runnerOptions.progressInterval) == 0U) {
-                    progressCallback(parsedObjectCount);
-                }
-                rowResult.orderedBodyIndexes.push_back(
-                    CelestialBodyCatalog::OrderEntry{
-                        .domain = CelestialBodyCatalog::BodyDomain::Distant,
-                        .bodyIndex = rowResult.distantBodies.size(),
-                    }
+                appendAcceptedBody(
+                    rowResult,
+                    rowResult.distantBodies,
+                    CelestialBodyCatalog::BodyDomain::Distant,
+                    std::move(*outcome.distantBody)
                 );
-                rowResult.distantBodies.push_back(std::move(*outcome.distantBody));
                 return true;
             }
 
