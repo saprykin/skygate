@@ -16,6 +16,7 @@
 #include <memory>
 #include <vector>
 
+class CatalogDownloadCancellation;
 class QNetworkAccessManager;
 class QObject;
 class CatalogCoordinator;
@@ -61,7 +62,11 @@ public:
 
     [[nodiscard]] bool isAvailable() const noexcept;
 
-    void downloadSource(
+    // Starts the download and returns the handle that cancels it, or null
+    // when no download was started. A canceled download stops without
+    // reporting a completion; an ordinary failure is reported through the
+    // completion result.
+    std::shared_ptr<CatalogDownloadCancellation> downloadSource(
         const SkyCatalogSourceInstance& source,
         skygate::ephemeris::CatalogCompositionPolicy policy,
         QObject* callbackContext,
@@ -69,7 +74,7 @@ public:
         SourceCompletionHandler completionHandler
     ) const;
 
-    void downloadConstellationLines(
+    std::shared_ptr<CatalogDownloadCancellation> downloadConstellationLines(
         const QStringList& urlTexts,
         QObject* callbackContext,
         StatusHandler statusHandler,

@@ -38,7 +38,7 @@ bool SkyCatalogImportWorkflow::isAvailable() const noexcept
     return m_catalogCoordinator != nullptr;
 }
 
-void SkyCatalogImportWorkflow::downloadSource(
+std::shared_ptr<CatalogDownloadCancellation> SkyCatalogImportWorkflow::downloadSource(
     const SkyCatalogSourceInstance& source,
     const skygate::ephemeris::CatalogCompositionPolicy policy,
     QObject* callbackContext,
@@ -53,10 +53,10 @@ void SkyCatalogImportWorkflow::downloadSource(
         result.sourceVersion = source.version;
         result.errorText = "Catalog: Network unavailable";
         completionHandler(std::move(result));
-        return;
+        return nullptr;
     }
 
-    m_catalogCoordinator->downloadCatalogFromUrls(
+    return m_catalogCoordinator->downloadCatalogFromUrls(
         source.urls,
         CatalogParseOptions{
             .archiveMember = source.archiveSelector,
@@ -93,7 +93,7 @@ void SkyCatalogImportWorkflow::downloadSource(
     );
 }
 
-void SkyCatalogImportWorkflow::downloadConstellationLines(
+std::shared_ptr<CatalogDownloadCancellation> SkyCatalogImportWorkflow::downloadConstellationLines(
     const QStringList& urlTexts,
     QObject* callbackContext,
     StatusHandler statusHandler,
@@ -104,10 +104,10 @@ void SkyCatalogImportWorkflow::downloadConstellationLines(
         SkyConstellationLineImportResult result;
         result.statusSuffix = "no constellation data (Catalog: Network unavailable)";
         completionHandler(std::move(result));
-        return;
+        return nullptr;
     }
 
-    m_catalogCoordinator->downloadRawDataFromUrls(
+    return m_catalogCoordinator->downloadRawDataFromUrls(
         urlTexts,
         callbackContext,
         std::move(statusHandler),

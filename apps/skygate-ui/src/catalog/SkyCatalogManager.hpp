@@ -21,6 +21,7 @@
 #include <span>
 #include <vector>
 
+class CatalogDownloadCancellation;
 class QNetworkAccessManager;
 
 namespace skygate::ui::internal {
@@ -141,6 +142,9 @@ public:
     // requested configuration, which may be a rejected or canceled attempt;
     // the instance ID is never re-allocated by a reload.
     void retrySource(const QString& instanceId);
+    // Cancels this manager's active catalog download and its pending related
+    // downloads. Requests issued by other owners on an injected network
+    // manager are not touched.
     void cancelCatalogDownload();
     bool clearCatalogCache();
     bool clearDeepSkyCatalogCache();
@@ -195,6 +199,12 @@ private:
         bool busy = false;
         bool hasError = false;
         QString statusText;
+        // The transfers this instance started, retained so cancellation aborts
+        // exactly them instead of every request on the network manager. A new
+        // transfer of the same kind replaces its handle; a completed transfer
+        // drops it.
+        std::shared_ptr<CatalogDownloadCancellation> catalogCancellation;
+        std::shared_ptr<CatalogDownloadCancellation> relatedCancellation;
     };
 
     void loadSourceInstance(
@@ -277,7 +287,6 @@ private:
     std::unique_ptr<skygate::ui::internal::SkyCatalogRuntime> m_runtime;
     std::unique_ptr<skygate::ui::internal::SkyCatalogCacheController> m_cacheController;
     std::unique_ptr<skygate::ui::internal::SkyCatalogImportWorkflow> m_importWorkflow;
-    QNetworkAccessManager* m_networkAccessManager = nullptr;
     QString m_statusText;
     int m_catalogPresetIndex = 0;
     int m_deepSkyCatalogPresetIndex = 0;
