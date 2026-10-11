@@ -16,6 +16,7 @@ class CelestialFrameMathTests final : public QObject {
 private slots:
     void roundTripsEquatorialCoordinates();
     void normalizesRightAscension();
+    void buildsEquatorialTangentBasis();
     void rejectsZeroAndNonfiniteVectors();
 };
 
@@ -44,6 +45,30 @@ void CelestialFrameMathTests::normalizesRightAscension()
     QVERIFY(result.has_value());
     QCOMPARE(result->rightAscensionHours, 18.0);
     QCOMPARE(result->declinationDeg, 0.0);
+}
+
+void CelestialFrameMathTests::buildsEquatorialTangentBasis()
+{
+    const EquatorialCoordinate coordinate{5.5, 23.5};
+    const Vector3d reference = CelestialFrameMath::fromEquatorial(coordinate);
+    const Vector3d east = CelestialFrameMath::eastBasisFromEquatorial(coordinate);
+    const Vector3d north = CelestialFrameMath::northBasisFromEquatorial(coordinate);
+
+    QVERIFY(std::abs(east.length() - 1.0) < 1.0e-14);
+    QVERIFY(std::abs(north.length() - 1.0) < 1.0e-14);
+    QVERIFY(std::abs(east.dot(north)) < 1.0e-14);
+    QVERIFY(std::abs(east.dot(reference)) < 1.0e-14);
+    QVERIFY(std::abs(north.dot(reference)) < 1.0e-14);
+
+    const Vector3d zeroDecEast = CelestialFrameMath::eastBasisFromEquatorial(EquatorialCoordinate{0.0, 0.0});
+    QCOMPARE(zeroDecEast.x, 0.0);
+    QCOMPARE(zeroDecEast.y, 1.0);
+    QCOMPARE(zeroDecEast.z, 0.0);
+
+    const Vector3d zeroDecNorth = CelestialFrameMath::northBasisFromEquatorial(EquatorialCoordinate{0.0, 0.0});
+    QCOMPARE(zeroDecNorth.x, 0.0);
+    QCOMPARE(zeroDecNorth.y, 0.0);
+    QCOMPARE(zeroDecNorth.z, 1.0);
 }
 
 void CelestialFrameMathTests::rejectsZeroAndNonfiniteVectors()
