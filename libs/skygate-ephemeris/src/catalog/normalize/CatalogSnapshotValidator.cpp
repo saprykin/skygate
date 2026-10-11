@@ -24,8 +24,7 @@ namespace {
 
 [[nodiscard]] bool isValidEpoch(const skygate::core::AstronomicalEpoch& epoch) noexcept
 {
-    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2)
-           && CatalogSnapshotValidator::isKnownTimeScale(epoch.timeScale);
+    return epoch.isFinite() && CatalogSnapshotValidator::isKnownTimeScale(epoch.timeScale);
 }
 
 [[nodiscard]] bool isValidOptionalFiniteDouble(const std::optional<double> value) noexcept
