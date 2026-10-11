@@ -12,6 +12,7 @@ public:
 
     [[nodiscard]] static char toLowerAscii(char character) noexcept;
     [[nodiscard]] static std::string toLowerAscii(std::string_view value);
+    [[nodiscard]] static bool isAsciiWhitespace(char character) noexcept;
     [[nodiscard]] static std::string_view trimAsciiWhitespace(std::string_view value) noexcept;
     [[nodiscard]] static bool equalsIgnoreAsciiCase(std::string_view lhs, std::string_view rhs) noexcept;
     [[nodiscard]] static bool containsIgnoreAsciiCase(std::string_view value, std::string_view token);

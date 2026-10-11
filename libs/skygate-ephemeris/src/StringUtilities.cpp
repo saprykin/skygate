@@ -4,14 +4,11 @@
 #include <cctype>
 
 namespace skygate::ephemeris {
-namespace {
 
-[[nodiscard]] bool isAsciiWhitespace(const char character) noexcept
+bool StringUtilities::isAsciiWhitespace(const char character) noexcept
 {
     return std::isspace(static_cast<unsigned char>(character)) != 0;
 }
-
-}  // namespace
 
 char StringUtilities::toLowerAscii(const char character) noexcept
 {

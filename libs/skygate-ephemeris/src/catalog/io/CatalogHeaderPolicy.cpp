@@ -1,23 +1,15 @@
 #include "CatalogHeaderPolicy.hpp"
 #include "CsvRowTokenizer.hpp"
+#include "StringUtilities.hpp"
 
 #include <QString>
 #include <QStringView>
 #include <QVector>
 
 #include <algorithm>
-#include <cctype>
 #include <cstddef>
 
 namespace skygate::ephemeris {
-namespace {
-
-[[nodiscard]] bool isAsciiWhitespace(const char character) noexcept
-{
-    return std::isspace(static_cast<unsigned char>(character)) != 0;
-}
-
-}  // namespace
 
 std::string_view CatalogHeaderPolicy::findHeaderLine(std::string_view& remaining) noexcept
 {
@@ -36,12 +28,7 @@ std::string_view CatalogHeaderPolicy::findHeaderLine(std::string_view& remaining
             line.remove_suffix(1U);
         }
 
-        while (!line.empty() && isAsciiWhitespace(line.front())) {
-            line.remove_prefix(1U);
-        }
-        while (!line.empty() && isAsciiWhitespace(line.back())) {
-            line.remove_suffix(1U);
-        }
+        line = StringUtilities::trimAsciiWhitespace(line);
 
         if (line.empty()) {
             continue;
