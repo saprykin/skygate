@@ -1,6 +1,7 @@
 #include "LeapSecondTableParser.hpp"
 #include "EphemerisTableMetadata.hpp"
 #include "IEphemerisDataSnapshot.hpp"
+#include "NumericParsingUtilities.hpp"
 #include "StringUtilities.hpp"
 #include "TextParsingUtilities.hpp"
 #include "time/CalendarTime.hpp"
@@ -28,18 +29,17 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
         return std::nullopt;
     }
 
-    int day = 0;
-    int year = 0;
+    const std::optional<int> day = NumericParsingUtilities::parseInt(tokens[0]);
     const std::optional<int> month = TextParsingUtilities::parseEnglishMonthAbbreviation(tokens[1]);
-    if (!TextParsingUtilities::parseInt(tokens[0], day) || !month.has_value()
-        || !TextParsingUtilities::parseInt(tokens[2], year)) {
+    const std::optional<int> year = NumericParsingUtilities::parseInt(tokens[2]);
+    if (!day.has_value() || !month.has_value() || !year.has_value()) {
         return std::nullopt;
     }
 
     skygate::core::CivilDateTime dateTime;
-    dateTime.astronomicalYear = year;
+    dateTime.astronomicalYear = *year;
     dateTime.month = *month;
-    dateTime.day = day;
+    dateTime.day = *day;
     dateTime.timeScale = skygate::core::TimeScale::Utc;
     if (!skygate::core::CalendarTime::isValidCivilDateTime(dateTime)) {
         return std::nullopt;
@@ -56,13 +56,13 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
         return diagnosticText;
     }
     if (line.starts_with("#@")) {
-        std::uint64_t ntpExpiration = 0U;
-        if (!TextParsingUtilities::parseUint64(line.substr(2U), ntpExpiration)) {
+        const std::optional<std::uint64_t> ntpExpiration = NumericParsingUtilities::parseUint64(line.substr(2U));
+        if (!ntpExpiration.has_value()) {
             return "Leap-second table contains malformed expiration metadata at line " + std::to_string(lineNumber)
                    + ".";
         }
 
-        info.expiresAt = skygate::core::EpochCodec::epochFromNtpTimestamp(ntpExpiration);
+        info.expiresAt = skygate::core::EpochCodec::epochFromNtpTimestamp(*ntpExpiration);
     }
 
     return std::nullopt;
@@ -76,8 +76,8 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
     }
 
     const std::optional<skygate::core::CivilDateTime> effectiveDate = TextParsingUtilities::parseUtcDate(columns[0]);
-    int taiMinusUtcSeconds = 0;
-    if (!effectiveDate.has_value() || !TextParsingUtilities::parseInt(columns[1], taiMinusUtcSeconds)) {
+    const std::optional<int> taiMinusUtcSeconds = NumericParsingUtilities::parseInt(columns[1]);
+    if (!effectiveDate.has_value() || !taiMinusUtcSeconds.has_value()) {
         return false;
     }
 
@@ -88,7 +88,7 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
     }
 
     entry.effectiveUtcEpoch = *effectiveEpoch;
-    entry.taiMinusUtcSeconds = taiMinusUtcSeconds;
+    entry.taiMinusUtcSeconds = *taiMinusUtcSeconds;
     return true;
 }
 
@@ -103,14 +103,13 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
         return false;
     }
 
-    std::uint64_t ntpTimestamp = 0U;
-    int taiMinusUtcSeconds = 0;
-    if (!TextParsingUtilities::parseUint64(columns[0], ntpTimestamp)
-        || !TextParsingUtilities::parseInt(columns[1], taiMinusUtcSeconds)) {
+    const std::optional<std::uint64_t> ntpTimestamp = NumericParsingUtilities::parseUint64(columns[0]);
+    const std::optional<int> taiMinusUtcSeconds = NumericParsingUtilities::parseInt(columns[1]);
+    if (!ntpTimestamp.has_value() || !taiMinusUtcSeconds.has_value()) {
         return false;
     }
 
-    const skygate::core::AstronomicalEpoch epoch = skygate::core::EpochCodec::epochFromNtpTimestamp(ntpTimestamp);
+    const skygate::core::AstronomicalEpoch epoch = skygate::core::EpochCodec::epochFromNtpTimestamp(*ntpTimestamp);
     std::optional<skygate::core::CivilDateTime> effectiveDate;
     if (commentOffset != std::string_view::npos) {
         effectiveDate = parseIanaCommentDate(line.substr(commentOffset + 1U));
@@ -123,7 +122,7 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
     }
 
     entry.effectiveUtcEpoch = epoch;
-    entry.taiMinusUtcSeconds = taiMinusUtcSeconds;
+    entry.taiMinusUtcSeconds = *taiMinusUtcSeconds;
     return true;
 }
 

@@ -3,7 +3,6 @@
 #include "time/CivilDateTime.hpp"
 
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -16,8 +15,6 @@ public:
     TextParsingUtilities() = delete;
 
     [[nodiscard]] static bool parseBool(std::string_view text, bool& value) noexcept;
-    [[nodiscard]] static bool parseInt(std::string_view text, int& value) noexcept;
-    [[nodiscard]] static bool parseUint64(std::string_view text, std::uint64_t& value) noexcept;
     [[nodiscard]] static std::vector<std::string_view> splitAsciiWhitespace(std::string_view text);
     // Keeps empty fields and trims them, unlike StringUtilities::splitView; quotes are data.
     [[nodiscard]] static std::vector<std::string_view> splitCommaSeparated(std::string_view text);

@@ -224,6 +224,10 @@ add_skygate_ephemeris_qtest(
     engine/StringUtilitiesTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-numeric-parsing-utilities-tests
+    engine/NumericParsingUtilitiesTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-planet-identity-tests
     reference/PlanetIdentityTests.cpp
 )

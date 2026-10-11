@@ -137,29 +137,27 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
 
     skygate::core::CivilDateTime effectiveDate;
     double deltaTSeconds = 0.0;
-    int year = 0;
-    int month = 0;
-    int day = 1;
+    const std::optional<int> year = NumericParsingUtilities::parseInt(columns[0]);
+    const std::optional<int> month = NumericParsingUtilities::parseInt(columns[1]);
+    const std::optional<int> day = columns.size() >= 4U ? NumericParsingUtilities::parseInt(columns[2]) : std::nullopt;
     const std::optional<double> fourthColumnSeconds =
         columns.size() >= 4U ? NumericParsingUtilities::parseFiniteDouble(columns[3]) : std::nullopt;
     const std::optional<double> thirdColumnSeconds =
         columns.size() >= 3U ? NumericParsingUtilities::parseFiniteDouble(columns[2]) : std::nullopt;
-    if (columns.size() >= 4U && TextParsingUtilities::parseInt(columns[0], year)
-        && TextParsingUtilities::parseInt(columns[1], month) && TextParsingUtilities::parseInt(columns[2], day)
-        && month >= 1 && month <= 12 && fourthColumnSeconds.has_value()) {
+    if (columns.size() >= 4U && year.has_value() && month.has_value() && day.has_value() && *month >= 1 && *month <= 12
+        && fourthColumnSeconds.has_value()) {
         deltaTSeconds = *fourthColumnSeconds;
-        effectiveDate.astronomicalYear = year;
-        effectiveDate.month = month;
-        effectiveDate.day = day;
+        effectiveDate.astronomicalYear = *year;
+        effectiveDate.month = *month;
+        effectiveDate.day = *day;
         effectiveDate.timeScale = skygate::core::TimeScale::Utc;
     } else if (
-        columns.size() >= 3U && TextParsingUtilities::parseInt(columns[0], year)
-        && TextParsingUtilities::parseInt(columns[1], month) && month >= 1 && month <= 12
+        columns.size() >= 3U && year.has_value() && month.has_value() && *month >= 1 && *month <= 12
         && thirdColumnSeconds.has_value()
     ) {
         deltaTSeconds = *thirdColumnSeconds;
-        effectiveDate.astronomicalYear = year;
-        effectiveDate.month = month;
+        effectiveDate.astronomicalYear = *year;
+        effectiveDate.month = *month;
         effectiveDate.day = 1;
         effectiveDate.timeScale = skygate::core::TimeScale::Utc;
     } else {

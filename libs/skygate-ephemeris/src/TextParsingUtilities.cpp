@@ -1,40 +1,12 @@
 #include "TextParsingUtilities.hpp"
+#include "NumericParsingUtilities.hpp"
 #include "StringUtilities.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <algorithm>
-#include <charconv>
 #include <string>
 
 namespace skygate::ephemeris {
-
-namespace {
-
-template <typename Integer>
-[[nodiscard]] bool parseInteger(const std::string_view text, Integer& value) noexcept
-{
-    const std::string_view trimmed = StringUtilities::trimAsciiWhitespace(text);
-    if (trimmed.empty()) {
-        return false;
-    }
-
-    const char* begin = trimmed.data();
-    const char* end = begin + trimmed.size();
-    const std::from_chars_result result = std::from_chars(begin, end, value);
-    return result.ec == std::errc{} && result.ptr == end;
-}
-
-}  // namespace
-
-bool TextParsingUtilities::parseInt(const std::string_view text, int& value) noexcept
-{
-    return parseInteger(text, value);
-}
-
-bool TextParsingUtilities::parseUint64(const std::string_view text, std::uint64_t& value) noexcept
-{
-    return parseInteger(text, value);
-}
 
 std::vector<std::string_view> TextParsingUtilities::splitAsciiWhitespace(std::string_view text)
 {
@@ -150,19 +122,18 @@ std::optional<skygate::core::CivilDateTime> TextParsingUtilities::parseUtcDate(s
         return std::nullopt;
     }
 
-    int year = 0;
-    int month = 0;
-    int day = 0;
-    if (!parseInt(text.substr(0U, firstDash), year)
-        || !parseInt(text.substr(firstDash + 1U, secondDash - firstDash - 1U), month)
-        || !parseInt(text.substr(secondDash + 1U), day)) {
+    const std::optional<int> year = NumericParsingUtilities::parseInt(text.substr(0U, firstDash));
+    const std::optional<int> month =
+        NumericParsingUtilities::parseInt(text.substr(firstDash + 1U, secondDash - firstDash - 1U));
+    const std::optional<int> day = NumericParsingUtilities::parseInt(text.substr(secondDash + 1U));
+    if (!year.has_value() || !month.has_value() || !day.has_value()) {
         return std::nullopt;
     }
 
     skygate::core::CivilDateTime dateTime;
-    dateTime.astronomicalYear = year;
-    dateTime.month = month;
-    dateTime.day = day;
+    dateTime.astronomicalYear = *year;
+    dateTime.month = *month;
+    dateTime.day = *day;
     dateTime.timeScale = skygate::core::TimeScale::Utc;
     if (!skygate::core::CalendarTime::isValidCivilDateTime(dateTime)) {
         return std::nullopt;
