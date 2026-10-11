@@ -2,7 +2,6 @@
 #include "EphemerisTableMetadata.hpp"
 #include "IEphemerisDataSnapshot.hpp"
 #include "NumericParsingUtilities.hpp"
-#include "StringUtilities.hpp"
 #include "TextParsingUtilities.hpp"
 #include "time/CalendarTime.hpp"
 
@@ -66,25 +65,30 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     return std::nullopt;
 }
 
-[[nodiscard]] std::optional<std::string> applyMetadataLine(
+[[nodiscard]] bool applyMetadataLine(
     IDeltaTProvider::DataInfo& info,
     const std::string_view line,
     const std::size_t lineNumber,
     bool& hasFallbackStart,
-    bool& hasFallbackEnd
+    bool& hasFallbackEnd,
+    std::optional<std::string>& diagnosticText
 )
 {
-    std::optional<std::string> diagnosticText;
+    if (!line.starts_with("#@ ")) {
+        return false;
+    }
     if (EphemerisTableMetadata::applyCommonLine(info, line, "Delta T data", lineNumber, diagnosticText)) {
-        return diagnosticText;
+        return true;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "ancient_fallback_start");
         value.has_value()) {
-        return setFallbackStart(info, *value, lineNumber, hasFallbackStart);
+        diagnosticText = setFallbackStart(info, *value, lineNumber, hasFallbackStart);
+        return true;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "ancient_fallback_end");
         value.has_value()) {
-        return setFallbackEnd(info, *value, lineNumber, hasFallbackEnd);
+        diagnosticText = setFallbackEnd(info, *value, lineNumber, hasFallbackEnd);
+        return true;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "ancient_fallback_source");
         value.has_value()) {
@@ -92,40 +96,42 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
             info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
         fallback.provenance = std::move(*value);
         info.ancientFallbackModel = std::move(fallback);
-        return std::nullopt;
+        return true;
     }
     if (std::optional<std::string> value =
             TextParsingUtilities::metadataValue(line, "ancient_fallback_delta_t_seconds");
         value.has_value()) {
         const std::optional<double> seconds = NumericParsingUtilities::parseFiniteDouble(*value);
         if (!seconds.has_value()) {
-            return "Delta T data contains malformed ancient fallback estimate metadata at line "
-                   + std::to_string(lineNumber) + ".";
+            diagnosticText = "Delta T data contains malformed ancient fallback estimate metadata at line "
+                             + std::to_string(lineNumber) + ".";
+            return true;
         }
 
         IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
             info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
         fallback.representativeDeltaTSeconds = *seconds;
         info.ancientFallbackModel = std::move(fallback);
-        return std::nullopt;
+        return true;
     }
     if (std::optional<std::string> value =
             TextParsingUtilities::metadataValue(line, "ancient_fallback_uncertainty_seconds");
         value.has_value()) {
         const std::optional<double> seconds = NumericParsingUtilities::parseFiniteDouble(*value);
         if (!seconds.has_value() || *seconds < 0.0) {
-            return "Delta T data contains malformed ancient fallback uncertainty metadata at line "
-                   + std::to_string(lineNumber) + ".";
+            diagnosticText = "Delta T data contains malformed ancient fallback uncertainty metadata at line "
+                             + std::to_string(lineNumber) + ".";
+            return true;
         }
 
         IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
             info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
         fallback.estimatedUncertaintySeconds = *seconds;
         info.ancientFallbackModel = std::move(fallback);
-        return std::nullopt;
+        return true;
     }
 
-    return std::nullopt;
+    return true;
 }
 
 [[nodiscard]] bool parseUsnoEntryLine(std::string_view line, IDeltaTProvider::TableEntry& entry) noexcept
@@ -228,42 +234,20 @@ DeltaTDataParser::Result DeltaTDataParser::parse(const EphemerisTextDataAsset& a
     std::vector<IDeltaTProvider::TableEntry> entries;
     bool hasFallbackStart = false;
     bool hasFallbackEnd = false;
-    std::string_view remaining = asset.content;
-    std::size_t lineNumber = 0U;
-    while (!remaining.empty()) {
-        ++lineNumber;
-        std::string_view line = StringUtilities::takeLine(remaining);
-
-        line = StringUtilities::trimAsciiWhitespace(line);
-        if (line.empty()) {
-            continue;
-        }
-        if (line.starts_with("#@ ")) {
-            if (std::optional<std::string> diagnosticText =
-                    applyMetadataLine(info, line, lineNumber, hasFallbackStart, hasFallbackEnd);
-                diagnosticText.has_value()) {
-                return failureResult(
-                    std::move(info), IDeltaTProvider::DataStatus::Malformed, std::move(*diagnosticText)
-                );
-            }
-            continue;
-        }
-        if (line.starts_with("#")) {
-            continue;
-        }
-        if (EphemerisTableMetadata::isHeaderLine(line)) {
-            continue;
-        }
-
-        IDeltaTProvider::TableEntry entry;
-        if (!parseEntryLine(line, entry)) {
-            return failureResult(
-                std::move(info),
-                IDeltaTProvider::DataStatus::Malformed,
-                "Delta T data contains a malformed row at line " + std::to_string(lineNumber) + "."
-            );
-        }
-        entries.push_back(entry);
+    std::optional<std::string> malformedLine = EphemerisTableMetadata::parseTableLines(
+        asset.content,
+        [&info, &hasFallbackStart, &hasFallbackEnd](
+            const std::string_view line, const std::size_t lineNumber, std::optional<std::string>& diagnosticText
+        ) { return applyMetadataLine(info, line, lineNumber, hasFallbackStart, hasFallbackEnd, diagnosticText); },
+        [](const std::string_view, const std::string_view, const bool) noexcept { return false; },
+        [](const std::string_view, const std::string_view trimmedLine, IDeltaTProvider::TableEntry& entry) noexcept {
+            return parseEntryLine(trimmedLine, entry);
+        },
+        entries,
+        "Delta T data"
+    );
+    if (malformedLine.has_value()) {
+        return failureResult(std::move(info), IDeltaTProvider::DataStatus::Malformed, std::move(*malformedLine));
     }
 
     if (entries.empty()) {

@@ -2,7 +2,6 @@
 #include "EphemerisTableMetadata.hpp"
 #include "IEphemerisDataSnapshot.hpp"
 #include "NumericParsingUtilities.hpp"
-#include "StringUtilities.hpp"
 #include "TextParsingUtilities.hpp"
 #include "time/CalendarTime.hpp"
 
@@ -77,28 +76,33 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     return std::nullopt;
 }
 
-[[nodiscard]] std::optional<std::string> applyMetadataLine(
+[[nodiscard]] bool applyMetadataLine(
     IEarthOrientationProvider::DataInfo& info,
     const std::string_view line,
     const std::size_t lineNumber,
     bool& hasPredictionStart,
-    bool& hasPredictionEnd
+    bool& hasPredictionEnd,
+    std::optional<std::string>& diagnosticText
 )
 {
-    std::optional<std::string> diagnosticText;
+    if (!line.starts_with("#@ ")) {
+        return false;
+    }
     if (EphemerisTableMetadata::applyCommonLine(info, line, "Earth-orientation data", lineNumber, diagnosticText)) {
-        return diagnosticText;
+        return true;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "prediction_start");
         value.has_value()) {
-        return setPredictionStart(info, *value, lineNumber, hasPredictionStart);
+        diagnosticText = setPredictionStart(info, *value, lineNumber, hasPredictionStart);
+        return true;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "prediction_end");
         value.has_value()) {
-        return setPredictionEnd(info, *value, lineNumber, hasPredictionEnd);
+        diagnosticText = setPredictionEnd(info, *value, lineNumber, hasPredictionEnd);
+        return true;
     }
 
-    return std::nullopt;
+    return true;
 }
 
 // FINALS dates use two-digit years, so the MJD column is needed to pick the
@@ -382,46 +386,24 @@ EarthOrientationDataParser::Result EarthOrientationDataParser::parse(const Ephem
     std::vector<IEarthOrientationProvider::TableEntry> entries;
     bool hasPredictionStart = false;
     bool hasPredictionEnd = false;
-    std::string_view remaining = asset.content;
-    std::size_t lineNumber = 0U;
-    while (!remaining.empty()) {
-        ++lineNumber;
-        std::string_view line = StringUtilities::takeLine(remaining);
-
-        const std::string_view trimmedLine = StringUtilities::trimAsciiWhitespace(line);
-        if (trimmedLine.empty()) {
-            continue;
-        }
-        if (trimmedLine.starts_with("#@ ")) {
-            if (std::optional<std::string> diagnosticText =
-                    applyMetadataLine(info, trimmedLine, lineNumber, hasPredictionStart, hasPredictionEnd);
-                diagnosticText.has_value()) {
-                return failureResult(
-                    std::move(info), IEarthOrientationProvider::DataStatus::Malformed, std::move(*diagnosticText)
-                );
-            }
-            continue;
-        }
-        if (trimmedLine.starts_with("#")) {
-            continue;
-        }
-        if (isFinals2000ADateOnlyLine(line)) {
-            continue;
-        }
-        if (EphemerisTableMetadata::isHeaderLine(trimmedLine)
-            || (entries.empty() && isIgnorableHeaderLine(trimmedLine))) {
-            continue;
-        }
-
-        IEarthOrientationProvider::TableEntry entry;
-        if (!parseEntryLine(line, entry)) {
-            return failureResult(
-                std::move(info),
-                IEarthOrientationProvider::DataStatus::Malformed,
-                "Earth-orientation data contains a malformed row at line " + std::to_string(lineNumber) + "."
-            );
-        }
-        entries.push_back(entry);
+    std::optional<std::string> malformedLine = EphemerisTableMetadata::parseTableLines(
+        asset.content,
+        [&info, &hasPredictionStart, &hasPredictionEnd](
+            const std::string_view line, const std::size_t lineNumber, std::optional<std::string>& diagnosticText
+        ) { return applyMetadataLine(info, line, lineNumber, hasPredictionStart, hasPredictionEnd, diagnosticText); },
+        [](const std::string_view rawLine, const std::string_view trimmedLine, const bool entriesEmpty) noexcept {
+            return isFinals2000ADateOnlyLine(rawLine) || (entriesEmpty && isIgnorableHeaderLine(trimmedLine));
+        },
+        [](const std::string_view rawLine,
+           const std::string_view,
+           IEarthOrientationProvider::TableEntry& entry) noexcept { return parseEntryLine(rawLine, entry); },
+        entries,
+        "Earth-orientation data"
+    );
+    if (malformedLine.has_value()) {
+        return failureResult(
+            std::move(info), IEarthOrientationProvider::DataStatus::Malformed, std::move(*malformedLine)
+        );
     }
 
     if (entries.empty()) {
