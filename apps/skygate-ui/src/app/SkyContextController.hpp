@@ -518,7 +518,7 @@ private:
     void setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
     [[nodiscard]] EphemerisRequestContext
     ephemerisRequestContextFor(const skygate::core::ObservationContext& skyContext) const;
-    void applyEphemerisUserSettings(const SkySettingsStore::EphemerisUserSettingsSnapshot& settings);
+    void applyEphemerisUserSettings(const SkyEphemerisUserSettingsSnapshot& settings);
     void setEphemerisEngineStatusText(QString statusText);
     [[nodiscard]] const skygate::ephemeris::EphemerisDataManifest* activeEphemerisDataManifest() const noexcept;
     void rebuildEphemerisEngine();
@@ -543,7 +543,7 @@ private:
     std::unique_ptr<SkyEphemerisDataManager> m_ephemerisDataManager;
     std::unique_ptr<SkyEphemerisUpdateWorkflow> m_ephemerisUpdateWorkflow;
     std::unique_ptr<SkyEphemerisSession> m_ephemerisSession;
-    SkySettingsStore::EphemerisUserSettingsSnapshot m_ephemerisUserSettings;
+    SkyEphemerisUserSettingsSnapshot m_ephemerisUserSettings;
     QString m_ephemerisEngineStatusText;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;

@@ -92,7 +92,7 @@ void SkyContextControllerViewLocationTests::manualCoordinateEditSwitchesToCustom
 void SkyContextControllerViewLocationTests::invalidSavedCityFallsBackToCustom()
 {
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.locationSourceText = "City";
     snapshot.selectedCityId = "missing-city";
     snapshot.latitudeDeg = 12.345678;

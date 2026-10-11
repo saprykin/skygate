@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SkySettingsStore.hpp"
+#include "catalog/SkyCatalogCollectionCacheSnapshot.hpp"
 
 #include <QString>
 
@@ -12,7 +12,7 @@ class SettingsTestFixture;
 // storage suites.
 class CatalogCollectionCacheFixture final {
 public:
-    [[nodiscard]] static SkySettingsStore::CatalogCollectionCacheSnapshot sampleCollectionSnapshot();
+    [[nodiscard]] static SkyCatalogCollectionCacheSnapshot sampleCollectionSnapshot();
 
     static QString prepareCollectionCacheDirectory(const SettingsTestFixture& settings);
 };

@@ -17,7 +17,7 @@ namespace {
 
 Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
 
-using EphemerisDataCacheSnapshot = SkySettingsStore::EphemerisDataCacheSnapshot;
+using EphemerisDataCacheSnapshot = SkyEphemerisDataCacheSnapshot;
 using StagedUpdateActivationRequest = SkyEphemerisDataManager::StagedUpdateActivationRequest;
 using StagedUpdateDownloadRequest = SkyEphemerisDataManager::StagedUpdateDownloadRequest;
 
@@ -280,7 +280,7 @@ std::uint64_t SkyEphemerisDataManager::dataRevision() const noexcept
     return m_dataRevision;
 }
 
-SkySettingsStore::EphemerisDataCacheSnapshot SkyEphemerisDataManager::activeCacheSnapshot() const
+SkyEphemerisDataCacheSnapshot SkyEphemerisDataManager::activeCacheSnapshot() const
 {
     return m_activeCacheSnapshot;
 }

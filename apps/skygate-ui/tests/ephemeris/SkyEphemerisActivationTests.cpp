@@ -400,7 +400,7 @@ void SkyEphemerisActivationTests::activatesVerifiedStagedUpdateSetAtomically()
     QCOMPARE(manager.dataRevisionToken(), QString("installed-rev-2"));
     QCOMPARE(result.activatedAssetIds.size(), std::size_t{4});
 
-    const SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
+    const SkyEphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
     QCOMPARE(savedSnapshot.dataRevisionToken, QString("installed-rev-2"));
     QCOMPARE(savedSnapshot.installedKernelAssetId, QString("de440s-kernel"));
     QCOMPARE(savedSnapshot.installedKernelProfileId, QString("de440s-short-range"));
@@ -491,7 +491,7 @@ void SkyEphemerisActivationTests::supportDataActivationPreservesInstalledKernel(
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
 
     SkySettingsStore store;
-    const SkySettingsStore::EphemerisDataCacheSnapshot oldSnapshot =
+    const SkyEphemerisDataCacheSnapshot oldSnapshot =
         EphemerisDataCacheSnapshotFixture::installedSnapshot(oldKernelPath, QString());
     QVERIFY(store.saveEphemerisDataCache(oldSnapshot));
     SkyEphemerisDataManager manager(&store);
@@ -510,7 +510,7 @@ void SkyEphemerisActivationTests::supportDataActivationPreservesInstalledKernel(
     QVERIFY2(result.isSuccess(), failureMessage.constData());
     QCOMPARE(result.activatedAssetIds.size(), std::size_t{3});
 
-    const SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
+    const SkyEphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
     QCOMPARE(savedSnapshot.installedKernelAssetId, oldSnapshot.installedKernelAssetId);
     QCOMPARE(savedSnapshot.installedKernelProfileId, oldSnapshot.installedKernelProfileId);
     QCOMPARE(savedSnapshot.installedKernelPath, oldKernelPath);
@@ -556,7 +556,7 @@ void SkyEphemerisActivationTests::activatesLiveSupportDataUpdateWithDriftedPaylo
     QCOMPARE(result.activatedAssetIds.size(), std::size_t{3});
     QVERIFY(manager.usingInstalledData());
 
-    const SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
+    const SkyEphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
     QCOMPARE(savedSnapshot.installedEarthOrientationVersion, QString("test"));
     QCOMPARE(savedSnapshot.installedLeapSecondTableVersion, QString("test"));
     QCOMPARE(savedSnapshot.installedDeltaTDataVersion, QString("test"));
@@ -597,7 +597,7 @@ void SkyEphemerisActivationTests::clearPlanetaryKernelCachePreservesSupportData(
 
     QVERIFY(manager.clearPlanetaryKernelCache());
 
-    const SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
+    const SkyEphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
     QVERIFY(savedSnapshot.installedKernelAssetId.isEmpty());
     QVERIFY(savedSnapshot.installedKernelProfileId.isEmpty());
     QVERIFY(savedSnapshot.installedKernelPath.isEmpty());
@@ -635,7 +635,7 @@ void SkyEphemerisActivationTests::clearSupportDataCachePreservesInstalledKernel(
 
     QVERIFY(manager.clearSupportDataCache());
 
-    const SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
+    const SkyEphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
     QCOMPARE(savedSnapshot.installedKernelPath, kernelPath);
     QCOMPARE(savedSnapshot.installedKernelVersion, QString("DE-test"));
     QVERIFY(savedSnapshot.installedEarthOrientationPath.isEmpty());
@@ -656,7 +656,7 @@ void SkyEphemerisActivationTests::activationFailurePreservesActiveDataAndSetting
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
 
     SkySettingsStore store;
-    const SkySettingsStore::EphemerisDataCacheSnapshot oldSnapshot =
+    const SkyEphemerisDataCacheSnapshot oldSnapshot =
         EphemerisDataCacheSnapshotFixture::installedSnapshot(oldKernelPath, QString());
     QVERIFY(store.saveEphemerisDataCache(oldSnapshot));
     SkyEphemerisDataManager manager(&store);
@@ -691,7 +691,7 @@ void SkyEphemerisActivationTests::sameRevisionFailureKeepsActiveFilesAndSettings
     QVERIFY(writeFile(oldLeapSecondPath, QByteArrayLiteral("old leap seconds")));
 
     SkySettingsStore store;
-    const SkySettingsStore::EphemerisDataCacheSnapshot oldSnapshot =
+    const SkyEphemerisDataCacheSnapshot oldSnapshot =
         EphemerisDataCacheSnapshotFixture::installedSnapshot(oldKernelPath, QString(), oldLeapSecondPath, QString());
     QVERIFY(store.saveEphemerisDataCache(oldSnapshot));
     SkyEphemerisDataManager manager(&store);
@@ -760,7 +760,7 @@ void SkyEphemerisActivationTests::cancelBeforeVerificationKeepsDataAndStaging()
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
 
     SkySettingsStore store;
-    const SkySettingsStore::EphemerisDataCacheSnapshot oldSnapshot =
+    const SkyEphemerisDataCacheSnapshot oldSnapshot =
         EphemerisDataCacheSnapshotFixture::installedSnapshot(oldKernelPath, QString());
     QVERIFY(store.saveEphemerisDataCache(oldSnapshot));
     SkyEphemerisDataManager manager(&store);
@@ -799,7 +799,7 @@ void SkyEphemerisActivationTests::cancelDuringVerificationCleansStagingKeepsData
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
 
     SkySettingsStore store;
-    const SkySettingsStore::EphemerisDataCacheSnapshot oldSnapshot =
+    const SkyEphemerisDataCacheSnapshot oldSnapshot =
         EphemerisDataCacheSnapshotFixture::installedSnapshot(oldKernelPath, QString());
     QVERIFY(store.saveEphemerisDataCache(oldSnapshot));
     SkyEphemerisDataManager manager(&store);
@@ -839,7 +839,7 @@ void SkyEphemerisActivationTests::cancelBeforeActivationKeepsStagingAndActiveDat
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
 
     SkySettingsStore store;
-    const SkySettingsStore::EphemerisDataCacheSnapshot oldSnapshot =
+    const SkyEphemerisDataCacheSnapshot oldSnapshot =
         EphemerisDataCacheSnapshotFixture::installedSnapshot(oldKernelPath, QString());
     QVERIFY(store.saveEphemerisDataCache(oldSnapshot));
     SkyEphemerisDataManager manager(&store);
@@ -888,7 +888,7 @@ void SkyEphemerisActivationTests::cancelDuringActivationCleansCacheKeepsActiveDa
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
 
     SkySettingsStore store;
-    const SkySettingsStore::EphemerisDataCacheSnapshot oldSnapshot =
+    const SkyEphemerisDataCacheSnapshot oldSnapshot =
         EphemerisDataCacheSnapshotFixture::installedSnapshot(oldKernelPath, QString());
     QVERIFY(store.saveEphemerisDataCache(oldSnapshot));
     SkyEphemerisDataManager manager(&store);

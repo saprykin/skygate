@@ -36,6 +36,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/ephemeris/SkyEphemerisCacheController.hpp
     src/ephemeris/SkyEphemerisDataManager.cpp
     src/ephemeris/SkyEphemerisDataManager.hpp
+    src/ephemeris/SkyEphemerisDataCacheSnapshot.hpp
     src/ephemeris/SkyEphemerisDownloadService.cpp
     src/ephemeris/SkyEphemerisDownloadService.hpp
     src/ephemeris/SkyEphemerisSession.cpp
@@ -87,6 +88,10 @@ qt_add_library(skygate-ui-lib STATIC
     src/time/TimeZoneCatalogModel.hpp
     src/catalog/SkyCatalogCacheController.cpp
     src/catalog/SkyCatalogCacheController.hpp
+    src/catalog/SkyCatalogCollectionCacheLoadResult.hpp
+    src/catalog/SkyCatalogCollectionCacheSnapshot.hpp
+    src/catalog/SkyCatalogLegacyCacheSnapshot.hpp
+    src/catalog/SkyCatalogSourceCacheRecord.hpp
     src/catalog/SkyCatalogConstellationStore.cpp
     src/catalog/SkyCatalogConstellationStore.hpp
     src/catalog/SkyCatalogRuntime.cpp
@@ -138,6 +143,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/settings/SkySettingsSnapshotCodecs.hpp
     src/settings/SkySettingsStore.cpp
     src/settings/SkySettingsStore.hpp
+    src/settings/SkyEphemerisUserSettingsSnapshot.hpp
+    src/settings/SkyPersistedStateSnapshot.hpp
     src/settings/SkySettingsValueCodecs.cpp
     src/settings/SkySettingsValueCodecs.hpp
     src/render/SkyViewportGeometry.cpp

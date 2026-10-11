@@ -437,7 +437,7 @@ void SkyContextControllerTimelineTests::restoresLiveSettingsAtCurrentUtc()
 {
     FakeTimeSource timeSource;
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.live = true;
     snapshot.utcEpochMicros = QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toMSecsSinceEpoch() * 1000;
     QVERIFY(store.saveState(snapshot));
@@ -453,7 +453,7 @@ void SkyContextControllerTimelineTests::restoresLiveSettingsAtCurrentUtc()
 void SkyContextControllerTimelineTests::restoresPausedSettingsAtSavedUtc()
 {
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.live = false;
     snapshot.utcEpochMicros = QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toMSecsSinceEpoch() * 1000;
     QVERIFY(store.saveState(snapshot));

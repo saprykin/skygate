@@ -2,14 +2,14 @@
 
 namespace skygate::ui::tests {
 
-SkySettingsStore::EphemerisDataCacheSnapshot EphemerisDataCacheSnapshotFixture::installedSnapshot(
+SkyEphemerisDataCacheSnapshot EphemerisDataCacheSnapshotFixture::installedSnapshot(
     const QString& kernelPath,
     const QString& earthOrientationPath,
     const QString& leapSecondTablePath,
     const QString& deltaTDataPath
 )
 {
-    SkySettingsStore::EphemerisDataCacheSnapshot snapshot;
+    SkyEphemerisDataCacheSnapshot snapshot;
     snapshot.installedKernelAssetId = QStringLiteral("de440s-kernel");
     snapshot.installedKernelProfileId = QStringLiteral("de440s-short-range");
     snapshot.installedKernelPath = kernelPath;

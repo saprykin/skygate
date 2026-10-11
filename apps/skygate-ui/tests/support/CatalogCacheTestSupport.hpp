@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CatalogTestPayloads.hpp"
-#include "SkySettingsStore.hpp"
+#include "catalog/SkyCatalogLegacyCacheSnapshot.hpp"
 
 #include <QCryptographicHash>
 #include <QDir>
@@ -21,10 +21,10 @@ struct CatalogCacheSnapshotOptions final {
     std::size_t constellationCount = 1;
 };
 
-[[nodiscard]] inline SkySettingsStore::CatalogCacheSnapshot
+[[nodiscard]] inline SkyCatalogLegacyCacheSnapshot
 sampleCatalogCacheSnapshot(const CatalogCacheSnapshotOptions& options = {})
 {
-    SkySettingsStore::CatalogCacheSnapshot snapshot;
+    SkyCatalogLegacyCacheSnapshot snapshot;
     snapshot.sourceLabel = options.sourceLabel;
     snapshot.catalogPayload = sampleHygCsvPayload();
     snapshot.deepSkySourceLabel = options.deepSkySourceLabel;

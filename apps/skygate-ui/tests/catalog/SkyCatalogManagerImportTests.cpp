@@ -524,10 +524,9 @@ void SkyCatalogManagerImportTests::failedUpdateKeepsAcceptedFactsWhenPersisting(
 
     // Reordering the still-active source persists the accepted facts alone.
     manager.moveSource(instanceId, 0);
-    const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
     QVERIFY(persisted.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* record =
-        CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
+    const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
     QVERIFY(record != nullptr);
     QCOMPARE(record->title, QStringLiteral("Accepted V1 Title"));
     QCOMPARE(record->version, QStringLiteral("v1"));
@@ -552,9 +551,9 @@ void SkyCatalogManagerImportTests::failedUpdateKeepsAcceptedFactsWhenPersisting(
     QVERIFY(manager.statusText().contains(QStringLiteral("failed"), Qt::CaseInsensitive));
 
     manager.moveSource(instanceId, 1);
-    const SkySettingsStore::CatalogCollectionCacheLoadResult persistedAfterRetry = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult persistedAfterRetry = store.loadCatalogCollectionCache();
     QVERIFY(persistedAfterRetry.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* recordAfterRetry =
+    const SkyCatalogSourceCacheRecord* recordAfterRetry =
         CatalogSourceFactsQuery::findRecord(persistedAfterRetry.snapshot, instanceId);
     QVERIFY(recordAfterRetry != nullptr);
     QCOMPARE(recordAfterRetry->title, QStringLiteral("Accepted V1 Title"));
@@ -645,9 +644,9 @@ void SkyCatalogManagerImportTests::acceptedFactsSurviveRestartAfterFailedUpdate(
             QStringLiteral("Restart Accepted Title")
         );
 
-        const SkySettingsStore::CatalogCollectionCacheLoadResult upgraded = store.loadCatalogCollectionCache();
+        const SkyCatalogCollectionCacheLoadResult upgraded = store.loadCatalogCollectionCache();
         QVERIFY(upgraded.isLoaded());
-        const SkySettingsStore::CatalogSourceCacheRecord* upgradedRecord =
+        const SkyCatalogSourceCacheRecord* upgradedRecord =
             CatalogSourceFactsQuery::findRecord(upgraded.snapshot, instanceId);
         QVERIFY(upgradedRecord != nullptr);
         QCOMPARE(upgradedRecord->version, QStringLiteral("v1"));
@@ -702,10 +701,9 @@ void SkyCatalogManagerImportTests::successfulRetryInstallsUpdateFactsTogether()
     // accepted facts; the successful retry below then replaces them together.
     manager.moveSource(instanceId, 0);
     {
-        const SkySettingsStore::CatalogCollectionCacheLoadResult persistedBeforeRetry =
-            store.loadCatalogCollectionCache();
+        const SkyCatalogCollectionCacheLoadResult persistedBeforeRetry = store.loadCatalogCollectionCache();
         QVERIFY(persistedBeforeRetry.isLoaded());
-        const SkySettingsStore::CatalogSourceCacheRecord* recordBeforeRetry =
+        const SkyCatalogSourceCacheRecord* recordBeforeRetry =
             CatalogSourceFactsQuery::findRecord(persistedBeforeRetry.snapshot, instanceId);
         QVERIFY(recordBeforeRetry != nullptr);
         QCOMPARE(recordBeforeRetry->urls, QStringList{acceptedUrl});
@@ -724,10 +722,9 @@ void SkyCatalogManagerImportTests::successfulRetryInstallsUpdateFactsTogether()
     QVERIFY(!CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Retry Accepted Star")));
     QCOMPARE(manager.sourceTitles().value(instanceId), QStringLiteral("Retried Title"));
 
-    const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
     QVERIFY(persisted.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* record =
-        CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
+    const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
     QVERIFY(record != nullptr);
     QCOMPARE(record->title, QStringLiteral("Retried Title"));
     QCOMPARE(record->version, QStringLiteral("v2"));
@@ -802,10 +799,9 @@ void SkyCatalogManagerImportTests::canceledUpdateKeepsAcceptedSourceFacts()
 
     // Persisting after the cancellation still serializes the accepted facts.
     manager.moveSource(instanceId, 0);
-    const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
     QVERIFY(persisted.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* record =
-        CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
+    const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
     QVERIFY(record != nullptr);
     QCOMPARE(record->title, QStringLiteral("Cancel Accepted Title"));
     QCOMPARE(record->version, QStringLiteral("v1"));
@@ -873,10 +869,9 @@ void SkyCatalogManagerImportTests::parseFailedUpdateKeepsAcceptedSourceFacts()
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Parse Accepted Star")));
 
     manager.moveSource(instanceId, 0);
-    const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
     QVERIFY(persisted.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* record =
-        CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
+    const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
     QVERIFY(record != nullptr);
     QCOMPARE(record->title, QStringLiteral("Parse Accepted Title"));
     QCOMPARE(record->version, QStringLiteral("v1"));
@@ -950,10 +945,9 @@ void SkyCatalogManagerImportTests::rejectedParsedUpdateKeepsAcceptedSourceFacts(
     // Persisting later serializes the accepted facts, not the parsed attempt.
     manager.setDeepSkyCatalogPresetIndex(1);
     manager.moveSource(instanceId, 0);
-    const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
     QVERIFY(persisted.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* record =
-        CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
+    const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
     QVERIFY(record != nullptr);
     QCOMPARE(record->title, QStringLiteral("Composition Accepted Title"));
     QCOMPARE(record->version, QStringLiteral("v1"));

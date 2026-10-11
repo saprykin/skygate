@@ -39,7 +39,7 @@ private slots:
     void unreadableCommittedKeepsActiveCollection();
 
 private:
-    SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
+    SkyCatalogLegacyCacheSnapshot makeCacheSnapshot() const;
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -60,7 +60,7 @@ void SkyCatalogManagerRecoveryTests::init()
     QDir(m_settings.filePath(QStringLiteral("catalog-collection-cache"))).removeRecursively();
 }
 
-SkySettingsStore::CatalogCacheSnapshot SkyCatalogManagerRecoveryTests::makeCacheSnapshot() const
+SkyCatalogLegacyCacheSnapshot SkyCatalogManagerRecoveryTests::makeCacheSnapshot() const
 {
     return skygate::ui::tests::sampleCatalogCacheSnapshot(
         {.sourceLabel = QStringLiteral("Custom"), .deepSkySourceLabel = QStringLiteral("OpenNGC")}
@@ -76,9 +76,9 @@ void SkyCatalogManagerRecoveryTests::restoresLegacyPersistedInstanceIdsWithRefer
         skygate::ui::internal::SkyCatalogSourceInstance::migratedLegacyInstanceId(legacyInstance);
     QVERIFY(legacyInstanceId.startsWith(QStringLiteral("custom:")));
 
-    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    SkyCatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = 1;
-    SkySettingsStore::CatalogSourceCacheRecord record;
+    SkyCatalogSourceCacheRecord record;
     record.instanceId = legacyInstanceId;
     record.title = QStringLiteral("Legacy Stars");
     record.version = QStringLiteral("v1");
@@ -136,7 +136,7 @@ void SkyCatalogManagerRecoveryTests::restoresLegacyPersistedInstanceIdsWithRefer
 void SkyCatalogManagerRecoveryTests::legacyMigrationRenamesDuplicateInstanceIds()
 {
     const QString sharedUrl = QStringLiteral("https://example.test/shared-slot-catalog.csv");
-    SkySettingsStore::CatalogCacheSnapshot legacy;
+    SkyCatalogLegacyCacheSnapshot legacy;
     legacy.sourceLabel = QStringLiteral("Legacy Stars");
     legacy.catalogPayload = skygate::ui::tests::sampleHygCsvPayload(
         {.id = 905001, .hip = 905001, .properName = "Legacy Slot Star", .mag = "1.0"}
@@ -183,7 +183,7 @@ void SkyCatalogManagerRecoveryTests::legacyMigrationRenamesDuplicateInstanceIds(
 
 void SkyCatalogManagerRecoveryTests::legacyBundledStarSlotSurvivesMigration()
 {
-    SkySettingsStore::CatalogCacheSnapshot legacy;
+    SkyCatalogLegacyCacheSnapshot legacy;
     legacy.deepSkySourceLabel = QStringLiteral("OpenNGC");
     legacy.deepSkyCatalogPayload = skygate::ui::tests::sampleCompactOpenNgcCsvPayload();
 
@@ -225,10 +225,10 @@ void SkyCatalogManagerRecoveryTests::unreadablePayloadKeepsConfiguredAndSiblings
     const QString damagedUrl = QStringLiteral("https://example.test/damaged-stars.csv");
     const QString healthyUrl = QStringLiteral("https://example.test/healthy-stars.csv");
 
-    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    SkyCatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
 
-    SkySettingsStore::CatalogSourceCacheRecord bundled;
+    SkyCatalogSourceCacheRecord bundled;
     bundled.instanceId = QStringLiteral("primary");
     bundled.title = QStringLiteral("Bundled");
     bundled.bundled = true;
@@ -237,7 +237,7 @@ void SkyCatalogManagerRecoveryTests::unreadablePayloadKeepsConfiguredAndSiblings
     bundled.order = 0;
     snapshot.sources.push_back(std::move(bundled));
 
-    SkySettingsStore::CatalogSourceCacheRecord damaged;
+    SkyCatalogSourceCacheRecord damaged;
     damaged.instanceId = QStringLiteral("custom:damaged");
     damaged.title = QStringLiteral("Damaged Source");
     damaged.urls = QStringList{damagedUrl};
@@ -247,7 +247,7 @@ void SkyCatalogManagerRecoveryTests::unreadablePayloadKeepsConfiguredAndSiblings
     damaged.payload = "this is not a catalog";
     snapshot.sources.push_back(std::move(damaged));
 
-    SkySettingsStore::CatalogSourceCacheRecord healthy;
+    SkyCatalogSourceCacheRecord healthy;
     healthy.instanceId = QStringLiteral("custom:healthy");
     healthy.title = QStringLiteral("Healthy Source");
     healthy.urls = QStringList{healthyUrl};
@@ -305,9 +305,7 @@ void SkyCatalogManagerRecoveryTests::unreadablePayloadKeepsConfiguredAndSiblings
     const auto persistedDamaged = std::find_if(
         persisted.snapshot.sources.begin(),
         persisted.snapshot.sources.end(),
-        [](const SkySettingsStore::CatalogSourceCacheRecord& record) {
-            return record.instanceId == QStringLiteral("custom:damaged");
-        }
+        [](const SkyCatalogSourceCacheRecord& record) { return record.instanceId == QStringLiteral("custom:damaged"); }
     );
     QVERIFY(persistedDamaged != persisted.snapshot.sources.end());
     QCOMPARE(persistedDamaged->urls, QStringList{damagedUrl});
@@ -333,7 +331,7 @@ void SkyCatalogManagerRecoveryTests::unreadablePayloadKeepsConfiguredAndSiblings
 
 void SkyCatalogManagerRecoveryTests::legacySourcesStayRetiredAfterEmptyMigration()
 {
-    SkySettingsStore::CatalogCacheSnapshot legacy;
+    SkyCatalogLegacyCacheSnapshot legacy;
     legacy.sourceLabel = QStringLiteral("Legacy Custom");
     legacy.catalogPayload = skygate::ui::tests::sampleHygCsvPayload(
         {.id = 907001, .hip = 907001, .properName = "Legacy Star", .mag = "1.0"}
@@ -369,7 +367,7 @@ void SkyCatalogManagerRecoveryTests::legacySourcesStayRetiredAfterEmptyMigration
         QVERIFY(manager.sourceViewEntries().isEmpty());
         QVERIFY(!CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Legacy Star")));
         QVERIFY(store.loadCatalogCache().has_value());
-        const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+        const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
         QVERIFY(persisted.isLoaded());
         QVERIFY(persisted.snapshot.sources.isEmpty());
     }
@@ -392,7 +390,7 @@ void SkyCatalogManagerRecoveryTests::legacySourcesStayRetiredAfterEmptyMigration
     // configuration as well: the restart restores it as an empty collection of
     // zero sources and never falls back to the legacy two-slot cache that is
     // still readable.
-    SkySettingsStore::CatalogCollectionCacheSnapshot emptyCollection;
+    SkyCatalogCollectionCacheSnapshot emptyCollection;
     emptyCollection.schemaVersion =
         skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
     emptyCollection.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
@@ -529,17 +527,17 @@ void SkyCatalogManagerRecoveryTests::unreadableCommittedKeepsActiveCollection()
 {
     // The retired pre-generation two-slot cache stays readable on disk, so a
     // restore that fell back to it would visibly resurrect its source.
-    SkySettingsStore::CatalogCacheSnapshot legacy;
+    SkyCatalogLegacyCacheSnapshot legacy;
     legacy.sourceLabel = QStringLiteral("Legacy Custom");
     legacy.catalogPayload = skygate::ui::tests::sampleHygCsvPayload(
         {.id = 908001, .hip = 908001, .properName = "Legacy Star", .mag = "1.0"}
     );
 
-    SkySettingsStore::CatalogCollectionCacheSnapshot committed;
+    SkyCatalogCollectionCacheSnapshot committed;
     committed.schemaVersion =
         skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
     committed.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
-    SkySettingsStore::CatalogSourceCacheRecord accepted;
+    SkyCatalogSourceCacheRecord accepted;
     accepted.instanceId = QStringLiteral("custom:accepted");
     accepted.title = QStringLiteral("Accepted Source");
     accepted.urls = QStringList{QStringLiteral("https://example.test/accepted-stars.csv")};

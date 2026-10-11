@@ -125,7 +125,7 @@ void SkyCatalogCacheMigrationTests::migratesLegacyBundledCustomMixedConfiguratio
     {
         resetSettings();
         SkySettingsStore store;
-        const SkySettingsStore::CatalogCacheSnapshot legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
+        const SkyCatalogLegacyCacheSnapshot legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
             {.sourceLabel = QStringLiteral("Custom"), .deepSkySourceLabel = QStringLiteral("OpenNGC")}
         );
         QVERIFY(store.saveCatalogCache(legacy));
@@ -154,7 +154,7 @@ void SkyCatalogCacheMigrationTests::migratesLegacyBundledCustomMixedConfiguratio
     {
         resetSettings();
         SkySettingsStore store;
-        SkySettingsStore::CatalogCacheSnapshot legacy;
+        SkyCatalogLegacyCacheSnapshot legacy;
         legacy.deepSkySourceLabel = QStringLiteral("OpenNGC");
         legacy.deepSkyCatalogPayload = skygate::ui::tests::sampleCompactOpenNgcCsvPayload();
         QVERIFY(store.saveCatalogCache(legacy));
@@ -178,7 +178,7 @@ void SkyCatalogCacheMigrationTests::migratesLegacyBundledCustomMixedConfiguratio
 void SkyCatalogCacheMigrationTests::repeatedMigrationIsIdempotent()
 {
     SkySettingsStore store;
-    const SkySettingsStore::CatalogCacheSnapshot legacy =
+    const SkyCatalogLegacyCacheSnapshot legacy =
         skygate::ui::tests::sampleCatalogCacheSnapshot({.sourceLabel = QStringLiteral("HYG v4.2")});
     QVERIFY(store.saveCatalogCache(legacy));
 
@@ -215,7 +215,7 @@ void SkyCatalogCacheMigrationTests::emptyMigratedCollectionDoesNotRestoreLegacy(
     QVERIFY(nothingStored.sources.empty());
     m_settings.resetCatalogCachePaths();
 
-    const SkySettingsStore::CatalogCacheSnapshot legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
+    const SkyCatalogLegacyCacheSnapshot legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
         {.sourceLabel = QStringLiteral("Custom"), .deepSkySourceLabel = QStringLiteral("OpenNGC")}
     );
     QVERIFY(store.saveCatalogCache(legacy));
@@ -285,7 +285,7 @@ void SkyCatalogCacheMigrationTests::clearingPayloadCacheDoesNotReAddLegacySource
 void SkyCatalogCacheMigrationTests::failedMigrationCommitKeepsLegacyCacheReadable()
 {
     SkySettingsStore store;
-    const SkySettingsStore::CatalogCacheSnapshot legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
+    const SkyCatalogLegacyCacheSnapshot legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
         {.sourceLabel = QStringLiteral("Custom"), .deepSkySourceLabel = QStringLiteral("OpenNGC")}
     );
     QVERIFY(store.saveCatalogCache(legacy));
@@ -498,9 +498,7 @@ void SkyCatalogCacheMigrationTests::truncatedCommittedManifestRejectsLegacyMigra
     // The committed configuration is still stored; only its manifest is
     // incomplete, so a later start reaches the same decision instead of
     // reading the legacy sources.
-    QCOMPARE(
-        store.loadCatalogCollectionCache().state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable
-    );
+    QCOMPARE(store.loadCatalogCollectionCache().state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
 }
 
 void SkyCatalogCacheMigrationTests::restoreUsesCommittedOverStagedGeneration()
@@ -615,9 +613,7 @@ void SkyCatalogCacheMigrationTests::missingManifestStagedGenerationRejectsRestor
     QVERIFY(!repeated.migratedLegacy);
     QVERIFY(repeated.unusableCommittedCollection);
     QVERIFY(store.loadCatalogCache().has_value());
-    QCOMPARE(
-        store.loadCatalogCollectionCache().state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable
-    );
+    QCOMPARE(store.loadCatalogCollectionCache().state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
     {
         QFile stagedSidecar(stagedSidecarPath);
         QVERIFY(stagedSidecar.open(QIODevice::ReadOnly));

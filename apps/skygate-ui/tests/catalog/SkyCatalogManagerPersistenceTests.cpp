@@ -32,7 +32,7 @@ using skygate::ui::tests::CatalogTestPayloadFile;
 namespace {
 
 void compareConfiguredSourceFields(
-    const SkySettingsStore::CatalogSourceCacheRecord& actual, const SkySettingsStore::CatalogSourceCacheRecord& expected
+    const SkyCatalogSourceCacheRecord& actual, const SkyCatalogSourceCacheRecord& expected
 )
 {
     QCOMPARE(actual.instanceId, expected.instanceId);
@@ -70,7 +70,7 @@ private slots:
     void savedEmptyCollectionRestoresEmptyAcrossRestarts();
 
 private:
-    SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
+    SkyCatalogLegacyCacheSnapshot makeCacheSnapshot() const;
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -91,7 +91,7 @@ void SkyCatalogManagerPersistenceTests::init()
     QDir(m_settings.filePath(QStringLiteral("catalog-collection-cache"))).removeRecursively();
 }
 
-SkySettingsStore::CatalogCacheSnapshot SkyCatalogManagerPersistenceTests::makeCacheSnapshot() const
+SkyCatalogLegacyCacheSnapshot SkyCatalogManagerPersistenceTests::makeCacheSnapshot() const
 {
     return skygate::ui::tests::sampleCatalogCacheSnapshot(
         {.sourceLabel = QStringLiteral("Custom"), .deepSkySourceLabel = QStringLiteral("OpenNGC")}
@@ -155,7 +155,7 @@ void SkyCatalogManagerPersistenceTests::clearSourceCacheKeepsConfiguredRecords()
 
     const auto beforeClear = store.loadCatalogCollectionCache();
     QVERIFY(beforeClear.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* recordBeforeClear =
+    const SkyCatalogSourceCacheRecord* recordBeforeClear =
         CatalogSourceFactsQuery::findRecord(beforeClear.snapshot, aId);
     QVERIFY(recordBeforeClear != nullptr);
     QVERIFY(!recordBeforeClear->payload.isEmpty());
@@ -172,8 +172,7 @@ void SkyCatalogManagerPersistenceTests::clearSourceCacheKeepsConfiguredRecords()
     const auto clearedCache = store.loadCatalogCollectionCache();
     QVERIFY(clearedCache.isLoaded());
     QCOMPARE(clearedCache.snapshot.sources.size(), 3);
-    const SkySettingsStore::CatalogSourceCacheRecord* clearedRecord =
-        CatalogSourceFactsQuery::findRecord(clearedCache.snapshot, aId);
+    const SkyCatalogSourceCacheRecord* clearedRecord = CatalogSourceFactsQuery::findRecord(clearedCache.snapshot, aId);
     QVERIFY(clearedRecord != nullptr);
     compareConfiguredSourceFields(*clearedRecord, *recordBeforeClear);
     QVERIFY(clearedRecord->payload.isEmpty());
@@ -181,8 +180,7 @@ void SkyCatalogManagerPersistenceTests::clearSourceCacheKeepsConfiguredRecords()
     QVERIFY(clearedRecord->constellationLineRows.isEmpty());
     QVERIFY(clearedRecord->constellationAnchorGroupRows.isEmpty());
     QCOMPARE(clearedRecord->constellationCount, std::size_t{0});
-    const SkySettingsStore::CatalogSourceCacheRecord* peerRecord =
-        CatalogSourceFactsQuery::findRecord(clearedCache.snapshot, bId);
+    const SkyCatalogSourceCacheRecord* peerRecord = CatalogSourceFactsQuery::findRecord(clearedCache.snapshot, bId);
     QVERIFY(peerRecord != nullptr);
     QVERIFY(!peerRecord->payload.isEmpty());
     QVERIFY(!peerRecord->binaryPayload.isEmpty());
@@ -198,10 +196,9 @@ void SkyCatalogManagerPersistenceTests::clearSourceCacheKeepsConfiguredRecords()
     QCOMPARE(reordered.snapshot.sources[1].instanceId, bId);
     QCOMPARE(reordered.snapshot.sources[2].instanceId, aId);
     QVERIFY(!reordered.snapshot.sources[1].payload.isEmpty());
-    const SkySettingsStore::CatalogSourceCacheRecord* reorderedCleared =
-        CatalogSourceFactsQuery::findRecord(reordered.snapshot, aId);
+    const SkyCatalogSourceCacheRecord* reorderedCleared = CatalogSourceFactsQuery::findRecord(reordered.snapshot, aId);
     QVERIFY(reorderedCleared != nullptr);
-    SkySettingsStore::CatalogSourceCacheRecord expectedReordered = *recordBeforeClear;
+    SkyCatalogSourceCacheRecord expectedReordered = *recordBeforeClear;
     expectedReordered.order = 2;
     compareConfiguredSourceFields(*reorderedCleared, expectedReordered);
     QVERIFY(reorderedCleared->payload.isEmpty());
@@ -232,8 +229,7 @@ void SkyCatalogManagerPersistenceTests::clearSourceCacheKeepsConfiguredRecords()
     QVERIFY(CatalogBodyQuery::containsDisplayName(restarted.starCatalog(), QStringLiteral("Clear Star A")));
     const auto recovered = store.loadCatalogCollectionCache();
     QVERIFY(recovered.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* recoveredRecord =
-        CatalogSourceFactsQuery::findRecord(recovered.snapshot, aId);
+    const SkyCatalogSourceCacheRecord* recoveredRecord = CatalogSourceFactsQuery::findRecord(recovered.snapshot, aId);
     QVERIFY(recoveredRecord != nullptr);
     QVERIFY(!recoveredRecord->payload.isEmpty());
 
@@ -287,9 +283,7 @@ void SkyCatalogManagerPersistenceTests::restoresArchiveSelectionAndMetadataOnCac
     const auto persistedSource = std::find_if(
         persisted.snapshot.sources.begin(),
         persisted.snapshot.sources.end(),
-        [&instanceId](const SkySettingsStore::CatalogSourceCacheRecord& record) {
-            return record.instanceId == instanceId;
-        }
+        [&instanceId](const SkyCatalogSourceCacheRecord& record) { return record.instanceId == instanceId; }
     );
     QVERIFY(persistedSource != persisted.snapshot.sources.end());
     QCOMPARE(persistedSource->descriptorId, QString("archive_demo"));
@@ -321,9 +315,7 @@ void SkyCatalogManagerPersistenceTests::restoresArchiveSelectionAndMetadataOnCac
     const auto upgradedSource = std::find_if(
         upgraded.snapshot.sources.begin(),
         upgraded.snapshot.sources.end(),
-        [&instanceId](const SkySettingsStore::CatalogSourceCacheRecord& record) {
-            return record.instanceId == instanceId;
-        }
+        [&instanceId](const SkyCatalogSourceCacheRecord& record) { return record.instanceId == instanceId; }
     );
     QVERIFY(upgradedSource != upgraded.snapshot.sources.end());
     QCOMPARE(upgradedSource->archiveSelector, CatalogArchiveFixture::deepSkyMemberPath());
@@ -502,10 +494,10 @@ void SkyCatalogManagerPersistenceTests::rejectedRestoreKeepsCollectionAndReports
     // staged collection.
     const QString collidingUrl = QStringLiteral("https://example.test/colliding-stars.csv");
 
-    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    SkyCatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
 
-    SkySettingsStore::CatalogSourceCacheRecord colliding;
+    SkyCatalogSourceCacheRecord colliding;
     colliding.instanceId = QStringLiteral("bundled-core");
     colliding.title = QStringLiteral("Colliding Source");
     colliding.urls = QStringList{collidingUrl};
@@ -602,7 +594,7 @@ void SkyCatalogManagerPersistenceTests::savedEmptyCollectionRestoresEmptyAcrossR
         manager.removeSource(QStringLiteral("primary"));
         QCOMPARE(manager.sourceCount(), std::size_t{0});
 
-        const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+        const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
         QVERIFY(persisted.isLoaded());
         QVERIFY(persisted.snapshot.sources.isEmpty());
     }
@@ -621,7 +613,7 @@ void SkyCatalogManagerPersistenceTests::savedEmptyCollectionRestoresEmptyAcrossR
         QVERIFY(catalogSpy.count() >= 1);
         QVERIFY(sourcesSpy.count() >= 1);
 
-        const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+        const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
         QVERIFY(persisted.isLoaded());
         QVERIFY(persisted.snapshot.sources.isEmpty());
     }
@@ -635,7 +627,7 @@ void SkyCatalogManagerPersistenceTests::savedEmptyCollectionRestoresEmptyAcrossR
         QVERIFY(secondRestart.sourceInstanceIds().isEmpty());
         QVERIFY(secondRestart.sourceViewEntries().isEmpty());
 
-        const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+        const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
         QVERIFY(persisted.isLoaded());
         QVERIFY(persisted.snapshot.sources.isEmpty());
     }

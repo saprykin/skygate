@@ -41,13 +41,13 @@ CatalogCacheFixture::makeStarCatalog(const std::string& id, const std::string& n
     return skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({std::move(star)});
 }
 
-SkySettingsStore::CatalogCollectionCacheSnapshot CatalogCacheFixture::makeCollectionSnapshot()
+SkyCatalogCollectionCacheSnapshot CatalogCacheFixture::makeCollectionSnapshot()
 {
-    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    SkyCatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = kCurrentCollectionSchemaVersion;
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
 
-    SkySettingsStore::CatalogSourceCacheRecord star;
+    SkyCatalogSourceCacheRecord star;
     star.instanceId = QStringLiteral("preset:hyg_v42");
     star.descriptorId = QStringLiteral("hyg_v42");
     star.title = QStringLiteral("HYG v4.2");
@@ -64,7 +64,7 @@ SkySettingsStore::CatalogCollectionCacheSnapshot CatalogCacheFixture::makeCollec
     star.constellationCount = 1;
     snapshot.sources.push_back(std::move(star));
 
-    SkySettingsStore::CatalogSourceCacheRecord deepSky;
+    SkyCatalogSourceCacheRecord deepSky;
     deepSky.instanceId = QStringLiteral("preset:open_ngc");
     deepSky.descriptorId = QStringLiteral("open_ngc");
     deepSky.title = QStringLiteral("OpenNGC");

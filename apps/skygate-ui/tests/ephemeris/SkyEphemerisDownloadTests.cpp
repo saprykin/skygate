@@ -246,7 +246,7 @@ void SkyEphemerisDownloadTests::cancelDuringDownloadKeepsStagingAndActiveData()
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
 
     SkySettingsStore store;
-    const SkySettingsStore::EphemerisDataCacheSnapshot oldSnapshot =
+    const SkyEphemerisDataCacheSnapshot oldSnapshot =
         EphemerisDataCacheSnapshotFixture::installedSnapshot(oldKernelPath, QString());
     QVERIFY(store.saveEphemerisDataCache(oldSnapshot));
     SkyEphemerisDataManager manager(&store);

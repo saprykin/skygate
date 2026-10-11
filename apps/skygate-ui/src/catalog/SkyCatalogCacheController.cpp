@@ -1,6 +1,7 @@
 #include "SkyCatalogCacheController.hpp"
 
 #include "CatalogParseOptions.hpp"
+#include "SkyCatalogCollectionCacheLoadResult.hpp"
 #include "SkyCatalogPresets.hpp"
 #include "SkyContextControllerSupport.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
@@ -8,6 +9,7 @@
 #include "catalog/CatalogIdentity.hpp"
 #include "catalog/CatalogParseRequest.hpp"
 #include "catalog/CatalogPayloadParser.hpp"
+#include "settings/SkySettingsStore.hpp"
 
 #include <QLoggingCategory>
 
@@ -51,7 +53,7 @@ QString savedLabel(const QString& sourceLabel, const QString& fallbackLabel)
     return QString("%1 (saved)").arg(normalizedSourceLabel);
 }
 
-bool hasRelatedPayload(const SkySettingsStore::CatalogSourceCacheRecord& record)
+bool hasRelatedPayload(const SkyCatalogSourceCacheRecord& record)
 {
     return !record.constellationLineRows.isEmpty() || !record.constellationAnchorGroupRows.isEmpty();
 }
@@ -119,7 +121,7 @@ bool SkyCatalogCacheController::clearCollectionCache() const
 }
 
 SkyCatalogCacheController::DecodedCatalog SkyCatalogCacheController::decodeSourceCatalog(
-    const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord, const int binarySchemaVersion
+    const SkyCatalogSourceCacheRecord& sourceRecord, const int binarySchemaVersion
 ) const
 {
     DecodedCatalog decoded;
@@ -176,7 +178,7 @@ SkyCatalogCacheController::DecodedCatalog SkyCatalogCacheController::decodeSourc
 }
 
 void SkyCatalogCacheController::appendRestoredSource(
-    const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord,
+    const SkyCatalogSourceCacheRecord& sourceRecord,
     DecodedCatalog decoded,
     const RelatedDataOwnership relatedDataOwnership,
     SkyCatalogCollectionRestoreResult& result
@@ -276,7 +278,7 @@ void SkyCatalogCacheController::appendRestoredSource(
 }
 
 SkyCatalogCacheController::RelatedDataOwnership
-SkyCatalogCacheController::relatedDataOwnership(const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot)
+SkyCatalogCacheController::relatedDataOwnership(const SkyCatalogCollectionCacheSnapshot& snapshot)
 {
     if (snapshot.schemaVersion >= SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion) {
         return RelatedDataOwnership::SourceOwned;
@@ -289,7 +291,7 @@ SkyCatalogCacheController::relatedDataOwnership(const SkySettingsStore::CatalogC
     // Several copies cannot establish ownership, so they stay unattributed
     // instead of being assigned to an arbitrary subset of records.
     std::size_t relatedPayloadRecordCount = 0U;
-    for (const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord : snapshot.sources) {
+    for (const SkyCatalogSourceCacheRecord& sourceRecord : snapshot.sources) {
         if (hasRelatedPayload(sourceRecord)) {
             ++relatedPayloadRecordCount;
         }
@@ -299,7 +301,7 @@ SkyCatalogCacheController::relatedDataOwnership(const SkySettingsStore::CatalogC
 }
 
 SkyCatalogCollectionRestoreResult
-SkyCatalogCacheController::restoreFromRecords(const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot) const
+SkyCatalogCacheController::restoreFromRecords(const SkyCatalogCollectionCacheSnapshot& snapshot) const
 {
     SkyCatalogCollectionRestoreResult result;
     const int binarySchemaVersion = snapshot.binarySchemaVersion;
@@ -315,7 +317,7 @@ SkyCatalogCacheController::restoreFromRecords(const SkySettingsStore::CatalogCol
         snapshot.schemaVersion < SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
 
     const RelatedDataOwnership recordOwnership = SkyCatalogCacheController::relatedDataOwnership(snapshot);
-    for (const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord : snapshot.sources) {
+    for (const SkyCatalogSourceCacheRecord& sourceRecord : snapshot.sources) {
         DecodedCatalog decoded = decodeSourceCatalog(sourceRecord, binarySchemaVersion);
         appendRestoredSource(sourceRecord, std::move(decoded), recordOwnership, result);
     }
@@ -323,7 +325,7 @@ SkyCatalogCacheController::restoreFromRecords(const SkySettingsStore::CatalogCol
 }
 
 SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
-    const SkySettingsStore::CatalogCacheSnapshot& legacy,
+    const SkyCatalogLegacyCacheSnapshot& legacy,
     const int catalogPresetIndex,
     const int deepSkyCatalogPresetIndex,
     const QString& catalogUrlText,
@@ -333,7 +335,7 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
     SkyCatalogCollectionRestoreResult result;
     result.migratedLegacy = true;
 
-    const auto appendRecord = [&](SkySettingsStore::CatalogSourceCacheRecord record) {
+    const auto appendRecord = [&](SkyCatalogSourceCacheRecord record) {
         DecodedCatalog decoded = decodeSourceCatalog(record, legacy.catalogBinarySchemaVersion);
         // The legacy two-slot cache has a single star slot, so its related
         // dataset has exactly one possible owner and is attributed to it.
@@ -349,7 +351,7 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
         const std::optional<SkyCatalogSourceDescriptor> descriptor =
             SkyCatalogPresets::starSourceDescriptor(QStringLiteral("bundled"));
         if (descriptor.has_value()) {
-            SkySettingsStore::CatalogSourceCacheRecord record;
+            SkyCatalogSourceCacheRecord record;
             record.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
             record.enabled = true;
             record.bundled = true;
@@ -363,7 +365,7 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
             appendRecord(std::move(record));
         }
     } else {
-        SkySettingsStore::CatalogSourceCacheRecord record;
+        SkyCatalogSourceCacheRecord record;
         record.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
         record.enabled = true;
         if (starIndex == 1) {
@@ -401,7 +403,7 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
 
     const int deepSkyIndex = SkyCatalogPresets::normalizeDeepSkyCatalogPresetIndex(deepSkyCatalogPresetIndex);
     if (deepSkyIndex != 0) {
-        SkySettingsStore::CatalogSourceCacheRecord record;
+        SkyCatalogSourceCacheRecord record;
         record.policy = skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly;
         record.enabled = true;
         if (deepSkyIndex == 1) {
@@ -447,12 +449,12 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::restoreCollection(
         return {};
     }
 
-    const SkySettingsStore::CatalogCollectionCacheLoadResult collection = m_settingsStore->loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult collection = m_settingsStore->loadCatalogCollectionCache();
     if (collection.isLoaded()) {
         return restoreFromRecords(collection.snapshot);
     }
 
-    if (collection.state == SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable) {
+    if (collection.state == SkyCatalogCollectionCacheLoadResult::State::Unusable) {
         // A committed configuration that cannot be read still owns the current
         // collection, so the retired legacy cache must not be migrated over
         // it. The stored state is left untouched: a later start reaches the
@@ -474,7 +476,7 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::restoreCollection(
     // The legacy two-slot cache is read only while no collection was ever
     // committed, which is also the state of a first migration whose commit
     // never completed, so a genuinely failed migration stays retryable.
-    const std::optional<SkySettingsStore::CatalogCacheSnapshot> legacy = m_settingsStore->loadCatalogCache();
+    const std::optional<SkyCatalogLegacyCacheSnapshot> legacy = m_settingsStore->loadCatalogCache();
     if (!legacy.has_value()) {
         return {};
     }
@@ -487,12 +489,12 @@ void SkyCatalogCacheController::persistCollection(const SkyCatalogCollectionPers
         return;
     }
 
-    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    SkyCatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
 
     for (const SkyCatalogSourcePersistEntry& source : request.sources) {
-        SkySettingsStore::CatalogSourceCacheRecord record;
+        SkyCatalogSourceCacheRecord record;
         record.instanceId = source.instanceId;
         record.descriptorId = source.descriptorId;
         record.title = source.title;

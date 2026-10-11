@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SkySettingsStore.hpp"
+#include "SkyEphemerisDataCacheSnapshot.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
 
@@ -12,7 +12,7 @@
 class SkyEphemerisSnapshotAdapter final : public skygate::ephemeris::IEphemerisDataSnapshot {
 public:
     SkyEphemerisSnapshotAdapter(
-        SkySettingsStore::EphemerisDataCacheSnapshot cacheSnapshot,
+        SkyEphemerisDataCacheSnapshot cacheSnapshot,
         bool installedDataActive,
         const skygate::ephemeris::EphemerisDataManifest* bundledFallbackManifest,
         QString bundledFallbackResourceRoot,
@@ -26,7 +26,7 @@ public:
     solarSystemKernelAsset(std::string_view assetId) const override;
 
 private:
-    SkySettingsStore::EphemerisDataCacheSnapshot m_cacheSnapshot;
+    SkyEphemerisDataCacheSnapshot m_cacheSnapshot;
     const skygate::ephemeris::EphemerisDataManifest* m_bundledFallbackManifest = nullptr;
     QString m_bundledFallbackResourceRoot;
     QString m_bundledFallbackProfileId;

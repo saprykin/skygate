@@ -16,7 +16,7 @@ namespace {
 
 Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
 
-using EphemerisDataCacheSnapshot = SkySettingsStore::EphemerisDataCacheSnapshot;
+using EphemerisDataCacheSnapshot = SkyEphemerisDataCacheSnapshot;
 using skygate::ephemeris::EphemerisDataFileUtilities;
 using skygate::ephemeris::EphemerisDataManifest;
 using skygate::ephemeris::EphemerisKernelDataAsset;

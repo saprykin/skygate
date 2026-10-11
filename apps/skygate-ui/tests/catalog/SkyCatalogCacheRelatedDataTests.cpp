@@ -228,7 +228,7 @@ void SkyCatalogCacheRelatedDataTests::corruptRelatedPayloadLeavesSiblingsIntact(
     snapshot.sources[1].constellationCount = 1;
 
     // A third, healthy record carries a distinguishable dataset.
-    SkySettingsStore::CatalogSourceCacheRecord healthy;
+    SkyCatalogSourceCacheRecord healthy;
     healthy.instanceId = QStringLiteral("custom:healthy-owner");
     healthy.title = QStringLiteral("Healthy Owner");
     healthy.urls = QStringList{QStringLiteral("https://example.test/healthy-owner.csv")};

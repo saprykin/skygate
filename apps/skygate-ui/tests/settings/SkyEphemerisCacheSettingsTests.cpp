@@ -30,10 +30,10 @@ void SkyEphemerisCacheSettingsTests::savesLoadsAndClearsEphemerisDataCacheMetada
     );
 
     SkySettingsStore store;
-    const SkySettingsStore::CatalogCacheSnapshot catalogSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot();
+    const SkyCatalogLegacyCacheSnapshot catalogSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot();
     QVERIFY(store.saveCatalogCache(catalogSnapshot));
 
-    SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot;
+    SkyEphemerisDataCacheSnapshot savedSnapshot;
     savedSnapshot.installedKernelAssetId = QStringLiteral("de440s-kernel");
     savedSnapshot.installedKernelProfileId = QStringLiteral("de440s-short-range");
     savedSnapshot.installedKernelPath = m_settings.filePath(QStringLiteral("de440s.bsp"));
@@ -88,7 +88,7 @@ void SkyEphemerisCacheSettingsTests::ephemerisDataCachePathsRoundTripExactly()
     QSettings settings;
     settings.clear();
 
-    SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot;
+    SkyEphemerisDataCacheSnapshot savedSnapshot;
     savedSnapshot.installedKernelPath =
         QStringLiteral("  %1  ").arg(m_settings.filePath(QStringLiteral("spaced kernel.bsp")));
     savedSnapshot.installedEarthOrientationPath =

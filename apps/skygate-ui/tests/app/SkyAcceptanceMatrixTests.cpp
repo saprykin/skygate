@@ -442,7 +442,7 @@ void verifyDE440sShortRangeBodyState(const skygate::ephemeris::IEphemerisEngine&
 }
 
 void compareCatalogCacheSnapshots(
-    const SkySettingsStore::CatalogCacheSnapshot& actual, const SkySettingsStore::CatalogCacheSnapshot& expected
+    const SkyCatalogLegacyCacheSnapshot& actual, const SkyCatalogLegacyCacheSnapshot& expected
 )
 {
     QCOMPARE(actual.sourceLabel, expected.sourceLabel);
@@ -484,7 +484,7 @@ void SkyAcceptanceMatrixTests::init()
 
 void SkyAcceptanceMatrixTests::engineSelectionPersistsAcrossRestart()
 {
-    SkySettingsStore::StateSnapshot savedSnapshot;
+    SkyPersistedStateSnapshot savedSnapshot;
     savedSnapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     savedSnapshot.ephemeris.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric();
     savedSnapshot.ephemeris.correctionPresetId = QStringLiteral("apparent-topocentric");
@@ -637,7 +637,7 @@ void SkyAcceptanceMatrixTests::optionalLongRangeProfileSelectsDe441Kernel()
 void SkyAcceptanceMatrixTests::ephemerisDataUpdateLeavesCatalogStateUnchanged()
 {
     SkySettingsStore store;
-    const SkySettingsStore::CatalogCacheSnapshot catalogSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot();
+    const SkyCatalogLegacyCacheSnapshot catalogSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot();
     QVERIFY(store.saveCatalogCache(catalogSnapshot));
 
     const skygate::ephemeris::EphemerisDataManifest manifest = acceptanceManifest();

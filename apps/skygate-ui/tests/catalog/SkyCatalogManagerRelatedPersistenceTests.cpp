@@ -85,7 +85,7 @@ void SkyCatalogManagerRelatedPersistenceTests::clearSourceCacheEvictsOwnedRelate
 
     const auto withRelated = store.loadCatalogCollectionCache();
     QVERIFY(withRelated.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* recordWithRelated =
+    const SkyCatalogSourceCacheRecord* recordWithRelated =
         CatalogSourceFactsQuery::findRecord(withRelated.snapshot, sourceId);
     QVERIFY(recordWithRelated != nullptr);
     QVERIFY(!recordWithRelated->payload.isEmpty());
@@ -100,8 +100,7 @@ void SkyCatalogManagerRelatedPersistenceTests::clearSourceCacheEvictsOwnedRelate
     QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
     const auto evicted = store.loadCatalogCollectionCache();
     QVERIFY(evicted.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* evictedRecord =
-        CatalogSourceFactsQuery::findRecord(evicted.snapshot, sourceId);
+    const SkyCatalogSourceCacheRecord* evictedRecord = CatalogSourceFactsQuery::findRecord(evicted.snapshot, sourceId);
     QVERIFY(evictedRecord != nullptr);
     QVERIFY(evictedRecord->payload.isEmpty());
     QVERIFY(evictedRecord->binaryPayload.isEmpty());
@@ -116,7 +115,7 @@ void SkyCatalogManagerRelatedPersistenceTests::clearSourceCacheEvictsOwnedRelate
     manager.enableSource(sourceId);
     const auto afterToggle = store.loadCatalogCollectionCache();
     QVERIFY(afterToggle.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* toggledRecord =
+    const SkyCatalogSourceCacheRecord* toggledRecord =
         CatalogSourceFactsQuery::findRecord(afterToggle.snapshot, sourceId);
     QVERIFY(toggledRecord != nullptr);
     QVERIFY(toggledRecord->enabled);
@@ -149,7 +148,7 @@ void SkyCatalogManagerRelatedPersistenceTests::relatedReplyAfterCacheEvictionSta
     // The main load is accepted while its related reply is still pending.
     const auto beforeClear = store.loadCatalogCollectionCache();
     QVERIFY(beforeClear.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* recordBeforeClear =
+    const SkyCatalogSourceCacheRecord* recordBeforeClear =
         CatalogSourceFactsQuery::findRecord(beforeClear.snapshot, instanceId);
     QVERIFY(recordBeforeClear != nullptr);
     QVERIFY(!recordBeforeClear->payload.isEmpty());
@@ -169,7 +168,7 @@ void SkyCatalogManagerRelatedPersistenceTests::relatedReplyAfterCacheEvictionSta
 
     const auto afterEviction = store.loadCatalogCollectionCache();
     QVERIFY(afterEviction.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* evictedRecord =
+    const SkyCatalogSourceCacheRecord* evictedRecord =
         CatalogSourceFactsQuery::findRecord(afterEviction.snapshot, instanceId);
     QVERIFY(evictedRecord != nullptr);
     QVERIFY(evictedRecord->payload.isEmpty());
@@ -232,10 +231,8 @@ void SkyCatalogManagerRelatedPersistenceTests::relatedDatasetsRoundTripToTheirOw
 
     const auto snapshot = store.loadCatalogCollectionCache();
     QVERIFY(snapshot.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* recordA =
-        CatalogSourceFactsQuery::findRecord(snapshot.snapshot, sourceAId);
-    const SkySettingsStore::CatalogSourceCacheRecord* recordB =
-        CatalogSourceFactsQuery::findRecord(snapshot.snapshot, sourceBId);
+    const SkyCatalogSourceCacheRecord* recordA = CatalogSourceFactsQuery::findRecord(snapshot.snapshot, sourceAId);
+    const SkyCatalogSourceCacheRecord* recordB = CatalogSourceFactsQuery::findRecord(snapshot.snapshot, sourceBId);
     QVERIFY(recordA != nullptr);
     QVERIFY(recordB != nullptr);
 
@@ -308,10 +305,8 @@ void SkyCatalogManagerRelatedPersistenceTests::disabledOwnerDataStaysOwnedButIna
 
     const auto snapshot = store.loadCatalogCollectionCache();
     QVERIFY(snapshot.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* recordA =
-        CatalogSourceFactsQuery::findRecord(snapshot.snapshot, sourceAId);
-    const SkySettingsStore::CatalogSourceCacheRecord* recordB =
-        CatalogSourceFactsQuery::findRecord(snapshot.snapshot, sourceBId);
+    const SkyCatalogSourceCacheRecord* recordA = CatalogSourceFactsQuery::findRecord(snapshot.snapshot, sourceAId);
+    const SkyCatalogSourceCacheRecord* recordB = CatalogSourceFactsQuery::findRecord(snapshot.snapshot, sourceBId);
     QVERIFY(recordA != nullptr);
     QVERIFY(recordB != nullptr);
     QVERIFY(!recordA->enabled);
@@ -394,7 +389,7 @@ void SkyCatalogManagerRelatedPersistenceTests::removedOwnerRelatedDataDoesNotRet
     const auto afterRemoval = store.loadCatalogCollectionCache();
     QVERIFY(afterRemoval.isLoaded());
     QVERIFY(!CatalogSourceFactsQuery::containsInstanceId(afterRemoval.snapshot, sourceBId));
-    const SkySettingsStore::CatalogSourceCacheRecord* survivingRecord =
+    const SkyCatalogSourceCacheRecord* survivingRecord =
         CatalogSourceFactsQuery::findRecord(afterRemoval.snapshot, sourceAId);
     QVERIFY(survivingRecord != nullptr);
     const auto survivingLines = CatalogSourceFactsQuery::relatedLineRefs(*survivingRecord);
@@ -402,7 +397,7 @@ void SkyCatalogManagerRelatedPersistenceTests::removedOwnerRelatedDataDoesNotRet
 
     // The retired pre-collection two-slot cache still holds related data on
     // disk, but a committed collection snapshot keeps that fallback unused.
-    SkySettingsStore::CatalogCacheSnapshot legacy;
+    SkyCatalogLegacyCacheSnapshot legacy;
     legacy.sourceLabel = QStringLiteral("Legacy Related");
     legacy.catalogPayload = skygate::ui::tests::orionHygCsvPayload();
     legacy.constellationLineRows = "hip_26311|hip_26727\n";
@@ -464,9 +459,7 @@ void SkyCatalogManagerRelatedPersistenceTests::corruptOwnerPayloadLeavesSiblingD
     const auto corruptedRecord = std::find_if(
         corruptedSnapshot.snapshot.sources.begin(),
         corruptedSnapshot.snapshot.sources.end(),
-        [&sourceAId](const SkySettingsStore::CatalogSourceCacheRecord& record) {
-            return record.instanceId == sourceAId;
-        }
+        [&sourceAId](const SkyCatalogSourceCacheRecord& record) { return record.instanceId == sourceAId; }
     );
     QVERIFY(corruptedRecord != corruptedSnapshot.snapshot.sources.end());
     corruptedRecord->constellationLineRows = "not a related line payload";
@@ -496,11 +489,11 @@ void SkyCatalogManagerRelatedPersistenceTests::migratesPriorSingleOwnerRelatedPa
     // A snapshot written before the per-source related format: the bundled
     // record and one star record, where the star record holds the only copy of
     // the then-collection-wide related dataset.
-    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    SkyCatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion =
         skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion - 1;
 
-    SkySettingsStore::CatalogSourceCacheRecord bundled;
+    SkyCatalogSourceCacheRecord bundled;
     bundled.instanceId = QStringLiteral("primary");
     bundled.title = QStringLiteral("Bundled");
     bundled.bundled = true;
@@ -509,7 +502,7 @@ void SkyCatalogManagerRelatedPersistenceTests::migratesPriorSingleOwnerRelatedPa
     bundled.order = 0;
     snapshot.sources.push_back(std::move(bundled));
 
-    SkySettingsStore::CatalogSourceCacheRecord star;
+    SkyCatalogSourceCacheRecord star;
     star.instanceId = QStringLiteral("custom:prior-owner");
     star.title = QStringLiteral("Prior Owner");
     star.urls = QStringList{QStringLiteral("https://example.test/prior-owner.csv")};
@@ -543,7 +536,7 @@ void SkyCatalogManagerRelatedPersistenceTests::migratesPriorSingleOwnerRelatedPa
         migrated.snapshot.schemaVersion,
         skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
     );
-    const SkySettingsStore::CatalogSourceCacheRecord* migratedRecord =
+    const SkyCatalogSourceCacheRecord* migratedRecord =
         CatalogSourceFactsQuery::findRecord(migrated.snapshot, QStringLiteral("custom:prior-owner"));
     QVERIFY(migratedRecord != nullptr);
     QCOMPARE(CatalogSourceFactsQuery::relatedLineRefs(*migratedRecord).size(), std::size_t{2});

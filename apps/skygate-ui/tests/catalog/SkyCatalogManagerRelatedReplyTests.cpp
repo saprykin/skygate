@@ -339,10 +339,9 @@ void SkyCatalogManagerRelatedReplyTests::failedUpdateSupersedesItsPendingRelated
     QCOMPARE(manager.statusText(), statusAfterFailure);
 
     manager.moveSource(instanceId, 0);
-    const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
     QVERIFY(persisted.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* record =
-        CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
+    const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(persisted.snapshot, instanceId);
     QVERIFY(record != nullptr);
     QCOMPARE(record->title, QStringLiteral("Superseded Accepted Title"));
     QCOMPARE(record->version, QStringLiteral("v1"));
@@ -643,7 +642,7 @@ void SkyCatalogManagerRelatedReplyTests::readdedOwnerRejectsPreviousIncarnationR
     const auto currentRecord = std::find_if(
         persistedAfterCurrent.snapshot.sources.begin(),
         persistedAfterCurrent.snapshot.sources.end(),
-        [&sourceId](const SkySettingsStore::CatalogSourceCacheRecord& record) { return record.instanceId == sourceId; }
+        [&sourceId](const SkyCatalogSourceCacheRecord& record) { return record.instanceId == sourceId; }
     );
     QVERIFY(currentRecord != persistedAfterCurrent.snapshot.sources.end());
     const QByteArray persistedLineRows = currentRecord->constellationLineRows;
@@ -670,7 +669,7 @@ void SkyCatalogManagerRelatedReplyTests::readdedOwnerRejectsPreviousIncarnationR
     const auto staleRecord = std::find_if(
         persistedAfterStale.snapshot.sources.begin(),
         persistedAfterStale.snapshot.sources.end(),
-        [&sourceId](const SkySettingsStore::CatalogSourceCacheRecord& record) { return record.instanceId == sourceId; }
+        [&sourceId](const SkyCatalogSourceCacheRecord& record) { return record.instanceId == sourceId; }
     );
     QVERIFY(staleRecord != persistedAfterStale.snapshot.sources.end());
     QCOMPARE(staleRecord->constellationLineRows, persistedLineRows);

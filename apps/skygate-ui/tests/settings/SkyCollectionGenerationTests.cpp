@@ -21,11 +21,11 @@ using skygate::ui::tests::CatalogCollectionCacheFixture;
 
 namespace {
 
-SkySettingsStore::CatalogSourceCacheRecord makeCollectionRecord(
+SkyCatalogSourceCacheRecord makeCollectionRecord(
     const QString& instanceId, const QString& title, const QByteArray& rawPayload, const QByteArray& binaryPayload
 )
 {
-    SkySettingsStore::CatalogSourceCacheRecord record;
+    SkyCatalogSourceCacheRecord record;
     record.instanceId = instanceId;
     record.title = title;
     record.urls = QStringList{QStringLiteral("https://example.test/%1.csv").arg(instanceId)};
@@ -36,10 +36,9 @@ SkySettingsStore::CatalogSourceCacheRecord makeCollectionRecord(
     return record;
 }
 
-SkySettingsStore::CatalogCollectionCacheSnapshot
-makeCollectionSnapshot(QVector<SkySettingsStore::CatalogSourceCacheRecord> records)
+SkyCatalogCollectionCacheSnapshot makeCollectionSnapshot(QVector<SkyCatalogSourceCacheRecord> records)
 {
-    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    SkyCatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
     for (std::size_t index = 0; index < records.size(); ++index) {
@@ -51,7 +50,7 @@ makeCollectionSnapshot(QVector<SkySettingsStore::CatalogSourceCacheRecord> recor
 
 // Two committed sources whose titles, raw bytes, and binary bytes all differ
 // from the update a failure test attempts, so a mixed snapshot is visible.
-SkySettingsStore::CatalogCollectionCacheSnapshot oldCollectionSnapshot()
+SkyCatalogCollectionCacheSnapshot oldCollectionSnapshot()
 {
     return makeCollectionSnapshot(
         {makeCollectionRecord(
@@ -69,7 +68,7 @@ SkySettingsStore::CatalogCollectionCacheSnapshot oldCollectionSnapshot()
     );
 }
 
-SkySettingsStore::CatalogCollectionCacheSnapshot newCollectionSnapshot()
+SkyCatalogCollectionCacheSnapshot newCollectionSnapshot()
 {
     return makeCollectionSnapshot(
         {makeCollectionRecord(
@@ -88,8 +87,7 @@ SkySettingsStore::CatalogCollectionCacheSnapshot newCollectionSnapshot()
 }
 
 void compareCollectionRecords(
-    const SkySettingsStore::CatalogCollectionCacheSnapshot& loaded,
-    const SkySettingsStore::CatalogCollectionCacheSnapshot& expected
+    const SkyCatalogCollectionCacheSnapshot& loaded, const SkyCatalogCollectionCacheSnapshot& expected
 )
 {
     QCOMPARE(loaded.sources.size(), expected.sources.size());
@@ -143,8 +141,8 @@ void SkyCollectionGenerationTests::freshStoreReportsNoCommittedCollection()
 
     const SkySettingsStore store;
     const auto firstUse = store.loadCatalogCollectionCache();
-    QCOMPARE(firstUse.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
-    QCOMPARE(firstUse.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::None);
+    QCOMPARE(firstUse.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
+    QCOMPARE(firstUse.failure, SkyCatalogCollectionCacheLoadResult::Failure::None);
     QVERIFY(firstUse.diagnostic.isEmpty());
     QVERIFY(firstUse.snapshot.sources.isEmpty());
     QVERIFY(firstUse.unreadablePayloadInstanceIds.isEmpty());
@@ -162,7 +160,7 @@ void SkyCollectionGenerationTests::emptyCatalogCollectionCacheIsExplicitlyPersis
     SkySettingsStore store;
     QVERIFY(store.saveCatalogCache(skygate::ui::tests::sampleCatalogCacheSnapshot()));
 
-    SkySettingsStore::CatalogCollectionCacheSnapshot emptySnapshot;
+    SkyCatalogCollectionCacheSnapshot emptySnapshot;
     emptySnapshot.schemaVersion =
         skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
     QVERIFY(store.saveCatalogCollectionCache(emptySnapshot));
@@ -171,7 +169,7 @@ void SkyCollectionGenerationTests::emptyCatalogCollectionCacheIsExplicitlyPersis
     // manifest distinguishes it from "no collection was ever stored" and keeps
     // the legacy two-slot cache retired.
     const auto loaded = store.loadCatalogCollectionCache();
-    QCOMPARE(loaded.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Loaded);
+    QCOMPARE(loaded.state, SkyCatalogCollectionCacheLoadResult::State::Loaded);
     QVERIFY(loaded.snapshot.sources.isEmpty());
     QCOMPARE(
         loaded.snapshot.schemaVersion,
@@ -181,7 +179,7 @@ void SkyCollectionGenerationTests::emptyCatalogCollectionCacheIsExplicitlyPersis
     // A second restart persists the same intentionally empty configuration.
     QVERIFY(store.saveCatalogCollectionCache(emptySnapshot));
     const auto reloaded = store.loadCatalogCollectionCache();
-    QCOMPARE(reloaded.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Loaded);
+    QCOMPARE(reloaded.state, SkyCatalogCollectionCacheLoadResult::State::Loaded);
     QVERIFY(reloaded.snapshot.sources.isEmpty());
 
     // The legacy cache stays readable; the committed collection retires the
@@ -191,9 +189,7 @@ void SkyCollectionGenerationTests::emptyCatalogCollectionCacheIsExplicitlyPersis
     // Resetting the stored configuration is the operation that removes the
     // committed collection again.
     QVERIFY(store.clearCatalogCollectionCache());
-    QCOMPARE(
-        store.loadCatalogCollectionCache().state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent
-    );
+    QCOMPARE(store.loadCatalogCollectionCache().state, SkyCatalogCollectionCacheLoadResult::State::Absent);
 }
 
 void SkyCollectionGenerationTests::failedCollectionSaveKeepsLegacyCacheUnmigrated()
@@ -223,8 +219,8 @@ void SkyCollectionGenerationTests::failedCollectionSaveKeepsLegacyCacheUnmigrate
     // The failed save neither records a completed migration nor destroys the
     // last readable legacy data.
     const auto failedLoad = store.loadCatalogCollectionCache();
-    QCOMPARE(failedLoad.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
-    QCOMPARE(failedLoad.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::None);
+    QCOMPARE(failedLoad.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
+    QCOMPARE(failedLoad.failure, SkyCatalogCollectionCacheLoadResult::Failure::None);
     const auto stillReadable = store.loadCatalogCache();
     QVERIFY(stillReadable.has_value());
     QCOMPARE(stillReadable->sourceLabel, legacySnapshot.sourceLabel);
@@ -468,8 +464,8 @@ void SkyCollectionGenerationTests::missingManifestWithRecordsSkipsEmptyCollectio
     }
     skygate::ui::tests::LogCapture capture;
     const auto unreadable = store.loadCatalogCollectionCache();
-    QCOMPARE(unreadable.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable);
-    QCOMPARE(unreadable.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::LegacyRecordsReplaced);
+    QCOMPARE(unreadable.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
+    QCOMPARE(unreadable.failure, SkyCatalogCollectionCacheLoadResult::Failure::LegacyRecordsReplaced);
     QVERIFY(!unreadable.diagnostic.isEmpty());
     const QString messages = capture.joinedMessages();
     QVERIFY(messages.contains(QStringLiteral("Catalog collection manifest is missing")));
@@ -521,7 +517,7 @@ void SkyCollectionGenerationTests::missingManifestWithSidecarsLogsManifestLoss()
 
     skygate::ui::tests::LogCapture capture;
     const auto stagedLeftovers = store.loadCatalogCollectionCache();
-    QCOMPARE(stagedLeftovers.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
+    QCOMPARE(stagedLeftovers.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
     QVERIFY(!stagedLeftovers.diagnostic.isEmpty());
     QVERIFY(capture.joinedMessages().contains(QStringLiteral("Catalog collection manifest is missing")));
 }
@@ -553,10 +549,8 @@ void SkyCollectionGenerationTests::lostManifestAfterCommittedCollectionNotFirstU
     QVERIFY(QFile::remove(manifestPath));
 
     const auto lostManifest = store.loadCatalogCollectionCache();
-    QCOMPARE(lostManifest.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable);
-    QCOMPARE(
-        lostManifest.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::CommittedManifestMissing
-    );
+    QCOMPARE(lostManifest.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
+    QCOMPARE(lostManifest.failure, SkyCatalogCollectionCacheLoadResult::Failure::CommittedManifestMissing);
     QVERIFY(lostManifest.diagnostic.contains(QStringLiteral("recorded as committed")));
 
     // The recorded generation is a proven recovery point: restoring the
@@ -597,8 +591,8 @@ void SkyCollectionGenerationTests::stageOnlyGenerationIsNotProofOfCommit()
 
     SkySettingsStore store;
     const auto firstUse = store.loadCatalogCollectionCache();
-    QCOMPARE(firstUse.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
-    QCOMPARE(firstUse.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::None);
+    QCOMPARE(firstUse.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
+    QCOMPARE(firstUse.failure, SkyCatalogCollectionCacheLoadResult::Failure::None);
     QVERIFY(!firstUse.diagnostic.isEmpty());
 
     // Once a manifest has committed a generation, losing it is unusable
@@ -606,10 +600,8 @@ void SkyCollectionGenerationTests::stageOnlyGenerationIsNotProofOfCommit()
     QVERIFY(store.saveCatalogCollectionCache(oldCollectionSnapshot()));
     QVERIFY(QFile::remove(skygate::ui::tests::catalogCollectionManifestFilePath(directory)));
     const auto lostCommitted = store.loadCatalogCollectionCache();
-    QCOMPARE(lostCommitted.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable);
-    QCOMPARE(
-        lostCommitted.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::CommittedManifestMissing
-    );
+    QCOMPARE(lostCommitted.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
+    QCOMPARE(lostCommitted.failure, SkyCatalogCollectionCacheLoadResult::Failure::CommittedManifestMissing);
 }
 
 void SkyCollectionGenerationTests::truncatedManifestIsUnusableButRecoverable()
@@ -636,8 +628,8 @@ void SkyCollectionGenerationTests::truncatedManifestIsUnusableButRecoverable()
 
     skygate::ui::tests::LogCapture capture;
     const auto truncated = store.loadCatalogCollectionCache();
-    QCOMPARE(truncated.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable);
-    QCOMPARE(truncated.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::ManifestUnreadable);
+    QCOMPARE(truncated.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
+    QCOMPARE(truncated.failure, SkyCatalogCollectionCacheLoadResult::Failure::ManifestUnreadable);
     QVERIFY(!truncated.diagnostic.isEmpty());
     QVERIFY(capture.joinedMessages().contains(QStringLiteral("Unreadable catalog collection manifest")));
 
@@ -672,10 +664,8 @@ void SkyCollectionGenerationTests::missingCommittedGenerationRecordsAreUnusable(
 
     skygate::ui::tests::LogCapture capture;
     const auto missingRecords = store.loadCatalogCollectionCache();
-    QCOMPARE(missingRecords.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable);
-    QCOMPARE(
-        missingRecords.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::CommittedGenerationMissing
-    );
+    QCOMPARE(missingRecords.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
+    QCOMPARE(missingRecords.failure, SkyCatalogCollectionCacheLoadResult::Failure::CommittedGenerationMissing);
     QVERIFY(missingRecords.diagnostic.contains(QString::number(committedGeneration)));
     QVERIFY(capture.joinedMessages().contains(QStringLiteral("names a generation without stored records")));
 }
@@ -834,8 +824,8 @@ void SkyCollectionGenerationTests::failedFirstPublicationKeepsLegacyCacheReadabl
     )});
     QVERIFY(!store.saveCatalogCollectionCache(firstCollection));
     const auto failedFirstSave = store.loadCatalogCollectionCache();
-    QCOMPARE(failedFirstSave.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
-    QCOMPARE(failedFirstSave.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::None);
+    QCOMPARE(failedFirstSave.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
+    QCOMPARE(failedFirstSave.failure, SkyCatalogCollectionCacheLoadResult::Failure::None);
     // A failed first publication leaves no commit record behind either.
     {
         QSettings settings;

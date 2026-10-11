@@ -513,10 +513,7 @@ void removeObsoleteCatalogCollectionRecords(QSettings& settings, const quint64 c
 }
 
 void saveCatalogSourceRecord(
-    QSettings& settings,
-    const SkySettingsStore::CatalogSourceCacheRecord& record,
-    const QString& directory,
-    const quint64 generation
+    QSettings& settings, const SkyCatalogSourceCacheRecord& record, const QString& directory, const quint64 generation
 )
 {
     settings.beginGroup(catalogSourceGenerationSettingsGroup(generation, record.instanceId));
@@ -549,10 +546,10 @@ void saveCatalogSourceRecord(
     settings.endGroup();
 }
 
-SkySettingsStore::CatalogSourceCacheRecord
+SkyCatalogSourceCacheRecord
 loadCatalogSourceRecord(QSettings& settings, const QString& group, QStringList& unreadablePayloadInstanceIds)
 {
-    SkySettingsStore::CatalogSourceCacheRecord record;
+    SkyCatalogSourceCacheRecord record;
     settings.beginGroup(group);
     record.instanceId = settings.value(QStringLiteral("instanceId")).toString();
     record.descriptorId = settings.value(QStringLiteral("descriptorId")).toString();
@@ -594,7 +591,7 @@ loadCatalogSourceRecord(QSettings& settings, const QString& group, QStringList& 
 
 }  // namespace
 
-bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
+bool SkySettingsStore::saveState(const SkyPersistedStateSnapshot& snapshot) const
 {
     QSettings settings;
     saveStateSnapshot(settings, snapshot);
@@ -606,7 +603,7 @@ bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
     return true;
 }
 
-std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() const
+std::optional<SkyPersistedStateSnapshot> SkySettingsStore::loadState() const
 {
     QSettings settings;
     return loadStateSnapshot(settings);
@@ -709,7 +706,7 @@ bool SkySettingsStore::clearDeepSkyCatalogCache() const
     return removedAllCacheFiles;
 }
 
-bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) const
+bool SkySettingsStore::saveCatalogCache(const SkyCatalogLegacyCacheSnapshot& snapshot) const
 {
     if (snapshot.catalogPayload.isEmpty() && snapshot.deepSkyCatalogPayload.isEmpty()) {
         return false;
@@ -816,14 +813,14 @@ bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) co
     return true;
 }
 
-std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCatalogCache() const
+std::optional<SkyCatalogLegacyCacheSnapshot> SkySettingsStore::loadCatalogCache() const
 {
     QSettings settings;
     const QString configuredPath =
         settings.value(SkyContextSettings::key("catalogCachePath"), SkyContextSettings::defaultCatalogCachePath())
             .toString();
 
-    CatalogCacheSnapshot snapshot;
+    SkyCatalogLegacyCacheSnapshot snapshot;
     QFile cacheFile(configuredPath);
     if (!configuredPath.isEmpty() && cacheFile.exists() && cacheFile.open(QIODevice::ReadOnly)) {
         snapshot.catalogPayload = cacheFile.readAll();
@@ -897,7 +894,7 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
     return snapshot;
 }
 
-bool SkySettingsStore::saveCatalogCollectionCache(const CatalogCollectionCacheSnapshot& snapshot) const
+bool SkySettingsStore::saveCatalogCollectionCache(const SkyCatalogCollectionCacheSnapshot& snapshot) const
 {
     QSettings settings;
     const QString directory = catalogCollectionCacheDirectory(settings);
@@ -916,7 +913,7 @@ bool SkySettingsStore::saveCatalogCollectionCache(const CatalogCollectionCacheSn
 
     QStringList stagedPaths;
     const auto discardStagedFiles = [&stagedPaths]() { removeCacheFiles(stagedPaths); };
-    for (const CatalogSourceCacheRecord& record : snapshot.sources) {
+    for (const SkyCatalogSourceCacheRecord& record : snapshot.sources) {
         if (!record.payload.isEmpty()) {
             const QString rawPath = catalogSourceRawPath(directory, record.instanceId, generation);
             if (!writeCatalogSourceFile(rawPath, record.payload)) {
@@ -950,8 +947,8 @@ bool SkySettingsStore::saveCatalogCollectionCache(const CatalogCollectionCacheSn
     settings.remove(generationGroup);
     settings.setValue(generationGroup + QLatin1Char('/') + catalogCollectionRecordsStoredKey(), true);
     int order = 0;
-    for (const CatalogSourceCacheRecord& record : snapshot.sources) {
-        CatalogSourceCacheRecord orderedRecord = record;
+    for (const SkyCatalogSourceCacheRecord& record : snapshot.sources) {
+        SkyCatalogSourceCacheRecord orderedRecord = record;
         orderedRecord.order = order++;
         saveCatalogSourceRecord(settings, orderedRecord, directory, generation);
     }
@@ -1005,14 +1002,14 @@ bool SkySettingsStore::saveCatalogCollectionCache(const CatalogCollectionCacheSn
     return true;
 }
 
-SkySettingsStore::CatalogCollectionCacheLoadResult SkySettingsStore::loadCatalogCollectionCache() const
+SkyCatalogCollectionCacheLoadResult SkySettingsStore::loadCatalogCollectionCache() const
 {
     QSettings settings;
     const QString directory = catalogCollectionCacheDirectory(settings);
     const QString manifestPath = catalogCollectionManifestPath(directory);
     const QString recordsStoredKey = catalogCollectionRecordsStoredKey();
 
-    CatalogCollectionCacheLoadResult result;
+    SkyCatalogCollectionCacheLoadResult result;
     QString recordsGroup;
     const CatalogCollectionManifestReadResult manifest = readCatalogCollectionManifest(manifestPath);
     if (manifest.state == CatalogCollectionManifestState::Readable) {
@@ -1024,8 +1021,8 @@ SkySettingsStore::CatalogCollectionCacheLoadResult SkySettingsStore::loadCatalog
         if (!settings.value(generationGroup + QLatin1Char('/') + recordsStoredKey).toBool()) {
             qCWarning(skygateCatalogCacheLog).noquote()
                 << "Catalog collection manifest names a generation without stored records" << manifestPath;
-            result.state = CatalogCollectionCacheLoadResult::State::Unusable;
-            result.failure = CatalogCollectionCacheLoadResult::Failure::CommittedGenerationMissing;
+            result.state = SkyCatalogCollectionCacheLoadResult::State::Unusable;
+            result.failure = SkyCatalogCollectionCacheLoadResult::Failure::CommittedGenerationMissing;
             result.diagnostic =
                 QStringLiteral(
                     "The committed catalog collection manifest names generation %1, whose stored records "
@@ -1043,8 +1040,8 @@ SkySettingsStore::CatalogCollectionCacheLoadResult SkySettingsStore::loadCatalog
         rememberCommittedCatalogCollectionGeneration(settings, manifest.manifest.generation);
     } else {
         if (manifest.state == CatalogCollectionManifestState::Unreadable) {
-            result.state = CatalogCollectionCacheLoadResult::State::Unusable;
-            result.failure = CatalogCollectionCacheLoadResult::Failure::ManifestUnreadable;
+            result.state = SkyCatalogCollectionCacheLoadResult::State::Unusable;
+            result.failure = SkyCatalogCollectionCacheLoadResult::Failure::ManifestUnreadable;
             result.diagnostic =
                 QStringLiteral("The committed catalog collection manifest is unreadable: %1").arg(manifestPath);
             bool hasCommittedGeneration = false;
@@ -1073,8 +1070,8 @@ SkySettingsStore::CatalogCollectionCacheLoadResult SkySettingsStore::loadCatalog
         if (hasCommittedGeneration && committedGeneration > 0U) {
             qCWarning(skygateCatalogCacheLog).noquote() << "Catalog collection manifest is missing while generation"
                                                         << committedGeneration << "was recorded as committed";
-            result.state = CatalogCollectionCacheLoadResult::State::Unusable;
-            result.failure = CatalogCollectionCacheLoadResult::Failure::CommittedManifestMissing;
+            result.state = SkyCatalogCollectionCacheLoadResult::State::Unusable;
+            result.failure = SkyCatalogCollectionCacheLoadResult::Failure::CommittedManifestMissing;
             result.diagnostic =
                 QStringLiteral(
                     "The committed catalog collection manifest is missing while generation %1 was recorded as "
@@ -1116,8 +1113,8 @@ SkySettingsStore::CatalogCollectionCacheLoadResult SkySettingsStore::loadCatalog
             qCWarning(skygateCatalogCacheLog).noquote()
                 << "Ignoring stale catalog collection version marker: generation-format records exist without a "
                    "committed manifest";
-            result.state = CatalogCollectionCacheLoadResult::State::Unusable;
-            result.failure = CatalogCollectionCacheLoadResult::Failure::LegacyRecordsReplaced;
+            result.state = SkyCatalogCollectionCacheLoadResult::State::Unusable;
+            result.failure = SkyCatalogCollectionCacheLoadResult::Failure::LegacyRecordsReplaced;
             result.diagnostic = QStringLiteral(
                 "The catalog collection version marker outlived its records, which generation-format data replaced"
             );
@@ -1133,7 +1130,7 @@ SkySettingsStore::CatalogCollectionCacheLoadResult SkySettingsStore::loadCatalog
         recordsGroup = QStringLiteral("catalogSources");
     }
 
-    QVector<CatalogSourceCacheRecord> records;
+    QVector<SkyCatalogSourceCacheRecord> records;
     settings.beginGroup(recordsGroup);
     const QStringList groups = settings.childGroups();
     for (const QString& group : groups) {
@@ -1144,7 +1141,8 @@ SkySettingsStore::CatalogCollectionCacheLoadResult SkySettingsStore::loadCatalog
             // sidecar-named groups under the current group are source records.
             continue;
         }
-        CatalogSourceCacheRecord record = loadCatalogSourceRecord(settings, group, result.unreadablePayloadInstanceIds);
+        SkyCatalogSourceCacheRecord record =
+            loadCatalogSourceRecord(settings, group, result.unreadablePayloadInstanceIds);
         if (!record.instanceId.isEmpty()) {
             records.push_back(std::move(record));
         }
@@ -1152,12 +1150,14 @@ SkySettingsStore::CatalogCollectionCacheLoadResult SkySettingsStore::loadCatalog
     settings.endGroup();
 
     std::stable_sort(
-        records.begin(), records.end(), [](const CatalogSourceCacheRecord& lhs, const CatalogSourceCacheRecord& rhs) {
+        records.begin(),
+        records.end(),
+        [](const SkyCatalogSourceCacheRecord& lhs, const SkyCatalogSourceCacheRecord& rhs) {
             return lhs.order < rhs.order;
         }
     );
     result.snapshot.sources = std::move(records);
-    result.state = CatalogCollectionCacheLoadResult::State::Loaded;
+    result.state = SkyCatalogCollectionCacheLoadResult::State::Loaded;
     qCInfo(skygateCatalogCacheLog).noquote()
         << "Catalog collection cache loaded: sources" << result.snapshot.sources.size();
     return result;
@@ -1240,7 +1240,7 @@ bool SkySettingsStore::clearCatalogSourceCache(const QString& instanceId) const
     return removedAllCacheFiles;
 }
 
-bool SkySettingsStore::saveEphemerisDataCache(const EphemerisDataCacheSnapshot& snapshot) const
+bool SkySettingsStore::saveEphemerisDataCache(const SkyEphemerisDataCacheSnapshot& snapshot) const
 {
     QSettings settings;
     settings.setValue(SkyContextSettings::key("version"), SkyContextControllerConstants::kSettingsVersion);
@@ -1260,12 +1260,12 @@ bool SkySettingsStore::saveEphemerisDataCache(const EphemerisDataCacheSnapshot& 
     settings.setValue(ephemerisDataCacheKey("installedDeltaTDataVersion"), snapshot.installedDeltaTDataVersion);
     settings.setValue(
         ephemerisDataCacheKey("dataRevisionToken"),
-        snapshot.dataRevisionToken.trimmed().isEmpty() ? EphemerisDataCacheSnapshot{}.dataRevisionToken
+        snapshot.dataRevisionToken.trimmed().isEmpty() ? SkyEphemerisDataCacheSnapshot{}.dataRevisionToken
                                                        : snapshot.dataRevisionToken.trimmed()
     );
     settings.setValue(
         ephemerisDataCacheKey("lastUpdateResult"),
-        snapshot.lastUpdateResult.trimmed().isEmpty() ? EphemerisDataCacheSnapshot{}.lastUpdateResult
+        snapshot.lastUpdateResult.trimmed().isEmpty() ? SkyEphemerisDataCacheSnapshot{}.lastUpdateResult
                                                       : snapshot.lastUpdateResult.trimmed()
     );
     settings.sync();
@@ -1276,10 +1276,10 @@ bool SkySettingsStore::saveEphemerisDataCache(const EphemerisDataCacheSnapshot& 
     return true;
 }
 
-SkySettingsStore::EphemerisDataCacheSnapshot SkySettingsStore::loadEphemerisDataCache() const
+SkyEphemerisDataCacheSnapshot SkySettingsStore::loadEphemerisDataCache() const
 {
     QSettings settings;
-    EphemerisDataCacheSnapshot snapshot;
+    SkyEphemerisDataCacheSnapshot snapshot;
     snapshot.installedKernelAssetId = settings.value(ephemerisDataCacheKey("installedKernelAssetId")).toString();
     snapshot.installedKernelProfileId = settings.value(ephemerisDataCacheKey("installedKernelProfileId")).toString();
     snapshot.installedKernelPath = settings.value(ephemerisDataCacheKey("installedKernelPath")).toString();
@@ -1298,12 +1298,12 @@ SkySettingsStore::EphemerisDataCacheSnapshot SkySettingsStore::loadEphemerisData
     snapshot.dataRevisionToken =
         readTrimmedStringSetting(settings, ephemerisDataCacheKey("dataRevisionToken"), snapshot.dataRevisionToken);
     if (snapshot.dataRevisionToken.isEmpty()) {
-        snapshot.dataRevisionToken = EphemerisDataCacheSnapshot{}.dataRevisionToken;
+        snapshot.dataRevisionToken = SkyEphemerisDataCacheSnapshot{}.dataRevisionToken;
     }
     snapshot.lastUpdateResult =
         readTrimmedStringSetting(settings, ephemerisDataCacheKey("lastUpdateResult"), snapshot.lastUpdateResult);
     if (snapshot.lastUpdateResult.isEmpty()) {
-        snapshot.lastUpdateResult = EphemerisDataCacheSnapshot{}.lastUpdateResult;
+        snapshot.lastUpdateResult = SkyEphemerisDataCacheSnapshot{}.lastUpdateResult;
     }
     return snapshot;
 }

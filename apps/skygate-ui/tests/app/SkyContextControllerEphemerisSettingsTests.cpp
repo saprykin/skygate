@@ -43,9 +43,9 @@ skygate::core::AstronomicalEpoch expectedUtcEpoch(
     return *epoch;
 }
 
-SkySettingsStore::EphemerisUserSettingsSnapshot customEphemerisUserSettings()
+SkyEphemerisUserSettingsSnapshot customEphemerisUserSettings()
 {
-    SkySettingsStore::EphemerisUserSettingsSnapshot settings;
+    SkyEphemerisUserSettingsSnapshot settings;
     settings.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
     settings.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
                                | skygate::ephemeris::EphemerisCorrectionFlags::stellarAberration();
@@ -199,14 +199,14 @@ skygate::ephemeris::EphemerisDataManifest makeInstalledEphemerisManifest(const Q
     return manifest;
 }
 
-SkySettingsStore::EphemerisDataCacheSnapshot installedEphemerisDataSnapshot(
+SkyEphemerisDataCacheSnapshot installedEphemerisDataSnapshot(
     const QString& kernelPath,
     const QString& leapSecondPath,
     const QString& earthOrientationPath,
     const QString& deltaTPath
 )
 {
-    SkySettingsStore::EphemerisDataCacheSnapshot snapshot;
+    SkyEphemerisDataCacheSnapshot snapshot;
     snapshot.installedKernelAssetId = QStringLiteral("de440s-kernel");
     snapshot.installedKernelProfileId = QStringLiteral("de440s-short-range");
     snapshot.installedKernelPath = kernelPath;
@@ -223,8 +223,7 @@ SkySettingsStore::EphemerisDataCacheSnapshot installedEphemerisDataSnapshot(
 }
 
 void verifyEphemerisUserSettings(
-    const SkySettingsStore::EphemerisUserSettingsSnapshot& actual,
-    const SkySettingsStore::EphemerisUserSettingsSnapshot& expected
+    const SkyEphemerisUserSettingsSnapshot& actual, const SkyEphemerisUserSettingsSnapshot& expected
 )
 {
     QCOMPARE(static_cast<std::uint8_t>(actual.engineKind), static_cast<std::uint8_t>(expected.engineKind));
@@ -280,10 +279,10 @@ void SkyContextControllerEphemerisSettingsTests::init()
 
 void SkyContextControllerEphemerisSettingsTests::loadSavePreservesAllEphemerisUserSettings()
 {
-    const SkySettingsStore::EphemerisUserSettingsSnapshot expectedSettings = customEphemerisUserSettings();
+    const SkyEphemerisUserSettingsSnapshot expectedSettings = customEphemerisUserSettings();
 
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.ephemeris = expectedSettings;
     snapshot.ephemerisSettingsPresent = true;
     QVERIFY(store.saveState(snapshot));
@@ -311,7 +310,7 @@ void SkyContextControllerEphemerisSettingsTests::loadSettingsBuildsHighPrecision
     QVERIFY(store.saveEphemerisDataCache(
         installedEphemerisDataSnapshot(kernelPath, leapSecondPath, earthOrientationPath, deltaTPath)
     ));
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.ephemerisSettingsPresent = true;
     snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     snapshot.ephemeris.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric();
@@ -350,7 +349,7 @@ void SkyContextControllerEphemerisSettingsTests::cachedProvidersRebuildAndInvali
     QVERIFY(store.saveEphemerisDataCache(
         installedEphemerisDataSnapshot(kernelPath, leapSecondPath, earthOrientationPath, deltaTPath)
     ));
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.ephemerisSettingsPresent = true;
     snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     snapshot.ephemeris.fallbackToSimpleEngine = true;
@@ -456,7 +455,7 @@ void SkyContextControllerEphemerisSettingsTests::requestContextCombinesObserverT
     expectedSettings.refractionEnabled = true;
 
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.ephemeris = expectedSettings;
     snapshot.ephemerisSettingsPresent = true;
     snapshot.utcEpochMicros = QDateTime(QDate(2030, 7, 2), QTime(3, 4, 5), QTimeZone::UTC).toMSecsSinceEpoch() * 1000;

@@ -86,7 +86,7 @@ void SkyCatalogManagerLiveRestoreTests::liveRestoreDropsOperationsOmittedFromCol
     // The committed configuration is now empty even though this manager still
     // holds the source it loaded, as after a settings restore that replaces
     // the session's collection.
-    SkySettingsStore::CatalogCollectionCacheSnapshot emptyCollection;
+    SkyCatalogCollectionCacheSnapshot emptyCollection;
     emptyCollection.schemaVersion =
         skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
     emptyCollection.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
@@ -102,7 +102,7 @@ void SkyCatalogManagerLiveRestoreTests::liveRestoreDropsOperationsOmittedFromCol
     QVERIFY(manager.sourceViewEntries().isEmpty());
     QVERIFY(!CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Live Restore Star")));
 
-    const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
     QVERIFY(persisted.isLoaded());
     QVERIFY(persisted.snapshot.sources.isEmpty());
 }
@@ -131,7 +131,7 @@ void SkyCatalogManagerLiveRestoreTests::liveRestoreSupersedesPendingImportReply(
         FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, pendingUrl);
     QVERIFY(!pendingReply.isNull());
 
-    SkySettingsStore::CatalogCollectionCacheSnapshot emptyCollection;
+    SkyCatalogCollectionCacheSnapshot emptyCollection;
     emptyCollection.schemaVersion =
         skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
     emptyCollection.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
@@ -156,7 +156,7 @@ void SkyCatalogManagerLiveRestoreTests::liveRestoreSupersedesPendingImportReply(
     QCOMPARE(manager.catalogRevision(), revisionAfterRestore);
     QVERIFY(!CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Superseded Pending Star")));
 
-    const SkySettingsStore::CatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult persisted = store.loadCatalogCollectionCache();
     QVERIFY(persisted.isLoaded());
     QVERIFY(persisted.snapshot.sources.isEmpty());
 }
@@ -190,7 +190,7 @@ void SkyCatalogManagerLiveRestoreTests::reusedInstanceLiveRestoreSupersedesRelat
     // The stored configuration names the same instance the live manager is
     // already waiting on a related reply for, so the restored source reuses
     // the pending instance's ID.
-    const SkySettingsStore::CatalogCollectionCacheLoadResult beforeRestore = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult beforeRestore = store.loadCatalogCollectionCache();
     QVERIFY(beforeRestore.isLoaded());
     QVERIFY(CatalogSourceFactsQuery::containsInstanceId(beforeRestore.snapshot, instanceId));
 
@@ -216,10 +216,9 @@ void SkyCatalogManagerLiveRestoreTests::reusedInstanceLiveRestoreSupersedesRelat
     QCOMPARE(manager.catalogRevision(), revisionAfterRestore);
     QCOMPARE(manager.statusText(), statusAfterRestore);
 
-    const SkySettingsStore::CatalogCollectionCacheLoadResult afterStale = store.loadCatalogCollectionCache();
+    const SkyCatalogCollectionCacheLoadResult afterStale = store.loadCatalogCollectionCache();
     QVERIFY(afterStale.isLoaded());
-    const SkySettingsStore::CatalogSourceCacheRecord* record =
-        CatalogSourceFactsQuery::findRecord(afterStale.snapshot, instanceId);
+    const SkyCatalogSourceCacheRecord* record = CatalogSourceFactsQuery::findRecord(afterStale.snapshot, instanceId);
     QVERIFY(record != nullptr);
     QVERIFY(record->constellationLineRows.isEmpty());
     QVERIFY(record->constellationAnchorGroupRows.isEmpty());
@@ -233,10 +232,10 @@ void SkyCatalogManagerLiveRestoreTests::rejectedRestoreKeepsPendingImportWork()
     // A persisted instance identity colliding with the implicit bundled core
     // source makes the restored collection uncomposable, so the restore is
     // rejected before it can replace the live collection.
-    SkySettingsStore::CatalogCollectionCacheSnapshot rejectedSnapshot;
+    SkyCatalogCollectionCacheSnapshot rejectedSnapshot;
     rejectedSnapshot.schemaVersion =
         skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
-    SkySettingsStore::CatalogSourceCacheRecord colliding;
+    SkyCatalogSourceCacheRecord colliding;
     colliding.instanceId = QStringLiteral("bundled-core");
     colliding.title = QStringLiteral("Colliding Source");
     colliding.urls = QStringList{QStringLiteral("https://example.test/colliding-stars.csv")};

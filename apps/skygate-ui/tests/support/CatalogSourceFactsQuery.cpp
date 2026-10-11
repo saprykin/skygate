@@ -14,26 +14,21 @@
 namespace skygate::ui::tests {
 
 bool CatalogSourceFactsQuery::containsInstanceId(
-    const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot, const QString& instanceId
+    const SkyCatalogCollectionCacheSnapshot& snapshot, const QString& instanceId
 )
 {
     return std::any_of(
-        snapshot.sources.begin(),
-        snapshot.sources.end(),
-        [&instanceId](const SkySettingsStore::CatalogSourceCacheRecord& record) {
+        snapshot.sources.begin(), snapshot.sources.end(), [&instanceId](const SkyCatalogSourceCacheRecord& record) {
             return record.instanceId == instanceId;
         }
     );
 }
 
-const SkySettingsStore::CatalogSourceCacheRecord* CatalogSourceFactsQuery::findRecord(
-    const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot, const QString& instanceId
-)
+const SkyCatalogSourceCacheRecord*
+CatalogSourceFactsQuery::findRecord(const SkyCatalogCollectionCacheSnapshot& snapshot, const QString& instanceId)
 {
     const auto it = std::find_if(
-        snapshot.sources.begin(),
-        snapshot.sources.end(),
-        [&instanceId](const SkySettingsStore::CatalogSourceCacheRecord& record) {
+        snapshot.sources.begin(), snapshot.sources.end(), [&instanceId](const SkyCatalogSourceCacheRecord& record) {
             return record.instanceId == instanceId;
         }
     );
@@ -89,7 +84,7 @@ QString CatalogSourceFactsQuery::durableTitle(const QString& title)
 }
 
 std::vector<skygate::ephemeris::ConstellationLineRef>
-CatalogSourceFactsQuery::relatedLineRefs(const SkySettingsStore::CatalogSourceCacheRecord& record)
+CatalogSourceFactsQuery::relatedLineRefs(const SkyCatalogSourceCacheRecord& record)
 {
     return skygate::ui::internal::SkyContextCatalogCodec::parseConstellationLineRows(
         std::string_view(
