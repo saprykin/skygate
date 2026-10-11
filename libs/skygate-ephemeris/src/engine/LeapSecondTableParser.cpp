@@ -1,7 +1,7 @@
 #include "LeapSecondTableParser.hpp"
 #include "EphemerisTableMetadata.hpp"
-#include "text/HighPrecisionTextParser.hpp"
 #include "IEphemerisDataSnapshot.hpp"
+#include "TextParsingUtilities.hpp"
 #include "time/CalendarTime.hpp"
 #include "time/EpochCodec.hpp"
 
@@ -20,22 +20,18 @@ namespace {
 constexpr std::string_view kValidityRangeId = "leap-seconds";
 constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
 
-[[nodiscard]] const HighPrecisionTextParser& textParser() noexcept
-{
-    return EphemerisTableMetadata::textParser();
-}
-
 [[nodiscard]] std::optional<skygate::core::CivilDateTime> parseIanaCommentDate(const std::string_view text) noexcept
 {
-    const std::vector<std::string_view> tokens = textParser().splitAsciiWhitespace(text);
+    const std::vector<std::string_view> tokens = TextParsingUtilities::splitAsciiWhitespace(text);
     if (tokens.size() < 3U) {
         return std::nullopt;
     }
 
     int day = 0;
     int year = 0;
-    const std::optional<int> month = HighPrecisionTextParser::parseEnglishMonthAbbreviation(tokens[1]);
-    if (!textParser().parseInt(tokens[0], day) || !month.has_value() || !textParser().parseInt(tokens[2], year)) {
+    const std::optional<int> month = TextParsingUtilities::parseEnglishMonthAbbreviation(tokens[1]);
+    if (!TextParsingUtilities::parseInt(tokens[0], day) || !month.has_value()
+        || !TextParsingUtilities::parseInt(tokens[2], year)) {
         return std::nullopt;
     }
 
@@ -60,7 +56,7 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
     }
     if (line.starts_with("#@")) {
         std::uint64_t ntpExpiration = 0U;
-        if (!textParser().parseUint64(line.substr(2U), ntpExpiration)) {
+        if (!TextParsingUtilities::parseUint64(line.substr(2U), ntpExpiration)) {
             return "Leap-second table contains malformed expiration metadata at line " + std::to_string(lineNumber)
                    + ".";
         }
@@ -73,14 +69,14 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
 
 [[nodiscard]] bool parseCsvEntryLine(std::string_view line, ILeapSecondProvider::TableEntry& entry) noexcept
 {
-    const std::vector<std::string_view> columns = textParser().splitCommaSeparated(line);
+    const std::vector<std::string_view> columns = TextParsingUtilities::splitCommaSeparated(line);
     if (columns.size() != 2U) {
         return false;
     }
 
-    const std::optional<skygate::core::CivilDateTime> effectiveDate = textParser().parseUtcDate(columns[0]);
+    const std::optional<skygate::core::CivilDateTime> effectiveDate = TextParsingUtilities::parseUtcDate(columns[0]);
     int taiMinusUtcSeconds = 0;
-    if (!effectiveDate.has_value() || !textParser().parseInt(columns[1], taiMinusUtcSeconds)) {
+    if (!effectiveDate.has_value() || !TextParsingUtilities::parseInt(columns[1], taiMinusUtcSeconds)) {
         return false;
     }
 
@@ -98,17 +94,18 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
 [[nodiscard]] bool parseIanaEntryLine(std::string_view line, ILeapSecondProvider::TableEntry& entry) noexcept
 {
     const std::size_t commentOffset = line.find('#');
-    const std::string_view payload = textParser().trimAsciiWhitespace(
+    const std::string_view payload = TextParsingUtilities::trimAsciiWhitespace(
         commentOffset == std::string_view::npos ? line : line.substr(0U, commentOffset)
     );
-    const std::vector<std::string_view> columns = textParser().splitAsciiWhitespace(payload);
+    const std::vector<std::string_view> columns = TextParsingUtilities::splitAsciiWhitespace(payload);
     if (columns.size() < 2U) {
         return false;
     }
 
     std::uint64_t ntpTimestamp = 0U;
     int taiMinusUtcSeconds = 0;
-    if (!textParser().parseUint64(columns[0], ntpTimestamp) || !textParser().parseInt(columns[1], taiMinusUtcSeconds)) {
+    if (!TextParsingUtilities::parseUint64(columns[0], ntpTimestamp)
+        || !TextParsingUtilities::parseInt(columns[1], taiMinusUtcSeconds)) {
         return false;
     }
 
@@ -159,9 +156,9 @@ LeapSecondTableParser::Result LeapSecondTableParser::parse(const EphemerisTextDa
     std::size_t lineNumber = 0U;
     while (!remaining.empty()) {
         ++lineNumber;
-        std::string_view line = textParser().takeLine(remaining);
+        std::string_view line = TextParsingUtilities::takeLine(remaining);
 
-        line = textParser().trimAsciiWhitespace(line);
+        line = TextParsingUtilities::trimAsciiWhitespace(line);
         if (line.empty()) {
             continue;
         }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "text/HighPrecisionTextParser.hpp"
+#include "TextParsingUtilities.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/CalendarTime.hpp"
 #include "time/EphemerisDateRange.hpp"
@@ -15,8 +15,6 @@ namespace skygate::ephemeris {
 class EphemerisTableMetadata final {
 public:
     EphemerisTableMetadata() = delete;
-
-    [[nodiscard]] static const HighPrecisionTextParser& textParser() noexcept;
 
     [[nodiscard]] static bool isHeaderLine(std::string_view line) noexcept;
 
@@ -39,20 +37,23 @@ public:
         std::optional<std::string>& diagnosticText
     )
     {
-        if (const std::optional<std::string> value = textParser().metadataValue(line, "version"); value.has_value()) {
+        if (const std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "version");
+            value.has_value()) {
             if (!value->empty()) {
                 info.version = *value;
             }
             return true;
         }
-        if (const std::optional<std::string> value = textParser().metadataValue(line, "source"); value.has_value()) {
+        if (const std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "source");
+            value.has_value()) {
             if (!value->empty()) {
                 info.provenance = *value;
             }
             return true;
         }
-        if (const std::optional<std::string> value = textParser().metadataValue(line, "expires"); value.has_value()) {
-            const std::optional<skygate::core::CivilDateTime> expiresDate = textParser().parseUtcDate(*value);
+        if (const std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "expires");
+            value.has_value()) {
+            const std::optional<skygate::core::CivilDateTime> expiresDate = TextParsingUtilities::parseUtcDate(*value);
             const std::optional<skygate::core::AstronomicalEpoch> expiresEpoch =
                 expiresDate.has_value() ? skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*expiresDate)
                                         : std::nullopt;

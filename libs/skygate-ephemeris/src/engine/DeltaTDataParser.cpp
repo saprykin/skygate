@@ -1,7 +1,7 @@
 #include "DeltaTDataParser.hpp"
 #include "EphemerisTableMetadata.hpp"
-#include "text/HighPrecisionTextParser.hpp"
 #include "IEphemerisDataSnapshot.hpp"
+#include "TextParsingUtilities.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <algorithm>
@@ -20,16 +20,11 @@ constexpr std::string_view kValidityRangeDisplayName = "Delta T data";
 constexpr std::string_view kAncientFallbackRangeId = "delta-t-ancient-fallback";
 constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T fallback model";
 
-[[nodiscard]] const HighPrecisionTextParser& textParser() noexcept
-{
-    return EphemerisTableMetadata::textParser();
-}
-
 [[nodiscard]] std::optional<std::string> setFallbackStart(
     IDeltaTProvider::DataInfo& info, const std::string& value, const std::size_t lineNumber, bool& hasFallbackStart
 )
 {
-    const std::optional<skygate::core::CivilDateTime> date = textParser().parseUtcDate(value);
+    const std::optional<skygate::core::CivilDateTime> date = TextParsingUtilities::parseUtcDate(value);
     const std::optional<skygate::core::AstronomicalEpoch> epoch =
         date.has_value() ? skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*date) : std::nullopt;
     if (!epoch.has_value()) {
@@ -51,7 +46,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     IDeltaTProvider::DataInfo& info, const std::string& value, const std::size_t lineNumber, bool& hasFallbackEnd
 )
 {
-    const std::optional<skygate::core::CivilDateTime> date = textParser().parseUtcDate(value);
+    const std::optional<skygate::core::CivilDateTime> date = TextParsingUtilities::parseUtcDate(value);
     const std::optional<skygate::core::AstronomicalEpoch> epoch =
         date.has_value() ? skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*date) : std::nullopt;
     if (!epoch.has_value()) {
@@ -81,15 +76,15 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     if (EphemerisTableMetadata::applyCommonLine(info, line, "Delta T data", lineNumber, diagnosticText)) {
         return diagnosticText;
     }
-    if (std::optional<std::string> value = textParser().metadataValue(line, "ancient_fallback_start");
+    if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "ancient_fallback_start");
         value.has_value()) {
         return setFallbackStart(info, *value, lineNumber, hasFallbackStart);
     }
-    if (std::optional<std::string> value = textParser().metadataValue(line, "ancient_fallback_end");
+    if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "ancient_fallback_end");
         value.has_value()) {
         return setFallbackEnd(info, *value, lineNumber, hasFallbackEnd);
     }
-    if (std::optional<std::string> value = textParser().metadataValue(line, "ancient_fallback_source");
+    if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "ancient_fallback_source");
         value.has_value()) {
         IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
             info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
@@ -97,10 +92,11 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
         info.ancientFallbackModel = std::move(fallback);
         return std::nullopt;
     }
-    if (std::optional<std::string> value = textParser().metadataValue(line, "ancient_fallback_delta_t_seconds");
+    if (std::optional<std::string> value =
+            TextParsingUtilities::metadataValue(line, "ancient_fallback_delta_t_seconds");
         value.has_value()) {
         double seconds = 0.0;
-        if (!textParser().parseFiniteDouble(*value, seconds)) {
+        if (!TextParsingUtilities::parseFiniteDouble(*value, seconds)) {
             return "Delta T data contains malformed ancient fallback estimate metadata at line "
                    + std::to_string(lineNumber) + ".";
         }
@@ -111,10 +107,11 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
         info.ancientFallbackModel = std::move(fallback);
         return std::nullopt;
     }
-    if (std::optional<std::string> value = textParser().metadataValue(line, "ancient_fallback_uncertainty_seconds");
+    if (std::optional<std::string> value =
+            TextParsingUtilities::metadataValue(line, "ancient_fallback_uncertainty_seconds");
         value.has_value()) {
         double seconds = 0.0;
-        if (!textParser().parseFiniteDouble(*value, seconds) || seconds < 0.0) {
+        if (!TextParsingUtilities::parseFiniteDouble(*value, seconds) || seconds < 0.0) {
             return "Delta T data contains malformed ancient fallback uncertainty metadata at line "
                    + std::to_string(lineNumber) + ".";
         }
@@ -131,7 +128,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
 
 [[nodiscard]] bool parseUsnoEntryLine(std::string_view line, IDeltaTProvider::TableEntry& entry) noexcept
 {
-    const std::vector<std::string_view> columns = textParser().splitAsciiWhitespace(line);
+    const std::vector<std::string_view> columns = TextParsingUtilities::splitAsciiWhitespace(line);
     if (columns.size() < 2U) {
         return false;
     }
@@ -141,16 +138,17 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     int year = 0;
     int month = 0;
     int day = 1;
-    if (columns.size() >= 4U && textParser().parseInt(columns[0], year) && textParser().parseInt(columns[1], month)
-        && textParser().parseInt(columns[2], day) && month >= 1 && month <= 12
-        && textParser().parseFiniteDouble(columns[3], deltaTSeconds)) {
+    if (columns.size() >= 4U && TextParsingUtilities::parseInt(columns[0], year)
+        && TextParsingUtilities::parseInt(columns[1], month) && TextParsingUtilities::parseInt(columns[2], day)
+        && month >= 1 && month <= 12 && TextParsingUtilities::parseFiniteDouble(columns[3], deltaTSeconds)) {
         effectiveDate.astronomicalYear = year;
         effectiveDate.month = month;
         effectiveDate.day = day;
         effectiveDate.timeScale = skygate::core::TimeScale::Utc;
     } else if (
-        columns.size() >= 3U && textParser().parseInt(columns[0], year) && textParser().parseInt(columns[1], month)
-        && month >= 1 && month <= 12 && textParser().parseFiniteDouble(columns[2], deltaTSeconds)
+        columns.size() >= 3U && TextParsingUtilities::parseInt(columns[0], year)
+        && TextParsingUtilities::parseInt(columns[1], month) && month >= 1 && month <= 12
+        && TextParsingUtilities::parseFiniteDouble(columns[2], deltaTSeconds)
     ) {
         effectiveDate.astronomicalYear = year;
         effectiveDate.month = month;
@@ -158,8 +156,8 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
         effectiveDate.timeScale = skygate::core::TimeScale::Utc;
     } else {
         double decimalYear = 0.0;
-        if (!textParser().parseFiniteDouble(columns[0], decimalYear)
-            || !textParser().parseFiniteDouble(columns[1], deltaTSeconds)) {
+        if (!TextParsingUtilities::parseFiniteDouble(columns[0], decimalYear)
+            || !TextParsingUtilities::parseFiniteDouble(columns[1], deltaTSeconds)) {
             return false;
         }
         effectiveDate = skygate::core::CalendarTime::civilDateFromDecimalYear(decimalYear);
@@ -182,7 +180,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
 
 [[nodiscard]] bool parseEntryLine(std::string_view line, IDeltaTProvider::TableEntry& entry) noexcept
 {
-    const std::vector<std::string_view> columns = textParser().splitCommaSeparated(line);
+    const std::vector<std::string_view> columns = TextParsingUtilities::splitCommaSeparated(line);
     if (columns.size() < 2U) {
         return parseUsnoEntryLine(line, entry);
     }
@@ -190,9 +188,9 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
         return false;
     }
 
-    const std::optional<skygate::core::CivilDateTime> effectiveDate = textParser().parseUtcDate(columns[0]);
+    const std::optional<skygate::core::CivilDateTime> effectiveDate = TextParsingUtilities::parseUtcDate(columns[0]);
     double deltaTSeconds = 0.0;
-    if (!effectiveDate.has_value() || !textParser().parseFiniteDouble(columns[1], deltaTSeconds)) {
+    if (!effectiveDate.has_value() || !TextParsingUtilities::parseFiniteDouble(columns[1], deltaTSeconds)) {
         return false;
     }
 
@@ -233,9 +231,9 @@ DeltaTDataParser::Result DeltaTDataParser::parse(const EphemerisTextDataAsset& a
     std::size_t lineNumber = 0U;
     while (!remaining.empty()) {
         ++lineNumber;
-        std::string_view line = textParser().takeLine(remaining);
+        std::string_view line = TextParsingUtilities::takeLine(remaining);
 
-        line = textParser().trimAsciiWhitespace(line);
+        line = TextParsingUtilities::trimAsciiWhitespace(line);
         if (line.empty()) {
             continue;
         }

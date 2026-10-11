@@ -120,8 +120,6 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ErfaFrameTransformer.cpp
     src/engine/highprecision/ErfaAstrometry.hpp
     src/engine/highprecision/ErfaAstrometry.cpp
-    src/text/HighPrecisionTextParser.hpp
-    src/text/HighPrecisionTextParser.cpp
     src/engine/IDeltaTProvider.hpp
     src/engine/ILeapSecondProvider.hpp
     src/engine/LeapSecondTableLoader.hpp
@@ -296,6 +294,7 @@ add_library(skygate-ephemeris STATIC
     src/OwnGalaxyCelestialBody.hpp
     src/StringUtilities.hpp
     src/NumericParsingUtilities.hpp
+    src/TextParsingUtilities.hpp
     src/PlanetIdentity.hpp
     src/catalog/CatalogStarAstrometry.hpp
     src/catalog/CatalogCoordinateModel.hpp
@@ -330,6 +329,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/zip/ZipEntryMetadata.hpp
     src/StringUtilities.cpp
     src/NumericParsingUtilities.cpp
+    src/TextParsingUtilities.cpp
     src/PlanetIdentity.cpp
     src/BaseCelestialBody.cpp
     src/CelestialBodyCatalog.cpp

@@ -1,14 +1,6 @@
 #include "EphemerisTableMetadata.hpp"
 
-#include "text/HighPrecisionTextParser.hpp"
-
 namespace skygate::ephemeris {
-
-const HighPrecisionTextParser& EphemerisTableMetadata::textParser() noexcept
-{
-    static const HighPrecisionTextParser parser;
-    return parser;
-}
 
 bool EphemerisTableMetadata::isHeaderLine(const std::string_view line) noexcept
 {
