@@ -50,6 +50,7 @@ function(add_skygate_core_qtest target_name source_file)
 endfunction()
 
 add_skygate_core_qtest(skygate-core-geolocation-tests types/GeoLocationTests.cpp)
+add_skygate_core_qtest(skygate-core-equatorial-coordinate-tests types/EquatorialCoordinateTests.cpp)
 add_skygate_core_qtest(skygate-core-core-types-tests types/CoreTypesTests.cpp)
 add_skygate_core_qtest(skygate-core-angle-math-tests math/AngleMathTests.cpp)
 add_skygate_core_qtest(skygate-core-math-constants-tests math/MathConstantsTests.cpp)

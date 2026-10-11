@@ -22,20 +22,6 @@
 namespace skygate::ephemeris {
 namespace {
 
-constexpr double kRightAscensionMinimumHours = 0.0;
-constexpr double kRightAscensionMaximumHours = 24.0;
-constexpr double kDeclinationMinimumDeg = -90.0;
-constexpr double kDeclinationMaximumDeg = 90.0;
-
-[[nodiscard]] bool isValidEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
-{
-    return std::isfinite(coordinate.rightAscensionHours) && std::isfinite(coordinate.declinationDeg)
-           && coordinate.rightAscensionHours >= kRightAscensionMinimumHours
-           && coordinate.rightAscensionHours < kRightAscensionMaximumHours
-           && coordinate.declinationDeg >= kDeclinationMinimumDeg
-           && coordinate.declinationDeg <= kDeclinationMaximumDeg;
-}
-
 [[nodiscard]] bool isValidEpoch(const skygate::core::AstronomicalEpoch& epoch) noexcept
 {
     return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2)
@@ -128,13 +114,13 @@ void normalizeDistantBody(DistantCelestialBody& body)
     }
 
     if (const skygate::core::EquatorialCoordinate* fixed = body.fixedEquatorialCoordinate();
-        fixed != nullptr && !isValidEquatorial(*fixed)) {
+        fixed != nullptr && !fixed->isValid()) {
         errorDetail = "catalog body '" + body.id + "' has an invalid fixed equatorial coordinate.";
         return false;
     }
 
     if (const CatalogStarAstrometry* astrometry = body.catalogStarAstrometry(); astrometry != nullptr) {
-        if (!isValidEquatorial(astrometry->referenceEquatorial)) {
+        if (!astrometry->referenceEquatorial.isValid()) {
             errorDetail = "catalog body '" + body.id + "' has an invalid astrometry reference coordinate.";
             return false;
         }

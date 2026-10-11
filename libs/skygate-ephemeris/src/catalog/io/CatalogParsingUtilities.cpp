@@ -1,4 +1,5 @@
 #include "CatalogParsingUtilities.hpp"
+#include "EquatorialCoordinate.hpp"
 
 #include <QByteArray>
 #include <QStringList>
@@ -73,7 +74,8 @@ std::optional<double> CatalogParsingUtilities::parseRightAscensionHours(QString 
     const QStringList parts = text.split(':');
     if (parts.size() != 3) {
         const auto value = parseFiniteDouble(text);
-        if (!value.has_value() || *value < 0.0 || *value >= 24.0) {
+        if (!value.has_value() || *value < skygate::core::EquatorialCoordinate::kRightAscensionMinHours
+            || *value >= skygate::core::EquatorialCoordinate::kRightAscensionMaxHours) {
             return std::nullopt;
         }
         return value;
@@ -87,7 +89,8 @@ std::optional<double> CatalogParsingUtilities::parseRightAscensionHours(QString 
     }
 
     const double value = *hours + (*minutes / 60.0) + (*seconds / 3600.0);
-    if (value < 0.0 || value >= 24.0) {
+    if (value < skygate::core::EquatorialCoordinate::kRightAscensionMinHours
+        || value >= skygate::core::EquatorialCoordinate::kRightAscensionMaxHours) {
         return std::nullopt;
     }
     return value;
@@ -103,7 +106,8 @@ std::optional<double> CatalogParsingUtilities::parseDeclinationDeg(QString text)
     const QStringList parts = text.split(':');
     if (parts.size() != 3) {
         const auto value = parseFiniteDouble(text);
-        if (!value.has_value() || *value < -90.0 || *value > 90.0) {
+        if (!value.has_value() || *value < skygate::core::EquatorialCoordinate::kDeclinationMinDeg
+            || *value > skygate::core::EquatorialCoordinate::kDeclinationMaxDeg) {
             return std::nullopt;
         }
         return value;
@@ -121,7 +125,8 @@ std::optional<double> CatalogParsingUtilities::parseDeclinationDeg(QString text)
     }
 
     const double value = sign * (*degrees + (*arcminutes / 60.0) + (*arcseconds / 3600.0));
-    if (value < -90.0 || value > 90.0) {
+    if (value < skygate::core::EquatorialCoordinate::kDeclinationMinDeg
+        || value > skygate::core::EquatorialCoordinate::kDeclinationMaxDeg) {
         return std::nullopt;
     }
     return value;
