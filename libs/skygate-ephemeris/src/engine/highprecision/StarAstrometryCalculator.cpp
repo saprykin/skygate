@@ -27,12 +27,6 @@ using skygate::core::TimeConstants;
 constexpr int kNaifEarth = 399;
 constexpr int kNaifSolarSystemBarycenter = 0;
 
-[[nodiscard]] bool isFiniteEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
-{
-    return std::isfinite(coordinate.rightAscensionHours) && std::isfinite(coordinate.declinationDeg)
-           && coordinate.declinationDeg >= -90.0 && coordinate.declinationDeg <= 90.0;
-}
-
 [[nodiscard]] double
 yearsBetween(const skygate::core::AstronomicalEpoch& start, const skygate::core::AstronomicalEpoch& end) noexcept
 {
@@ -268,7 +262,7 @@ void recordAppliedCorrections(
     } else if (fixedEquatorial.has_value()) {
         referenceEquatorial = &*fixedEquatorial;
     }
-    if (referenceEquatorial == nullptr || !isFiniteEquatorial(*referenceEquatorial)) {
+    if (referenceEquatorial == nullptr || !referenceEquatorial->isValid()) {
         return makeFailedResult();
     }
 
