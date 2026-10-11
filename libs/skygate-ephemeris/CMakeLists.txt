@@ -278,6 +278,7 @@ add_library(skygate-ephemeris STATIC
     src/MoonPhaseCalculator.hpp
     src/NightConditions.hpp
     src/NightConditionsCalculator.hpp
+    src/SolarAltitudeThresholds.hpp
     src/catalog/ICatalogParser.hpp
     src/catalog/IStarCatalog.hpp
     src/ObservationEvent.hpp
@@ -436,6 +437,7 @@ add_library(skygate-ephemeris STATIC
     src/MoonPhaseCalculator.cpp
     src/NightConditions.cpp
     src/NightConditionsCalculator.cpp
+    src/SolarAltitudeThresholds.cpp
     src/ObservationEvent.cpp
     src/ObservationEventCalculator.cpp
     src/ObservationEventStatus.cpp

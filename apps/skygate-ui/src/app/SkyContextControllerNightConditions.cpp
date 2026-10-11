@@ -3,6 +3,7 @@
 #include "SkyContextControllerSupport.hpp"
 #include "SkyNightConditionsAdapter.hpp"
 #include "SkyTimeController.hpp"
+#include "SolarAltitudeThresholds.hpp"
 
 #include <QDateTime>
 
@@ -131,7 +132,8 @@ QString SkyContextController::nightConditionsIconKind() const
     if (sunState->horizontal.altitudeDeg > 0.0) {
         return QStringLiteral("sun");
     }
-    if (sunState->horizontal.altitudeDeg > -18.0) {
+    if (sunState->horizontal.altitudeDeg
+        > skygate::ephemeris::SolarAltitudeThresholds::kAstronomicalTwilightAltitudeDeg) {
         return QStringLiteral("twilight");
     }
     return QStringLiteral("moon");
