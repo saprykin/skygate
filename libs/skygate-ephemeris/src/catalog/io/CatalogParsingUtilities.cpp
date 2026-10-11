@@ -51,7 +51,12 @@ std::string CatalogParsingUtilities::toUtf8String(const QString& text)
 
 std::optional<double> CatalogParsingUtilities::parseFiniteDouble(const QStringView text)
 {
-    return NumericParsingUtilities::parseFiniteDouble(toUtf8String(text.toString()));
+    QString trimmed = text.trimmed().toString();
+    if (trimmed.startsWith(QLatin1Char('+'))) {
+        trimmed.removeFirst();
+    }
+
+    return NumericParsingUtilities::parseFiniteDouble(toUtf8String(trimmed));
 }
 
 std::optional<double> CatalogParsingUtilities::parseFiniteDouble(const QString& text)

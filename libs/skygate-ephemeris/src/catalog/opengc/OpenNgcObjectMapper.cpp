@@ -150,11 +150,11 @@ bool OpenNgcObjectMapper::shouldSkipType(const QString& typeText)
 
 QString OpenNgcObjectMapper::withoutLeadingZeros(const QString& value)
 {
-    QString result = value;
-    while (result.size() > 1 && result.startsWith('0')) {
-        result.remove(0, 1);
+    QString trimmed = value.trimmed();
+    while (trimmed.size() > 1 && trimmed.startsWith('0')) {
+        trimmed.remove(0, 1);
     }
-    return result;
+    return trimmed;
 }
 
 OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
