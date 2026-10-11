@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BitFlagSetOperations.hpp"
 #include "EphemerisCorrectionFlags.hpp"
 #include "EphemerisDataSourceProvenance.hpp"
 #include "EphemerisEngineQueryStatus.hpp"
@@ -37,7 +38,7 @@ struct EphemerisEngineQueryResult {
 
     void addWarning(const EphemerisEngineWarning::Code code) noexcept
     {
-        warningCodeMask |= EphemerisEngineWarning::mask(code);
+        warningCodeMask |= BitFlagSetOperations::bit(code);
     }
 
     void addWarning(const EphemerisEngineWarning::Code code, std::string text)
@@ -67,7 +68,7 @@ struct EphemerisEngineQueryResult {
 
     [[nodiscard]] bool hasWarning(const EphemerisEngineWarning::Code code) const noexcept
     {
-        return (warningCodeMask & EphemerisEngineWarning::mask(code)) != 0U;
+        return (warningCodeMask & BitFlagSetOperations::bit(code)) != 0U;
     }
 
     [[nodiscard]] std::size_t warningCount() const noexcept

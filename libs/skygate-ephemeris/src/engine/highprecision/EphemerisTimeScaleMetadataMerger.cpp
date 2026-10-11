@@ -1,4 +1,5 @@
 #include "EphemerisTimeScaleMetadataMerger.hpp"
+#include "BitFlagSetOperations.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
 #include "engine/TimeScaleConversionResult.hpp"
@@ -12,7 +13,7 @@ void EphemerisTimeScaleMetadataMerger::mergeKernelEpochTimeScaleMetadata(
 ) noexcept
 {
     constexpr std::uint32_t kTdbApproximationWarning =
-        TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::TdbApproximationApplied);
+        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::TdbApproximationApplied);
     if (conversion.status == TimeScaleConversionStatus::Degraded
         && (conversion.warningCodeMask & ~kTdbApproximationWarning) == 0U) {
         return;

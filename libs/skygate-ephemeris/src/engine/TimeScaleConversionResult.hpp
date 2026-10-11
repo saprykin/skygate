@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BitFlagSetOperations.hpp"
 #include "TimeScaleConversionDiagnostics.hpp"
 #include "time/AstronomicalEpoch.hpp"
 
@@ -36,12 +37,12 @@ struct TimeScaleConversionResult {
 
     void addWarning(const TimeScaleConversionWarningCode code) noexcept
     {
-        warningCodeMask |= TimeScaleConversionDiagnostics::warningMask(code);
+        warningCodeMask |= BitFlagSetOperations::bit(code);
     }
 
     [[nodiscard]] bool hasWarning(const TimeScaleConversionWarningCode code) const noexcept
     {
-        return (warningCodeMask & TimeScaleConversionDiagnostics::warningMask(code)) != 0U;
+        return (warningCodeMask & BitFlagSetOperations::bit(code)) != 0U;
     }
 };
 

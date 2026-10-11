@@ -3,7 +3,6 @@
 #include "TimeScaleConversionStatus.hpp"
 #include "TimeScaleConversionWarningCode.hpp"
 
-#include <cstdint>
 #include <string_view>
 
 namespace skygate::ephemeris {
@@ -58,11 +57,6 @@ public:
         }
 
         return "Time-scale conversion warning.";
-    }
-
-    [[nodiscard]] static constexpr std::uint32_t warningMask(const TimeScaleConversionWarningCode code) noexcept
-    {
-        return 1U << static_cast<std::uint8_t>(code);
     }
 };
 

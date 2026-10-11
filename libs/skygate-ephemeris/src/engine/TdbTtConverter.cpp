@@ -1,5 +1,6 @@
 #include "TdbTtConverter.hpp"
-#include "TimeScaleConversionDiagnostics.hpp"
+#include "BitFlagSetOperations.hpp"
+#include "TimeScaleConversionWarningCode.hpp"
 #include "math/AngleMath.hpp"
 #include "math/PhysicalConstants.hpp"
 #include "time/EpochCodec.hpp"
@@ -79,7 +80,7 @@ TimeScaleConversionResult TdbTtConverter::ttToTdb(const skygate::core::Astronomi
     TimeScaleConversionResult result = TimeScaleConversionResult::success(
         terrestrialTime.addSeconds(*tdbMinusTt, skygate::core::TimeScale::Tdb),
         TimeScaleConversionStatus::Degraded,
-        TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::TdbApproximationApplied),
+        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::TdbApproximationApplied),
         "TT to TDB conversion used the configured high-precision approximation."
     );
     addTdbApproximationWarning(result);
@@ -105,7 +106,7 @@ TimeScaleConversionResult TdbTtConverter::tdbToTt(const skygate::core::Astronomi
     TimeScaleConversionResult result = TimeScaleConversionResult::success(
         tt,
         TimeScaleConversionStatus::Degraded,
-        TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::TdbApproximationApplied),
+        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::TdbApproximationApplied),
         "TDB to TT conversion used the configured high-precision approximation."
     );
     addTdbApproximationWarning(result);

@@ -128,11 +128,6 @@ public:
         return "Ephemeris warning.";
     }
 
-    [[nodiscard]] static constexpr std::uint32_t mask(const Code code) noexcept
-    {
-        return 1U << static_cast<std::uint8_t>(code);
-    }
-
 private:
     Code m_code = Code::AccuracyDegraded;
 };
