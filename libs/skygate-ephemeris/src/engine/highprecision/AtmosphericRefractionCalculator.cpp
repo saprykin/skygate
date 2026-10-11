@@ -21,14 +21,6 @@ constexpr double kMaximumRelativeHumidity = 1.0;
 constexpr double kMinimumWavelengthMicrometers = 0.1;
 constexpr double kMaximumWavelengthMicrometers = 100.0;
 
-[[nodiscard]] bool isRequested(const EphemerisRequest& request) noexcept
-{
-    return request.options.enableAtmosphericRefraction()
-           && skygate::ephemeris::EphemerisCorrectionFlags::has(
-               request.options.correctionFlags(), EphemerisCorrectionFlags::atmosphericRefraction()
-           );
-}
-
 [[nodiscard]] bool hasValidAtmosphere(const EphemerisEngineOptions& options) noexcept
 {
     return std::isfinite(options.atmosphericPressureHpa()) && options.atmosphericPressureHpa() > kMinimumPressureHpa
@@ -80,7 +72,7 @@ HighPrecisionCalculatorResult AtmosphericRefractionCalculator::apply(
 ) const
 {
     HighPrecisionCalculatorResult result = calculatorResult;
-    if (!isRequested(input.request)) {
+    if (!input.request.options.requestsAtmosphericRefraction()) {
         return result;
     }
 

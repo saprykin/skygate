@@ -141,7 +141,7 @@ public:
         }
 
         const std::filesystem::path activePath(snapshotAsset->activePath);
-        const QFileInfo activeFileInfo(QString::fromStdString(activePath.generic_string()));
+        const QFileInfo activeFileInfo(EphemerisDataFileUtilities::pathToQString(activePath));
         if (!activeFileInfo.exists() || !activeFileInfo.isFile()) {
             return failedKernel(Status::MissingKernelFile, "The selected solar-system kernel file does not exist.");
         }
@@ -226,7 +226,7 @@ public:
 
     [[nodiscard]] bool verifySha256File(const std::filesystem::path& path, const std::string& expectedHexDigest) const
     {
-        QFile file(QString::fromStdString(path.generic_string()));
+        QFile file(EphemerisDataFileUtilities::pathToQString(path));
         if (!file.open(QIODevice::ReadOnly)) {
             return false;
         }
