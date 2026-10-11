@@ -135,6 +135,15 @@ private:
         std::optional<skygate::core::Matrix3x3> matrix;
         EphemerisEngineQueryResult metadata;
 
+        void recordMatrix(std::optional<skygate::core::Matrix3x3> value) noexcept
+        {
+            matrix = std::move(value);
+            if (!matrix.has_value()) {
+                metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+                metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+            }
+        }
+
         void mergeMetadataInto(EphemerisEngineQueryResult& target) const noexcept
         {
             EphemerisMetadataMerger::merge(target, metadata, FrameTransformSession::cachedMetadataMergeOptions());
@@ -252,11 +261,7 @@ private:
             const std::optional<skygate::core::AstronomicalEpoch> ttEpoch =
                 epochInScale(skygate::core::TimeScale::Tt, cacheEntry.metadata);
             if (ttEpoch.has_value()) {
-                cacheEntry.matrix = ErfaAstrometry::celestialToIntermediateMatrix06A(*ttEpoch);
-                if (!cacheEntry.matrix.has_value()) {
-                    cacheEntry.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-                    cacheEntry.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
-                }
+                cacheEntry.recordMatrix(ErfaAstrometry::celestialToIntermediateMatrix06A(*ttEpoch));
             }
             m_celestialIntermediateMatrix = cacheEntry;
         }
@@ -272,11 +277,7 @@ private:
             MatrixCacheEntry cacheEntry;
             const std::optional<skygate::core::AstronomicalEpoch> universalTime1 = ut1Epoch(cacheEntry.metadata);
             if (universalTime1.has_value()) {
-                cacheEntry.matrix = ErfaAstrometry::earthRotationMatrix00(*universalTime1);
-                if (!cacheEntry.matrix.has_value()) {
-                    cacheEntry.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-                    cacheEntry.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
-                }
+                cacheEntry.recordMatrix(ErfaAstrometry::earthRotationMatrix00(*universalTime1));
             }
             m_earthRotationMatrix = cacheEntry;
         }
@@ -297,18 +298,15 @@ private:
             if (ttEpoch.has_value() && earthOrientationSample.has_value()) {
                 const std::optional<double> tioLocator = ErfaAstrometry::tioLocatorS00(*ttEpoch);
                 if (tioLocator.has_value()) {
-                    cacheEntry.matrix = ErfaAstrometry::polarMotionMatrix00(
-                        earthOrientationSample->polarMotionXArcseconds * MathConstants::kArcsecondsToRadians,
-                        earthOrientationSample->polarMotionYArcseconds * MathConstants::kArcsecondsToRadians,
-                        *tioLocator
+                    cacheEntry.recordMatrix(
+                        ErfaAstrometry::polarMotionMatrix00(
+                            earthOrientationSample->polarMotionXArcseconds * MathConstants::kArcsecondsToRadians,
+                            earthOrientationSample->polarMotionYArcseconds * MathConstants::kArcsecondsToRadians,
+                            *tioLocator
+                        )
                     );
-                    if (!cacheEntry.matrix.has_value()) {
-                        cacheEntry.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-                        cacheEntry.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
-                    }
                 } else {
-                    cacheEntry.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-                    cacheEntry.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+                    cacheEntry.recordMatrix(std::nullopt);
                 }
             }
             m_polarMotionMatrix = cacheEntry;
@@ -326,11 +324,7 @@ private:
             const std::optional<skygate::core::AstronomicalEpoch> ttEpoch =
                 epochInScale(skygate::core::TimeScale::Tt, cacheEntry.metadata);
             if (ttEpoch.has_value()) {
-                cacheEntry.matrix = ErfaAstrometry::precessionNutationMatrix06A(*ttEpoch);
-                if (!cacheEntry.matrix.has_value()) {
-                    cacheEntry.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-                    cacheEntry.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
-                }
+                cacheEntry.recordMatrix(ErfaAstrometry::precessionNutationMatrix06A(*ttEpoch));
             }
             m_apparentEquatorAndEquinoxMatrix = cacheEntry;
         }

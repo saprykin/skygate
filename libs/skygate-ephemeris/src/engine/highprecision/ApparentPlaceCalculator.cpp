@@ -228,14 +228,6 @@ private:
         return targetFrameForRequest(requestModeForCorrections(requestedCorrections()));
     }
 
-    [[nodiscard]] bool requestsAtmosphericRefraction() const noexcept
-    {
-        return m_context.request.options.enableAtmosphericRefraction()
-               && skygate::ephemeris::EphemerisCorrectionFlags::has(
-                   requestedCorrections(), EphemerisCorrectionFlags::atmosphericRefraction()
-               );
-    }
-
     [[nodiscard]] TopocentricRequestState prepareTopocentricRequestState() const
     {
         TopocentricRequestState state;
@@ -518,7 +510,7 @@ private:
 
     void applyAtmosphericRefraction(ApparentPlaceWorkItem& item, const bool canApplyRefraction) const
     {
-        if (!requestsAtmosphericRefraction() || !canApplyRefraction) {
+        if (!m_context.request.options.requestsAtmosphericRefraction() || !canApplyRefraction) {
             return;
         }
 

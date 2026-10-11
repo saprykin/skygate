@@ -17,6 +17,11 @@ struct CatalogStarAstrometry {
     std::optional<double> stellarParallaxMas;
     std::optional<double> radialVelocityKmPerSecond;
     std::optional<EphemerisDateRange> validityRange;
+
+    [[nodiscard]] bool hasUsableProperMotionRightAscension() const noexcept;
+    [[nodiscard]] bool hasUsableProperMotionDeclination() const noexcept;
+    [[nodiscard]] bool hasUsableParallax() const noexcept;
+    [[nodiscard]] bool hasUsableRadialVelocity() const noexcept;
 };
 
 }  // namespace skygate::ephemeris

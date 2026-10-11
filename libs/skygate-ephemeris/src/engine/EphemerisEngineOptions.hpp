@@ -68,6 +68,12 @@ public:
         return m_enableAtmosphericRefraction;
     }
 
+    [[nodiscard]] bool requestsAtmosphericRefraction() const noexcept
+    {
+        return m_enableAtmosphericRefraction
+               && EphemerisCorrectionFlags::has(m_correctionFlags, EphemerisCorrectionFlags::atmosphericRefraction());
+    }
+
     void setAtmosphericPressureHpa(double atmosphericPressureHpa)
     {
         if (!std::isfinite(atmosphericPressureHpa)) {
