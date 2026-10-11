@@ -17,14 +17,6 @@
 
 namespace {
 
-[[nodiscard]] bool epochInRange(
-    const skygate::core::AstronomicalEpoch& epoch, const skygate::ephemeris::EphemerisDateRange& range
-) noexcept
-{
-    const double key = epoch.sortKey();
-    return key >= range.start.sortKey() && key <= range.end.sortKey();
-}
-
 [[nodiscard]] QString formatEpochDate(const skygate::core::AstronomicalEpoch& epoch)
 {
     const auto dateTime = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
@@ -65,7 +57,7 @@ void appendRangeWarning(
     const QString& label
 )
 {
-    if (!range.has_value() || epochInRange(epoch, *range)) {
+    if (!range.has_value() || range->contains(epoch)) {
         return;
     }
 
@@ -79,7 +71,7 @@ void appendRangeWarning(
     QStringList reasons;
     if (engine != nullptr) {
         for (const skygate::ephemeris::EphemerisDateRange& range : engine->supportedDateRanges()) {
-            if (isKernelRange(range) && !epochInRange(context.request.epoch, range)) {
+            if (isKernelRange(range) && !range.contains(context.request.epoch)) {
                 appendUniqueReason(
                     reasons,
                     QStringLiteral("Planetary kernel out of range. Supported range: %1.").arg(rangeLabel(range))

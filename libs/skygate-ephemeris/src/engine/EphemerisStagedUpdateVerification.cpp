@@ -7,7 +7,6 @@
 #include <QIODevice>
 
 #include <algorithm>
-#include <cmath>
 #include <optional>
 #include <string_view>
 #include <unordered_set>
@@ -54,21 +53,10 @@ stagedSourcePath(const std::filesystem::path& stagedResourceRoot, const Ephemeri
     return EphemerisDataFileUtilities::pathToQString(stagedResourceRoot / std::filesystem::path(asset.relativePath));
 }
 
-[[nodiscard]] bool isValidDateRange(const EphemerisDateRange& range) noexcept
-{
-    const double rangeStart = range.start.sortKey();
-    const double rangeEnd = range.end.sortKey();
-    return std::isfinite(rangeStart) && std::isfinite(rangeEnd) && rangeStart <= rangeEnd;
-}
-
 [[nodiscard]] bool
 validityRangeCovers(const EphemerisDateRange& availableRange, const EphemerisDateRange& requiredRange) noexcept
 {
-    const double availableStart = availableRange.start.sortKey();
-    const double availableEnd = availableRange.end.sortKey();
-    const double requiredStart = requiredRange.start.sortKey();
-    const double requiredEnd = requiredRange.end.sortKey();
-    return availableStart <= requiredStart && requiredEnd <= availableEnd;
+    return availableRange.contains(requiredRange.start) && availableRange.contains(requiredRange.end);
 }
 
 [[nodiscard]] bool hasKind(
@@ -107,7 +95,7 @@ validateAssetMetadata(const EphemerisDataManifest::Asset& asset, EphemerisStaged
         addDiagnostic(result, "zstd staged ephemeris assets require positive compressed and uncompressed sizes.");
         valid = false;
     }
-    if (!isValidDateRange(asset.validityRange)) {
+    if (!asset.validityRange.isValid()) {
         addDiagnostic(result, "Staged ephemeris asset metadata requires an ordered finite validity range.");
         valid = false;
     }
@@ -277,7 +265,7 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
             addDiagnostic(result, "Selected ephemeris update component version does not match the expected version.");
             return result;
         }
-        if (component.requiredValidityRange.has_value() && !isValidDateRange(*component.requiredValidityRange)) {
+        if (component.requiredValidityRange.has_value() && !component.requiredValidityRange->isValid()) {
             result.status = EphemerisStagedUpdateVerificationStatus::InvalidRequest;
             addDiagnostic(result, "Required staged ephemeris component validity ranges must be ordered and finite.");
             return result;

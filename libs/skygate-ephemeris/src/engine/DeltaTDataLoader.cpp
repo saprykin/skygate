@@ -1,5 +1,6 @@
 #include "DeltaTDataLoader.hpp"
 #include "DeltaTDataParser.hpp"
+#include "EphemerisDataStaleness.hpp"
 #include "TableBackedDeltaTProvider.hpp"
 
 #include <utility>
@@ -31,8 +32,7 @@ DeltaTDataLoader::loadFromTextAsset(const EphemerisTextDataAsset& asset, const O
     }
 
     auto& info = parsed.dataInfo;
-    if (options.referenceEpoch.has_value() && info.expiresAt.has_value() && options.referenceEpoch->isFinite()
-        && options.referenceEpoch->sortKey() > info.expiresAt->sortKey()) {
+    if (EphemerisDataStaleness::isStale(options.referenceEpoch, info.expiresAt)) {
         info.status = IDeltaTProvider::DataStatus::Stale;
         info.diagnosticText = "Delta T data is stale for the reference epoch.";
     }

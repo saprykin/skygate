@@ -420,11 +420,6 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     return result;
 }
 
-[[nodiscard]] bool isValidPredictionRange(const EphemerisDateRange& range) noexcept
-{
-    return range.start.isFiniteUtc() && range.end.isFiniteUtc() && range.start.sortKey() <= range.end.sortKey();
-}
-
 }  // namespace
 
 EarthOrientationDataParser::Result EarthOrientationDataParser::parse(const EphemerisTextDataAsset& asset)
@@ -498,7 +493,7 @@ EarthOrientationDataParser::Result EarthOrientationDataParser::parse(const Ephem
 
     if (info.predictionRange.has_value()) {
         EphemerisDateRange predictionRange = *info.predictionRange;
-        if (!hasPredictionStart || !hasPredictionEnd || !isValidPredictionRange(predictionRange)) {
+        if (!hasPredictionStart || !hasPredictionEnd || !predictionRange.isValid()) {
             return failureResult(
                 std::move(info),
                 IEarthOrientationProvider::DataStatus::Malformed,

@@ -8,17 +8,6 @@ namespace skygate::ephemeris {
 
 namespace {
 
-[[nodiscard]] bool
-epochWithinRange(const skygate::core::AstronomicalEpoch& epoch, const EphemerisDateRange& range) noexcept
-{
-    if (!epoch.isFinite()) {
-        return false;
-    }
-
-    const double key = epoch.sortKey();
-    return key >= range.start.sortKey() && key <= range.end.sortKey();
-}
-
 [[nodiscard]] IDeltaTProvider::Estimate unavailableEstimate(std::string diagnosticText)
 {
     IDeltaTProvider::Estimate estimate;
@@ -94,8 +83,7 @@ IDeltaTProvider::Estimate TableBackedDeltaTProvider::deltaTSeconds(const skygate
         };
     }
 
-    if (m_dataInfo.ancientFallbackModel.has_value()
-        && epochWithinRange(epoch, m_dataInfo.ancientFallbackModel->validityRange)) {
+    if (m_dataInfo.ancientFallbackModel.has_value() && m_dataInfo.ancientFallbackModel->validityRange.contains(epoch)) {
         const DataInfo::FallbackModelInfo& fallback = *m_dataInfo.ancientFallbackModel;
         return Estimate{
             .status = EstimateStatus::Degraded,

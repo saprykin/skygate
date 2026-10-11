@@ -1,5 +1,6 @@
 #include "EarthOrientationDataLoader.hpp"
 #include "EarthOrientationDataParser.hpp"
+#include "EphemerisDataStaleness.hpp"
 #include "IEphemerisDataSnapshot.hpp"
 #include "TableBackedEarthOrientationProvider.hpp"
 
@@ -30,8 +31,7 @@ EarthOrientationDataLoader::loadFromTextAsset(const EphemerisTextDataAsset& asse
         return result;
     }
     auto& info = parsed.dataInfo;
-    if (options.referenceEpoch.has_value() && info.expiresAt.has_value() && options.referenceEpoch->isFiniteUtc()
-        && options.referenceEpoch->sortKey() > info.expiresAt->sortKey()) {
+    if (EphemerisDataStaleness::isStale(options.referenceEpoch, info.expiresAt)) {
         info.status = IEarthOrientationProvider::DataStatus::Stale;
         info.diagnosticText = "Earth-orientation data is stale for the reference epoch.";
     }

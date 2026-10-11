@@ -216,13 +216,14 @@ private:
             diagnostics.push_back(std::string(context) + " contains malformed UTC date fields.");
             return false;
         }
-        if (!start->isFinite() || !end->isFinite() || start->sortKey() > end->sortKey()) {
+
+        range.start = *start;
+        range.end = *end;
+        if (!range.isValid()) {
             diagnostics.push_back(std::string(context) + " must have an ordered finite UTC validity range.");
             return false;
         }
 
-        range.start = *start;
-        range.end = *end;
         return valid;
     }
 

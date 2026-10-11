@@ -331,9 +331,7 @@ DeltaTDataParser::Result DeltaTDataParser::parse(const EphemerisTextDataAsset& a
 
     if (info.ancientFallbackModel.has_value()) {
         IDeltaTProvider::DataInfo::FallbackModelInfo fallback = std::move(*info.ancientFallbackModel);
-        if (!hasFallbackStart || !hasFallbackEnd || !fallback.validityRange.start.isFinite()
-            || !fallback.validityRange.end.isFinite()
-            || fallback.validityRange.start.sortKey() > fallback.validityRange.end.sortKey()) {
+        if (!hasFallbackStart || !hasFallbackEnd || !fallback.validityRange.isValid()) {
             return failureResult(
                 std::move(info),
                 IDeltaTProvider::DataStatus::Malformed,
