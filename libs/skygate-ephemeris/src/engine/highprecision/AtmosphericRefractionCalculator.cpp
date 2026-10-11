@@ -21,6 +21,20 @@ constexpr double kMaximumRelativeHumidity = 1.0;
 constexpr double kMinimumWavelengthMicrometers = 0.1;
 constexpr double kMaximumWavelengthMicrometers = 100.0;
 
+// Bennett refraction fit for the model altitude band. The correction in
+// arcminutes is R = kRefractionScale / tan(h + 10.3 / (h + 5.11)) with the
+// altitude h in degrees.
+constexpr double kRefractionScale = 1.02;
+constexpr double kRefractionArgumentNumeratorDeg = 10.3;
+constexpr double kRefractionArgumentOffsetDeg = 5.11;
+
+// The fit is scaled with the actual atmosphere relative to 1010 hPa and
+// 283 K (10 degrees Celsius). The denominator keeps the rounded 273 K ice
+// point used by the original formulation.
+constexpr double kReferencePressureHpa = 1010.0;
+constexpr double kReferenceTemperatureKelvin = 283.0;
+constexpr double kCelsiusToKelvinOffset = 273.0;
+
 [[nodiscard]] bool hasValidAtmosphere(const EphemerisEngineOptions& options) noexcept
 {
     return std::isfinite(options.atmosphericPressureHpa()) && options.atmosphericPressureHpa() > kMinimumPressureHpa
@@ -47,20 +61,21 @@ constexpr double kMaximumWavelengthMicrometers = 100.0;
 
 [[nodiscard]] double pressureScale(const EphemerisEngineOptions& options) noexcept
 {
-    return options.atmosphericPressureHpa() / 1010.0;
+    return options.atmosphericPressureHpa() / kReferencePressureHpa;
 }
 
 [[nodiscard]] double temperatureScale(const EphemerisEngineOptions& options) noexcept
 {
-    return 283.0 / (273.0 + options.atmosphericTemperatureC());
+    return kReferenceTemperatureKelvin / (kCelsiusToKelvinOffset + options.atmosphericTemperatureC());
 }
 
 [[nodiscard]] double
 refractionCorrectionDegrees(const double altitudeDeg, const EphemerisEngineOptions& options) noexcept
 {
     const double modelAltitudeDeg = std::clamp(altitudeDeg, kMinimumModelAltitudeDeg, kMaximumModelAltitudeDeg);
-    const double refractionArgumentDeg = modelAltitudeDeg + 10.3 / (modelAltitudeDeg + 5.11);
-    const double refractionArcminutes = pressureScale(options) * temperatureScale(options) * 1.02
+    const double refractionArgumentDeg =
+        modelAltitudeDeg + kRefractionArgumentNumeratorDeg / (modelAltitudeDeg + kRefractionArgumentOffsetDeg);
+    const double refractionArcminutes = pressureScale(options) * temperatureScale(options) * kRefractionScale
                                         / std::tan(skygate::core::AngleMath::toRadians(refractionArgumentDeg));
     return refractionArcminutes / 60.0;
 }
