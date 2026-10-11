@@ -32,6 +32,8 @@ public:
     [[nodiscard]] virtual const CatalogStarAstrometry* catalogStarAstrometry() const noexcept;
     [[nodiscard]] virtual const DeepSkyObjectInfo* deepSkyObjectInfo() const noexcept;
 
+    [[nodiscard]] bool isCatalogStar() const noexcept;
+
     // Canonical domain object identity. Never derived from displayName or sky
     // position; planet IDs such as "mercury" remain their domain identity.
     std::string id;

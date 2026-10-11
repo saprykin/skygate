@@ -44,4 +44,9 @@ const DeepSkyObjectInfo* BaseCelestialBody::deepSkyObjectInfo() const noexcept
     return value.has_value() ? &*value : nullptr;
 }
 
+bool BaseCelestialBody::isCatalogStar() const noexcept
+{
+    return kind == Kind::Star || fixedEquatorialValue().has_value();
+}
+
 }  // namespace skygate::ephemeris
