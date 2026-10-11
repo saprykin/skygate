@@ -1,5 +1,7 @@
 #pragma once
 
+#include "TimeScaleConversionDiagnostics.hpp"
+
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -82,47 +84,71 @@ public:
         case Code::BarycenterFallback:
             return "A planetary-system barycenter was used because the requested body center is unavailable.";
         case Code::LeapSecondTableMissing:
-            return "Leap-second table data is unavailable.";
+            return TimeScaleConversionDiagnostics::warningText(TimeScaleConversionWarningCode::LeapSecondTableMissing);
         case Code::LeapSecondTableStale:
-            return "Leap-second table data is stale for this conversion.";
+            return TimeScaleConversionDiagnostics::warningText(TimeScaleConversionWarningCode::LeapSecondTableStale);
         case Code::EpochOutsideLeapSecondTable:
-            return "The requested epoch is outside the leap-second table validity range.";
+            return TimeScaleConversionDiagnostics::warningText(
+                TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable
+            );
         case Code::LeapSecondFallbackApplied:
-            return "A degraded leap-second fallback offset was applied.";
+            return TimeScaleConversionDiagnostics::warningText(
+                TimeScaleConversionWarningCode::LeapSecondFallbackApplied
+            );
         case Code::UnsupportedTimeScaleConversion:
-            return "The requested time-scale conversion is not supported.";
+            return TimeScaleConversionDiagnostics::warningText(TimeScaleConversionWarningCode::UnsupportedConversion);
         case Code::InvalidExplicitEpoch:
             return "The requested explicit epoch has non-finite Julian date parts.";
         case Code::InvalidTimeScaleInput:
-            return "The requested time-scale conversion input is invalid.";
+            return TimeScaleConversionDiagnostics::warningText(TimeScaleConversionWarningCode::InvalidInput);
         case Code::TdbApproximationApplied:
-            return "The TT/TDB conversion used a documented approximation.";
+            return TimeScaleConversionDiagnostics::warningText(TimeScaleConversionWarningCode::TdbApproximationApplied);
         case Code::EarthOrientationDataMissing:
-            return "Earth-orientation data is unavailable.";
+            return TimeScaleConversionDiagnostics::warningText(
+                TimeScaleConversionWarningCode::EarthOrientationDataMissing
+            );
         case Code::EarthOrientationDataStale:
-            return "Earth-orientation data is stale for this conversion.";
+            return TimeScaleConversionDiagnostics::warningText(
+                TimeScaleConversionWarningCode::EarthOrientationDataStale
+            );
         case Code::EarthOrientationDataPredicted:
-            return "Earth-orientation data uses a prediction for this conversion.";
+            return TimeScaleConversionDiagnostics::warningText(
+                TimeScaleConversionWarningCode::EarthOrientationDataPredicted
+            );
         case Code::EpochOutsideEarthOrientationData:
-            return "The requested epoch is outside the Earth-orientation data range.";
+            return TimeScaleConversionDiagnostics::warningText(
+                TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData
+            );
         case Code::DeltaTFallbackApplied:
-            return "A degraded Delta T fallback was applied.";
+            return TimeScaleConversionDiagnostics::warningText(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
         case Code::DeltaTUnavailable:
-            return "Delta T data is unavailable for this conversion.";
+            return TimeScaleConversionDiagnostics::warningText(TimeScaleConversionWarningCode::DeltaTUnavailable);
         case Code::EarthOrientationDataEstimated:
-            return "Earth-orientation data uses an estimate for this conversion.";
+            return TimeScaleConversionDiagnostics::warningText(
+                TimeScaleConversionWarningCode::EarthOrientationDataEstimated
+            );
         case Code::EarthOrientationStaleData:
-            return "Earth-orientation data is stale for this conversion.";
+            return TimeScaleConversionDiagnostics::warningText(
+                TimeScaleConversionWarningCode::EarthOrientationDataStale
+            );
         case Code::EarthOrientationPredictedData:
-            return "Earth-orientation data uses a prediction for this conversion.";
+            return TimeScaleConversionDiagnostics::warningText(
+                TimeScaleConversionWarningCode::EarthOrientationDataPredicted
+            );
         case Code::EarthOrientationMissingData:
-            return "Earth-orientation data is unavailable.";
+            return TimeScaleConversionDiagnostics::warningText(
+                TimeScaleConversionWarningCode::EarthOrientationDataMissing
+            );
         case Code::EarthOrientationEpochOutsideRange:
-            return "The requested epoch is outside the Earth-orientation data range.";
+            return TimeScaleConversionDiagnostics::warningText(
+                TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData
+            );
         case Code::EarthOrientationInvalidInput:
             return "Earth-orientation data input is invalid.";
         case Code::EarthOrientationEstimatedData:
-            return "Earth-orientation data uses an estimate for this conversion.";
+            return TimeScaleConversionDiagnostics::warningText(
+                TimeScaleConversionWarningCode::EarthOrientationDataEstimated
+            );
         }
 
         return "Ephemeris warning.";
