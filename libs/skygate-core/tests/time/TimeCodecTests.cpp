@@ -55,6 +55,7 @@ private slots:
     void calendarTimeRejectsInvalidCivilDate();
     void epochCodecMapsJ2000UtcToJulianDate();
     void epochCodecRoundTripsUtcAndEpoch();
+    void epochCodecDaysSinceJ2000FromEpoch();
     void astronomicalEpochAddsSecondsAndNormalizes();
     void astronomicalEpochComparesEqual();
     void astronomicalTimeReportsJ2000SiderealTime();
@@ -118,6 +119,23 @@ void TimeCodecTests::epochCodecRoundTripsUtcAndEpoch()
         )
         < 1'000
     );
+}
+
+void TimeCodecTests::epochCodecDaysSinceJ2000FromEpoch()
+{
+    const skygate::core::AstronomicalEpoch j2000Epoch{
+        .julianDatePart1 = 2'451'545.0,
+        .julianDatePart2 = 0.0,
+        .timeScale = skygate::core::TimeScale::Utc,
+    };
+    QCOMPARE(skygate::core::EpochCodec::daysSinceJ2000(j2000Epoch), 0.0);
+
+    const skygate::core::AstronomicalEpoch offsetEpoch{
+        .julianDatePart1 = 2'451'545.0,
+        .julianDatePart2 = 1.25,
+        .timeScale = skygate::core::TimeScale::Tt,
+    };
+    QCOMPARE(skygate::core::EpochCodec::daysSinceJ2000(offsetEpoch), 1.25);
 }
 
 void TimeCodecTests::astronomicalEpochAddsSecondsAndNormalizes()

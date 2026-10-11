@@ -41,4 +41,9 @@ double EpochCodec::daysSinceJ2000(const UtcTimePoint& utcTime) noexcept
     return julianDayFromUtc(utcTime) - TimeConstants::kJulianDateJ2000;
 }
 
+double EpochCodec::daysSinceJ2000(const AstronomicalEpoch& epoch) noexcept
+{
+    return epoch.sortKey() - TimeConstants::kJulianDateJ2000;
+}
+
 }  // namespace skygate::core
