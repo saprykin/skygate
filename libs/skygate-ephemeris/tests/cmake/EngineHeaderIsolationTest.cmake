@@ -9,6 +9,8 @@
 #   - the backend composition component (src/composition)
 #   - the engine implementation directories themselves (src/engine/simple and
 #     src/engine/highprecision)
+#   - the engine descriptor registry (src/engine), which shares the simple
+#     engine's default options and kind display names
 #   - test support
 #   - the documented, build-gated TdbTtConverter ERFA adapter crossing
 #

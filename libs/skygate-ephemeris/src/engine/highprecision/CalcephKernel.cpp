@@ -30,6 +30,9 @@ void captureCalcephError(const char* message)
 // Kernel epochs are expressed in TDB while the manifest validity range is
 // expressed in UTC. The conversion runs through the shared time-scale service
 // so leap seconds come from the same table the rest of the engine uses.
+// Without a usable time-scale service (or when the conversion fails) the
+// caller falls back to a coarse TDB-key comparison, which can be off by the
+// TDB minus UTC offset at the validity boundary.
 [[nodiscard]] std::optional<skygate::core::AstronomicalEpoch> utcEpochForTdbEpoch(
     const skygate::core::AstronomicalEpoch& epoch, const skygate::ephemeris::ITimeScaleService* timeScaleService
 )

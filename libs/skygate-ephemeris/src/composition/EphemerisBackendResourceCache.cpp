@@ -57,7 +57,7 @@ void EphemerisBackendResourceCache::refresh(
         highprecision::CalcephKernelProvider::Options kernelOptions;
         kernelOptions.verifyChecksum = false;
         m_calcephKernelProvider = std::make_shared<highprecision::CalcephKernelProvider>(
-            *activeDataSnapshot, *dataManifest, std::move(kernelOptions)
+            *activeDataSnapshot, *dataManifest, std::move(kernelOptions), m_timeScaleService
         );
         m_cacheManaged = true;
 #endif
