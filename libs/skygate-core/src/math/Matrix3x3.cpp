@@ -1,6 +1,7 @@
 #include "Matrix3x3.hpp"
 
 #include <cassert>
+#include <cmath>
 
 namespace skygate::core {
 namespace {
@@ -36,6 +37,17 @@ Matrix3x3 Matrix3x3::identity() noexcept
     return {
         {.x = 1.0, .y = 0.0, .z = 0.0},
         {.x = 0.0, .y = 1.0, .z = 0.0},
+        {.x = 0.0, .y = 0.0, .z = 1.0},
+    };
+}
+
+Matrix3x3 Matrix3x3::rotationZ(const double radians) noexcept
+{
+    const double sine = std::sin(radians);
+    const double cosine = std::cos(radians);
+    return {
+        {.x = cosine, .y = sine, .z = 0.0},
+        {.x = -sine, .y = cosine, .z = 0.0},
         {.x = 0.0, .y = 0.0, .z = 1.0},
     };
 }
