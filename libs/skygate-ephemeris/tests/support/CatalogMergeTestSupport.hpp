@@ -21,7 +21,8 @@
 namespace skygate::ephemeris::tests {
 
 // Builds catalog bodies and composes catalog collections for the identity,
-// bridge-retention, field-precedence, and coordinate-model merge tests.
+// bridge-retention, source-precedence, row-origin, magnitude-precedence,
+// and coordinate-model merge tests.
 class CatalogMergeTestSupport final {
 public:
     [[nodiscard]] static OwnGalaxyCelestialBody makeStar(
