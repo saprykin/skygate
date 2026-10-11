@@ -22,16 +22,6 @@ const QRegularExpression& utcDateInputPattern()
     return pattern;
 }
 
-QString formatDateText(const QDate& date)
-{
-    const int year = date.year();
-    const qint64 displayYear = year < 0 ? -static_cast<qint64>(year) : static_cast<qint64>(year);
-    const QString yearText = QString::number(displayYear).rightJustified(4, '0');
-    const QString dateText =
-        QString("%1-%2-%3").arg(yearText).arg(date.month(), 2, 10, QChar('0')).arg(date.day(), 2, 10, QChar('0'));
-    return year < 0 ? QString("%1 BCE").arg(dateText) : dateText;
-}
-
 }  // namespace
 
 QString SkyContextTextFormatter::formatCoordinate(const double value)
@@ -197,7 +187,13 @@ SkyContextUtcDateTimeTextCodec::parse(const QString& utcDateText, const QString&
 
 QString SkyContextUtcDateTimeTextCodec::formatDate(const QDateTime& utcTime)
 {
-    return formatDateText(utcTime.date());
+    const QDate date = utcTime.date();
+    if (!date.isValid()) {
+        // Invalid instants keep the zeroed placeholder rather than empty text.
+        return QStringLiteral("0000-00-00");
+    }
+
+    return SkyQtTimeCodec::formatDateText(date);
 }
 
 QString SkyContextSettings::key(const QString& name)

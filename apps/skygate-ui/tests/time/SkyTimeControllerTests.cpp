@@ -1,5 +1,6 @@
 #include <QtTest>
 
+#include "SkyContextControllerSupport.hpp"
 #include "SkyLiveClock.hpp"
 #include "SkyQtTimeCodec.hpp"
 #include "SkyTimeController.hpp"
@@ -47,6 +48,8 @@ private slots:
     void parsesSelectedZoneWallTimeToUtc();
     void validatesBceInput();
     void formatsBceDateTimesWithSuffix();
+    void dateTextCodecsAgreeOnValidDates();
+    void invalidDateTimeKeepsZeroedDateText();
     void emitsSignalsOnlyWhenValuesChange();
 };
 
@@ -194,6 +197,38 @@ void SkyTimeControllerTests::formatsBceDateTimesWithSuffix()
         controller.formatUtcTimeRange(controller.utcTimePoint(), oneHourLater),
         QStringLiteral("0044-03-15 BCE 12:00:00 / 13:00:00 UTC")
     );
+}
+
+void SkyTimeControllerTests::dateTextCodecsAgreeOnValidDates()
+{
+    using skygate::ui::internal::SkyContextUtcDateTimeTextCodec;
+
+    const QList<QPair<QDate, QString>> cases = {
+        {QDate(2026, 1, 2), QStringLiteral("2026-01-02")},
+        {QDate(5, 1, 1), QStringLiteral("0005-01-01")},
+        {QDate(44, 3, 15), QStringLiteral("0044-03-15")},
+        {QDate(999, 12, 31), QStringLiteral("0999-12-31")},
+        {QDate(-1, 12, 31), QStringLiteral("0001-12-31 BCE")},
+        {QDate(-44, 3, 15), QStringLiteral("0044-03-15 BCE")},
+        {QDate(10000, 1, 1), QStringLiteral("10000-01-01")},
+    };
+
+    for (const auto& [date, expectedText] : cases) {
+        QCOMPARE(SkyQtTimeCodec::formatDateText(date), expectedText);
+        QCOMPARE(
+            SkyContextUtcDateTimeTextCodec::formatDate(QDateTime(date, QTime(12, 0, 0), QTimeZone::UTC)), expectedText
+        );
+    }
+}
+
+void SkyTimeControllerTests::invalidDateTimeKeepsZeroedDateText()
+{
+    // The support codec formats an invalid instant as the zeroed placeholder;
+    // the Qt codec reports an invalid date as empty text.
+    using skygate::ui::internal::SkyContextUtcDateTimeTextCodec;
+
+    QCOMPARE(SkyContextUtcDateTimeTextCodec::formatDate(QDateTime()), QStringLiteral("0000-00-00"));
+    QVERIFY(SkyQtTimeCodec::formatDateText(QDate()).isEmpty());
 }
 
 void SkyTimeControllerTests::emitsSignalsOnlyWhenValuesChange()
