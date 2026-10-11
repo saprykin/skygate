@@ -1,4 +1,5 @@
 #include "catalog/bundled/BundledCatalogParser.hpp"
+#include "StringUtilities.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 
 #include <QObject>
@@ -1139,25 +1140,6 @@ constexpr std::array<BundledDeepSkyObjectEntry, 110> kBundledMessierEntries{{
      "M110|NGC 205"},
 }};
 
-std::vector<std::string> splitAliases(std::string_view aliases)
-{
-    std::vector<std::string> values;
-    std::size_t cursor = 0;
-    while (cursor <= aliases.size()) {
-        const std::size_t delimiter = aliases.find('|', cursor);
-        const std::size_t tokenEnd = delimiter == std::string_view::npos ? aliases.size() : delimiter;
-        const std::string_view token = aliases.substr(cursor, tokenEnd - cursor);
-        if (!token.empty()) {
-            values.emplace_back(token);
-        }
-        if (delimiter == std::string_view::npos) {
-            break;
-        }
-        cursor = delimiter + 1;
-    }
-    return values;
-}
-
 std::optional<double> positiveOptional(const double value)
 {
     if (value <= 0.0) {
@@ -1174,17 +1156,17 @@ bool isAsciiDigit(const char character)
 std::vector<CatalogIdentifier> bundledMessierExternalIdentifiers(const std::string_view aliases)
 {
     std::vector<CatalogIdentifier> identifiers;
-    for (const std::string& alias : splitAliases(aliases)) {
+    for (const std::string_view alias : StringUtilities::splitView(aliases, '|')) {
         if (alias.size() >= 2U && alias[0] == 'M' && isAsciiDigit(alias[1])) {
-            identifiers.push_back(CatalogIdentifier::make("messier", alias.substr(1U)));
+            identifiers.push_back(CatalogIdentifier::make("messier", std::string(alias.substr(1U))));
             continue;
         }
         if (alias.starts_with("NGC ")) {
-            identifiers.push_back(CatalogIdentifier::make("ngc", alias.substr(4U)));
+            identifiers.push_back(CatalogIdentifier::make("ngc", std::string(alias.substr(4U))));
             continue;
         }
         if (alias.starts_with("IC ")) {
-            identifiers.push_back(CatalogIdentifier::make("ic", alias.substr(3U)));
+            identifiers.push_back(CatalogIdentifier::make("ic", std::string(alias.substr(3U))));
         }
     }
     return identifiers;
@@ -1229,7 +1211,8 @@ BundledCatalogParser::parse(const std::string_view data, const CatalogParseProgr
         body.fixedEquatorial = skygate::core::EquatorialCoordinate{
             .rightAscensionHours = entry.rightAscensionHours, .declinationDeg = entry.declinationDeg
         };
-        std::vector<std::string> aliases = splitAliases(entry.aliases);
+        const std::vector<std::string_view> aliasViews = StringUtilities::splitView(entry.aliases, '|');
+        std::vector<std::string> aliases(aliasViews.begin(), aliasViews.end());
         body.identity.aliases = aliases;
         body.deepSkyObject = DeepSkyObjectInfo{
             .kind = entry.kind,
