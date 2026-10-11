@@ -1,10 +1,10 @@
 #include "HighPrecisionTextParser.hpp"
+#include "NumericParsingUtilities.hpp"
 #include "StringUtilities.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <algorithm>
 #include <charconv>
-#include <cmath>
 #include <string>
 
 namespace skygate::ephemeris {
@@ -50,15 +50,13 @@ bool HighPrecisionTextParser::parseUint64(const std::string_view text, std::uint
 
 bool HighPrecisionTextParser::parseFiniteDouble(const std::string_view text, double& value) const noexcept
 {
-    const std::string_view trimmed = trimAsciiWhitespace(text);
-    if (trimmed.empty()) {
+    const std::optional<double> parsed = NumericParsingUtilities::parseFiniteDouble(text);
+    if (!parsed.has_value()) {
         return false;
     }
 
-    const char* begin = trimmed.data();
-    const char* end = begin + trimmed.size();
-    const std::from_chars_result result = std::from_chars(begin, end, value);
-    return result.ec == std::errc{} && result.ptr == end && std::isfinite(value);
+    value = *parsed;
+    return true;
 }
 
 std::vector<std::string_view> HighPrecisionTextParser::splitAsciiWhitespace(std::string_view text) const
