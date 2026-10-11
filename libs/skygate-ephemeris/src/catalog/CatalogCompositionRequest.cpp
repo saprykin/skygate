@@ -1,1 +1,0 @@
-#include "CatalogCompositionRequest.hpp"

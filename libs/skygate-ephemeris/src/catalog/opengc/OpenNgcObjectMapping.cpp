@@ -1,1 +1,0 @@
-#include "OpenNgcObjectMapping.hpp"
