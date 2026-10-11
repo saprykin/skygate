@@ -29,6 +29,10 @@ private slots:
     void retriesAfterAbortedReply();
     void completesConcurrentRequestsIndependently();
     void concurrentFallbackChainsRemainIsolated();
+    void successReleasesCompletionCapture();
+    void exhaustedRetriesReleaseCompletionCapture();
+    void invalidCandidatesReleaseCompletionCapture();
+    void callbackContextDestructionReleasesCapture();
 };
 
 void CatalogDownloadServiceTests::invalidUrlCompletesWithoutNetworkRequest()
@@ -353,6 +357,125 @@ void CatalogDownloadServiceTests::concurrentFallbackChainsRemainIsolated()
     QVERIFY(firstResult.payload.contains("Alpha"));
     QVERIFY(secondResult.payload.contains("Beta"));
     QCOMPARE(networkAccessManager.requestedUrls().size(), 4);
+}
+
+void CatalogDownloadServiceTests::successReleasesCompletionCapture()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/catalog.csv", {.payload = sampleHygCsvPayload({1, 1, "Alpha", "1.0", "2.0", "3.0"})}
+    );
+    CatalogDownloadService service(&networkAccessManager);
+
+    const auto capture = std::make_shared<int>(0);
+    int completionCount = 0;
+    CatalogDownloadService::CompletionHandler completionHandler =
+        [capture, &completionCount](CatalogDownloadService::DownloadResult) { ++completionCount; };
+    service.downloadFirstSuccessfulFromUrls({"https://example.test/catalog.csv"}, this, {}, completionHandler);
+    completionHandler = {};
+
+    QTRY_COMPARE(completionCount, 1);
+    QTRY_COMPARE(capture.use_count(), 1L);
+    QCoreApplication::processEvents();
+    QCOMPARE(completionCount, 1);
+}
+
+void CatalogDownloadServiceTests::exhaustedRetriesReleaseCompletionCapture()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/a-fail.csv",
+        {.error = QNetworkReply::ContentNotFoundError, .errorText = "not found", .httpStatusCode = 404}
+    );
+    networkAccessManager.enqueueResponse(
+        "https://example.test/b-fail.csv",
+        {.error = QNetworkReply::ContentNotFoundError, .errorText = "not found", .httpStatusCode = 404}
+    );
+    CatalogDownloadService service(&networkAccessManager);
+
+    QTest::ignoreMessage(QtWarningMsg, "Catalog source failed https://example.test/a-fail.csv Unknown error HTTP 404");
+    QTest::ignoreMessage(QtWarningMsg, "Catalog source failed https://example.test/b-fail.csv Unknown error HTTP 404");
+
+    const auto capture = std::make_shared<int>(0);
+    int completionCount = 0;
+    QString errorText;
+    CatalogDownloadService::CompletionHandler completionHandler =
+        [capture, &completionCount, &errorText](CatalogDownloadService::DownloadResult result) {
+            ++completionCount;
+            errorText = result.errorText;
+        };
+    service.downloadFirstSuccessfulFromUrls(
+        {"https://example.test/a-fail.csv", "https://example.test/b-fail.csv"}, this, {}, completionHandler
+    );
+    completionHandler = {};
+
+    QTRY_COMPARE(completionCount, 1);
+    QTRY_COMPARE(capture.use_count(), 1L);
+    QCoreApplication::processEvents();
+    QCOMPARE(completionCount, 1);
+    QCOMPARE(errorText, QString("Catalog: Source https://example.test/b-fail.csv failed (Unknown error, HTTP 404)"));
+    QCOMPARE(networkAccessManager.requestedUrls().size(), 2);
+}
+
+void CatalogDownloadServiceTests::invalidCandidatesReleaseCompletionCapture()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/ok.csv", {.payload = sampleHygCsvPayload({1, 1, "Alpha", "1.0", "2.0", "3.0"})}
+    );
+    CatalogDownloadService service(&networkAccessManager);
+
+    QTest::ignoreMessage(QtWarningMsg, "Skipping invalid catalog source URL invalid url");
+
+    const auto capture = std::make_shared<int>(0);
+    int completionCount = 0;
+    QString sourceUrl;
+    CatalogDownloadService::CompletionHandler completionHandler =
+        [capture, &completionCount, &sourceUrl](CatalogDownloadService::DownloadResult result) {
+            ++completionCount;
+            sourceUrl = result.sourceUrl;
+        };
+    service.downloadFirstSuccessfulFromUrls(
+        {"invalid url", "  ", "https://example.test/ok.csv"}, this, {}, completionHandler
+    );
+    completionHandler = {};
+
+    QTRY_COMPARE(completionCount, 1);
+    QTRY_COMPARE(capture.use_count(), 1L);
+    QCoreApplication::processEvents();
+    QCOMPARE(completionCount, 1);
+    QCOMPARE(sourceUrl, QString("https://example.test/ok.csv"));
+    QCOMPARE(networkAccessManager.requestedUrls(), QStringList({"https://example.test/ok.csv"}));
+}
+
+void CatalogDownloadServiceTests::callbackContextDestructionReleasesCapture()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/slow.csv",
+        {.payload = sampleHygCsvPayload({1, 1, "Slow", "1.0", "2.0", "3.0"}), .delayMs = 20}
+    );
+    CatalogDownloadService service(&networkAccessManager);
+
+    const auto capture = std::make_shared<int>(0);
+    int completionCount = 0;
+    CatalogDownloadService::CompletionHandler completionHandler =
+        [capture, &completionCount](CatalogDownloadService::DownloadResult) { ++completionCount; };
+    auto callbackContext = std::make_unique<QObject>();
+    service.downloadFirstSuccessfulFromUrls(
+        {"https://example.test/slow.csv"}, callbackContext.get(), {}, completionHandler
+    );
+    completionHandler = {};
+
+    FakeNetworkReply* reply = onlyIssuedReply(networkAccessManager);
+    callbackContext.reset();
+    waitForFakeReplyFinished(reply);
+    QCoreApplication::processEvents();
+
+    QCOMPARE(completionCount, 0);
+    QTRY_COMPARE(capture.use_count(), 1L);
+    QTRY_VERIFY(networkAccessManager.issuedReplies().isEmpty());
+    QCOMPARE(networkAccessManager.finishedUrls(), QStringList({"https://example.test/slow.csv"}));
 }
 
 QTEST_GUILESS_MAIN(CatalogDownloadServiceTests)
