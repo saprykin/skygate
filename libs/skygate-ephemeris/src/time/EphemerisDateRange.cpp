@@ -4,17 +4,17 @@ namespace skygate::ephemeris {
 
 bool EphemerisDateRange::isValid() const noexcept
 {
-    return start.isFinite() && end.isFinite() && start.sortKey() <= end.sortKey();
+    return interval().isValid();
 }
 
 bool EphemerisDateRange::contains(const skygate::core::AstronomicalEpoch& epoch) const noexcept
 {
-    if (!epoch.isFinite() || !isValid()) {
-        return false;
-    }
+    return interval().contains(epoch);
+}
 
-    const double key = epoch.sortKey();
-    return key >= start.sortKey() && key <= end.sortKey();
+skygate::core::AstronomicalEpochRange EphemerisDateRange::interval() const noexcept
+{
+    return skygate::core::AstronomicalEpochRange{start, end};
 }
 
 }  // namespace skygate::ephemeris
