@@ -8,6 +8,7 @@
 namespace skygate::ephemeris {
 class IEphemerisDataSnapshot;
 class EphemerisDataManifest;
+class ITimeScaleService;
 }  // namespace skygate::ephemeris
 
 namespace skygate::ephemeris::highprecision {
@@ -23,6 +24,12 @@ public:
     CalcephKernelProvider(const IEphemerisDataSnapshot& snapshot, const EphemerisDataManifest& manifest);
     CalcephKernelProvider(
         const IEphemerisDataSnapshot& snapshot, const EphemerisDataManifest& manifest, Options options
+    );
+    CalcephKernelProvider(
+        const IEphemerisDataSnapshot& snapshot,
+        const EphemerisDataManifest& manifest,
+        Options options,
+        std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService
     );
     ~CalcephKernelProvider() override;
 

@@ -1,17 +1,16 @@
 #include "CalcephKernel.hpp"
 #include "engine/EphemerisLogging.hpp"
+#include "engine/ITimeScaleService.hpp"
 #include "math/PhysicalConstants.hpp"
 
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 #include <calceph.h>
-#include <erfa.h>
 #endif
 
 #include <QDebug>
 #include <QString>
 
 #include <array>
-#include <cmath>
 #include <optional>
 #include <string>
 #include <utility>
@@ -26,43 +25,32 @@ void captureCalcephError(const char* message)
 {
     g_lastCalcephError = message != nullptr ? std::string{message} : std::string{};
 }
-[[nodiscard]] std::optional<double> utcSortKeyForTdbEpoch(const skygate::core::AstronomicalEpoch& epoch) noexcept
-{
-    if (epoch.timeScale != skygate::core::TimeScale::Tdb || !epoch.isFinite()) {
-        return std::nullopt;
-    }
-
-    // eraDtdb returns TDB-TT; the geocentric observer (u == v == 0) nullifies
-    // the topocentric term, so the UT1 fraction argument is irrelevant here.
-    const double tdbMinusTtSeconds = eraDtdb(epoch.julianDatePart1, epoch.julianDatePart2, 0.0, 0.0, 0.0, 0.0);
-    if (!std::isfinite(tdbMinusTtSeconds)) {
-        return std::nullopt;
-    }
-
-    const skygate::core::AstronomicalEpoch tt = epoch.addSeconds(-tdbMinusTtSeconds, skygate::core::TimeScale::Tt);
-    double tai1 = 0.0;
-    double tai2 = 0.0;
-    if (eraTttai(tt.julianDatePart1, tt.julianDatePart2, &tai1, &tai2) != 0) {
-        return std::nullopt;
-    }
-
-    double utc1 = 0.0;
-    double utc2 = 0.0;
-    if (eraTaiutc(tai1, tai2, &utc1, &utc2) < 0) {
-        return std::nullopt;
-    }
-
-    const skygate::core::AstronomicalEpoch utcEpoch{
-        .julianDatePart1 = utc1, .julianDatePart2 = utc2, .timeScale = skygate::core::TimeScale::Utc
-    };
-    return utcEpoch.sortKey();
-}
 #endif
+
+// Kernel epochs are expressed in TDB while the manifest validity range is
+// expressed in UTC. The conversion runs through the shared time-scale service
+// so leap seconds come from the same table the rest of the engine uses.
+[[nodiscard]] std::optional<skygate::core::AstronomicalEpoch> utcEpochForTdbEpoch(
+    const skygate::core::AstronomicalEpoch& epoch, const skygate::ephemeris::ITimeScaleService* timeScaleService
+)
+{
+    if (epoch.timeScale != skygate::core::TimeScale::Tdb || !epoch.isFinite() || timeScaleService == nullptr) {
+        return std::nullopt;
+    }
+
+    const TimeScaleConversionResult conversion = timeScaleService->convert(epoch, skygate::core::TimeScale::Utc);
+    if (!conversion.isSuccess()) {
+        return std::nullopt;
+    }
+
+    return conversion.epoch;
+}
 
 }  // namespace
 
 struct CalcephKernel::Impl final {
-    explicit Impl(Info info) : m_kernelInfo(std::move(info))
+    explicit Impl(Info info, std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService)
+        : m_kernelInfo(std::move(info)), m_timeScaleService(std::move(timeScaleService))
     {
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
         calceph_seterrorhandler(3, captureCalcephError);
@@ -107,27 +95,15 @@ struct CalcephKernel::Impl final {
             return Status::OutOfRange;
         }
 
-#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-        // Kernel epochs are expressed in TDB while the manifest validity range
-        // is expressed in UTC. Convert the epoch to UTC before comparing so a
-        // ~69 second boundary offset cannot misclassify the requested instant.
         if (epoch.timeScale == skygate::core::TimeScale::Tdb) {
-            const std::optional<double> utcKey = utcSortKeyForTdbEpoch(epoch);
-            if (utcKey.has_value()) {
-                return *utcKey < m_kernelInfo->validityRange.start.sortKey()
-                               || *utcKey > m_kernelInfo->validityRange.end.sortKey()
-                           ? Status::OutOfRange
-                           : Status::Ready;
+            const std::optional<skygate::core::AstronomicalEpoch> utcEpoch =
+                utcEpochForTdbEpoch(epoch, m_timeScaleService.get());
+            if (utcEpoch.has_value()) {
+                return m_kernelInfo->validityRange.contains(*utcEpoch) ? Status::Ready : Status::OutOfRange;
             }
         }
-#endif
 
-        if (epoch.sortKey() < m_kernelInfo->validityRange.start.sortKey()
-            || epoch.sortKey() > m_kernelInfo->validityRange.end.sortKey()) {
-            return Status::OutOfRange;
-        }
-
-        return Status::Ready;
+        return m_kernelInfo->validityRange.contains(epoch) ? Status::Ready : Status::OutOfRange;
     }
 
     [[nodiscard]] ICalcephKernel::StateResult
@@ -205,12 +181,16 @@ struct CalcephKernel::Impl final {
     Status m_status = Status::OpenFailed;
     mutable std::vector<std::string> m_diagnostics;
     std::optional<Info> m_kernelInfo;
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_timeScaleService;
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     t_calcephbin* m_handle = nullptr;
 #endif
 };
 
-CalcephKernel::CalcephKernel(Info info) : m_impl(std::make_unique<Impl>(std::move(info))) {}
+CalcephKernel::CalcephKernel(Info info, std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService)
+    : m_impl(std::make_unique<Impl>(std::move(info), std::move(timeScaleService)))
+{
+}
 
 CalcephKernel::~CalcephKernel() = default;
 
