@@ -9,13 +9,6 @@ namespace skygate::ephemeris {
 
 namespace {
 
-[[nodiscard]] bool
-epochOutsideRange(const skygate::core::AstronomicalEpoch& epoch, const EphemerisDateRange& range) noexcept
-{
-    const double key = epoch.sortKey();
-    return key < range.start.sortKey() || key > range.end.sortKey();
-}
-
 [[nodiscard]] bool taiEpochOutsideUtcRange(
     const skygate::core::AstronomicalEpoch& taiEpoch,
     const EphemerisDateRange& utcRange,
@@ -78,7 +71,7 @@ epochOutsideRange(const skygate::core::AstronomicalEpoch& epoch, const Ephemeris
         result.diagnosticText = "Leap-second table is stale for UTC conversion.";
     }
 
-    if (tableInfo.validityRange.has_value() && epochOutsideRange(utcEpoch, *tableInfo.validityRange)) {
+    if (tableInfo.validityRange.has_value() && !tableInfo.validityRange->contains(utcEpoch)) {
         const std::optional<int> tableOffset = provider->taiMinusUtcSeconds(utcEpoch);
         if (!options.allowDegradedLeapSecondFallback) {
             result.status = TimeScaleConversionStatus::Failed;

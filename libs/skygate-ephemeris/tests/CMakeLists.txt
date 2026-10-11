@@ -231,6 +231,14 @@ add_skygate_ephemeris_qtest(
     engine/EphemerisDataFileUtilitiesTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-date-range-tests
+    engine/EphemerisDateRangeTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-data-staleness-tests
+    engine/EphemerisDataStalenessTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-api-model-tests
     engine/EphemerisApiModelTests.cpp
 )

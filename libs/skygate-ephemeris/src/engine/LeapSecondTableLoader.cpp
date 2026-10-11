@@ -1,4 +1,5 @@
 #include "LeapSecondTableLoader.hpp"
+#include "EphemerisDataStaleness.hpp"
 #include "LeapSecondTableParser.hpp"
 #include "TableBackedLeapSecondProvider.hpp"
 
@@ -33,8 +34,7 @@ LeapSecondTableLoader::Result LeapSecondTableLoader::loadFromTextAsset(
     }
 
     auto& info = parsed.tableInfo;
-    if (options.referenceEpoch.has_value() && info.expiresAt.has_value() && options.referenceEpoch->isFiniteUtc()
-        && options.referenceEpoch->sortKey() > info.expiresAt->sortKey()) {
+    if (EphemerisDataStaleness::isStale(options.referenceEpoch, info.expiresAt)) {
         info.status = ILeapSecondProvider::TableStatus::Stale;
         info.diagnosticText = "Leap-second table is stale for the reference epoch.";
     }

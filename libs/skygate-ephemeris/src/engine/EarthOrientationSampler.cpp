@@ -15,12 +15,6 @@ constexpr double kEpochKeyEqualityToleranceDays = 1.0e-9;
     return std::abs(lhs - rhs) <= kEpochKeyEqualityToleranceDays;
 }
 
-[[nodiscard]] bool epochInRange(const skygate::core::AstronomicalEpoch& epoch, const EphemerisDateRange& range) noexcept
-{
-    const double key = epoch.sortKey();
-    return key >= range.start.sortKey() && key <= range.end.sortKey();
-}
-
 [[nodiscard]] bool
 epochAfter(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::AstronomicalEpoch& boundary) noexcept
 {
@@ -136,7 +130,7 @@ void applyDataWarnings(
         addSampleWarning(sample, EarthOrientationSampler::Sample::WarningCode::EstimatedData);
     }
 
-    if (sample.predicted || (info.predictionRange.has_value() && epochInRange(utcEpoch, *info.predictionRange))) {
+    if (sample.predicted || (info.predictionRange.has_value() && info.predictionRange->contains(utcEpoch))) {
         sample.predicted = true;
         if (options.degradePredictedData) {
             addSampleWarning(sample, EarthOrientationSampler::Sample::WarningCode::PredictedData);
