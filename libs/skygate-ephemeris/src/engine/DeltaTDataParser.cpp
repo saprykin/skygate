@@ -1,4 +1,5 @@
 #include "DeltaTDataParser.hpp"
+#include "EphemerisTableMetadata.hpp"
 #include "text/HighPrecisionTextParser.hpp"
 #include "IEphemerisDataSnapshot.hpp"
 #include "time/CalendarTime.hpp"
@@ -21,23 +22,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
 
 [[nodiscard]] const HighPrecisionTextParser& textParser() noexcept
 {
-    static const HighPrecisionTextParser parser;
-    return parser;
-}
-
-[[nodiscard]] EphemerisDateRange makeRange(
-    const std::string_view id,
-    const std::string_view displayName,
-    const skygate::core::AstronomicalEpoch& start,
-    const skygate::core::AstronomicalEpoch& end
-)
-{
-    EphemerisDateRange range;
-    range.id = id;
-    range.displayName = displayName;
-    range.start = start;
-    range.end = end;
-    return range;
+    return EphemerisTableMetadata::textParser();
 }
 
 [[nodiscard]] std::optional<std::string> setFallbackStart(
@@ -92,29 +77,9 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     bool& hasFallbackEnd
 )
 {
-    if (std::optional<std::string> value = textParser().metadataValue(line, "version"); value.has_value()) {
-        if (!value->empty()) {
-            info.version = std::move(*value);
-        }
-        return std::nullopt;
-    }
-    if (std::optional<std::string> value = textParser().metadataValue(line, "source"); value.has_value()) {
-        if (!value->empty()) {
-            info.provenance = std::move(*value);
-        }
-        return std::nullopt;
-    }
-    if (std::optional<std::string> value = textParser().metadataValue(line, "expires"); value.has_value()) {
-        const std::optional<skygate::core::CivilDateTime> expiresDate = textParser().parseUtcDate(*value);
-        const std::optional<skygate::core::AstronomicalEpoch> expiresEpoch =
-            expiresDate.has_value() ? skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*expiresDate)
-                                    : std::nullopt;
-        if (!expiresEpoch.has_value()) {
-            return "Delta T data contains malformed expiration metadata at line " + std::to_string(lineNumber) + ".";
-        }
-
-        info.expiresAt = *expiresEpoch;
-        return std::nullopt;
+    std::optional<std::string> diagnosticText;
+    if (EphemerisTableMetadata::applyCommonLine(info, line, "Delta T data", lineNumber, diagnosticText)) {
+        return diagnosticText;
     }
     if (std::optional<std::string> value = textParser().metadataValue(line, "ancient_fallback_start");
         value.has_value()) {
@@ -242,11 +207,6 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     return true;
 }
 
-[[nodiscard]] bool isHeaderLine(const std::string_view line) noexcept
-{
-    return line.starts_with("effective_utc_date");
-}
-
 [[nodiscard]] DeltaTDataParser::Result
 failureResult(IDeltaTProvider::DataInfo info, const IDeltaTProvider::DataStatus status, std::string diagnosticText)
 {
@@ -292,7 +252,7 @@ DeltaTDataParser::Result DeltaTDataParser::parse(const EphemerisTextDataAsset& a
         if (line.starts_with("#")) {
             continue;
         }
-        if (isHeaderLine(line)) {
+        if (EphemerisTableMetadata::isHeaderLine(line)) {
             continue;
         }
 
@@ -354,7 +314,7 @@ DeltaTDataParser::Result DeltaTDataParser::parse(const EphemerisTextDataAsset& a
         info.ancientFallbackModel = std::move(fallback);
     }
 
-    info.validityRange = makeRange(
+    info.validityRange = EphemerisTableMetadata::makeRange(
         kValidityRangeId, kValidityRangeDisplayName, entries.front().effectiveUtcEpoch, entries.back().effectiveUtcEpoch
     );
     info.status = IDeltaTProvider::DataStatus::Available;

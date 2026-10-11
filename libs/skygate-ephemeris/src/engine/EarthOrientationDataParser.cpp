@@ -1,4 +1,5 @@
 #include "EarthOrientationDataParser.hpp"
+#include "EphemerisTableMetadata.hpp"
 #include "text/HighPrecisionTextParser.hpp"
 #include "IEphemerisDataSnapshot.hpp"
 #include "time/CalendarTime.hpp"
@@ -22,8 +23,7 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
 
 [[nodiscard]] const HighPrecisionTextParser& textParser() noexcept
 {
-    static const HighPrecisionTextParser parser;
-    return parser;
+    return EphemerisTableMetadata::textParser();
 }
 
 [[nodiscard]] bool startsWithIntegerYear(const std::string_view line) noexcept
@@ -31,21 +31,6 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     const std::vector<std::string_view> columns = textParser().splitAsciiWhitespace(line);
     int year = 0;
     return !columns.empty() && textParser().parseInt(columns.front(), year);
-}
-
-[[nodiscard]] EphemerisDateRange makeRange(
-    const std::string_view id,
-    const std::string_view displayName,
-    const skygate::core::AstronomicalEpoch& start,
-    const skygate::core::AstronomicalEpoch& end
-)
-{
-    EphemerisDateRange range;
-    range.id = id;
-    range.displayName = displayName;
-    range.start = start;
-    range.end = end;
-    return range;
 }
 
 [[nodiscard]] std::optional<std::string> setPredictionStart(
@@ -104,30 +89,9 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     bool& hasPredictionEnd
 )
 {
-    if (std::optional<std::string> value = textParser().metadataValue(line, "version"); value.has_value()) {
-        if (!value->empty()) {
-            info.version = std::move(*value);
-        }
-        return std::nullopt;
-    }
-    if (std::optional<std::string> value = textParser().metadataValue(line, "source"); value.has_value()) {
-        if (!value->empty()) {
-            info.provenance = std::move(*value);
-        }
-        return std::nullopt;
-    }
-    if (std::optional<std::string> value = textParser().metadataValue(line, "expires"); value.has_value()) {
-        const std::optional<skygate::core::CivilDateTime> expiresDate = textParser().parseUtcDate(*value);
-        const std::optional<skygate::core::AstronomicalEpoch> expiresEpoch =
-            expiresDate.has_value() ? skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*expiresDate)
-                                    : std::nullopt;
-        if (!expiresEpoch.has_value()) {
-            return "Earth-orientation data contains malformed expiration metadata at line " + std::to_string(lineNumber)
-                   + ".";
-        }
-
-        info.expiresAt = *expiresEpoch;
-        return std::nullopt;
+    std::optional<std::string> diagnosticText;
+    if (EphemerisTableMetadata::applyCommonLine(info, line, "Earth-orientation data", lineNumber, diagnosticText)) {
+        return diagnosticText;
     }
     if (std::optional<std::string> value = textParser().metadataValue(line, "prediction_start"); value.has_value()) {
         return setPredictionStart(info, *value, lineNumber, hasPredictionStart);
@@ -396,11 +360,6 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
            && textParser().fixedColumn(line, 58U, 10U).empty();
 }
 
-[[nodiscard]] bool isHeaderLine(const std::string_view line) noexcept
-{
-    return line.starts_with("effective_utc_date");
-}
-
 [[nodiscard]] bool isIgnorableHeaderLine(const std::string_view line) noexcept
 {
     return line.find(',') == std::string_view::npos && !startsWithIntegerYear(line);
@@ -457,7 +416,8 @@ EarthOrientationDataParser::Result EarthOrientationDataParser::parse(const Ephem
         if (isFinals2000ADateOnlyLine(line)) {
             continue;
         }
-        if (isHeaderLine(trimmedLine) || (entries.empty() && isIgnorableHeaderLine(trimmedLine))) {
+        if (EphemerisTableMetadata::isHeaderLine(trimmedLine)
+            || (entries.empty() && isIgnorableHeaderLine(trimmedLine))) {
             continue;
         }
 
@@ -503,7 +463,7 @@ EarthOrientationDataParser::Result EarthOrientationDataParser::parse(const Ephem
         info.predictionRange = std::move(predictionRange);
     }
 
-    info.validityRange = makeRange(
+    info.validityRange = EphemerisTableMetadata::makeRange(
         kValidityRangeId, kValidityRangeDisplayName, entries.front().effectiveUtcEpoch, entries.back().effectiveUtcEpoch
     );
     info.status = IEarthOrientationProvider::DataStatus::Available;
