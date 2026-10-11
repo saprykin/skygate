@@ -1,5 +1,6 @@
 #include "EquatorialToHorizontalCalculator.hpp"
 #include "math/AngleMath.hpp"
+#include "math/MathConstants.hpp"
 #include "time/AstronomicalTime.hpp"
 
 #include <cmath>
@@ -14,8 +15,9 @@ skygate::core::HorizontalCoordinate EquatorialToHorizontalCalculator::compute(
 {
     const double gmstDeg = skygate::core::AstronomicalTime::greenwichMeanSiderealTimeDeg(utcTime);
     const double localSiderealDeg = skygate::core::AngleMath::normalizeDegrees(gmstDeg + observer.longitudeDeg);
-    const double hourAngleDeg =
-        skygate::core::AngleMath::normalizeDegreesSigned(localSiderealDeg - equatorial.rightAscensionHours * 15.0);
+    const double hourAngleDeg = skygate::core::AngleMath::normalizeDegreesSigned(
+        localSiderealDeg - equatorial.rightAscensionHours * skygate::core::MathConstants::kDegreesPerHour
+    );
 
     const double hourAngleRad = skygate::core::AngleMath::toRadians(hourAngleDeg);
     const double declinationRad = skygate::core::AngleMath::toRadians(equatorial.declinationDeg);

@@ -1,5 +1,6 @@
 #include "EclipticToEquatorialCalculator.hpp"
 #include "math/AngleMath.hpp"
+#include "math/MathConstants.hpp"
 
 #include <cmath>
 
@@ -22,8 +23,9 @@ skygate::core::EquatorialCoordinate EclipticToEquatorialCalculator::compute(
     const double zEq = yEcl * std::sin(epsRad) + zEcl * std::cos(epsRad);
 
     skygate::core::EquatorialCoordinate equatorial;
-    equatorial.rightAscensionHours =
-        skygate::core::AngleMath::normalizeHours(skygate::core::AngleMath::toDegrees(std::atan2(yEq, xEq)) / 15.0);
+    equatorial.rightAscensionHours = skygate::core::AngleMath::normalizeHours(
+        skygate::core::AngleMath::toDegrees(std::atan2(yEq, xEq)) / skygate::core::MathConstants::kDegreesPerHour
+    );
     equatorial.declinationDeg = skygate::core::AngleMath::toDegrees(std::asin(zEq));
     return equatorial;
 }
