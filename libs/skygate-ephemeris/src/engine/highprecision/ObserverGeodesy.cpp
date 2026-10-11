@@ -1,9 +1,7 @@
 #include "ObserverGeodesy.hpp"
 
-#include "math/AngleMath.hpp"
 #include "math/PhysicalConstants.hpp"
-
-#include <cmath>
+#include "math/Wgs84Geodesy.hpp"
 
 namespace skygate::ephemeris::highprecision {
 namespace {
@@ -19,26 +17,11 @@ ObserverGeodesy::observerItrsPositionAu(const skygate::core::GeoLocation& observ
         return std::nullopt;
     }
 
-    const double latitudeRad = skygate::core::AngleMath::toRadians(observer.latitudeDeg);
-    const double longitudeRad = skygate::core::AngleMath::toRadians(observer.longitudeDeg);
-    const double sinLatitude = std::sin(latitudeRad);
-    const double cosLatitude = std::cos(latitudeRad);
-    const double sinLongitude = std::sin(longitudeRad);
-    const double cosLongitude = std::cos(longitudeRad);
-    const double firstEccentricitySquared =
-        PhysicalConstants::kWgs84Flattening * (2.0 - PhysicalConstants::kWgs84Flattening);
-    const double primeVerticalRadius = PhysicalConstants::kWgs84EquatorialRadiusMeters
-                                       / std::sqrt(1.0 - firstEccentricitySquared * sinLatitude * sinLatitude);
-
-    const double xMeters = (primeVerticalRadius + observer.elevationMeters) * cosLatitude * cosLongitude;
-    const double yMeters = (primeVerticalRadius + observer.elevationMeters) * cosLatitude * sinLongitude;
-    const double zMeters =
-        (primeVerticalRadius * (1.0 - firstEccentricitySquared) + observer.elevationMeters) * sinLatitude;
-
+    const skygate::core::Vector3d positionMeters = skygate::core::Wgs84Geodesy::ecefMeters(observer);
     return skygate::core::Vector3d{
-        .x = xMeters / PhysicalConstants::kAstronomicalUnitMeters,
-        .y = yMeters / PhysicalConstants::kAstronomicalUnitMeters,
-        .z = zMeters / PhysicalConstants::kAstronomicalUnitMeters,
+        .x = positionMeters.x / PhysicalConstants::kAstronomicalUnitMeters,
+        .y = positionMeters.y / PhysicalConstants::kAstronomicalUnitMeters,
+        .z = positionMeters.z / PhysicalConstants::kAstronomicalUnitMeters,
     };
 }
 

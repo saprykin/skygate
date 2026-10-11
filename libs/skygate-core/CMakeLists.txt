@@ -38,6 +38,7 @@ add_library(skygate-core STATIC
     src/math/Vector2d.hpp
     src/math/Vector3d.hpp
     src/math/ViewportMath.hpp
+    src/math/Wgs84Geodesy.hpp
     src/projections/AzimuthalEquidistantProjection.hpp
     src/projections/PerspectiveProjection.hpp
     src/projections/StereographicProjection.hpp
@@ -71,6 +72,7 @@ add_library(skygate-core STATIC
     src/math/Vector2d.cpp
     src/math/Vector3d.cpp
     src/math/ViewportMath.cpp
+    src/math/Wgs84Geodesy.cpp
     src/ProjectionFactory.cpp
     src/projections/ProjectionAlgorithms.cpp
     src/projections/ProjectionAlgorithms.hpp
