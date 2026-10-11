@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BitFlagSetOperations.hpp"
 #include "IEarthOrientationProvider.hpp"
 
 #include <cstdint>
@@ -59,18 +60,12 @@ public:
 
         void addWarning(const WarningCode code) noexcept
         {
-            warningCodeMask |= warningMask(code);
+            warningCodeMask |= BitFlagSetOperations::bit(code);
         }
 
         [[nodiscard]] bool hasWarning(const WarningCode code) const noexcept
         {
-            return (warningCodeMask & warningMask(code)) != 0U;
-        }
-
-    private:
-        [[nodiscard]] static constexpr std::uint32_t warningMask(const WarningCode code) noexcept
-        {
-            return 1U << static_cast<std::uint8_t>(code);
+            return (warningCodeMask & BitFlagSetOperations::bit(code)) != 0U;
         }
     };
 

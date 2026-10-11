@@ -1,6 +1,7 @@
 #include "Ut1OffsetResolver.hpp"
+#include "BitFlagSetOperations.hpp"
 #include "EarthOrientationSampler.hpp"
-#include "TimeScaleConversionDiagnostics.hpp"
+#include "TimeScaleConversionWarningCode.hpp"
 #include "math/TimeConstants.hpp"
 
 #include <array>
@@ -190,7 +191,7 @@ void mergeEarthOrientationSampleWarnings(
 
 void Ut1OffsetResolver::Result::addWarning(const TimeScaleConversionWarningCode code) noexcept
 {
-    warningCodeMask |= TimeScaleConversionDiagnostics::warningMask(code);
+    warningCodeMask |= BitFlagSetOperations::bit(code);
 }
 
 Ut1OffsetResolver::Ut1OffsetResolver(

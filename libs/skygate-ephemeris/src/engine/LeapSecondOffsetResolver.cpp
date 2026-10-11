@@ -1,5 +1,6 @@
 #include "LeapSecondOffsetResolver.hpp"
-#include "TimeScaleConversionDiagnostics.hpp"
+#include "BitFlagSetOperations.hpp"
+#include "TimeScaleConversionWarningCode.hpp"
 
 #include <optional>
 #include <string>
@@ -166,7 +167,7 @@ namespace {
 
 void LeapSecondOffsetResolver::Result::addWarning(const TimeScaleConversionWarningCode code) noexcept
 {
-    warningCodeMask |= TimeScaleConversionDiagnostics::warningMask(code);
+    warningCodeMask |= BitFlagSetOperations::bit(code);
 }
 
 LeapSecondOffsetResolver::LeapSecondOffsetResolver(

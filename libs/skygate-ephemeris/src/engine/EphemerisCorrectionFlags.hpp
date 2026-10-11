@@ -89,24 +89,24 @@ public:
 
     [[nodiscard]] constexpr bool has(const EphemerisCorrectionFlags flag) const noexcept
     {
-        return BitFlagSetOperations<EphemerisCorrectionFlags>::hasFlag(*this, flag);
+        return BitFlagSetOperations::hasFlag(*this, flag);
     }
 
     [[nodiscard]] constexpr EphemerisCorrectionFlags without(const EphemerisCorrectionFlags removedFlags) const noexcept
     {
-        return BitFlagSetOperations<EphemerisCorrectionFlags>::withoutFlags(*this, removedFlags);
+        return BitFlagSetOperations::withoutFlags(*this, removedFlags);
     }
 
     [[nodiscard]] static constexpr bool
     has(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags flag) noexcept
     {
-        return BitFlagSetOperations<EphemerisCorrectionFlags>::hasFlag(flags, flag);
+        return BitFlagSetOperations::hasFlag(flags, flag);
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags
     without(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags removedFlags) noexcept
     {
-        return BitFlagSetOperations<EphemerisCorrectionFlags>::withoutFlags(flags, removedFlags);
+        return BitFlagSetOperations::withoutFlags(flags, removedFlags);
     }
 
     [[nodiscard]] constexpr bool hasCorrections() const noexcept

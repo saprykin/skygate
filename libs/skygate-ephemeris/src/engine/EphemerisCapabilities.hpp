@@ -71,13 +71,13 @@ public:
 
     [[nodiscard]] constexpr bool has(const EphemerisCapabilities capability) const noexcept
     {
-        return BitFlagSetOperations<EphemerisCapabilities>::hasFlag(*this, capability);
+        return BitFlagSetOperations::hasFlag(*this, capability);
     }
 
     [[nodiscard]] static constexpr bool
     has(const EphemerisCapabilities capabilities, const EphemerisCapabilities capability) noexcept
     {
-        return BitFlagSetOperations<EphemerisCapabilities>::hasFlag(capabilities, capability);
+        return BitFlagSetOperations::hasFlag(capabilities, capability);
     }
 
     [[nodiscard]] static constexpr EphemerisCapabilities noCapabilities() noexcept

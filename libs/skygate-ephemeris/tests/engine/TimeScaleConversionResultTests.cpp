@@ -1,4 +1,4 @@
-#include "engine/TimeScaleConversionDiagnostics.hpp"
+#include "engine/BitFlagSetOperations.hpp"
 #include "engine/TimeScaleConversionResult.hpp"
 #include "time/AstronomicalEpoch.hpp"
 
@@ -51,14 +51,11 @@ void TimeScaleConversionResultTests::successKeepsExplicitStatusAndDiagnostic()
     const TimeScaleConversionResult result = TimeScaleConversionResult::success(
         makeEpoch(),
         TimeScaleConversionStatus::Degraded,
-        TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::DeltaTFallbackApplied),
+        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::DeltaTFallbackApplied),
         "custom diagnostic"
     );
     QCOMPARE(result.status, TimeScaleConversionStatus::Degraded);
-    QCOMPARE(
-        result.warningCodeMask,
-        TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::DeltaTFallbackApplied)
-    );
+    QCOMPARE(result.warningCodeMask, BitFlagSetOperations::bit(TimeScaleConversionWarningCode::DeltaTFallbackApplied));
     QCOMPARE(result.diagnosticText, std::string("custom diagnostic"));
 }
 
@@ -85,12 +82,11 @@ void TimeScaleConversionResultTests::mergeCombinesMasksAndPromotesDegraded()
     TimeScaleConversionResult::mergeWarnings(
         result,
         TimeScaleConversionStatus::Degraded,
-        TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::LeapSecondFallbackApplied)
+        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::LeapSecondFallbackApplied)
     );
     QCOMPARE(result.status, TimeScaleConversionStatus::Degraded);
     QCOMPARE(
-        result.warningCodeMask,
-        TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::LeapSecondFallbackApplied)
+        result.warningCodeMask, BitFlagSetOperations::bit(TimeScaleConversionWarningCode::LeapSecondFallbackApplied)
     );
 }
 
@@ -103,13 +99,10 @@ void TimeScaleConversionResultTests::mergeKeepsFailedResult()
     TimeScaleConversionResult::mergeWarnings(
         result,
         TimeScaleConversionStatus::Degraded,
-        TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::InvalidInput)
+        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::InvalidInput)
     );
     QCOMPARE(result.status, TimeScaleConversionStatus::Failed);
-    QCOMPARE(
-        result.warningCodeMask,
-        TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::InvalidInput)
-    );
+    QCOMPARE(result.warningCodeMask, BitFlagSetOperations::bit(TimeScaleConversionWarningCode::InvalidInput));
 }
 
 QTEST_APPLESS_MAIN(TimeScaleConversionResultTests)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BitFlagSetOperations.hpp"
 #include "EphemerisCorrectionFlags.hpp"
 #include "EphemerisEngineKind.hpp"
 
@@ -26,7 +27,7 @@ public:
     void setEngineKind(EphemerisEngineKind::Type engineKind)
     {
         m_engineKind = engineKind;
-        m_specifiedMask |= maskBit(Key::EngineKind);
+        m_specifiedMask |= BitFlagSetOperations::bit(Key::EngineKind);
     }
 
     [[nodiscard]] EphemerisEngineKind::Type engineKind() const
@@ -37,7 +38,7 @@ public:
     void setCorrectionFlags(EphemerisCorrectionFlags correctionFlags)
     {
         m_correctionFlags = correctionFlags;
-        m_specifiedMask |= maskBit(Key::CorrectionFlags);
+        m_specifiedMask |= BitFlagSetOperations::bit(Key::CorrectionFlags);
     }
 
     [[nodiscard]] EphemerisCorrectionFlags correctionFlags() const
@@ -48,7 +49,7 @@ public:
     void setFallbackToSimpleEngine(bool fallbackToSimpleEngine)
     {
         m_fallbackToSimpleEngine = fallbackToSimpleEngine;
-        m_specifiedMask |= maskBit(Key::FallbackToSimpleEngine);
+        m_specifiedMask |= BitFlagSetOperations::bit(Key::FallbackToSimpleEngine);
     }
 
     [[nodiscard]] bool fallbackToSimpleEngine() const
@@ -59,7 +60,7 @@ public:
     void setEnableAtmosphericRefraction(bool enableAtmosphericRefraction)
     {
         m_enableAtmosphericRefraction = enableAtmosphericRefraction;
-        m_specifiedMask |= maskBit(Key::EnableAtmosphericRefraction);
+        m_specifiedMask |= BitFlagSetOperations::bit(Key::EnableAtmosphericRefraction);
     }
 
     [[nodiscard]] bool enableAtmosphericRefraction() const
@@ -73,7 +74,7 @@ public:
             return;
         }
         m_atmosphericPressureHpa = atmosphericPressureHpa;
-        m_specifiedMask |= maskBit(Key::AtmosphericPressureHpa);
+        m_specifiedMask |= BitFlagSetOperations::bit(Key::AtmosphericPressureHpa);
     }
 
     [[nodiscard]] double atmosphericPressureHpa() const
@@ -84,7 +85,7 @@ public:
     void setAtmosphericTemperatureC(double atmosphericTemperatureC)
     {
         m_atmosphericTemperatureC = atmosphericTemperatureC;
-        m_specifiedMask |= maskBit(Key::AtmosphericTemperatureC);
+        m_specifiedMask |= BitFlagSetOperations::bit(Key::AtmosphericTemperatureC);
     }
 
     [[nodiscard]] double atmosphericTemperatureC() const
@@ -98,7 +99,7 @@ public:
             return;
         }
         m_relativeHumidity = relativeHumidity;
-        m_specifiedMask |= maskBit(Key::RelativeHumidity);
+        m_specifiedMask |= BitFlagSetOperations::bit(Key::RelativeHumidity);
     }
 
     [[nodiscard]] double relativeHumidity() const
@@ -109,7 +110,7 @@ public:
     void setObservingWavelengthMicrometers(double observingWavelengthMicrometers)
     {
         m_observingWavelengthMicrometers = observingWavelengthMicrometers;
-        m_specifiedMask |= maskBit(Key::ObservingWavelengthMicrometers);
+        m_specifiedMask |= BitFlagSetOperations::bit(Key::ObservingWavelengthMicrometers);
     }
 
     [[nodiscard]] double observingWavelengthMicrometers() const
@@ -129,12 +130,7 @@ private:
     double m_atmosphericTemperatureC = 10.0;
     double m_relativeHumidity = 0.0;
     double m_observingWavelengthMicrometers = 0.55;
-    std::uint8_t m_specifiedMask = 0U;
-
-    static constexpr std::uint8_t maskBit(const Key key) noexcept
-    {
-        return static_cast<std::uint8_t>(1U << static_cast<std::uint8_t>(key));
-    }
+    std::uint32_t m_specifiedMask = 0U;
 };
 
 }  // namespace skygate::ephemeris
