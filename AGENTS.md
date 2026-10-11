@@ -7,8 +7,8 @@ repository.
 
 ## Repository Structure
 
-- Co-locate `.hpp` headers alongside their corresponding `.cpp` files under
-  `src/` in every module.
+- Co-locate `.hpp` headers and their `.cpp` files under `src/` in every
+  module.
 - The `src/` directory serves as the public include root for library targets:
   `target_include_directories(... PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)`.
 - Do not create a separate `include/` tree.
@@ -18,12 +18,10 @@ repository.
   header file.
 - Nest a type inside another class only when it is tightly coupled and has no
   standalone meaning outside that class.
-- If only the definition of a struct, class, or enum is required, still add the
-  corresponding `.cpp` file and include the header. Do not add anything else to
-  this companion source file.
-- Exception: pure interface classes are header-only. Do not add a companion
-  `.cpp` file for an interface that contains only virtual methods and no
-  implementation.
+- Keep a type header-only when all of its members can be defined inline.
+  Create a `.cpp` file only when a member needs an out-of-line definition; do
+  not create empty companion `.cpp` files that only include the header.
+- Pure interface classes are always header-only.
 
 ## Header Rules
 
