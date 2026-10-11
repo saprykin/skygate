@@ -86,18 +86,18 @@ stagedSourcePath(const std::filesystem::path& stagedResourceRoot, const Ephemeri
 
 [[nodiscard]] bool isValidDateRange(const EphemerisDateRange& range) noexcept
 {
-    const double rangeStart = range.start.julianDatePart1 + range.start.julianDatePart2;
-    const double rangeEnd = range.end.julianDatePart1 + range.end.julianDatePart2;
+    const double rangeStart = range.start.sortKey();
+    const double rangeEnd = range.end.sortKey();
     return std::isfinite(rangeStart) && std::isfinite(rangeEnd) && rangeStart <= rangeEnd;
 }
 
 [[nodiscard]] bool
 validityRangeCovers(const EphemerisDateRange& availableRange, const EphemerisDateRange& requiredRange) noexcept
 {
-    const double availableStart = availableRange.start.julianDatePart1 + availableRange.start.julianDatePart2;
-    const double availableEnd = availableRange.end.julianDatePart1 + availableRange.end.julianDatePart2;
-    const double requiredStart = requiredRange.start.julianDatePart1 + requiredRange.start.julianDatePart2;
-    const double requiredEnd = requiredRange.end.julianDatePart1 + requiredRange.end.julianDatePart2;
+    const double availableStart = availableRange.start.sortKey();
+    const double availableEnd = availableRange.end.sortKey();
+    const double requiredStart = requiredRange.start.sortKey();
+    const double requiredEnd = requiredRange.end.sortKey();
     return availableStart <= requiredStart && requiredEnd <= availableEnd;
 }
 

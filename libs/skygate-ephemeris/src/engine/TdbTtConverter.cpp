@@ -1,8 +1,8 @@
 #include "TdbTtConverter.hpp"
 #include "TimeScaleConversionDiagnostics.hpp"
-#include "math/MathConstants.hpp"
+#include "math/AngleMath.hpp"
 #include "math/PhysicalConstants.hpp"
-#include "math/TimeConstants.hpp"
+#include "time/EpochCodec.hpp"
 // TdbTtConverter is a shared time-scale service used by both the simple-only
 // and high-precision configurations. When the high-precision engine is
 // enabled it prefers the ERFA TDB-TT adapter and otherwise falls back to the
@@ -21,24 +21,17 @@ namespace skygate::ephemeris {
 
 namespace {
 
-using skygate::core::MathConstants;
+using skygate::core::AngleMath;
+using skygate::core::EpochCodec;
 using skygate::core::PhysicalConstants;
-using skygate::core::TimeConstants;
-
-[[nodiscard]] double epochJulianDate(const skygate::core::AstronomicalEpoch& epoch) noexcept
-{
-    return epoch.julianDatePart1 + epoch.julianDatePart2;
-}
 
 [[nodiscard]] double approximateTdbMinusTtSeconds(const skygate::core::AstronomicalEpoch& terrestrialTime) noexcept
 {
-    const double daysSinceJ2000 = epochJulianDate(terrestrialTime) - TimeConstants::kJulianDateJ2000;
-    const double meanAnomalyRadians = std::fmod(
-                                          PhysicalConstants::kSolarMeanAnomalyDegAtJ2000
-                                              + PhysicalConstants::kSolarMeanAnomalyDegPerDay * daysSinceJ2000,
-                                          360.0
-                                      )
-                                      * MathConstants::kDegreesToRadians;
+    const double daysSinceJ2000 = EpochCodec::daysSinceJ2000(terrestrialTime);
+    const double meanAnomalyDegrees = AngleMath::normalizeDegrees(
+        PhysicalConstants::kSolarMeanAnomalyDegAtJ2000 + PhysicalConstants::kSolarMeanAnomalyDegPerDay * daysSinceJ2000
+    );
+    const double meanAnomalyRadians = AngleMath::toRadians(meanAnomalyDegrees);
     return 0.001657 * std::sin(meanAnomalyRadians) + 0.00001385 * std::sin(2.0 * meanAnomalyRadians);
 }
 

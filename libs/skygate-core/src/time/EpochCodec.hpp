@@ -11,6 +11,7 @@ public:
     [[nodiscard]] static UtcTimePoint utcTimeFromEpoch(const AstronomicalEpoch& epoch) noexcept;
     [[nodiscard]] static double julianDayFromUtc(const UtcTimePoint& utcTime) noexcept;
     [[nodiscard]] static double daysSinceJ2000(const UtcTimePoint& utcTime) noexcept;
+    [[nodiscard]] static double daysSinceJ2000(const AstronomicalEpoch& epoch) noexcept;
 };
 
 }  // namespace skygate::core
