@@ -10,6 +10,7 @@
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
+#include "catalog/SkyCatalogCollectionStore.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -226,7 +227,7 @@ void SkyCatalogManagerRecoveryTests::unreadablePayloadKeepsConfiguredAndSiblings
     const QString healthyUrl = QStringLiteral("https://example.test/healthy-stars.csv");
 
     SkyCatalogCollectionCacheSnapshot snapshot;
-    snapshot.schemaVersion = skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    snapshot.schemaVersion = skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
 
     SkyCatalogSourceCacheRecord bundled;
     bundled.instanceId = QStringLiteral("primary");
@@ -391,8 +392,7 @@ void SkyCatalogManagerRecoveryTests::legacySourcesStayRetiredAfterEmptyMigration
     // zero sources and never falls back to the legacy two-slot cache that is
     // still readable.
     SkyCatalogCollectionCacheSnapshot emptyCollection;
-    emptyCollection.schemaVersion =
-        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    emptyCollection.schemaVersion = skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
     emptyCollection.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
     QVERIFY(store.saveCatalogCollectionCache(emptyCollection));
 
@@ -494,8 +494,7 @@ void SkyCatalogManagerRecoveryTests::interruptedGenerationUpgradeRestoresFlatSou
     const auto upgraded = store.loadCatalogCollectionCache();
     QVERIFY(upgraded.isLoaded());
     QCOMPARE(
-        upgraded.snapshot.schemaVersion,
-        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
+        upgraded.snapshot.schemaVersion, skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion
     );
     QCOMPARE(upgraded.snapshot.sources.size(), 2);
     QCOMPARE(upgraded.snapshot.sources[0].instanceId, QStringLiteral("flat:stars"));
@@ -534,8 +533,7 @@ void SkyCatalogManagerRecoveryTests::unreadableCommittedKeepsActiveCollection()
     );
 
     SkyCatalogCollectionCacheSnapshot committed;
-    committed.schemaVersion =
-        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    committed.schemaVersion = skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
     committed.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
     SkyCatalogSourceCacheRecord accepted;
     accepted.instanceId = QStringLiteral("custom:accepted");

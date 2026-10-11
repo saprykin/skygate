@@ -6,6 +6,7 @@
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
+#include "catalog/SkyCatalogCollectionStore.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -39,7 +40,7 @@ SkyCatalogSourceCacheRecord makeCollectionRecord(
 SkyCatalogCollectionCacheSnapshot makeCollectionSnapshot(QVector<SkyCatalogSourceCacheRecord> records)
 {
     SkyCatalogCollectionCacheSnapshot snapshot;
-    snapshot.schemaVersion = skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    snapshot.schemaVersion = skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
     for (std::size_t index = 0; index < records.size(); ++index) {
         records[index].order = static_cast<int>(index);
@@ -161,8 +162,7 @@ void SkyCollectionGenerationTests::emptyCatalogCollectionCacheIsExplicitlyPersis
     QVERIFY(store.saveCatalogCache(skygate::ui::tests::sampleCatalogCacheSnapshot()));
 
     SkyCatalogCollectionCacheSnapshot emptySnapshot;
-    emptySnapshot.schemaVersion =
-        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    emptySnapshot.schemaVersion = skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
     QVERIFY(store.saveCatalogCollectionCache(emptySnapshot));
 
     // An intentionally empty collection is stored, not erased: the committed
@@ -171,10 +171,7 @@ void SkyCollectionGenerationTests::emptyCatalogCollectionCacheIsExplicitlyPersis
     const auto loaded = store.loadCatalogCollectionCache();
     QCOMPARE(loaded.state, SkyCatalogCollectionCacheLoadResult::State::Loaded);
     QVERIFY(loaded.snapshot.sources.isEmpty());
-    QCOMPARE(
-        loaded.snapshot.schemaVersion,
-        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
-    );
+    QCOMPARE(loaded.snapshot.schemaVersion, skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion);
 
     // A second restart persists the same intentionally empty configuration.
     QVERIFY(store.saveCatalogCollectionCache(emptySnapshot));

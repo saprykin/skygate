@@ -13,6 +13,7 @@
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
+#include "catalog/SkyCatalogCollectionStore.hpp"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -87,8 +88,7 @@ void SkyCatalogManagerLiveRestoreTests::liveRestoreDropsOperationsOmittedFromCol
     // holds the source it loaded, as after a settings restore that replaces
     // the session's collection.
     SkyCatalogCollectionCacheSnapshot emptyCollection;
-    emptyCollection.schemaVersion =
-        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    emptyCollection.schemaVersion = skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
     emptyCollection.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
     QVERIFY(store.saveCatalogCollectionCache(emptyCollection));
 
@@ -132,8 +132,7 @@ void SkyCatalogManagerLiveRestoreTests::liveRestoreSupersedesPendingImportReply(
     QVERIFY(!pendingReply.isNull());
 
     SkyCatalogCollectionCacheSnapshot emptyCollection;
-    emptyCollection.schemaVersion =
-        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    emptyCollection.schemaVersion = skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
     emptyCollection.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
     QVERIFY(store.saveCatalogCollectionCache(emptyCollection));
 
@@ -233,8 +232,7 @@ void SkyCatalogManagerLiveRestoreTests::rejectedRestoreKeepsPendingImportWork()
     // source makes the restored collection uncomposable, so the restore is
     // rejected before it can replace the live collection.
     SkyCatalogCollectionCacheSnapshot rejectedSnapshot;
-    rejectedSnapshot.schemaVersion =
-        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    rejectedSnapshot.schemaVersion = skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
     SkyCatalogSourceCacheRecord colliding;
     colliding.instanceId = QStringLiteral("bundled-core");
     colliding.title = QStringLiteral("Colliding Source");

@@ -5,6 +5,7 @@
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
+#include "catalog/SkyCatalogCollectionStore.hpp"
 
 #include <QDir>
 #include <QRegularExpression>
@@ -25,7 +26,7 @@ using skygate::ui::tests::CatalogCacheFixture;
 namespace {
 
 constexpr int kCurrentCollectionSchemaVersion =
-    skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
 constexpr int kCurrentConstellationSchemaVersion =
     skygate::ui::internal::SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
 

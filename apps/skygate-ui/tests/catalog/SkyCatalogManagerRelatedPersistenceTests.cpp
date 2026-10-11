@@ -10,6 +10,7 @@
 #include "SkyContextControllerSupport.hpp"
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
+#include "catalog/SkyCatalogCollectionStore.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QCoreApplication>
@@ -490,8 +491,7 @@ void SkyCatalogManagerRelatedPersistenceTests::migratesPriorSingleOwnerRelatedPa
     // record and one star record, where the star record holds the only copy of
     // the then-collection-wide related dataset.
     SkyCatalogCollectionCacheSnapshot snapshot;
-    snapshot.schemaVersion =
-        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion - 1;
+    snapshot.schemaVersion = skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion - 1;
 
     SkyCatalogSourceCacheRecord bundled;
     bundled.instanceId = QStringLiteral("primary");
@@ -533,8 +533,7 @@ void SkyCatalogManagerRelatedPersistenceTests::migratesPriorSingleOwnerRelatedPa
     const auto migrated = store.loadCatalogCollectionCache();
     QVERIFY(migrated.isLoaded());
     QCOMPARE(
-        migrated.snapshot.schemaVersion,
-        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
+        migrated.snapshot.schemaVersion, skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion
     );
     const SkyCatalogSourceCacheRecord* migratedRecord =
         CatalogSourceFactsQuery::findRecord(migrated.snapshot, QStringLiteral("custom:prior-owner"));

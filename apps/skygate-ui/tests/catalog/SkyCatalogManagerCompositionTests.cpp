@@ -22,6 +22,7 @@
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/IStarCatalog.hpp"
+#include "catalog/SkyCatalogCollectionStore.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QCoreApplication>
@@ -722,7 +723,7 @@ void SkyCatalogManagerCompositionTests::crossSourceHipBridgesSurviveBinaryRestor
     QVERIFY(bridgingCatalog != nullptr);
 
     SkyCatalogCollectionCacheSnapshot snapshot;
-    snapshot.schemaVersion = skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    snapshot.schemaVersion = skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
 
     SkyCatalogSourceCacheRecord establishing;

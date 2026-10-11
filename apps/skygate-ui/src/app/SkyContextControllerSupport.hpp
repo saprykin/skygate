@@ -36,12 +36,6 @@ public:
     static constexpr int kThrottledLiveRecomputeIntervalMs = 10000;
     static constexpr int kSettingsVersion = 3;
     static constexpr int kConstellationLineCacheSchemaVersion = 4;
-    // Collection cache record format. Version 3 stores each source record's
-    // own related constellation dataset; version 2 records copied the composed
-    // collection-wide related view into every eligible source, and version 1
-    // records carry no parse contract. Older records are read with the defined
-    // defaults and rewritten once in the new format.
-    static constexpr int kCatalogCollectionCacheSchemaVersion = 3;
     static constexpr double kWheelZoomStepScale = 0.90;
     static constexpr double kWheelAngleDeltaStep = 120.0;
     static constexpr double kMagnitudeCutoffMin = -2.0;
@@ -99,7 +93,6 @@ public:
     [[nodiscard]] static QString defaultDeepSkyCatalogCachePath();
     [[nodiscard]] static QString defaultCatalogBinaryCachePath();
     [[nodiscard]] static QString defaultDeepSkyBinaryCatalogCachePath();
-    [[nodiscard]] static QString defaultCatalogCollectionCachePath();
 };
 
 class SkyContextCatalogCodec final {

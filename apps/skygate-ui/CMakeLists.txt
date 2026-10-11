@@ -90,6 +90,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/SkyCatalogCacheController.hpp
     src/catalog/SkyCatalogCollectionCacheLoadResult.hpp
     src/catalog/SkyCatalogCollectionCacheSnapshot.hpp
+    src/catalog/SkyCatalogCollectionStore.cpp
+    src/catalog/SkyCatalogCollectionStore.hpp
     src/catalog/SkyCatalogLegacyCacheSnapshot.hpp
     src/catalog/SkyCatalogSourceCacheRecord.hpp
     src/catalog/SkyCatalogConstellationStore.cpp

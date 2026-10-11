@@ -6,6 +6,7 @@
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "catalog/SkyCatalogCollectionStore.hpp"
 
 #include <QString>
 #include <QStringList>
@@ -23,7 +24,7 @@ using skygate::ui::internal::SkyCatalogSourceRestoreEntry;
 namespace {
 
 constexpr int kCurrentCollectionSchemaVersion =
-    skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
 
 }  // namespace
 
