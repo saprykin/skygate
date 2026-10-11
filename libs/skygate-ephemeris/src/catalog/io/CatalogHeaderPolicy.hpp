@@ -22,14 +22,15 @@ public:
     // Advances `remaining` past a leading UTF-8 BOM, blank lines, and full-line
     // comments. A line is a comment only when '#' is its first non-whitespace
     // character; a '#' inside a quoted field is never treated as a comment.
-    // Returns the first header line without its line terminator and leaves
+    // Returns the first header line without its line terminator, and leaves
     // `remaining` positioned after that line. Returns an empty view when no
-    // header line exists.
+    // header line exists. This is the only place that strips the BOM, so the
+    // returned line never carries one.
     [[nodiscard]] static std::string_view findHeaderLine(std::string_view& remaining) noexcept;
 
     // Decodes a header line into a lowercased column-name -> original-column
-    // index map. Quoted fields are decoded, empty names are omitted, and a BOM
-    // on the first field is removed.
+    // index map. Quoted fields are decoded and empty names are omitted. The
+    // line must come from findHeaderLine, which removes the BOM.
     [[nodiscard]] static QHash<QString, qsizetype> decodeHeaderLine(std::string_view headerLine, QChar separator);
 
     // Returns true when the decoded header contains every required column,
