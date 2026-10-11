@@ -36,16 +36,6 @@ constexpr std::size_t kZipMaxCommentBytes = 0xffffU;
 
 }  // namespace
 
-bool ZipEntryMetadata::isDirectory() const
-{
-    return !path.empty() && path.back() == '/';
-}
-
-bool ZipEntryMetadata::isEncrypted() const
-{
-    return (generalPurposeFlag & 0x1U) != 0U;
-}
-
 std::optional<std::vector<ZipEntryMetadata>> ZipDirectoryReader::readEntries(const std::string_view zipData)
 {
     const auto endOfCentralDirectoryOffset = findEndOfCentralDirectoryOffset(zipData);
