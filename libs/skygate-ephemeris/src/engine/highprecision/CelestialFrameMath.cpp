@@ -1,8 +1,8 @@
 #include "CelestialFrameMath.hpp"
 #include "math/AngleMath.hpp"
 #include "math/MathConstants.hpp"
+#include "math/SphericalGeometry.hpp"
 
-#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -69,16 +69,13 @@ std::optional<skygate::core::HorizontalCoordinate> CelestialFrameMath::horizonta
         -sinLatitude * cosLongitude * vector.x - sinLatitude * sinLongitude * vector.y + cosLatitude * vector.z;
     const double up =
         cosLatitude * cosLongitude * vector.x + cosLatitude * sinLongitude * vector.y + sinLatitude * vector.z;
-    const double length = std::hypot(std::hypot(east, north), up);
-    if (length <= std::numeric_limits<double>::min()) {
+    const std::optional<skygate::core::Vector3d> localUnit =
+        skygate::core::Vector3d{.x = east, .y = north, .z = up}.normalized();
+    if (!localUnit.has_value()) {
         return std::nullopt;
     }
 
-    return skygate::core::HorizontalCoordinate{
-        .altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(std::clamp(up / length, -1.0, 1.0))),
-        .azimuthDeg =
-            skygate::core::AngleMath::normalizeDegrees(skygate::core::AngleMath::toDegrees(std::atan2(east, north))),
-    };
+    return skygate::core::SphericalGeometry::horizontalFromUnitVector(*localUnit);
 }
 
 }  // namespace skygate::ephemeris::highprecision
