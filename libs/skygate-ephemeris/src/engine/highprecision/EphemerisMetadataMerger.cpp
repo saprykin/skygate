@@ -321,9 +321,7 @@ std::optional<EarthOrientationSampler::Sample> EphemerisMetadataMerger::prepareE
     std::optional<TimeScaleConversionResult> localConversion;
     std::optional<TimeScaleConversionResult>* conversionSlot =
         cache != nullptr ? &cache->utcConversion : &localConversion;
-    if (epoch.timeScale == skygate::core::TimeScale::Utc) {
-        *conversionSlot = TimeScaleConversionResult::success(epoch);
-    } else if (timeScaleService == nullptr) {
+    if (timeScaleService == nullptr) {
         metadata.status = EphemerisEngineQueryStatus::Type::Failed;
         metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
         return std::nullopt;
