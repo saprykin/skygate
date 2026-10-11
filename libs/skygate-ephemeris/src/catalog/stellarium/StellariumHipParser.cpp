@@ -145,4 +145,47 @@ void StellariumHipParser::collectHipPolylines(const QJsonValue& value, std::vect
     }
 }
 
+void StellariumHipParser::forEachConstellationEntry(
+    const QJsonObject& rootObject, const std::function<void(const QJsonValue&, const QString&)>& visit
+)
+{
+    const QJsonValue constellationsValue = rootObject.value("constellations");
+    if (constellationsValue.isArray()) {
+        for (const QJsonValue& entry : constellationsValue.toArray()) {
+            visit(entry, {});
+        }
+        return;
+    }
+
+    if (!constellationsValue.isObject()) {
+        return;
+    }
+
+    const QJsonObject constellationsObject = constellationsValue.toObject();
+    const QJsonValue linesValue = constellationsObject.value("lines");
+    const QJsonValue lineValue = constellationsObject.value("line");
+    if (!linesValue.isUndefined() || !lineValue.isUndefined()) {
+        if (!linesValue.isUndefined()) {
+            visit(linesValue, {});
+        }
+        if (!lineValue.isUndefined()) {
+            visit(lineValue, {});
+        }
+        return;
+    }
+
+    for (auto it = constellationsObject.begin(); it != constellationsObject.end(); ++it) {
+        visit(it.value(), it.key());
+    }
+}
+
+std::size_t StellariumHipParser::constellationArrayEntryCount(const QJsonObject& rootObject)
+{
+    const QJsonValue constellationsValue = rootObject.value("constellations");
+    if (!constellationsValue.isArray()) {
+        return 0U;
+    }
+    return static_cast<std::size_t>(constellationsValue.toArray().size());
+}
+
 }  // namespace skygate::ephemeris

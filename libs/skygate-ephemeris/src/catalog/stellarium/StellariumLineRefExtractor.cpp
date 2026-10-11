@@ -2,7 +2,7 @@
 #include "StellariumHipParser.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 
-#include <QJsonArray>
+#include <QJsonObject>
 #include <QJsonValue>
 
 #include <algorithm>
@@ -61,28 +61,9 @@ std::vector<ConstellationLineRef> StellariumLineRefExtractor::extract(const QJso
         appendPolylines(polylines);
     };
 
-    const QJsonValue constellationsValue = rootObject.value("constellations");
-    if (constellationsValue.isArray()) {
-        for (const QJsonValue& entry : constellationsValue.toArray()) {
-            collectFromEntry(entry);
-        }
-    } else if (constellationsValue.isObject()) {
-        const QJsonObject constellationsObject = constellationsValue.toObject();
-        const QJsonValue linesValue = constellationsObject.value("lines");
-        const QJsonValue lineValue = constellationsObject.value("line");
-        if (!linesValue.isUndefined() || !lineValue.isUndefined()) {
-            if (!linesValue.isUndefined()) {
-                collectFromEntry(linesValue);
-            }
-            if (!lineValue.isUndefined()) {
-                collectFromEntry(lineValue);
-            }
-        } else {
-            for (auto it = constellationsObject.begin(); it != constellationsObject.end(); ++it) {
-                collectFromEntry(it.value());
-            }
-        }
-    }
+    StellariumHipParser::forEachConstellationEntry(
+        rootObject, [&collectFromEntry](const QJsonValue& entry, const QString&) { collectFromEntry(entry); }
+    );
 
     return lineRefs;
 }

@@ -4,7 +4,7 @@
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/io/CatalogParsingUtilities.hpp"
 
-#include <QJsonArray>
+#include <QJsonObject>
 #include <QJsonValue>
 #include <QString>
 
@@ -177,28 +177,10 @@ std::vector<ConstellationAnchorGroup> StellariumAnchorGroupExtractor::extract(co
         addAnchorGroup(labelText, polylines);
     };
 
-    const QJsonValue constellationsValue = rootObject.value("constellations");
-    if (constellationsValue.isArray()) {
-        for (const QJsonValue& entry : constellationsValue.toArray()) {
-            collectEntry(entry, {});
-        }
-    } else if (constellationsValue.isObject()) {
-        const QJsonObject constellationsObject = constellationsValue.toObject();
-        const QJsonValue linesValue = constellationsObject.value("lines");
-        const QJsonValue lineValue = constellationsObject.value("line");
-        if (!linesValue.isUndefined() || !lineValue.isUndefined()) {
-            if (!linesValue.isUndefined()) {
-                collectEntry(linesValue, {});
-            }
-            if (!lineValue.isUndefined()) {
-                collectEntry(lineValue, {});
-            }
-        } else {
-            for (auto it = constellationsObject.begin(); it != constellationsObject.end(); ++it) {
-                collectEntry(it.value(), it.key());
-            }
-        }
-    }
+    StellariumHipParser::forEachConstellationEntry(
+        rootObject,
+        [&collectEntry](const QJsonValue& entry, const QString& fallbackId) { collectEntry(entry, fallbackId); }
+    );
 
     return anchorGroups;
 }
