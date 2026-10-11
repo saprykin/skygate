@@ -1,3 +1,4 @@
+#include "math/MathConstants.hpp"
 #include "math/Matrix3x3.hpp"
 
 #include <QtTest/QtTest>
@@ -25,6 +26,8 @@ class Matrix3x3Tests final : public QObject {
 
 private slots:
     void identityLeavesVectorsUnchanged();
+    void rotationZWithZeroAngleIsIdentity();
+    void rotationZQuarterTurnMapsAxes();
     void preservesRowsAndValues();
     void multipliesVectorUsingRows();
     void multipliesVectorUsingTransposedRows();
@@ -38,6 +41,25 @@ void Matrix3x3Tests::identityLeavesVectorsUnchanged()
 
     compareVector(matrix.multiplied(vector), vector);
     compareVector(matrix.transposeMultiplied(vector), vector);
+}
+
+void Matrix3x3Tests::rotationZWithZeroAngleIsIdentity()
+{
+    const skygate::core::Matrix3x3 matrix = skygate::core::Matrix3x3::rotationZ(0.0);
+
+    compareVector(matrix.row(0U), {.x = 1.0, .y = 0.0, .z = 0.0});
+    compareVector(matrix.row(1U), {.x = 0.0, .y = 1.0, .z = 0.0});
+    compareVector(matrix.row(2U), {.x = 0.0, .y = 0.0, .z = 1.0});
+}
+
+void Matrix3x3Tests::rotationZQuarterTurnMapsAxes()
+{
+    const skygate::core::Matrix3x3 matrix =
+        skygate::core::Matrix3x3::rotationZ(skygate::core::MathConstants::kPi / 2.0);
+
+    compareVector(matrix.multiplied({.x = 1.0, .y = 0.0, .z = 0.0}), {.x = 0.0, .y = -1.0, .z = 0.0});
+    compareVector(matrix.multiplied({.x = 0.0, .y = 1.0, .z = 0.0}), {.x = 1.0, .y = 0.0, .z = 0.0});
+    compareVector(matrix.multiplied({.x = 0.0, .y = 0.0, .z = 1.0}), {.x = 0.0, .y = 0.0, .z = 1.0});
 }
 
 void Matrix3x3Tests::preservesRowsAndValues()
