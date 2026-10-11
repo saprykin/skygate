@@ -1,5 +1,6 @@
 #include "CalcephKernelProvider.hpp"
 #include "CalcephKernel.hpp"
+#include "engine/EphemerisDataFileUtilities.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "ICalcephKernel.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
@@ -102,7 +103,8 @@ public:
             );
         }
         if (manifestAsset->profileId != profile->id || manifestAsset->relativePath.empty()
-            || manifestAsset->checksum.algorithm != "sha256" || manifestAsset->checksum.value.empty()) {
+            || manifestAsset->checksum.algorithm != EphemerisDataFileUtilities::kSha256Algorithm
+            || manifestAsset->checksum.value.empty()) {
             return failedKernel(
                 Status::InvalidKernelAsset, "Selected solar-system kernel asset metadata is incomplete or inconsistent."
             );
@@ -239,9 +241,8 @@ public:
             hash.addData(QByteArrayView(buffer.data(), bytesRead));
         }
 
-        const QByteArray actualHexDigest = hash.result().toHex().toLower();
-        const QByteArray expectedHexDigestLower = QByteArray::fromStdString(expectedHexDigest).toLower();
-        return actualHexDigest == expectedHexDigestLower;
+        const std::string actualHexDigest = hash.result().toHex().toStdString();
+        return EphemerisDataFileUtilities::checksumsMatch(actualHexDigest, expectedHexDigest);
     }
 
     [[nodiscard]] const EphemerisDataManifest::Profile* selectProfile() const noexcept

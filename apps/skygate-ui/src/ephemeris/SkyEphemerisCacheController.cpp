@@ -1,6 +1,7 @@
 #include "SkyEphemerisCacheController.hpp"
 
 #include "engine/EphemerisDataActivation.hpp"
+#include "engine/EphemerisDataFileUtilities.hpp"
 #include "engine/EphemerisStagedUpdateVerification.hpp"
 
 #include <QLoggingCategory>
@@ -22,6 +23,7 @@ using StagedUpdateActivationRequest = SkyEphemerisCacheController::StagedUpdateA
 using StagedUpdateActivationResult = SkyEphemerisCacheController::StagedUpdateActivationResult;
 using StagedUpdateActivationStatus = SkyEphemerisCacheController::StagedUpdateActivationStatus;
 using skygate::ephemeris::EphemerisDataActivationRequest;
+using skygate::ephemeris::EphemerisDataFileUtilities;
 using skygate::ephemeris::EphemerisDataManifest;
 using skygate::ephemeris::EphemerisStagedUpdateVerificationRequest;
 using skygate::ephemeris::EphemerisStagedUpdateVerificationResult;
@@ -30,11 +32,6 @@ using skygate::ephemeris::EphemerisStagedUpdateVerificationStatus;
 std::filesystem::path pathFromQString(const QString& path)
 {
     return std::filesystem::path(path.toStdString());
-}
-
-QString pathToQString(const std::filesystem::path& path)
-{
-    return QString::fromStdString(path.generic_string());
 }
 
 QString stringToQString(const std::string& value)
@@ -266,25 +263,25 @@ EphemerisDataCacheSnapshot cacheSnapshotForActivatedProfile(
             snapshot.installedKernelProfileId = stringToQString(asset->profileId);
             snapshot.installedKernelVersion = stringToQString(asset->version);
             if (activePath != activePaths.end()) {
-                snapshot.installedKernelPath = pathToQString(activePath->second);
+                snapshot.installedKernelPath = EphemerisDataFileUtilities::pathToQString(activePath->second);
             }
             break;
         case EphemerisDataManifest::AssetKind::EarthOrientationData:
             snapshot.installedEarthOrientationVersion = stringToQString(asset->version);
             if (activePath != activePaths.end()) {
-                snapshot.installedEarthOrientationPath = pathToQString(activePath->second);
+                snapshot.installedEarthOrientationPath = EphemerisDataFileUtilities::pathToQString(activePath->second);
             }
             break;
         case EphemerisDataManifest::AssetKind::LeapSecondTable:
             snapshot.installedLeapSecondTableVersion = stringToQString(asset->version);
             if (activePath != activePaths.end()) {
-                snapshot.installedLeapSecondTablePath = pathToQString(activePath->second);
+                snapshot.installedLeapSecondTablePath = EphemerisDataFileUtilities::pathToQString(activePath->second);
             }
             break;
         case EphemerisDataManifest::AssetKind::DeltaTData:
             snapshot.installedDeltaTDataVersion = stringToQString(asset->version);
             if (activePath != activePaths.end()) {
-                snapshot.installedDeltaTDataPath = pathToQString(activePath->second);
+                snapshot.installedDeltaTDataPath = EphemerisDataFileUtilities::pathToQString(activePath->second);
             }
             break;
         }

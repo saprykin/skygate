@@ -223,6 +223,10 @@ add_skygate_ephemeris_qtest(
     engine/StringUtilitiesTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-data-file-utilities-tests
+    engine/EphemerisDataFileUtilitiesTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-api-model-tests
     engine/EphemerisApiModelTests.cpp
 )

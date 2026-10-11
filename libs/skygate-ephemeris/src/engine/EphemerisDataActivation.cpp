@@ -1,4 +1,5 @@
 #include "EphemerisDataActivation.hpp"
+#include "EphemerisDataFileUtilities.hpp"
 #include "EphemerisDataManifest.hpp"
 #include "EphemerisDataPayloadReader.hpp"
 
@@ -14,6 +15,7 @@
 #include <array>
 #include <cstddef>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <system_error>
 
@@ -22,11 +24,6 @@ namespace skygate::ephemeris {
 namespace {
 
 constexpr std::size_t kIoBufferBytes = 1U << 16U;
-
-[[nodiscard]] QString pathToQString(const std::filesystem::path& path)
-{
-    return QString::fromStdString(path.generic_string());
-}
 
 [[nodiscard]] std::string pathToString(const std::filesystem::path& path)
 {
@@ -38,21 +35,6 @@ constexpr std::size_t kIoBufferBytes = 1U << 16U;
     return path.starts_with(":") || path.starts_with("qrc:");
 }
 
-[[nodiscard]] bool hasUnsafePathComponent(const std::filesystem::path& path)
-{
-    if (path.empty() || path.is_absolute()) {
-        return true;
-    }
-
-    for (const std::filesystem::path& component : path) {
-        if (component.empty() || component == "." || component == "..") {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 [[nodiscard]] std::optional<std::filesystem::path> activeRelativePath(const EphemerisDataManifest::Asset& asset)
 {
     if (asset.relativePath.empty()) {
@@ -60,12 +42,12 @@ constexpr std::size_t kIoBufferBytes = 1U << 16U;
     }
 
     std::filesystem::path profilePath(asset.profileId);
-    if (hasUnsafePathComponent(profilePath)) {
+    if (EphemerisDataFileUtilities::hasUnsafePathComponent(profilePath)) {
         return std::nullopt;
     }
 
     std::filesystem::path relativePath(asset.relativePath);
-    if (hasUnsafePathComponent(relativePath)) {
+    if (EphemerisDataFileUtilities::hasUnsafePathComponent(relativePath)) {
         return std::nullopt;
     }
 
@@ -73,7 +55,7 @@ constexpr std::size_t kIoBufferBytes = 1U << 16U;
         relativePath.replace_extension();
     }
 
-    if (relativePath.empty() || hasUnsafePathComponent(relativePath)) {
+    if (relativePath.empty() || EphemerisDataFileUtilities::hasUnsafePathComponent(relativePath)) {
         return std::nullopt;
     }
 
@@ -99,11 +81,6 @@ constexpr std::size_t kIoBufferBytes = 1U << 16U;
 void addDiagnostic(EphemerisDataActivationResult& result, const std::string_view diagnostic)
 {
     result.diagnostics.emplace_back(diagnostic);
-}
-
-[[nodiscard]] bool cancellationRequested(const std::function<bool()>& callback)
-{
-    return callback != nullptr && callback();
 }
 
 void markCanceled(EphemerisDataActivationResult& result)
@@ -132,9 +109,8 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
         hash.addData(QByteArrayView(buffer.data(), bytesRead));
     }
 
-    const QByteArray actualHexDigest = hash.result().toHex().toLower();
-    const QByteArray expectedHexDigestLower = QByteArray::fromStdString(expectedHexDigest).toLower();
-    return actualHexDigest == expectedHexDigestLower;
+    const std::string actualHexDigest = hash.result().toHex().toStdString();
+    return EphemerisDataFileUtilities::checksumsMatch(actualHexDigest, expectedHexDigest);
 }
 
 [[nodiscard]] bool existingTargetIsCurrent(
@@ -152,7 +128,7 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
         && targetInfo.size() != static_cast<qint64>(*asset.compression.uncompressedSizeBytes)) {
         return false;
     }
-    if (asset.checksum.algorithm != "sha256") {
+    if (asset.checksum.algorithm != EphemerisDataFileUtilities::kSha256Algorithm) {
         return false;
     }
 
@@ -197,45 +173,18 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
     return true;
 }
 
-[[nodiscard]] bool sourceSizeMatchesMetadata(const QFileInfo& sourceInfo, const EphemerisDataManifest::Asset& asset)
-{
-    return !asset.compression.compressedSizeBytes.has_value()
-           || sourceInfo.size() == static_cast<qint64>(*asset.compression.compressedSizeBytes);
-}
-
 [[nodiscard]] QString sourcePathForRequest(const EphemerisDataActivationRequest& request)
 {
     const std::filesystem::path sourceRelativePath(request.asset->relativePath);
     if (startsWithQtResourcePrefix(pathToString(request.bundledResourceRoot))) {
-        QString root = pathToQString(request.bundledResourceRoot);
+        QString root = EphemerisDataFileUtilities::pathToQString(request.bundledResourceRoot);
         if (!root.endsWith('/')) {
             root += '/';
         }
-        return root + pathToQString(sourceRelativePath);
+        return root + EphemerisDataFileUtilities::pathToQString(sourceRelativePath);
     }
 
-    return pathToQString(request.bundledResourceRoot / sourceRelativePath);
-}
-
-[[nodiscard]] EphemerisDataActivationStatus
-mappedActivationStatus(const EphemerisDataPayloadReader::Status status) noexcept
-{
-    switch (status) {
-    case EphemerisDataPayloadReader::Status::UnsupportedCompression:
-        return EphemerisDataActivationStatus::UnsupportedCompression;
-    case EphemerisDataPayloadReader::Status::CorruptArchive:
-        return EphemerisDataActivationStatus::CorruptArchive;
-    case EphemerisDataPayloadReader::Status::Canceled:
-        return EphemerisDataActivationStatus::Canceled;
-    case EphemerisDataPayloadReader::Status::IoError:
-        return EphemerisDataActivationStatus::IoError;
-    case EphemerisDataPayloadReader::Status::OutputLimitExceeded:
-        return EphemerisDataActivationStatus::ChecksumMismatch;
-    case EphemerisDataPayloadReader::Status::Read:
-        break;
-    }
-
-    return EphemerisDataActivationStatus::IoError;
+    return EphemerisDataFileUtilities::pathToQString(request.bundledResourceRoot / sourceRelativePath);
 }
 
 }  // namespace
@@ -243,7 +192,7 @@ mappedActivationStatus(const EphemerisDataPayloadReader::Status status) noexcept
 EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisDataActivationRequest& request)
 {
     EphemerisDataActivationResult result;
-    if (cancellationRequested(request.cancellationRequested)) {
+    if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
         markCanceled(result);
         return result;
     }
@@ -256,7 +205,8 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         return result;
     }
     if (!request.asset->live
-        && (request.asset->checksum.algorithm != "sha256" || request.asset->checksum.value.empty())) {
+        && (request.asset->checksum.algorithm != EphemerisDataFileUtilities::kSha256Algorithm
+            || request.asset->checksum.value.empty())) {
         addDiagnostic(result, "Ephemeris data activation requires a sha256 checksum for the active asset bytes.");
         return result;
     }
@@ -278,7 +228,7 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
     }
 
     const std::filesystem::path targetPath = request.writableCacheRoot / *relativeTargetPath;
-    const QString targetPathString = pathToQString(targetPath);
+    const QString targetPathString = EphemerisDataFileUtilities::pathToQString(targetPath);
     result.activePath = targetPath;
     if (existingTargetIsCurrent(*request.asset, targetPathString, result)) {
         result.status = EphemerisDataActivationStatus::AlreadyActive;
@@ -292,7 +242,7 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         addDiagnostic(result, "Bundled ephemeris data asset source file is missing.");
         return result;
     }
-    if (!request.asset->live && !sourceSizeMatchesMetadata(sourceInfo, *request.asset)) {
+    if (!request.asset->live && !EphemerisDataFileUtilities::sourceSizeMatchesMetadata(sourceInfo, *request.asset)) {
         result.status = EphemerisDataActivationStatus::ChecksumMismatch;
         addDiagnostic(result, "Bundled ephemeris data asset compressed size does not match manifest metadata.");
         return result;
@@ -329,11 +279,11 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
     );
     result.diagnostics.insert(result.diagnostics.end(), payload.diagnostics.begin(), payload.diagnostics.end());
     if (payload.status != EphemerisDataPayloadReader::Status::Read) {
-        result.status = mappedActivationStatus(payload.status);
+        result.status = EphemerisDataFileUtilities::payloadStatus<EphemerisDataActivationStatus>(payload.status);
         targetFile.cancelWriting();
         return result;
     }
-    if (cancellationRequested(request.cancellationRequested)) {
+    if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
         markCanceled(result);
         targetFile.cancelWriting();
         return result;
@@ -344,7 +294,7 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         targetFile.cancelWriting();
         return result;
     }
-    if (cancellationRequested(request.cancellationRequested)) {
+    if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
         markCanceled(result);
         targetFile.cancelWriting();
         return result;
@@ -364,15 +314,14 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         return result;
     }
     if (!request.asset->live
-        && QByteArray::fromStdString(payload.checksum).toLower()
-               != QByteArray::fromStdString(request.asset->checksum.value).toLower()) {
+        && !EphemerisDataFileUtilities::checksumsMatch(payload.checksum, request.asset->checksum.value)) {
         result.status = EphemerisDataActivationStatus::ChecksumMismatch;
         addDiagnostic(result, "Activated ephemeris data asset checksum does not match manifest metadata.");
         targetFile.cancelWriting();
         return result;
     }
 
-    if (cancellationRequested(request.cancellationRequested)) {
+    if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
         markCanceled(result);
         targetFile.cancelWriting();
         return result;

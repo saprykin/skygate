@@ -1,4 +1,5 @@
 #include "EphemerisStagedUpdateVerification.hpp"
+#include "EphemerisDataFileUtilities.hpp"
 #include "EphemerisDataPayloadReader.hpp"
 
 #include <QFile>
@@ -36,34 +37,9 @@ protected:
     }
 };
 
-[[nodiscard]] QString pathToQString(const std::filesystem::path& path)
-{
-    return QString::fromStdString(path.generic_string());
-}
-
-[[nodiscard]] bool hasUnsafePathComponent(const std::filesystem::path& path)
-{
-    if (path.empty() || path.is_absolute()) {
-        return true;
-    }
-
-    for (const std::filesystem::path& component : path) {
-        if (component.empty() || component == "." || component == "..") {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 void addDiagnostic(EphemerisStagedUpdateVerificationResult& result, const std::string_view diagnostic)
 {
     result.diagnostics.emplace_back(diagnostic);
-}
-
-[[nodiscard]] bool cancellationRequested(const std::function<bool()>& callback)
-{
-    return callback != nullptr && callback();
 }
 
 void markCanceled(EphemerisStagedUpdateVerificationResult& result)
@@ -72,16 +48,10 @@ void markCanceled(EphemerisStagedUpdateVerificationResult& result)
     addDiagnostic(result, "Staged ephemeris update verification was canceled.");
 }
 
-[[nodiscard]] bool sourceSizeMatchesMetadata(const QFileInfo& sourceInfo, const EphemerisDataManifest::Asset& asset)
-{
-    return !asset.compression.compressedSizeBytes.has_value()
-           || sourceInfo.size() == static_cast<qint64>(*asset.compression.compressedSizeBytes);
-}
-
 [[nodiscard]] QString
 stagedSourcePath(const std::filesystem::path& stagedResourceRoot, const EphemerisDataManifest::Asset& asset)
 {
-    return pathToQString(stagedResourceRoot / std::filesystem::path(asset.relativePath));
+    return EphemerisDataFileUtilities::pathToQString(stagedResourceRoot / std::filesystem::path(asset.relativePath));
 }
 
 [[nodiscard]] bool isValidDateRange(const EphemerisDateRange& range) noexcept
@@ -121,12 +91,13 @@ validateAssetMetadata(const EphemerisDataManifest::Asset& asset, EphemerisStaged
         addDiagnostic(result, "Staged ephemeris asset metadata requires id, profile, version, and relative path.");
         valid = false;
     }
-    if (!asset.live && (asset.checksum.algorithm != "sha256" || asset.checksum.value.empty())) {
+    if (!asset.live
+        && (asset.checksum.algorithm != EphemerisDataFileUtilities::kSha256Algorithm || asset.checksum.value.empty())) {
         addDiagnostic(result, "Staged ephemeris asset metadata requires a sha256 checksum.");
         valid = false;
     }
     const std::filesystem::path relativePath(asset.relativePath);
-    if (hasUnsafePathComponent(relativePath)) {
+    if (EphemerisDataFileUtilities::hasUnsafePathComponent(relativePath)) {
         addDiagnostic(result, "Staged ephemeris asset metadata contains an unsafe relative path.");
         valid = false;
     }
@@ -148,27 +119,6 @@ validateAssetMetadata(const EphemerisDataManifest::Asset& asset, EphemerisStaged
     return valid;
 }
 
-[[nodiscard]] EphemerisStagedUpdateVerificationStatus
-mappedVerificationStatus(const EphemerisDataPayloadReader::Status status) noexcept
-{
-    switch (status) {
-    case EphemerisDataPayloadReader::Status::UnsupportedCompression:
-        return EphemerisStagedUpdateVerificationStatus::UnsupportedCompression;
-    case EphemerisDataPayloadReader::Status::CorruptArchive:
-        return EphemerisStagedUpdateVerificationStatus::CorruptArchive;
-    case EphemerisDataPayloadReader::Status::Canceled:
-        return EphemerisStagedUpdateVerificationStatus::Canceled;
-    case EphemerisDataPayloadReader::Status::IoError:
-        return EphemerisStagedUpdateVerificationStatus::IoError;
-    case EphemerisDataPayloadReader::Status::OutputLimitExceeded:
-        return EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
-    case EphemerisDataPayloadReader::Status::Read:
-        break;
-    }
-
-    return EphemerisStagedUpdateVerificationStatus::IoError;
-}
-
 [[nodiscard]] bool verifyAssetPayload(
     const EphemerisDataManifest::Asset& asset,
     const QString& sourcePath,
@@ -176,7 +126,7 @@ mappedVerificationStatus(const EphemerisDataPayloadReader::Status status) noexce
     const std::function<bool()>& cancellationCallback
 )
 {
-    if (cancellationRequested(cancellationCallback)) {
+    if (EphemerisDataFileUtilities::cancellationRequested(cancellationCallback)) {
         markCanceled(result);
         return false;
     }
@@ -187,7 +137,7 @@ mappedVerificationStatus(const EphemerisDataPayloadReader::Status status) noexce
         addDiagnostic(result, "Staged ephemeris asset file is missing.");
         return false;
     }
-    if (!asset.live && !sourceSizeMatchesMetadata(sourceInfo, asset)) {
+    if (!asset.live && !EphemerisDataFileUtilities::sourceSizeMatchesMetadata(sourceInfo, asset)) {
         result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
         addDiagnostic(result, "Staged ephemeris asset size does not match manifest metadata.");
         return false;
@@ -215,7 +165,8 @@ mappedVerificationStatus(const EphemerisDataPayloadReader::Status status) noexce
         asset.live ? std::nullopt : asset.compression.uncompressedSizeBytes
     );
     if (payload.status != EphemerisDataPayloadReader::Status::Read) {
-        result.status = mappedVerificationStatus(payload.status);
+        result.status =
+            EphemerisDataFileUtilities::payloadStatus<EphemerisStagedUpdateVerificationStatus>(payload.status);
         result.diagnostics.insert(result.diagnostics.end(), payload.diagnostics.begin(), payload.diagnostics.end());
         return false;
     }
@@ -230,9 +181,7 @@ mappedVerificationStatus(const EphemerisDataPayloadReader::Status status) noexce
         addDiagnostic(result, "Staged ephemeris asset uncompressed size does not match manifest metadata.");
         return false;
     }
-    if (!asset.live
-        && QByteArray::fromStdString(payload.checksum).toLower()
-               != QByteArray::fromStdString(asset.checksum.value).toLower()) {
+    if (!asset.live && !EphemerisDataFileUtilities::checksumsMatch(payload.checksum, asset.checksum.value)) {
         result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
         addDiagnostic(result, "Staged ephemeris asset checksum does not match manifest metadata.");
         return false;
@@ -247,7 +196,7 @@ EphemerisStagedUpdateVerificationResult
 EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificationRequest& request)
 {
     EphemerisStagedUpdateVerificationResult result;
-    if (cancellationRequested(request.cancellationRequested)) {
+    if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
         markCanceled(result);
         return result;
     }
@@ -274,7 +223,7 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
     std::unordered_set<std::string> seenAssetIds;
     std::vector<EphemerisDataManifest::AssetKind> presentKinds;
     for (const std::string& assetId : profile->assetIds) {
-        if (cancellationRequested(request.cancellationRequested)) {
+        if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
             markCanceled(result);
             return result;
         }
@@ -303,7 +252,7 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
     }
 
     for (const EphemerisStagedUpdateVerificationRequest::ExpectedComponent& component : request.expectedComponents) {
-        if (cancellationRequested(request.cancellationRequested)) {
+        if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
             markCanceled(result);
             return result;
         }
@@ -344,7 +293,7 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
     }
 
     for (const EphemerisDataManifest::AssetKind kind : request.requiredKinds) {
-        if (cancellationRequested(request.cancellationRequested)) {
+        if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
             markCanceled(result);
             return result;
         }
@@ -356,7 +305,7 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
     }
 
     for (const std::string& assetId : profile->assetIds) {
-        if (cancellationRequested(request.cancellationRequested)) {
+        if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
             markCanceled(result);
             return result;
         }
