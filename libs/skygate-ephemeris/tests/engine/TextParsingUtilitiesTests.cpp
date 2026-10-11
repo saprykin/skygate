@@ -18,10 +18,8 @@ private slots:
     void parsesBooleansStrictly();
     void preservesEmptyCommaSeparatedFields();
     void clipsFixedColumns();
-    void consumesLinesPreservingWhitespace();
     void parsesAstronomicalUtcDates();
     void parsesIntegersStrictly();
-    void parsesFiniteDoublesStrictly();
 };
 
 void TextParsingUtilitiesTests::parsesBooleansStrictly()
@@ -69,21 +67,6 @@ void TextParsingUtilitiesTests::clipsFixedColumns()
     QVERIFY(TextParsingUtilities::fixedColumn("", 0U, 10U).empty());
 }
 
-void TextParsingUtilitiesTests::consumesLinesPreservingWhitespace()
-{
-    std::string_view remaining = "  first \t\r\n\nsecond\nlast\r";
-    QCOMPARE(TextParsingUtilities::takeLine(remaining), std::string_view("  first \t"));
-    QCOMPARE(remaining, std::string_view("\nsecond\nlast\r"));
-    QVERIFY(TextParsingUtilities::takeLine(remaining).empty());
-    QCOMPARE(TextParsingUtilities::takeLine(remaining), std::string_view("second"));
-    QCOMPARE(TextParsingUtilities::takeLine(remaining), std::string_view("last"));
-    QVERIFY(remaining.empty());
-    QVERIFY(TextParsingUtilities::takeLine(remaining).empty());
-    remaining = "a\rb\n";
-    QCOMPARE(TextParsingUtilities::takeLine(remaining), std::string_view("a\rb"));
-    QVERIFY(remaining.empty());
-}
-
 void TextParsingUtilitiesTests::parsesAstronomicalUtcDates()
 {
     const auto negativeYear = TextParsingUtilities::parseUtcDate(" -44-03-15 ");
@@ -119,16 +102,6 @@ void TextParsingUtilitiesTests::parsesIntegersStrictly()
     QCOMPARE(unsignedValue, std::numeric_limits<std::uint64_t>::max());
     for (const std::string_view text : {"", "-1", "+1", "12x", "18446744073709551616"}) {
         QVERIFY(!TextParsingUtilities::parseUint64(text, unsignedValue));
-    }
-}
-
-void TextParsingUtilitiesTests::parsesFiniteDoublesStrictly()
-{
-    double value = 0.0;
-    QVERIFY(TextParsingUtilities::parseFiniteDouble(" \t-1.25e2\r\n", value));
-    QCOMPARE(value, -125.0);
-    for (const std::string_view text : {"", " ", "+1.0", "1.0x", "1 2", "nan", "inf", "-inf", "1e9999"}) {
-        QVERIFY(!TextParsingUtilities::parseFiniteDouble(text, value));
     }
 }
 

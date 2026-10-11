@@ -1,6 +1,8 @@
 #include "EarthOrientationDataParser.hpp"
 #include "EphemerisTableMetadata.hpp"
 #include "IEphemerisDataSnapshot.hpp"
+#include "NumericParsingUtilities.hpp"
+#include "StringUtilities.hpp"
 #include "TextParsingUtilities.hpp"
 #include "time/CalendarTime.hpp"
 
@@ -170,15 +172,13 @@ constexpr double kFinalsTwoDigitYearPivotMjd = 51543.0;
     int twoDigitYear = 0;
     int month = 0;
     int day = 0;
-    double mjd = 0.0;
-    double polarMotionXArcseconds = 0.0;
-    double polarMotionYArcseconds = 0.0;
-    double ut1MinusUtcSeconds = 0.0;
+    const std::optional<double> mjd = NumericParsingUtilities::parseFiniteDouble(columns[3]);
+    const std::optional<double> polarMotionXArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[5]);
+    const std::optional<double> polarMotionYArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[7]);
+    const std::optional<double> ut1MinusUtcSeconds = NumericParsingUtilities::parseFiniteDouble(columns[10]);
     if (!TextParsingUtilities::parseInt(columns[0], twoDigitYear) || !TextParsingUtilities::parseInt(columns[1], month)
-        || !TextParsingUtilities::parseInt(columns[2], day) || !TextParsingUtilities::parseFiniteDouble(columns[3], mjd)
-        || !TextParsingUtilities::parseFiniteDouble(columns[5], polarMotionXArcseconds)
-        || !TextParsingUtilities::parseFiniteDouble(columns[7], polarMotionYArcseconds)
-        || !TextParsingUtilities::parseFiniteDouble(columns[10], ut1MinusUtcSeconds)) {
+        || !TextParsingUtilities::parseInt(columns[2], day) || !mjd.has_value() || !polarMotionXArcseconds.has_value()
+        || !polarMotionYArcseconds.has_value() || !ut1MinusUtcSeconds.has_value()) {
         return false;
     }
 
@@ -186,12 +186,12 @@ constexpr double kFinalsTwoDigitYearPivotMjd = 51543.0;
         twoDigitYear,
         month,
         day,
-        mjd,
+        *mjd,
         columns[4].front(),
         columns[9].front(),
-        polarMotionXArcseconds,
-        polarMotionYArcseconds,
-        ut1MinusUtcSeconds,
+        *polarMotionXArcseconds,
+        *polarMotionYArcseconds,
+        *ut1MinusUtcSeconds,
         entry
     );
 }
@@ -209,28 +209,23 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     int twoDigitYear = 0;
     int month = 0;
     int day = 0;
-    double mjd = 0.0;
+    const std::optional<double> mjd =
+        NumericParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 7U, 8U));
     if (!TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 0U, 2U), twoDigitYear)
         || !TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 2U, 2U), month)
-        || !TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 4U, 2U), day)
-        || !TextParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 7U, 8U), mjd)) {
+        || !TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 4U, 2U), day) || !mjd.has_value()) {
         return false;
     }
 
     const char polarMotionFlag = line.size() > 16U ? line[16U] : '\0';
     const char ut1Flag = line.size() > 57U ? line[57U] : '\0';
-    double polarMotionXArcseconds = 0.0;
-    double polarMotionYArcseconds = 0.0;
-    double ut1MinusUtcSeconds = 0.0;
-    if (!TextParsingUtilities::parseFiniteDouble(
-            TextParsingUtilities::fixedColumn(line, 18U, 9U), polarMotionXArcseconds
-        )
-        || !TextParsingUtilities::parseFiniteDouble(
-            TextParsingUtilities::fixedColumn(line, 37U, 9U), polarMotionYArcseconds
-        )
-        || !TextParsingUtilities::parseFiniteDouble(
-            TextParsingUtilities::fixedColumn(line, 58U, 10U), ut1MinusUtcSeconds
-        )) {
+    const std::optional<double> polarMotionXArcseconds =
+        NumericParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 18U, 9U));
+    const std::optional<double> polarMotionYArcseconds =
+        NumericParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 37U, 9U));
+    const std::optional<double> ut1MinusUtcSeconds =
+        NumericParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 58U, 10U));
+    if (!polarMotionXArcseconds.has_value() || !polarMotionYArcseconds.has_value() || !ut1MinusUtcSeconds.has_value()) {
         return false;
     }
 
@@ -238,12 +233,12 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
         twoDigitYear,
         month,
         day,
-        mjd,
+        *mjd,
         polarMotionFlag,
         ut1Flag,
-        polarMotionXArcseconds,
-        polarMotionYArcseconds,
-        ut1MinusUtcSeconds,
+        *polarMotionXArcseconds,
+        *polarMotionYArcseconds,
+        *ut1MinusUtcSeconds,
         entry
     );
 }
@@ -258,14 +253,12 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     int year = 0;
     int month = 0;
     int day = 0;
-    double polarMotionXArcseconds = 0.0;
-    double polarMotionYArcseconds = 0.0;
-    double ut1MinusUtcSeconds = 0.0;
+    const std::optional<double> polarMotionXArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[4]);
+    const std::optional<double> polarMotionYArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[5]);
+    const std::optional<double> ut1MinusUtcSeconds = NumericParsingUtilities::parseFiniteDouble(columns[6]);
     if (!TextParsingUtilities::parseInt(columns[0], year) || !TextParsingUtilities::parseInt(columns[1], month)
-        || !TextParsingUtilities::parseInt(columns[2], day)
-        || !TextParsingUtilities::parseFiniteDouble(columns[4], polarMotionXArcseconds)
-        || !TextParsingUtilities::parseFiniteDouble(columns[5], polarMotionYArcseconds)
-        || !TextParsingUtilities::parseFiniteDouble(columns[6], ut1MinusUtcSeconds)) {
+        || !TextParsingUtilities::parseInt(columns[2], day) || !polarMotionXArcseconds.has_value()
+        || !polarMotionYArcseconds.has_value() || !ut1MinusUtcSeconds.has_value()) {
         return false;
     }
 
@@ -285,9 +278,9 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     }
 
     entry.effectiveUtcEpoch = *effectiveEpoch;
-    entry.ut1MinusUtcSeconds = ut1MinusUtcSeconds;
-    entry.polarMotionXArcseconds = polarMotionXArcseconds;
-    entry.polarMotionYArcseconds = polarMotionYArcseconds;
+    entry.ut1MinusUtcSeconds = *ut1MinusUtcSeconds;
+    entry.polarMotionXArcseconds = *polarMotionXArcseconds;
+    entry.polarMotionYArcseconds = *polarMotionYArcseconds;
     entry.predicted = false;
     entry.estimated = false;
     return true;
@@ -305,14 +298,13 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     }
 
     const std::optional<skygate::core::CivilDateTime> effectiveDate = TextParsingUtilities::parseUtcDate(columns[0]);
-    double ut1MinusUtcSeconds = 0.0;
-    double polarMotionXArcseconds = 0.0;
-    double polarMotionYArcseconds = 0.0;
+    const std::optional<double> ut1MinusUtcSeconds = NumericParsingUtilities::parseFiniteDouble(columns[1]);
+    const std::optional<double> polarMotionXArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[2]);
+    const std::optional<double> polarMotionYArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[3]);
     bool predicted = false;
     bool estimated = false;
-    if (!effectiveDate.has_value() || !TextParsingUtilities::parseFiniteDouble(columns[1], ut1MinusUtcSeconds)
-        || !TextParsingUtilities::parseFiniteDouble(columns[2], polarMotionXArcseconds)
-        || !TextParsingUtilities::parseFiniteDouble(columns[3], polarMotionYArcseconds)) {
+    if (!effectiveDate.has_value() || !ut1MinusUtcSeconds.has_value() || !polarMotionXArcseconds.has_value()
+        || !polarMotionYArcseconds.has_value()) {
         return parseIersC04EntryLine(line, entry);
     }
     if (columns.size() == 5U && !TextParsingUtilities::parseBool(columns[4], predicted)) {
@@ -331,9 +323,9 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     }
 
     entry.effectiveUtcEpoch = *effectiveEpoch;
-    entry.ut1MinusUtcSeconds = ut1MinusUtcSeconds;
-    entry.polarMotionXArcseconds = polarMotionXArcseconds;
-    entry.polarMotionYArcseconds = polarMotionYArcseconds;
+    entry.ut1MinusUtcSeconds = *ut1MinusUtcSeconds;
+    entry.polarMotionXArcseconds = *polarMotionXArcseconds;
+    entry.polarMotionYArcseconds = *polarMotionYArcseconds;
     entry.predicted = predicted;
     entry.estimated = estimated;
     return true;
@@ -346,22 +338,21 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
         int twoDigitYear = 0;
         int month = 0;
         int day = 0;
-        double mjd = 0.0;
+        const std::optional<double> mjd = NumericParsingUtilities::parseFiniteDouble(columns[3]);
         return TextParsingUtilities::parseInt(columns[0], twoDigitYear)
                && TextParsingUtilities::parseInt(columns[1], month) && TextParsingUtilities::parseInt(columns[2], day)
-               && TextParsingUtilities::parseFiniteDouble(columns[3], mjd)
-               && finalsYearFromMjd(twoDigitYear, mjd).has_value();
+               && mjd.has_value() && finalsYearFromMjd(twoDigitYear, *mjd).has_value();
     }
 
     int twoDigitYear = 0;
     int month = 0;
     int day = 0;
-    double mjd = 0.0;
+    const std::optional<double> mjd =
+        NumericParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 7U, 8U));
     if (!TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 0U, 2U), twoDigitYear)
         || !TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 2U, 2U), month)
-        || !TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 4U, 2U), day)
-        || !TextParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 7U, 8U), mjd)
-        || !finalsYearFromMjd(twoDigitYear, mjd).has_value()) {
+        || !TextParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 4U, 2U), day) || !mjd.has_value()
+        || !finalsYearFromMjd(twoDigitYear, *mjd).has_value()) {
         return false;
     }
 
@@ -406,9 +397,9 @@ EarthOrientationDataParser::Result EarthOrientationDataParser::parse(const Ephem
     std::size_t lineNumber = 0U;
     while (!remaining.empty()) {
         ++lineNumber;
-        std::string_view line = TextParsingUtilities::takeLine(remaining);
+        std::string_view line = StringUtilities::takeLine(remaining);
 
-        const std::string_view trimmedLine = TextParsingUtilities::trimAsciiWhitespace(line);
+        const std::string_view trimmedLine = StringUtilities::trimAsciiWhitespace(line);
         if (trimmedLine.empty()) {
             continue;
         }

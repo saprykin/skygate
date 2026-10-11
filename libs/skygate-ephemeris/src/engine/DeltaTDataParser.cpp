@@ -1,6 +1,8 @@
 #include "DeltaTDataParser.hpp"
 #include "EphemerisTableMetadata.hpp"
 #include "IEphemerisDataSnapshot.hpp"
+#include "NumericParsingUtilities.hpp"
+#include "StringUtilities.hpp"
 #include "TextParsingUtilities.hpp"
 #include "time/CalendarTime.hpp"
 
@@ -95,30 +97,30 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     if (std::optional<std::string> value =
             TextParsingUtilities::metadataValue(line, "ancient_fallback_delta_t_seconds");
         value.has_value()) {
-        double seconds = 0.0;
-        if (!TextParsingUtilities::parseFiniteDouble(*value, seconds)) {
+        const std::optional<double> seconds = NumericParsingUtilities::parseFiniteDouble(*value);
+        if (!seconds.has_value()) {
             return "Delta T data contains malformed ancient fallback estimate metadata at line "
                    + std::to_string(lineNumber) + ".";
         }
 
         IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
             info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
-        fallback.representativeDeltaTSeconds = seconds;
+        fallback.representativeDeltaTSeconds = *seconds;
         info.ancientFallbackModel = std::move(fallback);
         return std::nullopt;
     }
     if (std::optional<std::string> value =
             TextParsingUtilities::metadataValue(line, "ancient_fallback_uncertainty_seconds");
         value.has_value()) {
-        double seconds = 0.0;
-        if (!TextParsingUtilities::parseFiniteDouble(*value, seconds) || seconds < 0.0) {
+        const std::optional<double> seconds = NumericParsingUtilities::parseFiniteDouble(*value);
+        if (!seconds.has_value() || *seconds < 0.0) {
             return "Delta T data contains malformed ancient fallback uncertainty metadata at line "
                    + std::to_string(lineNumber) + ".";
         }
 
         IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
             info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
-        fallback.estimatedUncertaintySeconds = seconds;
+        fallback.estimatedUncertaintySeconds = *seconds;
         info.ancientFallbackModel = std::move(fallback);
         return std::nullopt;
     }
@@ -138,9 +140,14 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     int year = 0;
     int month = 0;
     int day = 1;
+    const std::optional<double> fourthColumnSeconds =
+        columns.size() >= 4U ? NumericParsingUtilities::parseFiniteDouble(columns[3]) : std::nullopt;
+    const std::optional<double> thirdColumnSeconds =
+        columns.size() >= 3U ? NumericParsingUtilities::parseFiniteDouble(columns[2]) : std::nullopt;
     if (columns.size() >= 4U && TextParsingUtilities::parseInt(columns[0], year)
         && TextParsingUtilities::parseInt(columns[1], month) && TextParsingUtilities::parseInt(columns[2], day)
-        && month >= 1 && month <= 12 && TextParsingUtilities::parseFiniteDouble(columns[3], deltaTSeconds)) {
+        && month >= 1 && month <= 12 && fourthColumnSeconds.has_value()) {
+        deltaTSeconds = *fourthColumnSeconds;
         effectiveDate.astronomicalYear = year;
         effectiveDate.month = month;
         effectiveDate.day = day;
@@ -148,19 +155,21 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     } else if (
         columns.size() >= 3U && TextParsingUtilities::parseInt(columns[0], year)
         && TextParsingUtilities::parseInt(columns[1], month) && month >= 1 && month <= 12
-        && TextParsingUtilities::parseFiniteDouble(columns[2], deltaTSeconds)
+        && thirdColumnSeconds.has_value()
     ) {
+        deltaTSeconds = *thirdColumnSeconds;
         effectiveDate.astronomicalYear = year;
         effectiveDate.month = month;
         effectiveDate.day = 1;
         effectiveDate.timeScale = skygate::core::TimeScale::Utc;
     } else {
-        double decimalYear = 0.0;
-        if (!TextParsingUtilities::parseFiniteDouble(columns[0], decimalYear)
-            || !TextParsingUtilities::parseFiniteDouble(columns[1], deltaTSeconds)) {
+        const std::optional<double> decimalYear = NumericParsingUtilities::parseFiniteDouble(columns[0]);
+        const std::optional<double> seconds = NumericParsingUtilities::parseFiniteDouble(columns[1]);
+        if (!decimalYear.has_value() || !seconds.has_value()) {
             return false;
         }
-        effectiveDate = skygate::core::CalendarTime::civilDateFromDecimalYear(decimalYear);
+        deltaTSeconds = *seconds;
+        effectiveDate = skygate::core::CalendarTime::civilDateFromDecimalYear(*decimalYear);
     }
 
     if (!skygate::core::CalendarTime::isValidCivilDateTime(effectiveDate)) {
@@ -189,8 +198,8 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     }
 
     const std::optional<skygate::core::CivilDateTime> effectiveDate = TextParsingUtilities::parseUtcDate(columns[0]);
-    double deltaTSeconds = 0.0;
-    if (!effectiveDate.has_value() || !TextParsingUtilities::parseFiniteDouble(columns[1], deltaTSeconds)) {
+    const std::optional<double> deltaTSeconds = NumericParsingUtilities::parseFiniteDouble(columns[1]);
+    if (!effectiveDate.has_value() || !deltaTSeconds.has_value()) {
         return false;
     }
 
@@ -201,7 +210,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     }
 
     entry.effectiveUtcEpoch = *effectiveEpoch;
-    entry.deltaTSeconds = deltaTSeconds;
+    entry.deltaTSeconds = *deltaTSeconds;
     return true;
 }
 
@@ -231,9 +240,9 @@ DeltaTDataParser::Result DeltaTDataParser::parse(const EphemerisTextDataAsset& a
     std::size_t lineNumber = 0U;
     while (!remaining.empty()) {
         ++lineNumber;
-        std::string_view line = TextParsingUtilities::takeLine(remaining);
+        std::string_view line = StringUtilities::takeLine(remaining);
 
-        line = TextParsingUtilities::trimAsciiWhitespace(line);
+        line = StringUtilities::trimAsciiWhitespace(line);
         if (line.empty()) {
             continue;
         }

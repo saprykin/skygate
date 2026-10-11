@@ -12,6 +12,7 @@ class StringUtilitiesTests final : public QObject {
 private slots:
     void normalizesAsciiStrings();
     void recognizesAsciiWhitespaceCharacters();
+    void consumesLinesPreservingWhitespace();
     void appendsUniqueValuesIgnoringAsciiCase();
 };
 
@@ -39,6 +40,23 @@ void StringUtilitiesTests::recognizesAsciiWhitespaceCharacters()
     QVERIFY(StringUtilities::isAsciiWhitespace('\f'));
     QVERIFY(!StringUtilities::isAsciiWhitespace('A'));
     QVERIFY(!StringUtilities::isAsciiWhitespace('\0'));
+}
+
+void StringUtilitiesTests::consumesLinesPreservingWhitespace()
+{
+    using namespace skygate::ephemeris;
+
+    std::string_view remaining = "  first \t\r\n\nsecond\nlast\r";
+    QCOMPARE(StringUtilities::takeLine(remaining), std::string_view("  first \t"));
+    QCOMPARE(remaining, std::string_view("\nsecond\nlast\r"));
+    QVERIFY(StringUtilities::takeLine(remaining).empty());
+    QCOMPARE(StringUtilities::takeLine(remaining), std::string_view("second"));
+    QCOMPARE(StringUtilities::takeLine(remaining), std::string_view("last"));
+    QVERIFY(remaining.empty());
+    QVERIFY(StringUtilities::takeLine(remaining).empty());
+    remaining = "a\rb\n";
+    QCOMPARE(StringUtilities::takeLine(remaining), std::string_view("a\rb"));
+    QVERIFY(remaining.empty());
 }
 
 void StringUtilitiesTests::appendsUniqueValuesIgnoringAsciiCase()

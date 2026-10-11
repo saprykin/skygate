@@ -1,6 +1,7 @@
 #include "LeapSecondTableParser.hpp"
 #include "EphemerisTableMetadata.hpp"
 #include "IEphemerisDataSnapshot.hpp"
+#include "StringUtilities.hpp"
 #include "TextParsingUtilities.hpp"
 #include "time/CalendarTime.hpp"
 #include "time/EpochCodec.hpp"
@@ -94,7 +95,7 @@ applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view l
 [[nodiscard]] bool parseIanaEntryLine(std::string_view line, ILeapSecondProvider::TableEntry& entry) noexcept
 {
     const std::size_t commentOffset = line.find('#');
-    const std::string_view payload = TextParsingUtilities::trimAsciiWhitespace(
+    const std::string_view payload = StringUtilities::trimAsciiWhitespace(
         commentOffset == std::string_view::npos ? line : line.substr(0U, commentOffset)
     );
     const std::vector<std::string_view> columns = TextParsingUtilities::splitAsciiWhitespace(payload);
@@ -156,9 +157,9 @@ LeapSecondTableParser::Result LeapSecondTableParser::parse(const EphemerisTextDa
     std::size_t lineNumber = 0U;
     while (!remaining.empty()) {
         ++lineNumber;
-        std::string_view line = TextParsingUtilities::takeLine(remaining);
+        std::string_view line = StringUtilities::takeLine(remaining);
 
-        line = TextParsingUtilities::trimAsciiWhitespace(line);
+        line = StringUtilities::trimAsciiWhitespace(line);
         if (line.empty()) {
             continue;
         }

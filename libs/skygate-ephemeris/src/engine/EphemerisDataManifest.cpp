@@ -1,4 +1,5 @@
 #include "EphemerisDataManifest.hpp"
+#include "StringUtilities.hpp"
 #include "TextParsingUtilities.hpp"
 #include "time/CalendarTime.hpp"
 
@@ -434,7 +435,7 @@ public:
     [[nodiscard]] static ParseResult parse(const std::string_view payload)
     {
         ParseResult result;
-        if (TextParsingUtilities::trimAsciiWhitespace(payload).empty()) {
+        if (StringUtilities::trimAsciiWhitespace(payload).empty()) {
             result.diagnostics.push_back("Manifest payload is empty.");
             return result;
         }
