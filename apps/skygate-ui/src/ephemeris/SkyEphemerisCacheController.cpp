@@ -85,11 +85,6 @@ void addDiagnostics(StagedUpdateActivationResult& result, const std::vector<std:
     }
 }
 
-bool cancellationRequested(const std::function<bool()>& callback)
-{
-    return callback != nullptr && callback();
-}
-
 void markCanceled(StagedUpdateActivationResult& result, QString diagnostic)
 {
     result.status = StagedUpdateActivationStatus::Canceled;
@@ -299,7 +294,9 @@ SkyEphemerisCacheController::StagedUpdateActivationResult SkyEphemerisCacheContr
 ) const
 {
     StagedUpdateActivationResult result;
-    const auto isCanceled = [&request] { return cancellationRequested(request.cancellationRequested); };
+    const auto isCanceled = [&request] {
+        return EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested);
+    };
     if (isCanceled()) {
         markCanceled(result, QStringLiteral("Ephemeris staged update activation was canceled before verification."));
         cleanupCanceledStagingRoot(request, activeSnapshot, result);

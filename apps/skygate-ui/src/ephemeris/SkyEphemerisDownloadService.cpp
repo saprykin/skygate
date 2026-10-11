@@ -53,11 +53,6 @@ void addDiagnostic(StagedUpdateDownloadResult& result, QString diagnostic)
     }
 }
 
-bool cancellationRequested(const std::function<bool()>& callback)
-{
-    return callback != nullptr && callback();
-}
-
 void markCanceled(StagedUpdateDownloadResult& result, QString diagnostic)
 {
     result.status = StagedUpdateDownloadStatus::Canceled;
@@ -213,7 +208,9 @@ void SkyEphemerisDownloadService::stageInternal(
     const bool allowNetwork
 )
 {
-    const auto isCanceled = [&request] { return cancellationRequested(request.cancellationRequested); };
+    const auto isCanceled = [&request] {
+        return EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested);
+    };
 
     if (isCanceled()) {
         StagedUpdateDownloadResult result;
@@ -292,7 +289,9 @@ SkyEphemerisDownloadService::StagedUpdateDownloadResult
 SkyEphemerisDownloadService::stageLocalFile(const StagedUpdateDownloadRequest& request, const QString& sourcePath)
 {
     StagedUpdateDownloadResult result;
-    const auto isCanceled = [&request] { return cancellationRequested(request.cancellationRequested); };
+    const auto isCanceled = [&request] {
+        return EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested);
+    };
 
     const std::filesystem::path relativePath(request.asset->relativePath);
     result.stagedPath =
@@ -371,7 +370,7 @@ void SkyEphemerisDownloadService::stageNetworkUrl(
         if (state->completed) {
             return;
         }
-        if (cancellationRequested(state->request.cancellationRequested)) {
+        if (EphemerisDataFileUtilities::cancellationRequested(state->request.cancellationRequested)) {
             state->reply->abort();
             return;
         }
@@ -420,7 +419,8 @@ void SkyEphemerisDownloadService::stageNetworkUrl(
 
     state->cancellationTimer = new QTimer(this);
     QObject::connect(state->cancellationTimer, &QTimer::timeout, this, [state] {
-        if (!state->completed && cancellationRequested(state->request.cancellationRequested)) {
+        if (!state->completed
+            && EphemerisDataFileUtilities::cancellationRequested(state->request.cancellationRequested)) {
             state->reply->abort();
         }
     });
@@ -456,7 +456,7 @@ void SkyEphemerisDownloadService::stageNetworkUrl(
         const QString networkErrorText = state->reply->errorString();
         state->reply->deleteLater();
 
-        if (cancellationRequested(state->request.cancellationRequested)) {
+        if (EphemerisDataFileUtilities::cancellationRequested(state->request.cancellationRequested)) {
             state->stagedFile->close();
             markCanceled(state->result, QStringLiteral("Ephemeris update download was canceled during transfer."));
             cleanupCanceledDownload(state->request, state->result);
