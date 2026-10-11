@@ -1,5 +1,6 @@
 #include "CalcephKernelProvider.hpp"
 #include "CalcephKernel.hpp"
+#include "CalcephKernelStatusNames.hpp"
 #include "engine/EphemerisDataFileUtilities.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "ICalcephKernel.hpp"
@@ -18,7 +19,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -204,32 +204,6 @@ public:
         return assets;
     }
 
-    [[nodiscard]] std::string_view displayName(const Status status) const noexcept
-    {
-        switch (status) {
-        case Status::Ready:
-            return "ready";
-        case Status::CalcephUnavailable:
-            return "calceph-unavailable";
-        case Status::MissingManifestProfile:
-            return "missing-manifest-profile";
-        case Status::MissingKernelAsset:
-            return "missing-kernel-asset";
-        case Status::InvalidKernelAsset:
-            return "invalid-kernel-asset";
-        case Status::MissingKernelFile:
-            return "missing-kernel-file";
-        case Status::ChecksumMismatch:
-            return "checksum-mismatch";
-        case Status::OpenFailed:
-            return "open-failed";
-        case Status::OutOfRange:
-            return "out-of-range";
-        }
-
-        return {};
-    }
-
     [[nodiscard]] bool verifySha256File(const std::filesystem::path& path, const std::string& expectedHexDigest) const
     {
         QFile file(EphemerisDataFileUtilities::pathToQString(path));
@@ -317,7 +291,9 @@ public:
     [[nodiscard]] std::shared_ptr<const ICalcephKernel> failedKernel(Status status, std::string diagnostic) const
     {
         std::vector<std::string> diagnostics;
-        diagnostics.push_back(diagnostic.empty() ? std::string{displayName(status)} : std::move(diagnostic));
+        diagnostics.push_back(
+            diagnostic.empty() ? std::string{CalcephKernelStatusNames::displayName(status)} : std::move(diagnostic)
+        );
         return std::make_shared<FailedKernel>(status, std::move(diagnostics));
     }
 

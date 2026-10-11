@@ -1,6 +1,7 @@
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernel.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
+#include "engine/highprecision/CalcephKernelStatusNames.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
@@ -10,6 +11,7 @@
 #include <QTemporaryDir>
 #include <QtTest/QtTest>
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -189,6 +191,7 @@ private slots:
     void reportsSelectedKernelOpenFailure();
     void rejectsNonTdbEpochsBeforeCallingKernel();
     void keepsSelectedMetadataWhenOpenFails();
+    void statusNamesCoverEveryKernelStatus();
 };
 
 void CalcephKernelProviderTests::opensSelectedModernKernel()
@@ -482,6 +485,28 @@ void CalcephKernelProviderTests::keepsSelectedMetadataWhenOpenFails()
     QVERIFY(kernelInfo.has_value());
     QVERIFY(kernelInfo->provenance == std::string{"Installed test data"});
     QVERIFY(kernelInfo->validityRange.id == std::string{"de440s-kernel-range"});
+}
+
+void CalcephKernelProviderTests::statusNamesCoverEveryKernelStatus()
+{
+    using skygate::ephemeris::highprecision::CalcephKernelStatusNames;
+    using skygate::ephemeris::highprecision::ICalcephKernel;
+
+    constexpr std::array statuses{
+        ICalcephKernel::Status::Ready,
+        ICalcephKernel::Status::CalcephUnavailable,
+        ICalcephKernel::Status::MissingManifestProfile,
+        ICalcephKernel::Status::MissingKernelAsset,
+        ICalcephKernel::Status::InvalidKernelAsset,
+        ICalcephKernel::Status::MissingKernelFile,
+        ICalcephKernel::Status::ChecksumMismatch,
+        ICalcephKernel::Status::OpenFailed,
+        ICalcephKernel::Status::OutOfRange,
+    };
+
+    for (const ICalcephKernel::Status status : statuses) {
+        QVERIFY(!CalcephKernelStatusNames::displayName(status).empty());
+    }
 }
 
 QTEST_APPLESS_MAIN(CalcephKernelProviderTests)
