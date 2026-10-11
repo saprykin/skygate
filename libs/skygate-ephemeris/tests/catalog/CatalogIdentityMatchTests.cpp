@@ -67,6 +67,7 @@ private slots:
     void keepsSuffixDesignationsDistinct();
     void mergesExplicitCrossIdentifications();
     void primaryDesignationSurvivesBinaryRoundTrip();
+    void classifiesUppercaseCanonicalDesignations();
 };
 
 void CatalogIdentityMatchTests::deduplicatesDuplicateHipStars()
@@ -656,6 +657,38 @@ void CatalogIdentityMatchTests::primaryDesignationSurvivesBinaryRoundTrip()
     QVERIFY(result.isSuccess());
     QCOMPARE(result.deepSkyObjectCount, std::size_t{1});
     QCOMPARE(CatalogMergeTestSupport::countBodiesById(result.catalog->bodies(), "external_ngc_1"), std::size_t{1});
+}
+
+void CatalogIdentityMatchTests::classifiesUppercaseCanonicalDesignations()
+{
+    const auto designation = CatalogIdentifier::designationFromCanonicalId("NGC_224");
+    QVERIFY(designation.has_value());
+    QCOMPARE(designation->key(), std::string{"ngc:224"});
+    QVERIFY(!CatalogIdentifier::designationFromCanonicalId("hip_224").has_value());
+
+    // Records that spell their canonical deep-sky ids in upper case still
+    // classify as the designations those ids denote, so a shared descriptive
+    // alias keeps them distinct instead of merging them.
+    const auto catalog = CatalogMergeTestSupport::createCatalog(
+        {},
+        {
+            CatalogMergeTestSupport::makeDeepSkyObject("NGC_224", "Upper case", {"Shared region"}),
+            CatalogMergeTestSupport::makeDeepSkyObject("ngc_598", "Lower case", {"Shared region"}),
+        }
+    );
+    QVERIFY(catalog != nullptr);
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept ngc_598 distinct from NGC_224 because their shared alias is ambiguous across "
+        "authoritative identifiers."
+    );
+    const auto result = CatalogMergeTestSupport::composePrimary(*catalog);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.deepSkyObjectCount, std::size_t{2});
+    QCOMPARE(CatalogMergeTestSupport::countBodiesById(result.catalog->bodies(), "NGC_224"), std::size_t{1});
+    QCOMPARE(CatalogMergeTestSupport::countBodiesById(result.catalog->bodies(), "ngc_598"), std::size_t{1});
 }
 
 QTEST_APPLESS_MAIN(CatalogIdentityMatchTests)

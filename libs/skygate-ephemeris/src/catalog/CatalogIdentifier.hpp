@@ -1,7 +1,9 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace skygate::ephemeris {
 
@@ -20,6 +22,20 @@ struct CatalogIdentifier {
 
     [[nodiscard]] static CatalogIdentifier make(std::string namespaceName, std::string value);
     [[nodiscard]] static std::string normalizeValue(std::string_view namespaceName, std::string_view value);
+    // Canonical body id of the form "<namespace>_<normalized value>", so a
+    // record's public id and its external identifier always agree.
+    [[nodiscard]] static std::string bodyId(std::string namespaceName, std::string value);
+    // The deep-sky designation namespaces whose canonical body ids, ngc_<n>,
+    // ic_<n>, and messier_<nnn>, are recognized designations.
+    [[nodiscard]] static bool isDeepSkyDesignationNamespace(std::string_view namespaceName) noexcept;
+    // The designation a canonical deep-sky body id was derived from, matched
+    // ASCII case-insensitively like every other identity key.
+    [[nodiscard]] static std::optional<CatalogIdentifier> designationFromCanonicalId(std::string_view canonicalId);
+    // Appends `identifier` unless it is empty or already present.
+    static bool appendUnique(std::vector<CatalogIdentifier>& identifiers, CatalogIdentifier identifier);
+    // Drops leading zeros from a catalog number, keeping a single zero for a
+    // zero value.
+    [[nodiscard]] static std::string stripLeadingZeros(std::string value);
 
     // Stable collision-free key of the form "<namespace>:<value>".
     [[nodiscard]] std::string key() const;

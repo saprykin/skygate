@@ -6,22 +6,16 @@
 #include <QRegularExpression>
 #include <QStringList>
 
-#include <algorithm>
 #include <optional>
 
 namespace skygate::ephemeris {
 namespace {
 
-struct RecognizedDesignation final {
-    QString identifierNamespace;
-    QString value;
-};
-
 // Recognizes a primary NGC or IC designation, including supported component
-// suffixes ("NGC0001", "ngc 1", "NGC1234A"). The value drops the catalog
-// prefix and the zero padding but keeps the suffix; CatalogIdentifier applies
-// the remaining per-namespace normalization.
-std::optional<RecognizedDesignation> recognizedDesignation(const QString& text)
+// suffixes ("NGC0001", "ngc 1", "NGC1234A"). The raw captured digits and
+// suffix are passed through unchanged because CatalogIdentifier owns the
+// normalization of every identifier value.
+std::optional<CatalogIdentifier> recognizedDesignation(const QString& text)
 {
     static const QRegularExpression designationPattern(
         QStringLiteral("^(NGC|IC)\\s*(\\d+)([A-Za-z]*)$"), QRegularExpression::CaseInsensitiveOption
@@ -32,10 +26,10 @@ std::optional<RecognizedDesignation> recognizedDesignation(const QString& text)
         return std::nullopt;
     }
 
-    return RecognizedDesignation{
-        .identifierNamespace = match.captured(1).toLower(),
-        .value = OpenNgcObjectMapper::withoutLeadingZeros(match.captured(2)) + match.captured(3).toLower(),
-    };
+    return CatalogIdentifier::make(
+        CatalogParsingUtilities::toUtf8String(match.captured(1)),
+        CatalogParsingUtilities::toUtf8String(match.captured(2) + match.captured(3))
+    );
 }
 
 QString normalizedCatalogAlias(QString text)
@@ -77,7 +71,9 @@ QString objectIdFromAlias(const QString& alias)
         return "ic_" + normalized.sliced(3).trimmed();
     }
     if (normalized.startsWith("M ", Qt::CaseInsensitive)) {
-        return "messier_" + normalized.sliced(2).trimmed().rightJustified(3, '0');
+        return QString::fromStdString(
+            CatalogIdentifier::bodyId("messier", CatalogParsingUtilities::toUtf8String(normalized.sliced(2).trimmed()))
+        );
     }
 
     QString id = normalized.toLower();
@@ -99,16 +95,6 @@ void appendAlias(std::vector<std::string>& aliases, const QString& alias)
     }
 
     StringUtilities::appendUniqueIgnoreAsciiCase(aliases, CatalogParsingUtilities::toUtf8String(normalized));
-}
-
-void appendIdentifierUnique(std::vector<CatalogIdentifier>& identifiers, const CatalogIdentifier& identifier)
-{
-    if (identifier.empty()) {
-        return;
-    }
-    if (std::find(identifiers.begin(), identifiers.end(), identifier) == identifiers.end()) {
-        identifiers.push_back(identifier);
-    }
 }
 
 void appendDelimitedAliases(std::vector<std::string>& aliases, const QString& text)
@@ -150,11 +136,8 @@ bool OpenNgcObjectMapper::shouldSkipType(const QString& typeText)
 
 QString OpenNgcObjectMapper::withoutLeadingZeros(const QString& value)
 {
-    QString trimmed = value.trimmed();
-    while (trimmed.size() > 1 && trimmed.startsWith('0')) {
-        trimmed.remove(0, 1);
-    }
-    return trimmed;
+    const QString trimmed = value.trimmed();
+    return QString::fromStdString(CatalogIdentifier::stripLeadingZeros(CatalogParsingUtilities::toUtf8String(trimmed)));
 }
 
 OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
@@ -187,14 +170,8 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
     // The primary Name column is itself a designation column: a recognized
     // NGC/IC name is authoritative even when the optional cross-reference
     // columns are absent.
-    if (const std::optional<RecognizedDesignation> designation = recognizedDesignation(name); designation.has_value()) {
-        appendIdentifierUnique(
-            mapping.externalIdentifiers,
-            CatalogIdentifier::make(
-                CatalogParsingUtilities::toUtf8String(designation->identifierNamespace),
-                CatalogParsingUtilities::toUtf8String(designation->value)
-            )
-        );
+    if (const std::optional<CatalogIdentifier> designation = recognizedDesignation(name); designation.has_value()) {
+        CatalogIdentifier::appendUnique(mapping.externalIdentifiers, *designation);
     }
     mapping.sourceRecordId = CatalogParsingUtilities::toUtf8String(name);
     appendAlias(mapping.aliases, name);

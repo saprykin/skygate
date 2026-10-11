@@ -332,28 +332,13 @@ QString bodyLabel(const BaseCelestialBody& body)
     return QString::fromStdString(body.id);
 }
 
-void appendIdentifierUnique(std::vector<CatalogIdentifier>& identifiers, const CatalogIdentifier& identifier)
-{
-    if (identifier.empty()) {
-        return;
-    }
-
-    const bool present =
-        std::any_of(identifiers.begin(), identifiers.end(), [&identifier](const CatalogIdentifier& existing) {
-            return existing == identifier;
-        });
-    if (!present) {
-        identifiers.push_back(identifier);
-    }
-}
-
 // Retains the union of identifiers from both records, including several
 // values in the same namespace (a single object can carry multiple NGC or IC
 // designations).
 void mergeExternalIdentifiersInto(CatalogObjectIdentity& winner, const CatalogObjectIdentity& loser)
 {
     for (const CatalogIdentifier& identifier : loser.externalIdentifiers) {
-        appendIdentifierUnique(winner.externalIdentifiers, identifier);
+        CatalogIdentifier::appendUnique(winner.externalIdentifiers, identifier);
     }
 }
 
@@ -400,10 +385,6 @@ void retainCanonicalEquivalences(
     }
 }
 
-// Namespaces whose canonical deep-sky ids are recognized designations:
-// ngc_<n>, ic_<n>, and messier_<nnn>.
-constexpr std::string_view kDeepSkyDesignationNamespaces[] = {"ngc", "ic", "messier"};
-
 // The designations a record authoritatively carries. Explicit external
 // identifiers come first; a recognized deep-sky canonical id contributes the
 // designation it was derived from, because the identity contract treats that
@@ -414,23 +395,12 @@ std::vector<CatalogIdentifier> authoritativeDesignations(const BaseCelestialBody
     std::vector<CatalogIdentifier> designations;
     designations.reserve(body.identity.externalIdentifiers.size() + 1U);
     for (const CatalogIdentifier& identifier : body.identity.externalIdentifiers) {
-        if (!identifier.empty()) {
-            designations.push_back(identifier);
-        }
+        CatalogIdentifier::appendUnique(designations, identifier);
     }
 
-    for (const std::string_view designationNamespace : kDeepSkyDesignationNamespaces) {
-        const std::string prefix = std::string(designationNamespace) + "_";
-        if (!body.id.starts_with(prefix)) {
-            continue;
-        }
-
-        CatalogIdentifier designation =
-            CatalogIdentifier::make(std::string(designationNamespace), body.id.substr(prefix.size()));
-        if (std::find(designations.begin(), designations.end(), designation) == designations.end()) {
-            designations.push_back(std::move(designation));
-        }
-        break;
+    if (const std::optional<CatalogIdentifier> designation = CatalogIdentifier::designationFromCanonicalId(body.id);
+        designation.has_value()) {
+        CatalogIdentifier::appendUnique(designations, *designation);
     }
     return designations;
 }

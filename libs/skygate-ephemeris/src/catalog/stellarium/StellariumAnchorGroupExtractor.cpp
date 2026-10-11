@@ -1,6 +1,7 @@
 #include "StellariumAnchorGroupExtractor.hpp"
 #include "StellariumHipParser.hpp"
 #include "StringUtilities.hpp"
+#include "catalog/CatalogIdentifier.hpp"
 #include "catalog/io/CatalogParsingUtilities.hpp"
 
 #include <QJsonArray>
@@ -134,7 +135,7 @@ std::vector<ConstellationAnchorGroup> StellariumAnchorGroupExtractor::extract(co
             std::vector<std::string> hipIds;
             hipIds.reserve(uniqueHips.size());
             for (const int hip : uniqueHips) {
-                hipIds.push_back("hip_" + std::to_string(hip));
+                hipIds.push_back(CatalogIdentifier::bodyId("hip", std::to_string(hip)));
             }
             const std::size_t newIndex = anchorGroups.size();
             anchorGroups.emplace_back(CatalogParsingUtilities::toUtf8String(labelText), std::move(hipIds));
@@ -146,7 +147,7 @@ std::vector<ConstellationAnchorGroup> StellariumAnchorGroupExtractor::extract(co
             anchorGroups[indexIt->second].second.begin(), anchorGroups[indexIt->second].second.end()
         );
         for (const int hip : uniqueHips) {
-            const std::string hipId = "hip_" + std::to_string(hip);
+            const std::string hipId = CatalogIdentifier::bodyId("hip", std::to_string(hip));
             if (existingIds.insert(hipId).second) {
                 anchorGroups[indexIt->second].second.push_back(hipId);
             }

@@ -148,9 +148,9 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
             }
 
             if (!hip.isEmpty()) {
-                body.id = "hip_" + CatalogParsingUtilities::toUtf8String(hip);
+                body.id = CatalogIdentifier::bodyId("hip", CatalogParsingUtilities::toUtf8String(hip));
             } else if (!idField.isEmpty()) {
-                body.id = "hyg_" + CatalogParsingUtilities::toUtf8String(idField);
+                body.id = CatalogIdentifier::bodyId("hyg", CatalogParsingUtilities::toUtf8String(idField));
             } else {
                 // The counter restarts for every payload, so this id is a
                 // record key of this parse only; composition qualifies it

@@ -1,5 +1,6 @@
 #include "StellariumLineRefExtractor.hpp"
 #include "StellariumHipParser.hpp"
+#include "catalog/CatalogIdentifier.hpp"
 
 #include <QJsonArray>
 #include <QJsonValue>
@@ -28,7 +29,10 @@ std::vector<ConstellationLineRef> StellariumLineRefExtractor::extract(const QJso
             return;
         }
 
-        lineRefs.emplace_back("hip_" + std::to_string(startHip), "hip_" + std::to_string(endHip));
+        lineRefs.emplace_back(
+            CatalogIdentifier::bodyId("hip", std::to_string(startHip)),
+            CatalogIdentifier::bodyId("hip", std::to_string(endHip))
+        );
     };
 
     const auto appendPolylines = [&appendSegment](const std::vector<std::vector<int>>& polylines) {
