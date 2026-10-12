@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SkyLoggingConfiguration.hpp"
+
 #include <QMetaType>
 #include <QString>
 #include <QtGlobal>
@@ -7,16 +9,6 @@
 #include <optional>
 
 namespace skygate::ui {
-
-struct SkyLoggingConfiguration final {
-    bool logToTerminal = true;
-    bool logToFile = false;
-    QString logFilePath;
-    qint64 maxFileBytes = 5 * 1024 * 1024;
-    int backupFileCount = 3;
-    QtMsgType terminalMinimumType = QtInfoMsg;
-    QtMsgType fileMinimumType = QtInfoMsg;
-};
 
 class SkyLogging final {
 public:

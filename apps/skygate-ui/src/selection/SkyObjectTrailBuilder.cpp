@@ -1,6 +1,8 @@
 #include "SkyObjectTrailBuilder.hpp"
+#include "SkyObjectTrailInput.hpp"
 #include "SkyPerformanceLogging.hpp"
 #include "SkyRenderLabels.hpp"
+#include "SkyRenderLine.hpp"
 #include "math/LinePattern.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
 

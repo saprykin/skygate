@@ -1,4 +1,6 @@
 #include "SkyViewportSceneGraph.hpp"
+#include "SkyRenderPoint.hpp"
+#include "SkyViewportLineSegment.hpp"
 
 #include "math/Geometry2d.hpp"
 

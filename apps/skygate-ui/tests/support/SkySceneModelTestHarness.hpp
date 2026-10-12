@@ -1,6 +1,8 @@
 #pragma once
 
 #include "SkyEphemerisTestSupport.hpp"
+#include "SkyRenderGlyph.hpp"
+#include "SkyRenderPoint.hpp"
 #include "SkySceneModel.hpp"
 #include "catalog/CatalogFactory.hpp"
 

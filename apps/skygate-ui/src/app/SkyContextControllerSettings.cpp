@@ -1,6 +1,7 @@
 #include "SkyContextController.hpp"
 #include "SkyCatalogManager.hpp"
-#include "SkyContextControllerSupport.hpp"
+#include "SkyContextLocationSource.hpp"
+#include "SkyContextLocationSourceCodec.hpp"
 #include "SkyEphemerisDataManager.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkySettingsStore.hpp"

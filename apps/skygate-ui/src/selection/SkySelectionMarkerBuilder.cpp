@@ -1,5 +1,7 @@
 #include "SkySelectionMarkerBuilder.hpp"
 #include "SkySceneShared.hpp"
+#include "SkySelectionMarker.hpp"
+#include "SkySelectionOverlayInput.hpp"
 #include "math/SphericalGeometry.hpp"
 #include "math/Vector3d.hpp"
 

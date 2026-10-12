@@ -1,7 +1,9 @@
 #pragma once
 
 #include "SkyRenderFrame.hpp"
+#include "SkyRenderPoint.hpp"
 #include "SkyViewportGeometry.hpp"
+#include "SkyViewportLineSegment.hpp"
 
 #include <QSGNode>
 

@@ -1,4 +1,6 @@
 #include "TrailBuilderTestScenario.hpp"
+#include "SkyObjectTrailInput.hpp"
+#include "SkyThemeRenderPalette.hpp"
 
 #include "math/ViewportMath.hpp"
 

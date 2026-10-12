@@ -2,6 +2,7 @@
 
 #include "SettingsTestFixture.hpp"
 #include "SkyLogging.hpp"
+#include "SkyLoggingConfiguration.hpp"
 
 #include <QDir>
 #include <QFile>

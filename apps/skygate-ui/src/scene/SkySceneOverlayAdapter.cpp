@@ -1,4 +1,8 @@
 #include "SkySceneOverlayAdapter.hpp"
+#include "SkyInspectorField.hpp"
+#include "SkyOverlayItem.hpp"
+#include "SkySelectedObjectInspector.hpp"
+#include "SkySelectionMarker.hpp"
 
 namespace {
 

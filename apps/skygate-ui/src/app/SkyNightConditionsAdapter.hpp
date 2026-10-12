@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SkyNightConditionsData.hpp"
+#include "SkyNightConditionSunRow.hpp"
 
 #include <QVariantList>
 #include <QVariantMap>

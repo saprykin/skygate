@@ -1,6 +1,6 @@
 #include "SkyCatalogCollectionStore.hpp"
+#include "SkyContextSettings.hpp"
 
-#include "SkyContextControllerSupport.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
 #include "settings/SkySettingsValueCodecs.hpp"
 

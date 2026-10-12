@@ -1,4 +1,5 @@
 #include "SkySceneModelTestSupport.hpp"
+#include "SkyRenderPoint.hpp"
 #include "engine/EphemerisEngineQueries.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "time/CalendarTime.hpp"

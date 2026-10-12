@@ -1,8 +1,11 @@
 #include "CatalogCacheFixture.hpp"
+#include "SkyCatalogCollectionPersistRequest.hpp"
+#include "SkyCatalogCollectionRestoreResult.hpp"
+#include "SkyCatalogSourcePersistEntry.hpp"
+#include "SkyCatalogSourceRestoreEntry.hpp"
 
 #include "CatalogTestPayloads.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
-#include "SkyContextControllerSupport.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/CatalogFactory.hpp"

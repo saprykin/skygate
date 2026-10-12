@@ -1,6 +1,7 @@
 #pragma once
 
 #include "QmlTestSupport.hpp"
+#include "SkyThemeRenderPalette.hpp"
 
 #include <algorithm>
 #include <cmath>

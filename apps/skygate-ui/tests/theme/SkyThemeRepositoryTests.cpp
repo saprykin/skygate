@@ -1,6 +1,7 @@
-#include <QtTest>
+#include "SkyThemeDefinition.hpp"
+#include "SkyThemeRepository.hpp"
 
-#include "SkyTheme.hpp"
+#include <QtTest>
 
 #include <QFile>
 #include <QRegularExpression>

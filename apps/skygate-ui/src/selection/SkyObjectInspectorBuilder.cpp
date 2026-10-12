@@ -1,4 +1,7 @@
 #include "SkyObjectInspectorBuilder.hpp"
+#include "SkyInspectorField.hpp"
+#include "SkySelectedObjectInspector.hpp"
+#include "SkySelectionOverlayInput.hpp"
 #include "engine/EphemerisComputationPolicy.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "ObservationEventCalculator.hpp"

@@ -3,6 +3,8 @@
 #include "SkyEphemerisTestSupport.hpp"
 #include "SkyObjectSearchModel.hpp"
 #include "SkyOverlayLayerSettings.hpp"
+#include "SkyRenderLine.hpp"
+#include "SkyRenderPoint.hpp"
 #include "SkySceneModel.hpp"
 #include "SkySceneModelTestSupport.hpp"
 #include "UtcTimeCodec.hpp"

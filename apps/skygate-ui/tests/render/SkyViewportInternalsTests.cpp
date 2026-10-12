@@ -1,4 +1,10 @@
 #include "SkyViewportGeometry.hpp"
+#include "SkyRenderGlyph.hpp"
+#include "SkyRenderLine.hpp"
+#include "SkyRenderPoint.hpp"
+#include "SkyThemeRenderPalette.hpp"
+#include "SkyViewportGeometryInput.hpp"
+#include "SkyViewportLineSegment.hpp"
 #include "SkyViewportSceneGraph.hpp"
 #include "math/ViewportMath.hpp"
 

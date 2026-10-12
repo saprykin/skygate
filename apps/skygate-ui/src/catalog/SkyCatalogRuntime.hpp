@@ -1,6 +1,8 @@
 #pragma once
 
 #include "SkyCatalogConstellationStore.hpp"
+#include "SkyCatalogRuntimeBuildOptions.hpp"
+#include "SkyCatalogRuntimeResult.hpp"
 #include "SkyCatalogSourceRecord.hpp"
 
 #include "catalog/IStarCatalog.hpp"
@@ -17,36 +19,6 @@
 #include <vector>
 
 namespace skygate::ui::internal {
-
-struct SkyCatalogRuntimeBuildOptions final {
-    // Explicit participation of the bundled deep-sky catalog in this
-    // composition.
-    //
-    // Disabled: bundled deep-sky bodies do not participate.
-    // Fallback: bundled deep-sky bodies fill only the deep-sky identities no
-    // enabled configured source supplies. The fallback never replaces a
-    // configured source's body or its position in the visible collection, and
-    // its contribution is reported under its own provenance.
-    enum class BundledDeepSkyParticipation : std::uint8_t {
-        Disabled,
-        Fallback
-    };
-
-    BundledDeepSkyParticipation bundledDeepSkyParticipation = BundledDeepSkyParticipation::Disabled;
-};
-
-struct SkyCatalogRuntimeResult final {
-    QString statusText;
-    bool statusTextChanged = false;
-    bool datasetInfoChanged = false;
-    bool deepSkyCatalogInfoChanged = false;
-    bool catalogChanged = false;
-    // False when the requested transition was rejected and nothing was
-    // published: statusText reports the operation error. The last accepted
-    // configuration, snapshot, counts, provenance, related view, and revision
-    // are unchanged.
-    bool succeeded = true;
-};
 
 // Owns the configured source collection, the active composed snapshot, and the
 // per-source related constellation datasets that feed the active related view.

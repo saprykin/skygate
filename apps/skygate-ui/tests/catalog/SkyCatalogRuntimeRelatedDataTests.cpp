@@ -1,4 +1,5 @@
 #include "CatalogRuntimeFixture.hpp"
+#include "SkyCatalogRuntimeBuildOptions.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/IStarCatalog.hpp"

@@ -1,7 +1,14 @@
 #include "SkySettingsSnapshotCodecs.hpp"
-#include "SkyContextControllerSupport.hpp"
+#include "SkyCatalogSourceSettingsSnapshot.hpp"
+#include "SkyContextSettings.hpp"
+#include "SkyLocationSettingsSnapshot.hpp"
 #include "SkyLogging.hpp"
+#include "SkyLoggingSettingsSnapshot.hpp"
+#include "SkySearchSettingsSnapshot.hpp"
 #include "SkySettingsValueCodecs.hpp"
+#include "SkyStateSettingsSnapshot.hpp"
+#include "SkyTimelineSettingsSnapshot.hpp"
+#include "SkyViewSettingsSnapshot.hpp"
 #include "engine/EphemerisEngineDescriptorRegistry.hpp"
 
 #include <QSettings>

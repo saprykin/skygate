@@ -2,7 +2,7 @@
 
 #include "LocationCatalogModel.hpp"
 #include "MacDockIcon.hpp"
-#include "SkyTheme.hpp"
+#include "SkyThemeRepository.hpp"
 
 class ResourceDiagnosticsTests final : public QObject {
     Q_OBJECT

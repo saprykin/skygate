@@ -1,4 +1,5 @@
 #include "SkySceneModelTestSupport.hpp"
+#include "SkyRenderPoint.hpp"
 
 #include <QtTest>
 

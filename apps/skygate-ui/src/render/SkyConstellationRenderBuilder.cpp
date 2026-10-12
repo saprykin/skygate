@@ -1,6 +1,8 @@
 #include "SkyConstellationRenderBuilder.hpp"
-#include "SkyContextControllerSupport.hpp"
+#include "SkyContextRenderStyle.hpp"
 #include "SkyRenderLabels.hpp"
+#include "SkyRenderLine.hpp"
+#include "SkyThemeRenderPalette.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
 
 #include <algorithm>

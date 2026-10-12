@@ -1,5 +1,10 @@
 #include "SkyViewportGeometry.hpp"
 #include "CelestialReferenceCalculator.hpp"
+#include "SkyRenderGlyph.hpp"
+#include "SkyRenderLine.hpp"
+#include "SkyThemeRenderPalette.hpp"
+#include "SkyViewportGeometryInput.hpp"
+#include "SkyViewportLineSegment.hpp"
 #include "math/Geometry2d.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
 

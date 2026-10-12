@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SkyTheme.hpp"
+#include "SkyThemeOption.hpp"
 
 #include <QVariantList>
 #include <QVariantMap>

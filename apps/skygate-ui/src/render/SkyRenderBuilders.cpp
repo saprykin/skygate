@@ -3,6 +3,7 @@
 #include "SkyRenderBodyBuilder.hpp"
 #include "SkyRenderHorizontalLookup.hpp"
 #include "SkyRenderLabels.hpp"
+#include "SkyThemeRenderPalette.hpp"
 
 #include <optional>
 #include <string_view>

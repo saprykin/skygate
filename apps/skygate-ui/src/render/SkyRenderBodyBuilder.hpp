@@ -9,7 +9,7 @@
 #include "SkyOverlayLayerVisibility.hpp"
 #include "SkyRenderFrame.hpp"
 #include "SkyRenderHorizontalLookup.hpp"
-#include "SkyTheme.hpp"
+#include "SkyThemeRenderPalette.hpp"
 
 namespace skygate::ui::internal {
 

@@ -1,6 +1,7 @@
 #include "CelestialBodyCatalog.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "SkyObjectTrailBuilder.hpp"
+#include "SkyRenderLine.hpp"
 #include "TrailBuilderTestEngine.hpp"
 #include "TrailBuilderTestScenario.hpp"
 #include "TrailRenderQuery.hpp"

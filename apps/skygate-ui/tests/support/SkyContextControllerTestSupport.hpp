@@ -4,6 +4,7 @@
 #include "ITimeSource.hpp"
 #include "SettingsTestFixture.hpp"
 #include "SkyContextController.hpp"
+#include "SkyContextTimeCodec.hpp"
 #include "SkyLogging.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkyTimeController.hpp"

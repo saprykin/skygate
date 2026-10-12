@@ -5,9 +5,10 @@
 #include "SkyEphemerisTestSupport.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkyRenderBuilders.hpp"
+#include "SkyRenderLabel.hpp"
 #include "SkySceneModel.hpp"
 #include "SkySceneModelTestHarness.hpp"
-#include "SkyTheme.hpp"
+#include "SkyThemeRepository.hpp"
 #include "SkyTimeController.hpp"
 #include "math/ViewportMath.hpp"
 

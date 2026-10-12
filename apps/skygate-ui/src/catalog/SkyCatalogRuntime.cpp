@@ -1,4 +1,6 @@
 #include "SkyCatalogRuntime.hpp"
+#include "SkyCatalogRuntimeBuildOptions.hpp"
+#include "SkyCatalogRuntimeResult.hpp"
 
 #include "catalog/CatalogComposer.hpp"
 #include "catalog/CatalogFactory.hpp"

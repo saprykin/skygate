@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SkyCatalogCollectionPersistRequest.hpp"
+#include "SkyCatalogCollectionRestoreResult.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
 #include "catalog/SkyCatalogCollectionCacheSnapshot.hpp"
 
