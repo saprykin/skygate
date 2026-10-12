@@ -4,6 +4,7 @@
 
 #include <QDate>
 #include <QDateTime>
+#include <QRegularExpression>
 #include <QString>
 
 class SkyQtTimeCodec final {
@@ -12,4 +13,5 @@ public:
     [[nodiscard]] static skygate::core::UtcTimePoint toUtcTimePoint(const QDateTime& utcDateTime);
     [[nodiscard]] static QString formatDateText(const QDate& date);
     [[nodiscard]] static QString formatDateTimeText(const QDateTime& dateTime, bool includeSeconds = true);
+    [[nodiscard]] static QRegularExpression dateInputPattern();
 };

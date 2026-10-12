@@ -56,3 +56,11 @@ QString SkyQtTimeCodec::formatDateTimeText(const QDateTime& dateTime, const bool
     const QString timeFormat = includeSeconds ? QStringLiteral("HH:mm:ss") : QStringLiteral("HH:mm");
     return QString("%1 %2").arg(formatDateText(dateTime.date()), dateTime.toString(timeFormat));
 }
+
+QRegularExpression SkyQtTimeCodec::dateInputPattern()
+{
+    static const QRegularExpression pattern(
+        R"(^(\d{4,})-(\d{2})-(\d{2})(?:\s+(BCE|BC))?$)", QRegularExpression::CaseInsensitiveOption
+    );
+    return pattern;
+}

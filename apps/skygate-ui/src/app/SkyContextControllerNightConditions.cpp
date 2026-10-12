@@ -1,4 +1,3 @@
-#include "NightConditionsCalculator.hpp"
 #include "SkyContextController.hpp"
 #include "SkyContextTextFormatter.hpp"
 #include "SkyContextTimeCodec.hpp"
@@ -7,6 +6,8 @@
 #include "SkyNightConditionsData.hpp"
 #include "SolarAltitudeThresholds.hpp"
 #include "time/SkyTimeController.hpp"
+
+#include "NightConditionsCalculator.hpp"
 
 #include <QDateTime>
 

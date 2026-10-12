@@ -17,14 +17,6 @@
 
 namespace {
 
-const QRegularExpression& dateInputPattern()
-{
-    static const QRegularExpression pattern(
-        R"(^(\d{4,})-(\d{2})-(\d{2})(?:\s+(BCE|BC))?$)", QRegularExpression::CaseInsensitiveOption
-    );
-    return pattern;
-}
-
 QString formatUtcOffset(const int offsetSeconds)
 {
     const QChar sign = offsetSeconds < 0 ? QLatin1Char('-') : QLatin1Char('+');
@@ -259,7 +251,7 @@ QDateTime SkyTimeController::displayDateTime() const
 SkyTimeController::ParseResult
 SkyTimeController::parseDisplayDateTime(const QString& dateText, const QString& timeText) const
 {
-    const QRegularExpressionMatch dateMatch = dateInputPattern().match(dateText.trimmed());
+    const QRegularExpressionMatch dateMatch = SkyQtTimeCodec::dateInputPattern().match(dateText.trimmed());
     if (!dateMatch.hasMatch()) {
         return {.utcDateTime = {}, .errorText = "Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates."};
     }
