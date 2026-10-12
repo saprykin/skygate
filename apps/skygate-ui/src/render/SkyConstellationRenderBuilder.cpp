@@ -1,6 +1,6 @@
 #include "SkyConstellationRenderBuilder.hpp"
 #include "SkyContextRenderStyle.hpp"
-#include "SkyRenderLabels.hpp"
+#include "SkyRenderLabelBuilder.hpp"
 #include "SkyRenderLine.hpp"
 #include "SkyThemeRenderPalette.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
@@ -101,20 +101,22 @@ void SkyConstellationRenderBuilder::appendLabels(
 
         const double labelX = sumX / static_cast<double>(visiblePointCount);
         const double labelY = sumY / static_cast<double>(visiblePointCount);
-        const skygate::core::Rect2d bounds = skyRenderLabelBounds(labelX, labelY, anchorGroup.first);
-        if (!skyRenderLabelFitsViewport(bounds, viewportWidth, viewportHeight, edgeMarginPx)
-            || labelGrid.collides(bounds)) {
+        const skygate::core::Rect2d labelBounds = SkyRenderLabelBuilder::bounds(labelX, labelY, anchorGroup.first);
+        if (!SkyRenderLabelBuilder::fitsViewport(labelBounds, viewportWidth, viewportHeight, edgeMarginPx)
+            || labelGrid.collides(labelBounds)) {
             continue;
         }
 
-        appendSkyRenderLabel(
+        SkyRenderLabelBuilder::append(
             frame.labels,
             labelX,
             labelY,
             anchorGroup.first,
-            skyRenderLabelColorForBodyType(skygate::ephemeris::BaseCelestialBody::Kind::Constellation, renderTheme)
+            SkyRenderLabelBuilder::colorForBodyType(
+                skygate::ephemeris::BaseCelestialBody::Kind::Constellation, renderTheme
+            )
         );
-        labelGrid.add(bounds);
+        labelGrid.add(labelBounds);
     }
 }
 

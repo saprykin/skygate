@@ -7,7 +7,7 @@
 namespace skygate::ui
 {
 
-void setMacDockIcon(const QString& iconFilePath)
+void MacDockIcon::setIcon(const QString& iconFilePath)
 {
     if (iconFilePath.isEmpty()) {
         return;

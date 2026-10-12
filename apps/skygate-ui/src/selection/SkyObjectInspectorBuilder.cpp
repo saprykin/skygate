@@ -7,7 +7,7 @@
 #include "ObservationEventCalculator.hpp"
 #include "SkyObjectInspectorFormatters.hpp"
 #include "SkyPerformanceLogging.hpp"
-#include "SkySceneShared.hpp"
+#include "SkySceneLookupKey.hpp"
 
 #include <QElapsedTimer>
 
@@ -47,22 +47,31 @@ void appendObservationEventFields(
     }
 
     QElapsedTimer timer;
-    skygate::ui::startPerformanceTimer(timer);
+    skygate::ui::SkyPerformanceLogging::startTimer(timer);
 
     const auto events = observationEventsForInspector(input, body, bodyIndex);
-    if (skygate::ui::performanceLoggingEnabled()) {
+    if (skygate::ui::SkyPerformanceLogging::enabled()) {
         qCInfo(skygate::ui::skygatePerfLog)
-            << "object inspector events elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer)
+            << "object inspector events elapsedMs=" << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer)
             << "bodyId=" << QString::fromStdString(body.id) << "request=" << input.ephemerisRequest.has_value();
     }
-    fields.push_back(
-        inspectorField("Rise", skygate::ui::internal::formatObservationEvent(events.nextRise, input.timeController))
-    );
-    fields.push_back(
-        inspectorField("Set", skygate::ui::internal::formatObservationEvent(events.nextSet, input.timeController))
-    );
     fields.push_back(inspectorField(
-        "Culmination", skygate::ui::internal::formatObservationCulmination(events.culmination, input.timeController)
+        "Rise",
+        skygate::ui::internal::SkyObjectInspectorFormatters::formatObservationEvent(
+            events.nextRise, input.timeController
+        )
+    ));
+    fields.push_back(inspectorField(
+        "Set",
+        skygate::ui::internal::SkyObjectInspectorFormatters::formatObservationEvent(
+            events.nextSet, input.timeController
+        )
+    ));
+    fields.push_back(inspectorField(
+        "Culmination",
+        skygate::ui::internal::SkyObjectInspectorFormatters::formatObservationCulmination(
+            events.culmination, input.timeController
+        )
     ));
 }
 
@@ -132,19 +141,22 @@ EphemerisInspectorMetadata
 buildEphemerisInspectorMetadata(const skygate::ephemeris::EphemerisEngineQueryResult& metadata)
 {
     EphemerisInspectorMetadata result;
-    result.status = skygate::ui::internal::formatEphemerisStatus(metadata.status);
-    result.warningText = skygate::ui::internal::formatEphemerisWarnings(metadata);
+    result.status = skygate::ui::internal::SkyObjectInspectorFormatters::formatEphemerisStatus(metadata.status);
+    result.warningText = skygate::ui::internal::SkyObjectInspectorFormatters::formatEphemerisWarnings(metadata);
     if (!metadata.dataSourceProvenance.empty()) {
         result.provenance = QString::fromStdString(metadata.dataSourceProvenance);
     }
     if (metadata.effectiveDataValidityRange.has_value()) {
-        result.dataRange = skygate::ui::internal::formatEphemerisDateRange(*metadata.effectiveDataValidityRange);
+        result.dataRange = skygate::ui::internal::SkyObjectInspectorFormatters::formatEphemerisDateRange(
+            *metadata.effectiveDataValidityRange
+        );
     }
     if (metadata.estimatedAngularUncertaintyArcsec.has_value()) {
-        result.uncertainty =
-            skygate::ui::internal::formatAngularUncertaintyArcsec(*metadata.estimatedAngularUncertaintyArcsec);
+        result.uncertainty = skygate::ui::internal::SkyObjectInspectorFormatters::formatAngularUncertaintyArcsec(
+            *metadata.estimatedAngularUncertaintyArcsec
+        );
     }
-    result.corrections = skygate::ui::internal::formatCorrectionSummary(metadata);
+    result.corrections = skygate::ui::internal::SkyObjectInspectorFormatters::formatCorrectionSummary(metadata);
     return result;
 }
 
@@ -176,7 +188,7 @@ void appendEphemerisMetadataFields(
 SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOverlayInput& input) const
 {
     QElapsedTimer timer;
-    skygate::ui::startPerformanceTimer(timer);
+    skygate::ui::SkyPerformanceLogging::startTimer(timer);
 
     if (!hasSelectionInputs(input)) {
         return {};
@@ -185,13 +197,15 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
     const QString targetId =
         !input.selectedObjectTargetId.isEmpty()
             ? input.selectedObjectTargetId
-            : (normalizedSceneLookupKey(input.selectedSearchTargetKind) == "body" ? input.selectedSearchTargetId
-                                                                                  : QString());
+            : (skygate::ui::internal::SkySceneLookupKey::normalized(input.selectedSearchTargetKind) == "body"
+                   ? input.selectedSearchTargetId
+                   : QString());
     if (targetId.trimmed().isEmpty()) {
         return {};
     }
 
-    const auto stateIndexIt = input.stateIndexByBodyId->constFind(normalizedSceneLookupKey(targetId));
+    const auto stateIndexIt =
+        input.stateIndexByBodyId->constFind(skygate::ui::internal::SkySceneLookupKey::normalized(targetId));
     if (stateIndexIt == input.stateIndexByBodyId->cend()) {
         return {};
     }
@@ -218,21 +232,30 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
         inspectorY = projected.y + 18.0;
     }
 
-    const qint64 lookupNs = skygate::ui::performanceElapsedNanoseconds(timer);
+    const qint64 lookupNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
     const skygate::ephemeris::CelestialBodyState state = detailedInspectorState(input, sceneState);
-    const qint64 detailStateNs = skygate::ui::performanceLoggingEnabled() ? timer.nsecsElapsed() : lookupNs;
+    const qint64 detailStateNs = skygate::ui::SkyPerformanceLogging::enabled() ? timer.nsecsElapsed() : lookupNs;
 
     std::vector<SkyInspectorField> fields;
-    fields.push_back(inspectorField("Type", skygate::ui::internal::celestialBodyTypeText(body)));
-    fields.push_back(inspectorField("Magnitude", skygate::ui::internal::formatMagnitude(body.visualMagnitude)));
-    fields.push_back(inspectorField("Alt / Az", skygate::ui::internal::formatHorizontalCoordinate(state.horizontal)));
-    fields.push_back(inspectorField("RA / Dec", skygate::ui::internal::formatEquatorialCoordinate(state.equatorial)));
+    fields.push_back(
+        inspectorField("Type", skygate::ui::internal::SkyObjectInspectorFormatters::celestialBodyTypeText(body))
+    );
+    fields.push_back(inspectorField(
+        "Magnitude", skygate::ui::internal::SkyObjectInspectorFormatters::formatMagnitude(body.visualMagnitude)
+    ));
+    fields.push_back(inspectorField(
+        "Alt / Az", skygate::ui::internal::SkyObjectInspectorFormatters::formatHorizontalCoordinate(state.horizontal)
+    ));
+    fields.push_back(inspectorField(
+        "RA / Dec", skygate::ui::internal::SkyObjectInspectorFormatters::formatEquatorialCoordinate(state.equatorial)
+    ));
     const EphemerisInspectorMetadata ephemerisMetadata = buildEphemerisInspectorMetadata(state.metadata);
     appendEphemerisMetadataFields(fields, ephemerisMetadata, state.metadata.status);
     appendObservationEventFields(fields, input, body, sceneState.bodyIndex);
 
     if (body.deepSkyObjectValue().has_value()) {
-        const QString sizeText = skygate::ui::internal::angularSizeText(*body.deepSkyObjectValue());
+        const QString sizeText =
+            skygate::ui::internal::SkyObjectInspectorFormatters::angularSizeText(*body.deepSkyObjectValue());
         if (!sizeText.isEmpty()) {
             fields.push_back(inspectorField("Angular size", sizeText));
         }
@@ -240,18 +263,18 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
 
     fields.push_back(inspectorField(
         "Source",
-        skygate::ui::internal::sourceLabelForBodyIndex(
+        skygate::ui::internal::SkyObjectInspectorFormatters::sourceLabelForBodyIndex(
             input.catalogSourceIds, input.catalogSourceContributors, input.catalogSourceTitles, sceneState.bodyIndex
         )
     ));
-    const qint64 fieldsNs = skygate::ui::performanceLoggingEnabled() ? timer.nsecsElapsed() : detailStateNs;
+    const qint64 fieldsNs = skygate::ui::SkyPerformanceLogging::enabled() ? timer.nsecsElapsed() : detailStateNs;
 
-    if (skygate::ui::performanceLoggingEnabled()) {
+    if (skygate::ui::SkyPerformanceLogging::enabled()) {
         qCInfo(skygate::ui::skygatePerfLog)
-            << "object inspector build elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer)
-            << "lookupMs=" << skygate::ui::performanceMilliseconds(lookupNs)
-            << "detailStateMs=" << skygate::ui::performanceMilliseconds(detailStateNs - lookupNs)
-            << "fieldsMs=" << skygate::ui::performanceMilliseconds(fieldsNs - detailStateNs)
+            << "object inspector build elapsedMs=" << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer)
+            << "lookupMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(lookupNs)
+            << "detailStateMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(detailStateNs - lookupNs)
+            << "fieldsMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(fieldsNs - detailStateNs)
             << "bodyId=" << QString::fromStdString(body.id);
     }
 
@@ -264,7 +287,7 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
         .title = QString::fromStdString(body.displayName),
         .pinned = input.inspectorPinned,
         .fields = std::move(fields),
-        .aliases = skygate::ui::internal::aliasesText(body),
+        .aliases = skygate::ui::internal::SkyObjectInspectorFormatters::aliasesText(body),
         .ephemerisStatus = ephemerisMetadata.status,
         .ephemerisWarningText = ephemerisMetadata.warningText,
         .ephemerisProvenance = ephemerisMetadata.provenance,

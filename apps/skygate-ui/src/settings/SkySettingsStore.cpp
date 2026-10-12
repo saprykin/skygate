@@ -121,7 +121,7 @@ QString readTrimmedStringSetting(QSettings& settings, const QString& key, const 
 bool SkySettingsStore::saveState(const SkyPersistedStateSnapshot& snapshot) const
 {
     QSettings settings;
-    saveStateSnapshot(settings, snapshot);
+    SkySettingsSnapshotCodecs::saveStateSnapshot(settings, snapshot);
     settings.sync();
     if (settings.status() != QSettings::NoError) {
         qCWarning(skygateSettingsLog) << "Failed to save SkyGate settings";
@@ -133,7 +133,7 @@ bool SkySettingsStore::saveState(const SkyPersistedStateSnapshot& snapshot) cons
 std::optional<SkyPersistedStateSnapshot> SkySettingsStore::loadState() const
 {
     QSettings settings;
-    return loadStateSnapshot(settings);
+    return SkySettingsSnapshotCodecs::loadStateSnapshot(settings);
 }
 
 bool SkySettingsStore::saveMainWindowSize(const QSize& size) const
@@ -392,13 +392,14 @@ std::optional<SkyCatalogLegacyCacheSnapshot> SkySettingsStore::loadCatalogCache(
         settings.value(SkyContextSettings::key("catalogConstellationLineRefs")).toByteArray();
     snapshot.constellationAnchorGroupRows =
         settings.value(SkyContextSettings::key("catalogConstellationAnchorGroups")).toByteArray();
-    snapshot.constellationLineSchemaVersion =
-        readIntSetting(settings, SkyContextSettings::key("catalogConstellationLineSchemaVersion"), 0);
-    snapshot.constellationCount = static_cast<std::size_t>(
-        readULongLongSetting(settings, SkyContextSettings::key("catalogConstellationCount"), static_cast<qulonglong>(0))
+    snapshot.constellationLineSchemaVersion = SkySettingsValueCodecs::readIntSetting(
+        settings, SkyContextSettings::key("catalogConstellationLineSchemaVersion"), 0
     );
+    snapshot.constellationCount = static_cast<std::size_t>(SkySettingsValueCodecs::readULongLongSetting(
+        settings, SkyContextSettings::key("catalogConstellationCount"), static_cast<qulonglong>(0)
+    ));
     snapshot.catalogBinarySchemaVersion =
-        readIntSetting(settings, SkyContextSettings::key("catalogBinarySchemaVersion"), 0);
+        SkySettingsValueCodecs::readIntSetting(settings, SkyContextSettings::key("catalogBinarySchemaVersion"), 0);
     qCInfo(skygateCatalogCacheLog).noquote()
         << "Catalog cache loaded: starBytes" << snapshot.catalogPayload.size() << "deepSkyBytes"
         << snapshot.deepSkyCatalogPayload.size() << "starBinaryBytes" << snapshot.catalogBinaryPayload.size()

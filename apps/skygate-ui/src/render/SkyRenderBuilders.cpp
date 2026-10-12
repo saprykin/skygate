@@ -2,7 +2,7 @@
 #include "SkyConstellationRenderBuilder.hpp"
 #include "SkyRenderBodyBuilder.hpp"
 #include "SkyRenderHorizontalLookup.hpp"
-#include "SkyRenderLabels.hpp"
+#include "SkyRenderLabelBuilder.hpp"
 #include "SkyThemeRenderPalette.hpp"
 
 #include <optional>
@@ -56,12 +56,12 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     constexpr double kEdgeMarginPx = 10.0;
     skygate::core::RectOccupancyGrid labelGrid(72.0);
 
-    appendBodyPointLabels(
+    SkyRenderLabelBuilder::appendBodyPointLabels(
         frame, snapshot, viewportWidth, viewportHeight, renderTheme, overlayLayers, kEdgeMarginPx, seenLabels, labelGrid
     );
 
     if (overlayLayers.deepSkyLabels) {
-        appendDeepSkyLabels(
+        SkyRenderLabelBuilder::appendDeepSkyLabels(
             frame,
             snapshot,
             projection.params(),

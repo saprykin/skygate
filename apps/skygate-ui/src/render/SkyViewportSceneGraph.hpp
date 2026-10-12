@@ -1,8 +1,6 @@
 #pragma once
 
-#include "SkyRenderFrame.hpp"
 #include "SkyRenderPoint.hpp"
-#include "SkyViewportGeometry.hpp"
 #include "SkyViewportLineSegment.hpp"
 
 #include <QSGNode>
@@ -11,22 +9,13 @@
 
 namespace skygate::ui::internal {
 
-class SkyViewportSceneRootNode final : public QSGNode {
+class SkyViewportSceneGraph final {
 public:
-    SkyViewportSceneRootNode();
+    static void clearChildNodes(QSGNode* rootNode);
 
-    [[nodiscard]] QSGNode* lineRoot() const noexcept;
-    [[nodiscard]] QSGNode* pointRoot() const noexcept;
+    static void syncLineNodes(QSGNode* rootNode, std::span<const SkyViewportLineSegment> lineSegments);
 
-private:
-    QSGNode* m_lineRoot = nullptr;
-    QSGNode* m_pointRoot = nullptr;
+    static void syncPointNodes(QSGNode* rootNode, std::span<const SkyRenderPoint> points);
 };
-
-void clearSkyViewportChildNodes(QSGNode* rootNode);
-
-void syncSkyViewportLineNodes(QSGNode* rootNode, std::span<const SkyViewportLineSegment> lineSegments);
-
-void syncSkyViewportPointNodes(QSGNode* rootNode, std::span<const SkyRenderPoint> points);
 
 }  // namespace skygate::ui::internal

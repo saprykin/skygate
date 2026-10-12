@@ -1,7 +1,6 @@
 #include "SkyTrailTargetResolver.hpp"
+#include "SkySceneLookupKey.hpp"
 #include "SkySelectionOverlayInput.hpp"
-
-#include "SkySceneShared.hpp"
 
 QString SkyTrailTargetResolver::activeTrailTargetBodyId(const SkySelectionOverlayInput& input) const
 {
@@ -9,11 +8,12 @@ QString SkyTrailTargetResolver::activeTrailTargetBodyId(const SkySelectionOverla
         return input.selectedObjectTargetId;
     }
 
-    if (normalizedSceneLookupKey(input.trackedTargetKind) == "body" && !input.trackedTargetId.trimmed().isEmpty()) {
+    if (skygate::ui::internal::SkySceneLookupKey::normalized(input.trackedTargetKind) == "body"
+        && !input.trackedTargetId.trimmed().isEmpty()) {
         return input.trackedTargetId;
     }
 
-    if (normalizedSceneLookupKey(input.selectedSearchTargetKind) == "body"
+    if (skygate::ui::internal::SkySceneLookupKey::normalized(input.selectedSearchTargetKind) == "body"
         && !input.selectedSearchTargetId.trimmed().isEmpty()) {
         return input.selectedSearchTargetId;
     }
@@ -33,7 +33,8 @@ SkyTrailTargetResolver::activeTrailTargetBodyIndex(const SkySelectionOverlayInpu
         return std::nullopt;
     }
 
-    const auto stateIndexIt = input.stateIndexByBodyId->constFind(normalizedSceneLookupKey(targetBodyId));
+    const auto stateIndexIt =
+        input.stateIndexByBodyId->constFind(skygate::ui::internal::SkySceneLookupKey::normalized(targetBodyId));
     if (stateIndexIt == input.stateIndexByBodyId->cend()) {
         return std::nullopt;
     }

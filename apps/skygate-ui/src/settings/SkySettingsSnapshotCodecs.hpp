@@ -9,9 +9,12 @@ class QSettings;
 
 namespace skygate::ui::internal {
 
-[[nodiscard]] SkyStateSettingsSnapshot splitStateSnapshot(const SkyPersistedStateSnapshot& snapshot);
-[[nodiscard]] SkyPersistedStateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapshot& snapshot);
-void saveStateSnapshot(QSettings& settings, const SkyPersistedStateSnapshot& snapshot);
-[[nodiscard]] std::optional<SkyPersistedStateSnapshot> loadStateSnapshot(QSettings& settings);
+class SkySettingsSnapshotCodecs final {
+public:
+    [[nodiscard]] static SkyStateSettingsSnapshot splitStateSnapshot(const SkyPersistedStateSnapshot& snapshot);
+    [[nodiscard]] static SkyPersistedStateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapshot& snapshot);
+    static void saveStateSnapshot(QSettings& settings, const SkyPersistedStateSnapshot& snapshot);
+    [[nodiscard]] static std::optional<SkyPersistedStateSnapshot> loadStateSnapshot(QSettings& settings);
+};
 
 }  // namespace skygate::ui::internal

@@ -26,7 +26,7 @@ void ResourceDiagnosticsTests::packagedResourceDependenciesResolve()
 void ResourceDiagnosticsTests::platformNativeHooksTolerateEmptyInputs()
 {
 #ifdef Q_OS_MACOS
-    skygate::ui::setMacDockIcon(QString());
+    skygate::ui::MacDockIcon::setIcon(QString());
 #else
     QSKIP("Mac dock icon hook is only built on macOS.");
 #endif

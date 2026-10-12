@@ -1,7 +1,7 @@
 #include "SkyObjectTrailBuilder.hpp"
 #include "SkyObjectTrailInput.hpp"
 #include "SkyPerformanceLogging.hpp"
-#include "SkyRenderLabels.hpp"
+#include "SkyRenderLabelBuilder.hpp"
 #include "SkyRenderLine.hpp"
 #include "math/LinePattern.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
@@ -85,7 +85,7 @@ void appendFutureTrailTick(
         color
     );
 
-    skygate::ui::internal::appendSkyRenderLabel(
+    skygate::ui::internal::SkyRenderLabelBuilder::append(
         frame.labels, "trailTick", point.x, point.y, QString("+%1h").arg(offsetMinutes / 60), color
     );
 }
@@ -95,7 +95,7 @@ void appendFutureTrailTick(
 void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTrailInput& input) const
 {
     QElapsedTimer timer;
-    skygate::ui::startPerformanceTimer(timer);
+    skygate::ui::SkyPerformanceLogging::startTimer(timer);
 
     const skygate::core::ObservationContext& context =
         input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
@@ -124,11 +124,11 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
     };
     const bool sampleCacheHit = m_trailSampler.hasCachedSamples(samplingInput);
     const auto& samples = m_trailSampler.samples(samplingInput);
-    const qint64 sampleNs = skygate::ui::performanceElapsedNanoseconds(timer);
+    const qint64 sampleNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
 
     int lineCountBefore = 0;
     int labelCountBefore = 0;
-    if (skygate::ui::performanceLoggingEnabled()) {
+    if (skygate::ui::SkyPerformanceLogging::enabled()) {
         lineCountBefore = static_cast<int>(frame.lines.size());
         labelCountBefore = static_cast<int>(frame.labels.size());
     }
@@ -169,11 +169,11 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
         hasPreviousCoordinate = true;
     }
 
-    if (skygate::ui::performanceLoggingEnabled()) {
+    if (skygate::ui::SkyPerformanceLogging::enabled()) {
         qCInfo(skygate::ui::skygatePerfLog)
-            << "trail append elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer)
-            << "sampleMs=" << skygate::ui::performanceMilliseconds(sampleNs)
-            << "renderMs=" << skygate::ui::performanceMilliseconds(timer.nsecsElapsed() - sampleNs)
+            << "trail append elapsedMs=" << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer)
+            << "sampleMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(sampleNs)
+            << "renderMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(timer.nsecsElapsed() - sampleNs)
             << "samples=" << static_cast<qsizetype>(samples.size()) << "cacheHit=" << sampleCacheHit
             << "highPrecision=" << SkyObjectTrailSampler::usesAdaptiveTrailSampling(samplingInput)
             << "guidance=" << SkyObjectTrailSampler::shouldUseGuidanceTrail(samplingInput)

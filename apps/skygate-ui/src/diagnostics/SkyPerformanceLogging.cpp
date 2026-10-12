@@ -9,32 +9,32 @@ constexpr double kNanosecondsPerMillisecond = 1000000.0;
 
 Q_LOGGING_CATEGORY(skygatePerfLog, "skygate.perf")
 
-bool performanceLoggingEnabled() noexcept
+bool SkyPerformanceLogging::enabled() noexcept
 {
-    static const bool enabled = qEnvironmentVariableIsSet("SKYGATE_PERF_LOG");
-    return enabled;
+    static const bool loggingEnabled = qEnvironmentVariableIsSet("SKYGATE_PERF_LOG");
+    return loggingEnabled;
 }
 
-void startPerformanceTimer(QElapsedTimer& timer)
+void SkyPerformanceLogging::startTimer(QElapsedTimer& timer)
 {
-    if (performanceLoggingEnabled()) {
+    if (enabled()) {
         timer.start();
     }
 }
 
-qint64 performanceElapsedNanoseconds(const QElapsedTimer& timer) noexcept
+qint64 SkyPerformanceLogging::elapsedNanoseconds(const QElapsedTimer& timer) noexcept
 {
-    return performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
+    return enabled() ? timer.nsecsElapsed() : 0;
 }
 
-double performanceMilliseconds(const qint64 nanoseconds) noexcept
+double SkyPerformanceLogging::milliseconds(const qint64 nanoseconds) noexcept
 {
     return static_cast<double>(nanoseconds) / kNanosecondsPerMillisecond;
 }
 
-double performanceElapsedMilliseconds(const QElapsedTimer& timer) noexcept
+double SkyPerformanceLogging::elapsedMilliseconds(const QElapsedTimer& timer) noexcept
 {
-    return performanceMilliseconds(performanceElapsedNanoseconds(timer));
+    return milliseconds(elapsedNanoseconds(timer));
 }
 
 }  // namespace skygate::ui

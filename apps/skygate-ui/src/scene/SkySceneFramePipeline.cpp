@@ -2,7 +2,7 @@
 #include "SkyRenderBuilders.hpp"
 #include "SkySceneFramePipelineInput.hpp"
 #include "SkySceneFramePipelineResult.hpp"
-#include "SkySceneShared.hpp"
+#include "SkySceneLookupKey.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "math/ViewportMath.hpp"
 
@@ -70,7 +70,7 @@ std::optional<SkySceneFramePipelineResult> SkySceneFramePipeline::rebuild(
         for (std::size_t stateIndex = 0; stateIndex < m_snapshot.states.size(); ++stateIndex) {
             const auto& state = m_snapshot.states[stateIndex];
             const auto& body = m_snapshot.bodyAt(state.bodyIndex);
-            m_stateIndexByBodyId.insert(normalizedSceneLookupKey(body.id), stateIndex);
+            m_stateIndexByBodyId.insert(skygate::ui::internal::SkySceneLookupKey::normalized(body.id), stateIndex);
         }
         m_cachedEphemerisEngine = input.ephemerisEngine;
         m_snapshotCacheKey = snapshotKey;

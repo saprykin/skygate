@@ -13,7 +13,7 @@ Q_LOGGING_CATEGORY(skygateSettingsLog, "skygate.settings")
 
 }  // namespace
 
-std::optional<bool> boolFromSettingValue(const QVariant& value)
+std::optional<bool> SkySettingsValueCodecs::boolFromSettingValue(const QVariant& value)
 {
     if (!value.isValid()) {
         return std::nullopt;
@@ -32,7 +32,7 @@ std::optional<bool> boolFromSettingValue(const QVariant& value)
     return std::nullopt;
 }
 
-bool readBoolSetting(QSettings& settings, const QString& key, const bool fallback)
+bool SkySettingsValueCodecs::readBoolSetting(QSettings& settings, const QString& key, const bool fallback)
 {
     if (!settings.contains(key)) {
         return fallback;
@@ -48,7 +48,7 @@ bool readBoolSetting(QSettings& settings, const QString& key, const bool fallbac
     return *parsedValue;
 }
 
-double readDoubleSetting(QSettings& settings, const QString& key, const double fallback)
+double SkySettingsValueCodecs::readDoubleSetting(QSettings& settings, const QString& key, const double fallback)
 {
     if (!settings.contains(key)) {
         return fallback;
@@ -64,7 +64,7 @@ double readDoubleSetting(QSettings& settings, const QString& key, const double f
     return value;
 }
 
-int readIntSetting(QSettings& settings, const QString& key, const int fallback)
+int SkySettingsValueCodecs::readIntSetting(QSettings& settings, const QString& key, const int fallback)
 {
     if (!settings.contains(key)) {
         return fallback;
@@ -80,7 +80,7 @@ int readIntSetting(QSettings& settings, const QString& key, const int fallback)
     return value;
 }
 
-qint64 readLongLongSetting(QSettings& settings, const QString& key, const qint64 fallback)
+qint64 SkySettingsValueCodecs::readLongLongSetting(QSettings& settings, const QString& key, const qint64 fallback)
 {
     if (!settings.contains(key)) {
         return fallback;
@@ -96,7 +96,8 @@ qint64 readLongLongSetting(QSettings& settings, const QString& key, const qint64
     return value;
 }
 
-qulonglong readULongLongSetting(QSettings& settings, const QString& key, const qulonglong fallback)
+qulonglong
+SkySettingsValueCodecs::readULongLongSetting(QSettings& settings, const QString& key, const qulonglong fallback)
 {
     if (!settings.contains(key)) {
         return fallback;
@@ -112,7 +113,8 @@ qulonglong readULongLongSetting(QSettings& settings, const QString& key, const q
     return value;
 }
 
-QString readNonBlankStringSetting(QSettings& settings, const QString& key, const QString& fallback)
+QString
+SkySettingsValueCodecs::readNonBlankStringSetting(QSettings& settings, const QString& key, const QString& fallback)
 {
     const QString configuredValue = settings.value(key, fallback).toString().trimmed();
     if (configuredValue.isEmpty()) {

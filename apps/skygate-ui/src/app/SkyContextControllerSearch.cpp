@@ -53,7 +53,7 @@ void SkyContextController::setSearchToolbarCollapsed(const bool searchToolbarCol
 bool SkyContextController::focusSearchTarget(const QString& targetKind, const QString& targetId)
 {
     QElapsedTimer timer;
-    skygate::ui::startPerformanceTimer(timer);
+    skygate::ui::SkyPerformanceLogging::startTimer(timer);
 
     const auto* engine = ephemerisEngine();
     if (engine == nullptr || targetKind.trimmed().isEmpty() || targetId.trimmed().isEmpty()) {
@@ -61,12 +61,12 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
     }
 
     const auto requestContext = ephemerisRequestContext();
-    const qint64 requestContextNs = skygate::ui::performanceElapsedNanoseconds(timer);
+    const qint64 requestContextNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
     const std::string normalizedTargetKind = StringUtilities::normalizedLookupKey(targetKind.toStdString());
     if (normalizedTargetKind == "body") {
         const std::string trimmedTargetId = targetId.trimmed().toStdString();
         const auto bodyState = engine->computeBodyState(requestContext.request, trimmedTargetId);
-        const qint64 lookupNs = skygate::ui::performanceElapsedNanoseconds(timer);
+        const qint64 lookupNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
         if (!bodyState.has_value() || !hasFiniteHorizontal(bodyState->horizontal)) {
             return false;
         }
@@ -77,20 +77,20 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
                        != StringUtilities::normalizedLookupKey(targetId.toStdString()))) {
             clearTrackedTarget();
         }
-        const qint64 trackingNs = skygate::ui::performanceElapsedNanoseconds(timer);
+        const qint64 trackingNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
 
         setSelectedSearchTarget("body", targetId);
-        const qint64 selectedNs = skygate::ui::performanceElapsedNanoseconds(timer);
+        const qint64 selectedNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
         setViewCenter(bodyState->horizontal.altitudeDeg, bodyState->horizontal.azimuthDeg);
-        const qint64 centerNs = skygate::ui::performanceElapsedNanoseconds(timer);
-        if (skygate::ui::performanceLoggingEnabled()) {
+        const qint64 centerNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+        if (skygate::ui::SkyPerformanceLogging::enabled()) {
             qCInfo(skygate::ui::skygatePerfLog)
-                << "search focus elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer)
-                << "requestContextMs=" << skygate::ui::performanceMilliseconds(requestContextNs)
-                << "bodyLookupMs=" << skygate::ui::performanceMilliseconds(lookupNs - requestContextNs)
-                << "trackingMs=" << skygate::ui::performanceMilliseconds(trackingNs - lookupNs)
-                << "selectedSignalMs=" << skygate::ui::performanceMilliseconds(selectedNs - trackingNs)
-                << "viewCenterMs=" << skygate::ui::performanceMilliseconds(centerNs - selectedNs)
+                << "search focus elapsedMs=" << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer)
+                << "requestContextMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(requestContextNs)
+                << "bodyLookupMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(lookupNs - requestContextNs)
+                << "trackingMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(trackingNs - lookupNs)
+                << "selectedSignalMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(selectedNs - trackingNs)
+                << "viewCenterMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(centerNs - selectedNs)
                 << "kind=" << targetKind << "id=" << targetId;
         }
         return true;
@@ -98,11 +98,11 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
 
     if (normalizedTargetKind == "constellationlabel") {
         const auto snapshot = engine->compute(requestContext.request);
-        const qint64 snapshotNs = skygate::ui::performanceElapsedNanoseconds(timer);
+        const qint64 snapshotNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
         const auto center = skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(
             snapshot, resolvedConstellationAnchorGroups(), targetId.toStdString()
         );
-        const qint64 centerLookupNs = skygate::ui::performanceElapsedNanoseconds(timer);
+        const qint64 centerLookupNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
         if (!center.has_value()) {
             return false;
         }
@@ -110,21 +110,21 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
         if (hasTrackedTarget()) {
             clearTrackedTarget();
         }
-        const qint64 trackingNs = skygate::ui::performanceElapsedNanoseconds(timer);
+        const qint64 trackingNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
 
         setSelectedSearchTarget("constellationLabel", targetId);
-        const qint64 selectedNs = skygate::ui::performanceElapsedNanoseconds(timer);
+        const qint64 selectedNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
         setViewCenter(center->altitudeDeg, center->azimuthDeg);
-        const qint64 centerNs = skygate::ui::performanceElapsedNanoseconds(timer);
-        if (skygate::ui::performanceLoggingEnabled()) {
+        const qint64 centerNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+        if (skygate::ui::SkyPerformanceLogging::enabled()) {
             qCInfo(skygate::ui::skygatePerfLog)
-                << "search focus elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer)
-                << "requestContextMs=" << skygate::ui::performanceMilliseconds(requestContextNs)
-                << "snapshotMs=" << skygate::ui::performanceMilliseconds(snapshotNs - requestContextNs)
-                << "labelLookupMs=" << skygate::ui::performanceMilliseconds(centerLookupNs - snapshotNs)
-                << "trackingMs=" << skygate::ui::performanceMilliseconds(trackingNs - centerLookupNs)
-                << "selectedSignalMs=" << skygate::ui::performanceMilliseconds(selectedNs - trackingNs)
-                << "viewCenterMs=" << skygate::ui::performanceMilliseconds(centerNs - selectedNs)
+                << "search focus elapsedMs=" << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer)
+                << "requestContextMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(requestContextNs)
+                << "snapshotMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(snapshotNs - requestContextNs)
+                << "labelLookupMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(centerLookupNs - snapshotNs)
+                << "trackingMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(trackingNs - centerLookupNs)
+                << "selectedSignalMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(selectedNs - trackingNs)
+                << "viewCenterMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(centerNs - selectedNs)
                 << "kind=" << targetKind << "id=" << targetId;
         }
         return true;

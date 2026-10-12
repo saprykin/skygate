@@ -1,4 +1,4 @@
-#include "SkyRenderLabels.hpp"
+#include "SkyRenderLabelBuilder.hpp"
 #include "SkyRenderGlyph.hpp"
 #include "SkyRenderLabel.hpp"
 #include "SkyThemeRenderPalette.hpp"
@@ -184,11 +184,16 @@ deepSkyLabelBudget(const double fovDeg, const double viewportWidth, const double
     return score - (normalizedDistanceSquared * kCenterDistanceScoreWeight);
 }
 
+[[nodiscard]] double deepSkyHitRadius(const SkyRenderGlyph& glyph)
+{
+    return std::max({glyph.radiusXPx, glyph.radiusYPx, 8.0});
+}
+
 }  // namespace
 
 namespace skygate::ui::internal {
 
-QColor skyRenderLabelColorForBodyType(
+QColor SkyRenderLabelBuilder::colorForBodyType(
     const skygate::ephemeris::BaseCelestialBody::Kind type, const SkyThemeRenderPalette& renderTheme
 )
 {
@@ -210,7 +215,8 @@ QColor skyRenderLabelColorForBodyType(
     return renderTheme.labelDefault;
 }
 
-skygate::core::Rect2d skyRenderLabelBounds(const double anchorX, const double anchorY, const std::string_view text)
+skygate::core::Rect2d
+SkyRenderLabelBuilder::bounds(const double anchorX, const double anchorY, const std::string_view text)
 {
     constexpr double kLabelPaddingX = 12.0;
     constexpr double kLabelHeightPx = 20.0;
@@ -223,7 +229,7 @@ skygate::core::Rect2d skyRenderLabelBounds(const double anchorX, const double an
     return skygate::core::Rect2d{.left = left, .top = top, .right = left + width, .bottom = top + kLabelHeightPx};
 }
 
-bool skyRenderLabelFitsViewport(
+bool SkyRenderLabelBuilder::fitsViewport(
     const skygate::core::Rect2d& bounds,
     const double viewportWidth,
     const double viewportHeight,
@@ -233,14 +239,14 @@ bool skyRenderLabelFitsViewport(
     return skygate::core::Geometry2d::fitsWithin(bounds, viewportWidth, viewportHeight, edgeMarginPx);
 }
 
-void appendSkyRenderLabel(
+void SkyRenderLabelBuilder::append(
     std::vector<SkyRenderLabel>& labels, QString kind, const double x, const double y, QString text, const QColor& color
 )
 {
     labels.push_back(SkyRenderLabel{.kind = std::move(kind), .x = x, .y = y, .text = std::move(text), .color = color});
 }
 
-void appendSkyRenderLabel(
+void SkyRenderLabelBuilder::append(
     std::vector<SkyRenderLabel>& labels,
     const double x,
     const double y,
@@ -248,15 +254,10 @@ void appendSkyRenderLabel(
     const QColor& color
 )
 {
-    appendSkyRenderLabel(labels, {}, x, y, QString::fromStdString(std::string(text)), color);
+    append(labels, {}, x, y, QString::fromStdString(std::string(text)), color);
 }
 
-double skyRenderDeepSkyHitRadius(const SkyRenderGlyph& glyph)
-{
-    return std::max({glyph.radiusXPx, glyph.radiusYPx, 8.0});
-}
-
-void appendBodyPointLabels(
+void SkyRenderLabelBuilder::appendBodyPointLabels(
     SkyRenderFrame& frame,
     const skygate::ephemeris::EphemerisSnapshot& snapshot,
     const double viewportWidth,
@@ -288,15 +289,13 @@ void appendBodyPointLabels(
             continue;
         }
 
-        const skygate::core::Rect2d bounds = skyRenderLabelBounds(point.x, point.y, body.displayName);
-        appendSkyRenderLabel(
-            frame.labels, point.x, point.y, body.displayName, skyRenderLabelColorForBodyType(body.kind, renderTheme)
-        );
-        labelGrid.add(bounds);
+        const skygate::core::Rect2d labelBounds = bounds(point.x, point.y, body.displayName);
+        append(frame.labels, point.x, point.y, body.displayName, colorForBodyType(body.kind, renderTheme));
+        labelGrid.add(labelBounds);
     }
 }
 
-void appendDeepSkyLabels(
+void SkyRenderLabelBuilder::appendDeepSkyLabels(
     SkyRenderFrame& frame,
     const skygate::ephemeris::EphemerisSnapshot& snapshot,
     const skygate::core::ProjectionParams& projectionParams,
@@ -323,9 +322,9 @@ void appendDeepSkyLabels(
             continue;
         }
 
-        const double anchorY = glyph.y - skyRenderDeepSkyHitRadius(glyph);
-        const skygate::core::Rect2d bounds = skyRenderLabelBounds(glyph.x, anchorY, body.displayName);
-        if (!skyRenderLabelFitsViewport(bounds, viewportWidth, viewportHeight, edgeMarginPx)) {
+        const double anchorY = glyph.y - deepSkyHitRadius(glyph);
+        const skygate::core::Rect2d labelBounds = bounds(glyph.x, anchorY, body.displayName);
+        if (!fitsViewport(labelBounds, viewportWidth, viewportHeight, edgeMarginPx)) {
             continue;
         }
 
@@ -333,7 +332,7 @@ void appendDeepSkyLabels(
             DeepSkyLabelCandidate{
                 .glyphIndex = glyphIndex,
                 .score = deepSkyLabelScore(body, glyph, viewportWidth, viewportHeight),
-                .bounds = bounds
+                .bounds = labelBounds
             }
         );
     }
@@ -369,12 +368,12 @@ void appendDeepSkyLabels(
         }
 
         labelGrid.add(candidate.bounds);
-        appendSkyRenderLabel(
+        append(
             frame.labels,
             glyph.x,
-            glyph.y - skyRenderDeepSkyHitRadius(glyph),
+            glyph.y - deepSkyHitRadius(glyph),
             body.displayName,
-            skyRenderLabelColorForBodyType(body.kind, renderTheme)
+            colorForBodyType(body.kind, renderTheme)
         );
         ++acceptedCount;
     }

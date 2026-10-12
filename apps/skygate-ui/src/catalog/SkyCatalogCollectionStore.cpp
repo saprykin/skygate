@@ -532,19 +532,19 @@ loadCatalogSourceRecord(QSettings& settings, const QString& group, QStringList& 
     record.archiveSelector = settings.value(QStringLiteral("archiveSelector")).toString();
     record.schemaHint = readCatalogSourceSchemaHint(settings, QStringLiteral("schemaHint"));
     record.attribution = settings.value(QStringLiteral("attribution")).toString();
-    record.policy = static_cast<skygate::ephemeris::CatalogCompositionPolicy>(readIntSetting(
+    record.policy = static_cast<skygate::ephemeris::CatalogCompositionPolicy>(SkySettingsValueCodecs::readIntSetting(
         settings, QStringLiteral("policy"), static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::Merge)
     ));
-    record.enabled = readBoolSetting(settings, QStringLiteral("enabled"), true);
-    record.bundled = readBoolSetting(settings, QStringLiteral("bundled"), false);
-    record.order = readIntSetting(settings, QStringLiteral("order"), 0);
+    record.enabled = SkySettingsValueCodecs::readBoolSetting(settings, QStringLiteral("enabled"), true);
+    record.bundled = SkySettingsValueCodecs::readBoolSetting(settings, QStringLiteral("bundled"), false);
+    record.order = SkySettingsValueCodecs::readIntSetting(settings, QStringLiteral("order"), 0);
     record.constellationLineRows = settings.value(QStringLiteral("constellationLineRows")).toByteArray();
     record.constellationAnchorGroupRows = settings.value(QStringLiteral("constellationAnchorGroupRows")).toByteArray();
     record.constellationLineSchemaVersion =
-        readIntSetting(settings, QStringLiteral("constellationLineSchemaVersion"), 0);
-    record.constellationCount = static_cast<std::size_t>(
-        readULongLongSetting(settings, QStringLiteral("constellationCount"), static_cast<qulonglong>(0))
-    );
+        SkySettingsValueCodecs::readIntSetting(settings, QStringLiteral("constellationLineSchemaVersion"), 0);
+    record.constellationCount = static_cast<std::size_t>(SkySettingsValueCodecs::readULongLongSetting(
+        settings, QStringLiteral("constellationCount"), static_cast<qulonglong>(0)
+    ));
     const QString rawPath = settings.value(QStringLiteral("payloadPath")).toString();
     const QString binaryPath = settings.value(QStringLiteral("binaryPayloadPath")).toString();
     settings.endGroup();
@@ -786,10 +786,11 @@ SkyCatalogCollectionCacheLoadResult SkyCatalogCollectionStore::load() const
             );
             return result;
         }
-        result.snapshot.schemaVersion =
-            readIntSetting(settings, SkyContextSettings::key("catalogCollectionVersion"), kCollectionSchemaVersion);
+        result.snapshot.schemaVersion = SkySettingsValueCodecs::readIntSetting(
+            settings, SkyContextSettings::key("catalogCollectionVersion"), kCollectionSchemaVersion
+        );
         result.snapshot.binarySchemaVersion =
-            readIntSetting(settings, SkyContextSettings::key("catalogBinarySchemaVersion"), 0);
+            SkySettingsValueCodecs::readIntSetting(settings, SkyContextSettings::key("catalogBinarySchemaVersion"), 0);
         recordsGroup = QStringLiteral("catalogSources");
     }
 
