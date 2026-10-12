@@ -19,6 +19,7 @@
 #include <QStringList>
 
 #include <cmath>
+#include <memory>
 #include <optional>
 
 namespace {
@@ -124,6 +125,8 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
     m_hitTargetIndex.clear();
     m_sceneComposer.reset();
     m_sceneFrame = {};
+    m_viewportRenderFrameGeneration = 0;
+    m_viewportTrailTargetBodyIndex.reset();
     m_selectedObjectTargetId.clear();
     m_selectedObjectInspectorPinned = false;
     if (m_skyContextController != nullptr) {
@@ -182,6 +185,11 @@ QVariantMap SkySceneModel::selectedObjectInspector() const
 std::uint64_t SkySceneModel::snapshotGeneration() const noexcept
 {
     return m_framePipeline.snapshotGeneration();
+}
+
+std::shared_ptr<const SkyViewportSnapshot> SkySceneModel::viewportSnapshot() const noexcept
+{
+    return m_viewportSnapshot;
 }
 
 void SkySceneModel::setViewportSize(const double viewportWidth, const double viewportHeight)
@@ -374,7 +382,49 @@ bool SkySceneModel::clearSceneFrame()
     m_ephemerisDegradationReasons = {};
     m_selectionMarker = {};
     m_selectedObjectInspector = {};
+    clearViewportSnapshot();
     return hadSceneFrame;
+}
+
+void SkySceneModel::publishViewportSnapshot(
+    const std::uint64_t renderFrameGeneration, const std::optional<std::uint32_t>& trailTargetBodyIndex
+)
+{
+    if (m_viewportSnapshot != nullptr && renderFrameGeneration == m_viewportRenderFrameGeneration
+        && trailTargetBodyIndex == m_viewportTrailTargetBodyIndex) {
+        return;
+    }
+
+    m_viewportRenderFrameGeneration = renderFrameGeneration;
+    m_viewportTrailTargetBodyIndex = trailTargetBodyIndex;
+
+    auto snapshot = std::make_shared<SkyViewportSnapshot>();
+    snapshot->generation = ++m_viewportSnapshotGeneration;
+    snapshot->viewportWidth = m_viewportWidth;
+    snapshot->viewportHeight = m_viewportHeight;
+    snapshot->preparedProjection = m_sceneFrame.preparedProjection;
+    if (m_skyContextController != nullptr) {
+        snapshot->renderTheme = m_skyContextController->renderTheme();
+        snapshot->overlayLayers = m_skyContextController->overlayLayerVisibility();
+        snapshot->observationContext = referenceOverlayContext().value_or(m_skyContextController->skyContext());
+    }
+    snapshot->points = m_sceneFrame.frame.points;
+    snapshot->lines = m_sceneFrame.frame.lines;
+    snapshot->glyphs = m_sceneFrame.frame.glyphs;
+    m_viewportSnapshot = std::move(snapshot);
+    emit viewportSnapshotChanged();
+}
+
+void SkySceneModel::clearViewportSnapshot()
+{
+    if (m_viewportSnapshot == nullptr) {
+        return;
+    }
+
+    m_viewportSnapshot.reset();
+    m_viewportRenderFrameGeneration = 0;
+    m_viewportTrailTargetBodyIndex.reset();
+    emit viewportSnapshotChanged();
 }
 
 std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
@@ -490,6 +540,7 @@ void SkySceneModel::rebuildSceneFrame()
     m_selectionMarker = m_sceneOverlayAdapter.selectionMarker(m_sceneFrame.selectionMarker);
     m_selectedObjectInspector = m_sceneOverlayAdapter.selectedObjectInspector(m_sceneFrame.selectedObjectInspector);
     const qint64 adapterNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+    publishViewportSnapshot(frameResult->renderFrameGeneration, compositionResult.trailTargetBodyIndex);
     emit sceneFrameChanged();
 
     if (skygate::ui::SkyPerformanceLogging::enabled()) {

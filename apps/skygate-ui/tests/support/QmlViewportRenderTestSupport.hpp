@@ -14,6 +14,7 @@
 #include <QStringList>
 #include <QtTest/QtTest>
 
+#include <atomic>
 #include <cstddef>
 #include <memory>
 
@@ -25,6 +26,21 @@ public:
     {
         return updatePaintNode(nullptr, nullptr);
     }
+
+    [[nodiscard]] int paintNodeBuildCount() const noexcept
+    {
+        return m_paintNodeBuildCount;
+    }
+
+protected:
+    [[nodiscard]] QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* updatePaintNodeData) override
+    {
+        ++m_paintNodeBuildCount;
+        return SkyViewportItem::updatePaintNode(oldNode, updatePaintNodeData);
+    }
+
+private:
+    std::atomic<int> m_paintNodeBuildCount{0};
 };
 
 inline int nodeTreeSize(const QSGNode* node)

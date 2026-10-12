@@ -1,16 +1,13 @@
 #pragma once
 
-#include "SkyRenderBuilders.hpp"
+#include "scene/SkyViewportSnapshot.hpp"
 
 #include <QMetaObject>
 #include <QPointer>
 #include <QQuickItem>
 
-#include "PreparedProjection.hpp"
-
 #include <memory>
 #include <mutex>
-#include <optional>
 
 class SkySceneModel;
 class QSGNode;
@@ -33,14 +30,12 @@ protected:
     void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
 
 private:
-    struct ViewportRenderData;
-
     void disconnectFromSceneModel();
     void synchronizeRenderData();
 
 private:
     QPointer<SkySceneModel> m_skySceneModel;
-    QMetaObject::Connection m_sceneFrameChangedConnection;
+    QMetaObject::Connection m_viewportSnapshotChangedConnection;
     std::mutex m_renderDataMutex;
-    std::shared_ptr<const ViewportRenderData> m_renderData;
+    std::shared_ptr<const SkyViewportSnapshot> m_renderData;
 };

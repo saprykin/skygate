@@ -72,6 +72,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/scene/SkySceneLookupKey.hpp
     src/scene/SkySelectedObjectInspector.hpp
     src/scene/SkySelectionMarker.hpp
+    src/scene/SkyViewportSnapshot.hpp
     src/app/SkyNightConditionsAdapter.hpp
     src/app/SkyNightConditionsData.hpp
     src/app/SkyNightConditionSunRow.hpp

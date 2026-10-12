@@ -1,5 +1,16 @@
 #include "support/QmlRenderingTestSupport.hpp"
 
+namespace {
+
+int renderViewportFrame(QQuickWindow& window, TestSkyViewportItem& viewport)
+{
+    (void)window.grabWindow();
+    QCoreApplication::processEvents();
+    return viewport.paintNodeBuildCount();
+}
+
+}  // namespace
+
 class QmlViewportRenderingTests final : public QObject {
     Q_OBJECT
 
@@ -8,6 +19,7 @@ private slots:
     void init();
     void skyViewportItemRendersNonBlankScene();
     void skyViewportItemHandlesModelAndGeometryChanges();
+    void skyViewportOverlayEditsSkipGeometryRebuild();
     void skyViewportOverlayLayersAddGeometry_data();
     void skyViewportOverlayLayersAddGeometry();
     void skyViewportAstronomicalLayersAddGeometry_data();
@@ -150,6 +162,48 @@ void QmlViewportRenderingTests::skyViewportItemHandlesModelAndGeometryChanges()
     paintNode.reset(viewport.buildPaintNode());
     QVERIFY(paintNode != nullptr);
     QVERIFY(geometryVertexCount(paintNode.get()) > 0);
+}
+
+void QmlViewportRenderingTests::skyViewportOverlayEditsSkipGeometryRebuild()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    controller->setLive(false);
+    QVERIFY(controller->setUtcDateTimeText(QStringLiteral("2024-09-01"), QStringLiteral("22:00:00")));
+    controller->setViewCenter(45.0, 180.0);
+    auto sceneModel = makeSceneModel(*controller);
+    QVERIFY(sceneModel != nullptr);
+
+    TestSkyViewportItem viewport;
+    ExposedQuickWindow exposed(&viewport);
+    viewport.setSkySceneModel(sceneModel.get());
+    QTRY_VERIFY(sceneModel->viewportSnapshot() != nullptr);
+    QTRY_VERIFY(viewport.paintNodeBuildCount() > 0);
+
+    const int baselineBuildCount = renderViewportFrame(*exposed.window(), viewport);
+    const std::uint64_t baselineGeneration = sceneModel->viewportSnapshot()->generation;
+
+    QVERIFY(controller->focusSearchTarget(QStringLiteral("body"), QStringLiteral("sirius")));
+    const std::uint64_t selectedGeneration = sceneModel->viewportSnapshot()->generation;
+    QVERIFY(selectedGeneration > baselineGeneration);
+    const int trailBuildCount = renderViewportFrame(*exposed.window(), viewport);
+    QVERIFY(trailBuildCount > baselineBuildCount);
+
+    sceneModel->moveSelectedObjectInspector(120.0, 140.0);
+    QCOMPARE(sceneModel->viewportSnapshot()->generation, selectedGeneration);
+    QCOMPARE(renderViewportFrame(*exposed.window(), viewport), trailBuildCount);
+
+    sceneModel->setSelectedObjectInspectorPinned(false);
+    QCOMPARE(sceneModel->viewportSnapshot()->generation, selectedGeneration);
+    QCOMPARE(renderViewportFrame(*exposed.window(), viewport), trailBuildCount);
+
+    QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("Asia/Bishkek")));
+    QCOMPARE(sceneModel->viewportSnapshot()->generation, selectedGeneration);
+    QCOMPARE(renderViewportFrame(*exposed.window(), viewport), trailBuildCount);
+
+    controller->panViewBy(2.0, 0.0);
+    QVERIFY(sceneModel->viewportSnapshot()->generation > selectedGeneration);
+    QVERIFY(renderViewportFrame(*exposed.window(), viewport) > trailBuildCount);
 }
 
 void QmlViewportRenderingTests::skyViewportOverlayLayersAddGeometry_data()
