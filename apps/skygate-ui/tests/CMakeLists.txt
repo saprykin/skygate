@@ -148,6 +148,11 @@ add_skygate_ui_qtest(
     scene/SkySceneModelLayerVisibilityTests.cpp
     TIMEOUT 60
 )
+add_skygate_ui_qtest(
+    skygate-ui-scene-model-viewport-snapshot-tests
+    scene/SkySceneModelViewportSnapshotTests.cpp
+    TIMEOUT 60
+)
 add_skygate_ui_qtest(skygate-ui-location-catalog-model-tests location/LocationCatalogModelTests.cpp)
 add_skygate_ui_qtest(
     skygate-ui-device-location-acquisition-tests

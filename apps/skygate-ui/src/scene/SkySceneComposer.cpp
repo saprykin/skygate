@@ -255,7 +255,9 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
             << "inspectorMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(inspectorNs - markerNs)
             << "frameContentChanged=" << frameContentChanged << "hasTrail=" << trailTargetBodyIndex.has_value();
     }
-    return SkySceneCompositionResult{.changed = true, .frameContentChanged = frameContentChanged};
+    return SkySceneCompositionResult{
+        .changed = true, .frameContentChanged = frameContentChanged, .trailTargetBodyIndex = trailTargetBodyIndex
+    };
 }
 
 std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(

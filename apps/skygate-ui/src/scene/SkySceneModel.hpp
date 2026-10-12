@@ -7,6 +7,7 @@
 #include "SkySceneFrameData.hpp"
 #include "SkySceneFramePipeline.hpp"
 #include "SkySceneOverlayAdapter.hpp"
+#include "SkyViewportSnapshot.hpp"
 #include "render/SkyRenderGlyph.hpp"
 #include "render/SkyRenderLine.hpp"
 #include "render/SkyRenderPoint.hpp"
@@ -20,6 +21,7 @@
 #include <QVariantMap>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 
@@ -53,6 +55,7 @@ public:
     [[nodiscard]] QVariantMap selectionMarker() const;
     [[nodiscard]] QVariantMap selectedObjectInspector() const;
     [[nodiscard]] std::uint64_t snapshotGeneration() const noexcept;
+    [[nodiscard]] std::shared_ptr<const SkyViewportSnapshot> viewportSnapshot() const noexcept;
     void setViewportSize(double viewportWidth, double viewportHeight);
 
     Q_INVOKABLE QString objectLabelAt(double x, double y) const;
@@ -70,12 +73,17 @@ public:
 signals:
     void skyContextControllerChanged();
     void sceneFrameChanged();
+    void viewportSnapshotChanged();
 
 private:
     void disconnectFromContextController();
     void rebuildSceneFrame();
     [[nodiscard]] bool clearSceneFrame();
     [[nodiscard]] std::optional<SkySceneCompositionInput> buildSceneInput() const;
+    void publishViewportSnapshot(
+        std::uint64_t renderFrameGeneration, const std::optional<std::uint32_t>& trailTargetBodyIndex
+    );
+    void clearViewportSnapshot();
 
 private:
     QPointer<SkyContextController> m_skyContextController;
@@ -91,6 +99,10 @@ private:
     SkySceneComposer m_sceneComposer;
     SkySceneOverlayAdapter m_sceneOverlayAdapter;
     SkySceneFrameData m_sceneFrame;
+    std::shared_ptr<const SkyViewportSnapshot> m_viewportSnapshot;
+    std::uint64_t m_viewportSnapshotGeneration = 0;
+    std::uint64_t m_viewportRenderFrameGeneration = 0;
+    std::optional<std::uint32_t> m_viewportTrailTargetBodyIndex;
     QVariantList m_overlayItems;
     QVariantList m_ephemerisDegradationReasons;
     QVariantMap m_selectionMarker;
