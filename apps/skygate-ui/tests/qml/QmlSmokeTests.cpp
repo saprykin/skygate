@@ -1,18 +1,16 @@
-#include "SkyContextController.hpp"
-#include "SkySceneModel.hpp"
-#include "SkyViewportItem.hpp"
-#include "QmlObjectTreeTestSupport.hpp"
-
-#include "factory/EphemerisEngineFactory.hpp"
+#include "app/SkyContextController.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
+#include "render/SkyViewportItem.hpp"
+#include "scene/SkySceneModel.hpp"
+#include "support/QmlObjectTreeTestSupport.hpp"
 
-#include <QtTest/QtTest>
-
-#include <QGuiApplication>
 #include <QFont>
+#include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QSignalSpy>
+#include <QtTest/QtTest>
 #include <QUrl>
 #include <qqml.h>
 

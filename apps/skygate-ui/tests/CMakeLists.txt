@@ -34,7 +34,7 @@ target_link_libraries(skygate-ui-test-support
 
 target_include_directories(skygate-ui-test-support
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/support
+        ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_compile_features(skygate-ui-test-support PUBLIC cxx_std_20)
@@ -64,20 +64,7 @@ function(add_skygate_ui_qtest target_name source_file)
 
     target_include_directories(${target_name}
         PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/support
-            ${CMAKE_CURRENT_SOURCE_DIR}/app
-            ${CMAKE_CURRENT_SOURCE_DIR}/catalog
-            ${CMAKE_CURRENT_SOURCE_DIR}/diagnostics
-            ${CMAKE_CURRENT_SOURCE_DIR}/ephemeris
-            ${CMAKE_CURRENT_SOURCE_DIR}/location
-            ${CMAKE_CURRENT_SOURCE_DIR}/qml
-            ${CMAKE_CURRENT_SOURCE_DIR}/render
-            ${CMAKE_CURRENT_SOURCE_DIR}/scene
-            ${CMAKE_CURRENT_SOURCE_DIR}/search
-            ${CMAKE_CURRENT_SOURCE_DIR}/selection
-            ${CMAKE_CURRENT_SOURCE_DIR}/settings
-            ${CMAKE_CURRENT_SOURCE_DIR}/theme
-            ${CMAKE_CURRENT_SOURCE_DIR}/time
+            ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
     target_compile_features(${target_name} PRIVATE cxx_std_20)

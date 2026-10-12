@@ -1,12 +1,12 @@
-#include "DeviceLocationTestSupport.hpp"
-#include "SkyDeviceLocationAcquisition.hpp"
+#include "location/SkyDeviceLocationAcquisition.hpp"
+#include "support/DeviceLocationTestSupport.hpp"
 
-#include <QSignalSpy>
-#include <QString>
-#include <QtTest>
 #if SKYGATE_HAS_POSITIONING
 #include <QGeoCoordinate>
 #endif
+#include <QSignalSpy>
+#include <QString>
+#include <QtTest>
 
 #include <memory>
 

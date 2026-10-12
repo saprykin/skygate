@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SkyCatalogManager.hpp"
+#include "catalog/SkyCatalogManager.hpp"
 
 #include <cstddef>
 #include <cstdint>

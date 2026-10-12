@@ -1,15 +1,14 @@
-#include "AsyncTestSupport.hpp"
-#include "CatalogDownloadWorkflowTestSupport.hpp"
-#include "CatalogTestPayloads.hpp"
 #include "catalog/CatalogDownloadCancellation.hpp"
 #include "catalog/CatalogDownloadService.hpp"
-#include "FakeNetworkAccessManager.hpp"
-#include "LogCapture.hpp"
-
-#include <QtTest/QtTest>
+#include "support/AsyncTestSupport.hpp"
+#include "support/CatalogDownloadWorkflowTestSupport.hpp"
+#include "support/CatalogTestPayloads.hpp"
+#include "support/FakeNetworkAccessManager.hpp"
+#include "support/LogCapture.hpp"
 
 #include <QCoreApplication>
 #include <QNetworkReply>
+#include <QtTest/QtTest>
 
 #include <algorithm>
 #include <memory>

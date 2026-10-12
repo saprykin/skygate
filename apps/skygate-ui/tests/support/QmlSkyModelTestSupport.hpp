@@ -1,12 +1,12 @@
 #pragma once
 
 #include "ITimeSource.hpp"
-#include "SkyContextController.hpp"
-#include "SkyContextTimeCodec.hpp"
-#include "SkyObjectSearchModel.hpp"
-#include "SkySceneModel.hpp"
+#include "app/SkyContextController.hpp"
+#include "app/SkyContextTimeCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
+#include "scene/SkySceneModel.hpp"
+#include "search/SkyObjectSearchModel.hpp"
 
 #include <QDateTime>
 #include <QString>

@@ -1,20 +1,18 @@
-#include "AsyncTestSupport.hpp"
 #include "BaseCelestialBody.hpp"
 #include "CatalogArchiveTestSupport.hpp"
-#include "CatalogDownloadWorkflowTestSupport.hpp"
-#include "CatalogTestPayloads.hpp"
-#include "FakeNetworkAccessManager.hpp"
-#include "LogCapture.hpp"
-#include "SkyCatalogSourceImportResult.hpp"
-#include "SkyConstellationLineImportResult.hpp"
-
 #include "catalog/SkyCatalogImportWorkflow.hpp"
 #include "catalog/SkyCatalogSourceDescriptor.hpp"
+#include "catalog/SkyCatalogSourceImportResult.hpp"
 #include "catalog/SkyCatalogSourceInstance.hpp"
-
-#include <QtTest/QtTest>
+#include "catalog/SkyConstellationLineImportResult.hpp"
+#include "support/AsyncTestSupport.hpp"
+#include "support/CatalogDownloadWorkflowTestSupport.hpp"
+#include "support/CatalogTestPayloads.hpp"
+#include "support/FakeNetworkAccessManager.hpp"
+#include "support/LogCapture.hpp"
 
 #include <QCoreApplication>
+#include <QtTest/QtTest>
 
 #include <algorithm>
 #include <array>

@@ -1,6 +1,6 @@
-#include "SettingsTestFixture.hpp"
-#include "SkyLogging.hpp"
-#include "SkySettingsStore.hpp"
+#include "diagnostics/SkyLogging.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/SettingsTestFixture.hpp"
 
 #include <QRegularExpression>
 #include <QSettings>

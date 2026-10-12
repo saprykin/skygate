@@ -1,9 +1,9 @@
 #include "SkyRenderBodyBuilder.hpp"
-#include "SkyContextRenderStyle.hpp"
 #include "SkyRenderGlyph.hpp"
 #include "SkyRenderPoint.hpp"
-#include "SkyThemeRenderPalette.hpp"
+#include "app/SkyContextRenderStyle.hpp"
 #include "math/Geometry2d.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <algorithm>
 #include <cmath>

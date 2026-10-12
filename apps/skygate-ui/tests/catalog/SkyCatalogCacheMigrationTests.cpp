@@ -1,14 +1,14 @@
-#include "CatalogCacheFixture.hpp"
-#include "CatalogCacheTestSupport.hpp"
-#include "CatalogTestPayloads.hpp"
-#include "LogCapture.hpp"
-#include "SettingsTestFixture.hpp"
-#include "SkyCatalogCollectionPersistRequest.hpp"
-#include "SkyCatalogSourceInstance.hpp"
-#include "SkySettingsStore.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
+#include "catalog/SkyCatalogCollectionPersistRequest.hpp"
+#include "catalog/SkyCatalogSourceInstance.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/CatalogCacheFixture.hpp"
+#include "support/CatalogCacheTestSupport.hpp"
+#include "support/CatalogTestPayloads.hpp"
+#include "support/LogCapture.hpp"
+#include "support/SettingsTestFixture.hpp"
 
 #include <QByteArray>
 #include <QDir>

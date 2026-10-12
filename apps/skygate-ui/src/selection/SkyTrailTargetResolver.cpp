@@ -1,6 +1,6 @@
 #include "SkyTrailTargetResolver.hpp"
-#include "SkySceneLookupKey.hpp"
 #include "SkySelectionOverlayInput.hpp"
+#include "scene/SkySceneLookupKey.hpp"
 
 QString SkyTrailTargetResolver::activeTrailTargetBodyId(const SkySelectionOverlayInput& input) const
 {

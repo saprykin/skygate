@@ -1,11 +1,10 @@
 #include "SkySelectionOverlayBuilder.hpp"
-#include "SkySelectedObjectInspector.hpp"
-#include "SkySelectionMarker.hpp"
-#include "SkySelectionOverlayInput.hpp"
-
 #include "SkyObjectInspectorBuilder.hpp"
 #include "SkySelectionMarkerBuilder.hpp"
+#include "SkySelectionOverlayInput.hpp"
 #include "SkyTrailTargetResolver.hpp"
+#include "scene/SkySelectedObjectInspector.hpp"
+#include "scene/SkySelectionMarker.hpp"
 
 SkySelectionMarker SkySelectionOverlayBuilder::buildSelectionMarkerData(const SkySelectionOverlayInput& input) const
 {

@@ -1,5 +1,5 @@
-#include "QmlPreferencesTestSupport.hpp"
-#include "SkyCatalogSourceCollectionModel.hpp"
+#include "catalog/SkyCatalogSourceCollectionModel.hpp"
+#include "support/QmlPreferencesTestSupport.hpp"
 
 #include <QDir>
 #include <QSettings>

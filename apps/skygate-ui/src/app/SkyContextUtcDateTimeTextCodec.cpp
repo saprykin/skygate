@@ -1,5 +1,5 @@
 #include "SkyContextUtcDateTimeTextCodec.hpp"
-#include "SkyQtTimeCodec.hpp"
+#include "time/SkyQtTimeCodec.hpp"
 
 #include <QDate>
 #include <QRegularExpression>

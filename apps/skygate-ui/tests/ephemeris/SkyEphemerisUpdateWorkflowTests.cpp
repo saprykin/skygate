@@ -1,9 +1,9 @@
-#include "FakeNetworkAccessManager.hpp"
-#include "SettingsTestFixture.hpp"
-#include "SkyEphemerisDataManager.hpp"
-#include "SkyEphemerisUpdateWorkflow.hpp"
-#include "SkySettingsStore.hpp"
 #include "engine/EphemerisDataManifest.hpp"
+#include "ephemeris/SkyEphemerisDataManager.hpp"
+#include "ephemeris/SkyEphemerisUpdateWorkflow.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/FakeNetworkAccessManager.hpp"
+#include "support/SettingsTestFixture.hpp"
 
 #include <QByteArray>
 #include <QCoreApplication>

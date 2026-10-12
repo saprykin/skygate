@@ -5,7 +5,7 @@
 #include "EphemerisRequest.hpp"
 #include "ObservationContext.hpp"
 #include "PreparedProjection.hpp"
-#include "SkyThemeRenderPalette.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <cstdint>
 #include <memory>

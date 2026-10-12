@@ -3,7 +3,7 @@
 #include "CelestialBodyCatalog.hpp"
 #include "DistantCelestialBody.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
-#include "SkyContextController.hpp"
+#include "app/SkyContextController.hpp"
 #include "engine/EphemerisDatasetInfo.hpp"
 
 #include <string>

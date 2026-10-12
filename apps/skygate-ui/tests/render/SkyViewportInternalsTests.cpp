@@ -1,13 +1,13 @@
-#include "SkyViewportGeometry.hpp"
-#include "SkyRenderGlyph.hpp"
-#include "SkyRenderLine.hpp"
-#include "SkyRenderPoint.hpp"
-#include "SkyThemeRenderPalette.hpp"
-#include "SkyViewportGeometryInput.hpp"
-#include "SkyViewportLineSegment.hpp"
-#include "SkyViewportSceneGraph.hpp"
-#include "SkyViewportSceneRootNode.hpp"
 #include "math/ViewportMath.hpp"
+#include "render/SkyRenderGlyph.hpp"
+#include "render/SkyRenderLine.hpp"
+#include "render/SkyRenderPoint.hpp"
+#include "render/SkyViewportGeometry.hpp"
+#include "render/SkyViewportGeometryInput.hpp"
+#include "render/SkyViewportLineSegment.hpp"
+#include "render/SkyViewportSceneGraph.hpp"
+#include "render/SkyViewportSceneRootNode.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <QSGFlatColorMaterial>
 #include <QSGGeometryNode>

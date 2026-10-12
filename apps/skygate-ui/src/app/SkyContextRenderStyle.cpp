@@ -1,5 +1,5 @@
 #include "SkyContextRenderStyle.hpp"
-#include "SkyThemeRenderPalette.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <algorithm>
 

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "SkySelectedObjectInspector.hpp"
-#include "SkySelectionMarker.hpp"
 #include "SkySelectionOverlayInput.hpp"
+#include "scene/SkySelectedObjectInspector.hpp"
+#include "scene/SkySelectionMarker.hpp"
 
 #include <QString>
 

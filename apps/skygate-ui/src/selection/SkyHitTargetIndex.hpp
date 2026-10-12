@@ -1,9 +1,9 @@
 #pragma once
 
 #include "EphemerisSnapshot.hpp"
-#include "SkyRenderFrame.hpp"
 #include "math/CircleHitIndex.hpp"
 #include "math/CircleHitTarget.hpp"
+#include "render/SkyRenderFrame.hpp"
 
 #include <cstdint>
 #include <optional>

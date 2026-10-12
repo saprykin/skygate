@@ -1,7 +1,7 @@
 #include "CelestialBodyCatalog.hpp"
-#include "SkyHitTargetIndex.hpp"
-#include "SkyRenderGlyph.hpp"
-#include "SkyRenderPoint.hpp"
+#include "render/SkyRenderGlyph.hpp"
+#include "render/SkyRenderPoint.hpp"
+#include "selection/SkyHitTargetIndex.hpp"
 
 #include <QtTest/QtTest>
 

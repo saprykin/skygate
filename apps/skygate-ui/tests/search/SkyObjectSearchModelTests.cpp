@@ -3,7 +3,7 @@
 #include "DistantCelestialBody.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
-#include "SkyObjectSearchModel.hpp"
+#include "search/SkyObjectSearchModel.hpp"
 
 #include <QtTest>
 

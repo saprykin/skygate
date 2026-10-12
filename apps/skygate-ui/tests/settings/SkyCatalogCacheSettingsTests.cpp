@@ -1,8 +1,8 @@
-#include "CatalogCacheTestSupport.hpp"
-#include "CatalogCollectionCacheFixture.hpp"
-#include "CatalogTestPayloads.hpp"
-#include "SettingsTestFixture.hpp"
-#include "SkySettingsStore.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/CatalogCacheTestSupport.hpp"
+#include "support/CatalogCollectionCacheFixture.hpp"
+#include "support/CatalogTestPayloads.hpp"
+#include "support/SettingsTestFixture.hpp"
 
 #include <QDir>
 #include <QFile>

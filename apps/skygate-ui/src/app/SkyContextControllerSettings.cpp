@@ -1,12 +1,12 @@
 #include "SkyContextController.hpp"
-#include "SkyCatalogManager.hpp"
 #include "SkyContextLocationSource.hpp"
 #include "SkyContextLocationSourceCodec.hpp"
-#include "SkyEphemerisDataManager.hpp"
-#include "SkyOverlayLayerSettings.hpp"
-#include "SkySettingsStore.hpp"
-#include "SkyTimeController.hpp"
 #include "UtcTimeCodec.hpp"
+#include "catalog/SkyCatalogManager.hpp"
+#include "ephemeris/SkyEphemerisDataManager.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "theme/SkyOverlayLayerSettings.hpp"
+#include "time/SkyTimeController.hpp"
 
 #include <QDateTime>
 #include <QTimeZone>

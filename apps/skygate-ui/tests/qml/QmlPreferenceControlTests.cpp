@@ -1,4 +1,4 @@
-#include "QmlTestSupport.hpp"
+#include "support/QmlTestSupport.hpp"
 
 using namespace skygate::ui::tests;
 

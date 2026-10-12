@@ -1,8 +1,7 @@
-#include <QtTest>
-
-#include "SkyOverlayLayerSettings.hpp"
+#include "theme/SkyOverlayLayerSettings.hpp"
 
 #include <QSignalSpy>
+#include <QtTest>
 
 class SkyOverlayLayerSettingsTests final : public QObject {
     Q_OBJECT

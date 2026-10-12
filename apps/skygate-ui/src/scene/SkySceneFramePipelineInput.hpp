@@ -10,11 +10,11 @@
 #include "OwnGalaxyCelestialBody.hpp"
 #include "PreparedProjection.hpp"
 #include "ProjectionType.hpp"
-#include "SkyOverlayLayerVisibility.hpp"
-#include "SkyThemeRenderPalette.hpp"
 #include "UtcTimePoint.hpp"
 #include "engine/EphemerisEngineKind.hpp"
 #include "engine/EphemerisEngineOptions.hpp"
+#include "theme/SkyOverlayLayerVisibility.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QString>

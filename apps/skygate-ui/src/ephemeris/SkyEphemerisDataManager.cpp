@@ -1,9 +1,8 @@
 #include "SkyEphemerisDataManager.hpp"
-
 #include "SkyEphemerisCacheController.hpp"
 #include "SkyEphemerisDownloadService.hpp"
 #include "SkyEphemerisSnapshotAdapter.hpp"
-#include "SkySettingsStore.hpp"
+#include "settings/SkySettingsStore.hpp"
 
 #include <QFile>
 #include <QFileInfo>

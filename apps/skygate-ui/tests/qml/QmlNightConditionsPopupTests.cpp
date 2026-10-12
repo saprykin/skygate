@@ -1,5 +1,5 @@
-#include "QmlTestSupport.hpp"
-#include "SkyTimeController.hpp"
+#include "support/QmlTestSupport.hpp"
+#include "time/SkyTimeController.hpp"
 
 using namespace skygate::ui::tests;
 

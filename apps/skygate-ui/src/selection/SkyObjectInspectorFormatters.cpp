@@ -1,8 +1,8 @@
 #include "SkyObjectInspectorFormatters.hpp"
 #include "ObservationEventCalculator.hpp"
-#include "SkyQtTimeCodec.hpp"
-#include "SkyTimeController.hpp"
 #include "time/CalendarTime.hpp"
+#include "time/SkyQtTimeCodec.hpp"
+#include "time/SkyTimeController.hpp"
 
 #include <QDateTime>
 #include <QTimeZone>

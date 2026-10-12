@@ -4,10 +4,10 @@
 #include "SkyEphemerisUserSettingsSnapshot.hpp"
 #include "SkyLocationSettingsSnapshot.hpp"
 #include "SkyLoggingSettingsSnapshot.hpp"
-#include "SkyOverlayLayerVisibility.hpp"
 #include "SkySearchSettingsSnapshot.hpp"
 #include "SkyTimelineSettingsSnapshot.hpp"
 #include "SkyViewSettingsSnapshot.hpp"
+#include "theme/SkyOverlayLayerVisibility.hpp"
 
 namespace skygate::ui::internal {
 

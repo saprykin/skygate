@@ -1,9 +1,9 @@
-#include "AsyncTestSupport.hpp"
 #include "BaseCelestialBody.hpp"
-#include "CatalogCoordinator.hpp"
-#include "CatalogParseOptions.hpp"
-#include "CatalogTestPayloads.hpp"
-#include "FakeNetworkAccessManager.hpp"
+#include "catalog/CatalogCoordinator.hpp"
+#include "catalog/CatalogParseOptions.hpp"
+#include "support/AsyncTestSupport.hpp"
+#include "support/CatalogTestPayloads.hpp"
+#include "support/FakeNetworkAccessManager.hpp"
 
 #include <QtTest/QtTest>
 

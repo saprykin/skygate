@@ -237,19 +237,6 @@ qt_add_library(skygate-ui-lib STATIC
 target_include_directories(skygate-ui-lib
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/app
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/catalog
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/diagnostics
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/ephemeris
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/location
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/render
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/scene
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/search
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/selection
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/settings
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/theme
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/time
 )
 
 if(APPLE)

@@ -1,13 +1,12 @@
-#include "catalog/CatalogPayloadParseService.hpp"
 #include "BaseCelestialBody.hpp"
-#include "CatalogParseOptions.hpp"
-#include "CatalogTestPayloads.hpp"
-
-#include <QtTest/QtTest>
+#include "catalog/CatalogParseOptions.hpp"
+#include "catalog/CatalogPayloadParseService.hpp"
+#include "support/CatalogTestPayloads.hpp"
 
 #include <QEventLoop>
 #include <QThreadPool>
 #include <QTimer>
+#include <QtTest/QtTest>
 
 #include <cstddef>
 #include <utility>

@@ -1,11 +1,10 @@
 #pragma once
 
 #include "SettingsTestFixture.hpp"
-#include "SkyContextCatalogCodec.hpp"
-#include "SkyContextController.hpp"
-#include "SkySettingsStore.hpp"
-
+#include "app/SkyContextCatalogCodec.hpp"
+#include "app/SkyContextController.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
+#include "settings/SkySettingsStore.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QByteArray>

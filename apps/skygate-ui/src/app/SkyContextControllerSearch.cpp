@@ -1,7 +1,7 @@
 #include "ConstellationReferenceCalculator.hpp"
 #include "SkyContextController.hpp"
-#include "SkyPerformanceLogging.hpp"
 #include "StringUtilities.hpp"
+#include "diagnostics/SkyPerformanceLogging.hpp"
 
 #include <QElapsedTimer>
 

@@ -2,7 +2,7 @@
 
 #include "EphemerisSnapshot.hpp"
 #include "PreparedProjection.hpp"
-#include "SkyRenderFrame.hpp"
+#include "render/SkyRenderFrame.hpp"
 
 #include <QHash>
 #include <QString>

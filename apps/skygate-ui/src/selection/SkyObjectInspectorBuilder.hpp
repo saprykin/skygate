@@ -1,8 +1,8 @@
 #pragma once
 
-#include "SkySelectedObjectInspector.hpp"
 #include "SkySelectionOverlayBuilder.hpp"
 #include "SkySelectionOverlayInput.hpp"
+#include "scene/SkySelectedObjectInspector.hpp"
 
 class SkyObjectInspectorBuilder final {
 public:

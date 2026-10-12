@@ -1,12 +1,12 @@
 #include "CelestialBodyCatalog.hpp"
-#include "EphemerisDataCacheSnapshotFixture.hpp"
-#include "SettingsTestFixture.hpp"
-#include "SkyCatalogManager.hpp"
-#include "SkyContextController.hpp"
-#include "SkyEphemerisDataManager.hpp"
-#include "SkySettingsStore.hpp"
-#include "StagedEphemerisAssetFixture.hpp"
+#include "app/SkyContextController.hpp"
+#include "catalog/SkyCatalogManager.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "ephemeris/SkyEphemerisDataManager.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/EphemerisDataCacheSnapshotFixture.hpp"
+#include "support/SettingsTestFixture.hpp"
+#include "support/StagedEphemerisAssetFixture.hpp"
 
 #include <QByteArray>
 #include <QDir>

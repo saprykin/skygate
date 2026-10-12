@@ -1,8 +1,7 @@
 #include "TrailBuilderTestScenario.hpp"
-#include "SkyObjectTrailInput.hpp"
-#include "SkyThemeRenderPalette.hpp"
-
 #include "math/ViewportMath.hpp"
+#include "selection/SkyObjectTrailInput.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <QColor>
 

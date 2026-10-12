@@ -1,12 +1,12 @@
 #include "CelestialReferenceCalculator.hpp"
-#include "SkyOverlayItem.hpp"
-#include "SkyRenderLabel.hpp"
-#include "SkyRenderPoint.hpp"
-#include "SkySceneComposer.hpp"
-#include "SkySceneCompositionInput.hpp"
-#include "SkySceneFrameData.hpp"
-#include "SkySceneFramePipelineResult.hpp"
 #include "math/ViewportMath.hpp"
+#include "render/SkyRenderLabel.hpp"
+#include "render/SkyRenderPoint.hpp"
+#include "scene/SkyOverlayItem.hpp"
+#include "scene/SkySceneComposer.hpp"
+#include "scene/SkySceneCompositionInput.hpp"
+#include "scene/SkySceneFrameData.hpp"
+#include "scene/SkySceneFramePipelineResult.hpp"
 
 #include <QHash>
 #include <QtTest/QtTest>

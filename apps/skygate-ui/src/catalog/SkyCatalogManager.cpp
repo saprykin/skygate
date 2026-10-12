@@ -9,7 +9,7 @@
 #include "SkyCatalogSourceRecord.hpp"
 #include "SkyCatalogSourceRestoreEntry.hpp"
 #include "SkyConstellationLineImportResult.hpp"
-#include "SkyContextCatalogCodec.hpp"
+#include "app/SkyContextCatalogCodec.hpp"
 #include "catalog/CatalogDownloadCancellation.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"

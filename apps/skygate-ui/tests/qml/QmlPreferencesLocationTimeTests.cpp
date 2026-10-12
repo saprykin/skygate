@@ -1,4 +1,4 @@
-#include "QmlPreferencesTestSupport.hpp"
+#include "support/QmlPreferencesTestSupport.hpp"
 
 class QmlPreferencesLocationTimeTests final : public QObject {
     Q_OBJECT

@@ -1,6 +1,6 @@
-#include <QtTest>
+#include "location/LocationCatalogModel.hpp"
 
-#include "LocationCatalogModel.hpp"
+#include <QtTest>
 
 class LocationCatalogModelTests final : public QObject {
     Q_OBJECT

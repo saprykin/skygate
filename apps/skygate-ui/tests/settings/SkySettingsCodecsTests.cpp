@@ -1,6 +1,6 @@
-#include "SkyLogging.hpp"
-#include "SkySettingsSnapshotCodecs.hpp"
-#include "SkySettingsValueCodecs.hpp"
+#include "diagnostics/SkyLogging.hpp"
+#include "settings/SkySettingsSnapshotCodecs.hpp"
+#include "settings/SkySettingsValueCodecs.hpp"
 
 #include <QRegularExpression>
 #include <QSettings>

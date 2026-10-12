@@ -1,8 +1,8 @@
 #include "CelestialBodyCatalog.hpp"
-#include "SkySceneFramePipeline.hpp"
-#include "SkySceneFramePipelineInput.hpp"
 #include "engine/EphemerisEngineQueries.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "scene/SkySceneFramePipeline.hpp"
+#include "scene/SkySceneFramePipelineInput.hpp"
 
 #include <QtTest/QtTest>
 

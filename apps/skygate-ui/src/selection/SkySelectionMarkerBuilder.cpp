@@ -1,9 +1,9 @@
 #include "SkySelectionMarkerBuilder.hpp"
-#include "SkySceneLookupKey.hpp"
-#include "SkySelectionMarker.hpp"
 #include "SkySelectionOverlayInput.hpp"
 #include "math/SphericalGeometry.hpp"
 #include "math/Vector3d.hpp"
+#include "scene/SkySceneLookupKey.hpp"
+#include "scene/SkySelectionMarker.hpp"
 
 #include <QPointF>
 

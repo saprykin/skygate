@@ -1,8 +1,8 @@
-#include <QtTest>
+#include "location/LocationCatalogModel.hpp"
+#include "platform/MacDockIcon.hpp"
+#include "theme/SkyThemeRepository.hpp"
 
-#include "LocationCatalogModel.hpp"
-#include "MacDockIcon.hpp"
-#include "SkyThemeRepository.hpp"
+#include <QtTest>
 
 class ResourceDiagnosticsTests final : public QObject {
     Q_OBJECT

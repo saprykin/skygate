@@ -1,9 +1,8 @@
-#include <QtTest>
-
-#include "TimeZoneAliasCatalog.hpp"
-#include "TimeZoneCatalogModel.hpp"
+#include "time/TimeZoneAliasCatalog.hpp"
+#include "time/TimeZoneCatalogModel.hpp"
 
 #include <QTimeZone>
+#include <QtTest>
 
 namespace {
 

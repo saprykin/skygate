@@ -1,6 +1,6 @@
-#include "ConstellationTestSupport.hpp"
-#include "SkyContextControllerTestSupport.hpp"
-#include "SkyObjectSearchModel.hpp"
+#include "search/SkyObjectSearchModel.hpp"
+#include "support/ConstellationTestSupport.hpp"
+#include "support/SkyContextControllerTestSupport.hpp"
 
 #include <memory>
 #include <string_view>

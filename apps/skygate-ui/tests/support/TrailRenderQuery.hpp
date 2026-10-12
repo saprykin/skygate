@@ -1,8 +1,8 @@
 #pragma once
 
-#include "SkyRenderFrame.hpp"
-#include "SkyRenderLabel.hpp"
-#include "SkyRenderLine.hpp"
+#include "render/SkyRenderFrame.hpp"
+#include "render/SkyRenderLabel.hpp"
+#include "render/SkyRenderLine.hpp"
 
 #include <QString>
 

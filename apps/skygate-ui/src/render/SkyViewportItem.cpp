@@ -1,15 +1,15 @@
 #include "SkyViewportItem.hpp"
-#include "SkyContextController.hpp"
 #include "SkyRenderGlyph.hpp"
 #include "SkyRenderLine.hpp"
 #include "SkyRenderPoint.hpp"
-#include "SkySceneModel.hpp"
-#include "SkyThemeRenderPalette.hpp"
 #include "SkyViewportGeometry.hpp"
 #include "SkyViewportGeometryInput.hpp"
 #include "SkyViewportLineSegment.hpp"
 #include "SkyViewportSceneGraph.hpp"
 #include "SkyViewportSceneRootNode.hpp"
+#include "app/SkyContextController.hpp"
+#include "scene/SkySceneModel.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <memory>
 #include <mutex>

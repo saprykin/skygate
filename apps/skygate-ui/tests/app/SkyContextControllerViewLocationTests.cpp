@@ -1,6 +1,6 @@
-#include "SkyContextControllerTestSupport.hpp"
-#include "SkyDeviceLocationAcquisition.hpp"
-#include "SkyPersistedStateSnapshot.hpp"
+#include "location/SkyDeviceLocationAcquisition.hpp"
+#include "settings/SkyPersistedStateSnapshot.hpp"
+#include "support/SkyContextControllerTestSupport.hpp"
 
 class SkyContextControllerViewLocationTests final : public QObject {
     Q_OBJECT

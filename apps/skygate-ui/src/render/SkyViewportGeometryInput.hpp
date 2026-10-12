@@ -2,11 +2,11 @@
 
 #include "GeoLocation.hpp"
 #include "PreparedProjection.hpp"
-#include "SkyOverlayLayerVisibility.hpp"
 #include "SkyRenderGlyph.hpp"
 #include "SkyRenderLine.hpp"
-#include "SkyThemeRenderPalette.hpp"
 #include "UtcTimePoint.hpp"
+#include "theme/SkyOverlayLayerVisibility.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <span>
 

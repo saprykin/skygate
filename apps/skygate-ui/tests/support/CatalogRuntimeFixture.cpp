@@ -1,7 +1,4 @@
 #include "CatalogRuntimeFixture.hpp"
-#include "SkyCatalogRuntimeBuildOptions.hpp"
-#include "SkyCatalogRuntimeResult.hpp"
-
 #include "BaseCelestialBody.hpp"
 #include "CelestialBodyCatalog.hpp"
 #include "DeepSkyObjectInfo.hpp"
@@ -9,6 +6,8 @@
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogIdentifier.hpp"
+#include "catalog/SkyCatalogRuntimeBuildOptions.hpp"
+#include "catalog/SkyCatalogRuntimeResult.hpp"
 
 #include <algorithm>
 #include <cstddef>

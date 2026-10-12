@@ -1,7 +1,7 @@
-#include "SkyCatalogPresets.hpp"
-#include "SkyCatalogSourceDescriptor.hpp"
-#include "SkyCatalogSourceInstance.hpp"
-#include "SkyCatalogSourcePresetModel.hpp"
+#include "catalog/SkyCatalogPresets.hpp"
+#include "catalog/SkyCatalogSourceDescriptor.hpp"
+#include "catalog/SkyCatalogSourceInstance.hpp"
+#include "catalog/SkyCatalogSourcePresetModel.hpp"
 
 #include <QtTest/QtTest>
 

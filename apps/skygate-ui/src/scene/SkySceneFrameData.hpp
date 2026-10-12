@@ -3,9 +3,9 @@
 #include "EphemerisSnapshot.hpp"
 #include "PreparedProjection.hpp"
 #include "SkyOverlayItem.hpp"
-#include "SkyRenderFrame.hpp"
 #include "SkySelectedObjectInspector.hpp"
 #include "SkySelectionMarker.hpp"
+#include "render/SkyRenderFrame.hpp"
 
 #include <optional>
 #include <vector>

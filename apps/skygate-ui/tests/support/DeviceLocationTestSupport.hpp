@@ -1,14 +1,14 @@
 #pragma once
 
-#include "ILocationPermissionGate.hpp"
+#include "location/ILocationPermissionGate.hpp"
 
 #include <QDateTime>
-#include <QTimeZone>
 #if SKYGATE_HAS_POSITIONING
 #include <QGeoCoordinate>
 #include <QGeoPositionInfo>
 #include <QGeoPositionInfoSource>
 #endif
+#include <QTimeZone>
 
 #include <functional>
 #include <utility>

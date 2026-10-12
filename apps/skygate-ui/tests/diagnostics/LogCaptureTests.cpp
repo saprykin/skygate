@@ -1,12 +1,11 @@
-#include "LogCapture.hpp"
-#include "QmlWarningScope.hpp"
-
-#include <QtTest/QtTest>
+#include "support/LogCapture.hpp"
+#include "support/QmlWarningScope.hpp"
 
 #include <QDebug>
 #include <QMessageLogContext>
 #include <QStringList>
 #include <QtGlobal>
+#include <QtTest/QtTest>
 
 #include <algorithm>
 #include <optional>
