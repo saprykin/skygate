@@ -1,9 +1,11 @@
+#include "math/MathConstants.hpp"
 #include "math/SphericalGeometry.hpp"
 #include "math/Vector3d.hpp"
 
 #include <QtTest/QtTest>
 
 #include <cmath>
+#include <limits>
 
 namespace {
 
@@ -19,6 +21,17 @@ void compareVector(const skygate::core::Vector3d& actual, const skygate::core::V
     QVERIFY(isNear(actual.z, expected.z));
 }
 
+void compareHorizontalCoordinate(
+    const skygate::core::HorizontalCoordinate& actual,
+    const double altitudeDeg,
+    const double azimuthDeg,
+    const double tolerance = 1e-9
+)
+{
+    QVERIFY(isNear(actual.altitudeDeg, altitudeDeg, tolerance));
+    QVERIFY(isNear(actual.azimuthDeg, azimuthDeg, tolerance));
+}
+
 }  // namespace
 
 class SphericalGeometryTests final : public QObject {
@@ -27,6 +40,15 @@ class SphericalGeometryTests final : public QObject {
 private slots:
     void horizontalCoordinatesMapToUnitVectors();
     void unitVectorsMapToHorizontalCoordinates();
+    void measuresSeparationsBetweenDirections();
+    void separatesNearParallelAndWrappedAzimuths();
+    void interpolatesHorizontalCoordinatesAtEndpoints();
+    void interpolatesAcrossAzimuthWraparound();
+    void interpolatesNearParallelDirections();
+    void interpolatesAntipodalEquatorialDirections();
+    void fallsBackToZenithForNonFiniteDirection();
+    void rotatesUnitVectorsAroundAxis();
+    void rotationFallsBackToZenithForZeroVector();
     void buildsOrthonormalProjectionBasis();
     void projectionBasisNormalizesAzimuthAndSupportsNadir();
     void rejectsInvalidProjectionCenterKeepsOutputs();
@@ -68,6 +90,163 @@ void SphericalGeometryTests::unitVectorsMapToHorizontalCoordinates()
     const skygate::core::HorizontalCoordinate zenith =
         skygate::core::SphericalGeometry::horizontalFromUnitVector({.x = 0.0, .y = 0.0, .z = 1.0});
     QVERIFY(isNear(zenith.altitudeDeg, 90.0));
+}
+
+void SphericalGeometryTests::measuresSeparationsBetweenDirections()
+{
+    const skygate::core::HorizontalCoordinate direction{.altitudeDeg = 30.0, .azimuthDeg = 200.0};
+    QVERIFY(isNear(skygate::core::SphericalGeometry::angularSeparationDegrees(direction, direction), 0.0, 1e-5));
+
+    QVERIFY(isNear(
+        skygate::core::SphericalGeometry::angularSeparationDegrees(
+            {.altitudeDeg = 0.0, .azimuthDeg = 0.0}, {.altitudeDeg = 0.0, .azimuthDeg = 180.0}
+        ),
+        180.0
+    ));
+    QVERIFY(isNear(
+        skygate::core::SphericalGeometry::angularSeparationDegrees(
+            {.altitudeDeg = 45.0, .azimuthDeg = 30.0}, {.altitudeDeg = -45.0, .azimuthDeg = 210.0}
+        ),
+        180.0,
+        1e-4
+    ));
+}
+
+void SphericalGeometryTests::separatesNearParallelAndWrappedAzimuths()
+{
+    QVERIFY(isNear(
+        skygate::core::SphericalGeometry::angularSeparationDegrees(
+            {.altitudeDeg = 0.0, .azimuthDeg = 0.0}, {.altitudeDeg = 0.0, .azimuthDeg = 0.001}
+        ),
+        0.001,
+        1e-9
+    ));
+    QVERIFY(isNear(
+        skygate::core::SphericalGeometry::angularSeparationDegrees(
+            {.altitudeDeg = 44.9995, .azimuthDeg = 100.0005}, {.altitudeDeg = 45.0005, .azimuthDeg = 100.0005}
+        ),
+        0.001,
+        1e-9
+    ));
+    QVERIFY(isNear(
+        skygate::core::SphericalGeometry::angularSeparationDegrees(
+            {.altitudeDeg = 0.0, .azimuthDeg = 359.5}, {.altitudeDeg = 0.0, .azimuthDeg = 0.5}
+        ),
+        1.0,
+        1e-9
+    ));
+    QVERIFY(isNear(
+        skygate::core::SphericalGeometry::angularSeparationDegrees(
+            {.altitudeDeg = 10.0, .azimuthDeg = -0.5}, {.altitudeDeg = 10.0, .azimuthDeg = 359.5}
+        ),
+        0.0,
+        1e-5
+    ));
+}
+
+void SphericalGeometryTests::interpolatesHorizontalCoordinatesAtEndpoints()
+{
+    const skygate::core::HorizontalCoordinate previous{.altitudeDeg = 20.0, .azimuthDeg = 10.0};
+    const skygate::core::HorizontalCoordinate next{.altitudeDeg = 50.0, .azimuthDeg = 300.0};
+
+    compareHorizontalCoordinate(
+        skygate::core::SphericalGeometry::interpolateHorizontalCoordinate(previous, next, 0.0), 20.0, 10.0
+    );
+    compareHorizontalCoordinate(
+        skygate::core::SphericalGeometry::interpolateHorizontalCoordinate(previous, next, 1.0), 50.0, 300.0
+    );
+    compareHorizontalCoordinate(
+        skygate::core::SphericalGeometry::interpolateHorizontalCoordinate(previous, previous, 0.5), 20.0, 10.0
+    );
+}
+
+void SphericalGeometryTests::interpolatesAcrossAzimuthWraparound()
+{
+    compareHorizontalCoordinate(
+        skygate::core::SphericalGeometry::interpolateHorizontalCoordinate(
+            {.altitudeDeg = 0.0, .azimuthDeg = 350.0}, {.altitudeDeg = 0.0, .azimuthDeg = 20.0}, 0.5
+        ),
+        0.0,
+        5.0
+    );
+    compareHorizontalCoordinate(
+        skygate::core::SphericalGeometry::interpolateHorizontalCoordinate(
+            {.altitudeDeg = 0.0, .azimuthDeg = 170.0}, {.altitudeDeg = 0.0, .azimuthDeg = 190.0}, 0.5
+        ),
+        0.0,
+        180.0
+    );
+}
+
+void SphericalGeometryTests::interpolatesNearParallelDirections()
+{
+    compareHorizontalCoordinate(
+        skygate::core::SphericalGeometry::interpolateHorizontalCoordinate(
+            {.altitudeDeg = 20.0, .azimuthDeg = 10.0}, {.altitudeDeg = 20.001, .azimuthDeg = 10.001}, 0.5
+        ),
+        20.0005,
+        10.0005,
+        1e-6
+    );
+}
+
+void SphericalGeometryTests::interpolatesAntipodalEquatorialDirections()
+{
+    const skygate::core::HorizontalCoordinate previous{.altitudeDeg = 0.0, .azimuthDeg = 0.0};
+    const skygate::core::HorizontalCoordinate next{.altitudeDeg = 0.0, .azimuthDeg = 180.0};
+    const skygate::core::HorizontalCoordinate midpoint =
+        skygate::core::SphericalGeometry::interpolateHorizontalCoordinate(previous, next, 0.5);
+
+    QVERIFY(midpoint.isFinite());
+    QVERIFY(isNear(midpoint.altitudeDeg, 0.0, 1e-9));
+    QVERIFY(isNear(skygate::core::SphericalGeometry::angularSeparationDegrees(previous, midpoint), 90.0, 1e-6));
+    QVERIFY(isNear(skygate::core::SphericalGeometry::angularSeparationDegrees(next, midpoint), 90.0, 1e-6));
+}
+
+void SphericalGeometryTests::fallsBackToZenithForNonFiniteDirection()
+{
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    compareHorizontalCoordinate(
+        skygate::core::SphericalGeometry::interpolateHorizontalCoordinate(
+            {.altitudeDeg = nan, .azimuthDeg = 0.0}, {.altitudeDeg = 0.0, .azimuthDeg = 90.0}, 0.5
+        ),
+        90.0,
+        0.0
+    );
+}
+
+void SphericalGeometryTests::rotatesUnitVectorsAroundAxis()
+{
+    const skygate::core::Vector3d zAxis{.x = 0.0, .y = 0.0, .z = 1.0};
+    const skygate::core::Vector3d north{.x = 0.0, .y = 1.0, .z = 0.0};
+
+    compareVector(skygate::core::SphericalGeometry::rotatedAroundAxis(north, zAxis, 0.0), north);
+    compareVector(
+        skygate::core::SphericalGeometry::rotatedAroundAxis(north, zAxis, skygate::core::MathConstants::kPi / 2.0),
+        {.x = -1.0, .y = 0.0, .z = 0.0}
+    );
+    compareVector(
+        skygate::core::SphericalGeometry::rotatedAroundAxis(north, zAxis, -skygate::core::MathConstants::kPi / 2.0),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
+    );
+    compareVector(
+        skygate::core::SphericalGeometry::rotatedAroundAxis(north, zAxis, skygate::core::MathConstants::kPi),
+        {.x = 0.0, .y = -1.0, .z = 0.0}
+    );
+    compareVector(
+        skygate::core::SphericalGeometry::rotatedAroundAxis(zAxis, zAxis, skygate::core::MathConstants::kPi / 4.0),
+        {.x = 0.0, .y = 0.0, .z = 1.0}
+    );
+}
+
+void SphericalGeometryTests::rotationFallsBackToZenithForZeroVector()
+{
+    compareVector(
+        skygate::core::SphericalGeometry::rotatedAroundAxis(
+            {.x = 0.0, .y = 0.0, .z = 0.0}, {.x = 0.0, .y = 0.0, .z = 1.0}, 1.0
+        ),
+        {.x = 0.0, .y = 0.0, .z = 1.0}
+    );
 }
 
 void SphericalGeometryTests::buildsOrthonormalProjectionBasis()

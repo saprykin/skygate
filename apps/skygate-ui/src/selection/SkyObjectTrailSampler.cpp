@@ -24,6 +24,11 @@ constexpr int kObjectTrailAdaptiveRenderStepMinutes = 10;
 constexpr int kObjectTrailAdaptiveSampleStepMinutes = 120;
 constexpr double kObjectTrailAdaptiveMaxInterpolationErrorDeg = 0.05;
 
+// For two unit vectors the cross-product magnitude is the sine of their angle.
+// Below this value the rotation axis is unresolved and the directions are
+// treated as collinear.
+constexpr double kObjectTrailCollinearSinTolerance = 1e-9;
+
 void copyCommonBodyFields(
     skygate::ephemeris::BaseCelestialBody& target, const skygate::ephemeris::BaseCelestialBody& source
 )
@@ -84,50 +89,10 @@ equatorialEqual(const skygate::core::EquatorialCoordinate& lhs, const skygate::c
 {
     const skygate::core::Vector3d zAxis{.x = 0.0, .y = 0.0, .z = 1.0};
     skygate::core::Vector3d axis = vector.cross(zAxis);
-    if (axis.length() <= 1e-9) {
+    if (axis.length() <= kObjectTrailCollinearSinTolerance) {
         axis = vector.cross(skygate::core::Vector3d{.x = 1.0, .y = 0.0, .z = 0.0});
     }
     return axis.normalized().value_or(skygate::core::Vector3d{.x = 0.0, .y = 0.0, .z = 1.0});
-}
-
-[[nodiscard]] skygate::core::Vector3d rotatedAroundAxis(
-    const skygate::core::Vector3d& vector, const skygate::core::Vector3d& axis, const double angleRad
-) noexcept
-{
-    const double cosAngle = std::cos(angleRad);
-    const double sinAngle = std::sin(angleRad);
-    const skygate::core::Vector3d axisCrossVector = axis.cross(vector);
-    const double axisDotVector = axis.dot(vector);
-    const skygate::core::Vector3d rotated =
-        (vector * cosAngle) + (axisCrossVector * sinAngle) + (axis * (axisDotVector * (1.0 - cosAngle)));
-    return rotated.normalized().value_or(skygate::core::Vector3d{.x = 0.0, .y = 0.0, .z = 1.0});
-}
-
-[[nodiscard]] double angularSeparationDegrees(
-    const skygate::core::HorizontalCoordinate& lhs, const skygate::core::HorizontalCoordinate& rhs
-) noexcept
-{
-    constexpr double radiansToDegrees = 180.0 / std::numbers::pi;
-    const skygate::core::Vector3d lhsVector =
-        skygate::core::SphericalGeometry::horizontalToUnitVector(lhs.normalizedAzimuth());
-    const skygate::core::Vector3d rhsVector =
-        skygate::core::SphericalGeometry::horizontalToUnitVector(rhs.normalizedAzimuth());
-    const double dot = std::clamp(lhsVector.dot(rhsVector), -1.0, 1.0);
-    return std::acos(dot) * radiansToDegrees;
-}
-
-[[nodiscard]] skygate::core::HorizontalCoordinate interpolateHorizontalCoordinate(
-    const skygate::core::HorizontalCoordinate& previous,
-    const skygate::core::HorizontalCoordinate& next,
-    const double fraction
-) noexcept
-{
-    const skygate::core::Vector3d previousVector = skygate::core::SphericalGeometry::horizontalToUnitVector(previous);
-    const skygate::core::Vector3d nextVector = skygate::core::SphericalGeometry::horizontalToUnitVector(next);
-    const skygate::core::Vector3d interpolated = previousVector + ((nextVector - previousVector) * fraction);
-    return skygate::core::SphericalGeometry::horizontalFromUnitVector(
-        interpolated.normalized().value_or(skygate::core::Vector3d{.x = 0.0, .y = 0.0, .z = 1.0})
-    );
 }
 
 [[nodiscard]] std::optional<skygate::core::HorizontalCoordinate> interpolateSampleAtOffset(
@@ -161,7 +126,7 @@ equatorialEqual(const skygate::core::EquatorialCoordinate& lhs, const skygate::c
         return std::nullopt;
     }
 
-    return interpolateHorizontalCoordinate(
+    return skygate::core::SphericalGeometry::interpolateHorizontalCoordinate(
         *previous.horizontal,
         *next.horizontal,
         static_cast<double>(offsetMinutes - previous.offsetMinutes) / static_cast<double>(spanMinutes)
@@ -219,7 +184,7 @@ void alignTrailToSelectedState(
     skygate::core::Vector3d axis = guidanceNow.cross(selectedNow);
     const double axisLength = axis.length();
     double angleRad = 0.0;
-    if (axisLength <= 1e-9) {
+    if (axisLength <= kObjectTrailCollinearSinTolerance) {
         if (dot > 0.0) {
             presentSample->horizontal = selectedHorizontal;
             return;
@@ -233,9 +198,11 @@ void alignTrailToSelectedState(
 
     for (skygate::ephemeris::BodyTrailSample& sample : samples) {
         if (sample.horizontal.has_value() && sample.horizontal->isFinite()) {
-            sample.horizontal = skygate::core::SphericalGeometry::horizontalFromUnitVector(rotatedAroundAxis(
-                skygate::core::SphericalGeometry::horizontalToUnitVector(*sample.horizontal), axis, angleRad
-            ));
+            sample.horizontal = skygate::core::SphericalGeometry::horizontalFromUnitVector(
+                skygate::core::SphericalGeometry::rotatedAroundAxis(
+                    skygate::core::SphericalGeometry::horizontalToUnitVector(*sample.horizontal), axis, angleRad
+                )
+            );
         }
     }
     presentSample->horizontal = selectedHorizontal;
@@ -271,12 +238,14 @@ sampleEngineTrailAtOffset(const SkyObjectTrailSamplingInput& input, const int of
         return true;
     }
 
-    const skygate::core::HorizontalCoordinate interpolated = interpolateHorizontalCoordinate(
-        *previous.horizontal,
-        *next.horizontal,
-        static_cast<double>(midpoint.offsetMinutes - previous.offsetMinutes) / static_cast<double>(spanMinutes)
-    );
-    return angularSeparationDegrees(interpolated, *midpoint.horizontal) <= kObjectTrailAdaptiveMaxInterpolationErrorDeg;
+    const skygate::core::HorizontalCoordinate interpolated =
+        skygate::core::SphericalGeometry::interpolateHorizontalCoordinate(
+            *previous.horizontal,
+            *next.horizontal,
+            static_cast<double>(midpoint.offsetMinutes - previous.offsetMinutes) / static_cast<double>(spanMinutes)
+        );
+    return skygate::core::SphericalGeometry::angularSeparationDegrees(interpolated, *midpoint.horizontal)
+           <= kObjectTrailAdaptiveMaxInterpolationErrorDeg;
 }
 
 void appendAdaptiveTrailAnchors(
