@@ -69,7 +69,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/scene/SkySceneModel.hpp
     src/scene/SkySceneOverlayAdapter.cpp
     src/scene/SkySceneOverlayAdapter.hpp
-    src/scene/SkySceneShared.hpp
+    src/scene/SkySceneLookupKey.hpp
     src/scene/SkySelectedObjectInspector.hpp
     src/scene/SkySelectionMarker.hpp
     src/app/SkyNightConditionsAdapter.hpp
@@ -203,8 +203,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/render/SkyRenderPoint.hpp
     src/render/SkyRenderHorizontalLookup.cpp
     src/render/SkyRenderHorizontalLookup.hpp
-    src/render/SkyRenderLabels.cpp
-    src/render/SkyRenderLabels.hpp
+    src/render/SkyRenderLabelBuilder.cpp
+    src/render/SkyRenderLabelBuilder.hpp
     src/app/SkyContextControllerSettings.cpp
     src/app/SkyContextControllerTimeline.cpp
     src/settings/SkySettingsSnapshotCodecs.cpp
@@ -230,6 +230,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/render/SkyViewportItem.hpp
     src/render/SkyViewportSceneGraph.cpp
     src/render/SkyViewportSceneGraph.hpp
+    src/render/SkyViewportSceneRootNode.cpp
+    src/render/SkyViewportSceneRootNode.hpp
 )
 
 target_include_directories(skygate-ui-lib

@@ -328,26 +328,38 @@ void CatalogConsumerInterchangeabilityTests::inspectorMetadataAgreesForEquivalen
     const BaseCelestialBody* semanticSirius = findByExternalIdentifier(semantic.catalog->bodies(), "hip", "32349");
     QVERIFY(hygSirius != nullptr);
     QVERIFY(semanticSirius != nullptr);
-    QCOMPARE(celestialBodyTypeText(*hygSirius), celestialBodyTypeText(*semanticSirius));
-    QCOMPARE(formatMagnitude(hygSirius->visualMagnitude), formatMagnitude(semanticSirius->visualMagnitude));
     QCOMPARE(
-        formatEquatorialCoordinate(*hygSirius->fixedEquatorialValue()),
-        formatEquatorialCoordinate(*semanticSirius->fixedEquatorialValue())
+        SkyObjectInspectorFormatters::celestialBodyTypeText(*hygSirius),
+        SkyObjectInspectorFormatters::celestialBodyTypeText(*semanticSirius)
+    );
+    QCOMPARE(
+        SkyObjectInspectorFormatters::formatMagnitude(hygSirius->visualMagnitude),
+        SkyObjectInspectorFormatters::formatMagnitude(semanticSirius->visualMagnitude)
+    );
+    QCOMPARE(
+        SkyObjectInspectorFormatters::formatEquatorialCoordinate(*hygSirius->fixedEquatorialValue()),
+        SkyObjectInspectorFormatters::formatEquatorialCoordinate(*semanticSirius->fixedEquatorialValue())
     );
 
     const BaseCelestialBody* openNgcAndromeda = findByExternalIdentifier(openNgc.catalog->bodies(), "messier", "031");
     const BaseCelestialBody* semanticAndromeda = findByExternalIdentifier(semantic.catalog->bodies(), "messier", "031");
     QVERIFY(openNgcAndromeda != nullptr);
     QVERIFY(semanticAndromeda != nullptr);
-    QCOMPARE(celestialBodyTypeText(*openNgcAndromeda), celestialBodyTypeText(*semanticAndromeda));
-    QCOMPARE(formatMagnitude(openNgcAndromeda->visualMagnitude), formatMagnitude(semanticAndromeda->visualMagnitude));
     QCOMPARE(
-        formatEquatorialCoordinate(*openNgcAndromeda->fixedEquatorialValue()),
-        formatEquatorialCoordinate(*semanticAndromeda->fixedEquatorialValue())
+        SkyObjectInspectorFormatters::celestialBodyTypeText(*openNgcAndromeda),
+        SkyObjectInspectorFormatters::celestialBodyTypeText(*semanticAndromeda)
     );
     QCOMPARE(
-        angularSizeText(*openNgcAndromeda->deepSkyObjectValue()),
-        angularSizeText(*semanticAndromeda->deepSkyObjectValue())
+        SkyObjectInspectorFormatters::formatMagnitude(openNgcAndromeda->visualMagnitude),
+        SkyObjectInspectorFormatters::formatMagnitude(semanticAndromeda->visualMagnitude)
+    );
+    QCOMPARE(
+        SkyObjectInspectorFormatters::formatEquatorialCoordinate(*openNgcAndromeda->fixedEquatorialValue()),
+        SkyObjectInspectorFormatters::formatEquatorialCoordinate(*semanticAndromeda->fixedEquatorialValue())
+    );
+    QCOMPARE(
+        SkyObjectInspectorFormatters::angularSizeText(*openNgcAndromeda->deepSkyObjectValue()),
+        SkyObjectInspectorFormatters::angularSizeText(*semanticAndromeda->deepSkyObjectValue())
     );
 }
 
@@ -544,7 +556,7 @@ void CatalogConsumerInterchangeabilityTests::consumersAgreeOnComposedCollectionS
 
     // The inspector's source field reports the same surviving provenance.
     QCOMPARE(
-        sourceLabelForBodyIndex(
+        SkyObjectInspectorFormatters::sourceLabelForBodyIndex(
             manager.sourceIds(),
             &manager.contributorSourceIds(),
             manager.sourceTitles(),
@@ -553,7 +565,7 @@ void CatalogConsumerInterchangeabilityTests::consumersAgreeOnComposedCollectionS
         QStringLiteral("Semantic Fixture + HYG Fixture")
     );
     QCOMPARE(
-        sourceLabelForBodyIndex(
+        SkyObjectInspectorFormatters::sourceLabelForBodyIndex(
             manager.sourceIds(),
             &manager.contributorSourceIds(),
             manager.sourceTitles(),

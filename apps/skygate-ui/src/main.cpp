@@ -314,7 +314,7 @@ int main(int argc, char* argv[])
     QGuiApplication::setWindowIcon(appIcon);
 #if defined(Q_OS_MACOS)
     if (QFileInfo::exists(bundleIconPath)) {
-        skygate::ui::setMacDockIcon(bundleIconPath);
+        skygate::ui::MacDockIcon::setIcon(bundleIconPath);
     }
 #endif
 

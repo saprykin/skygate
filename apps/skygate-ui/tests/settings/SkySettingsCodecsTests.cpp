@@ -42,15 +42,15 @@ private slots:
 
 void SkySettingsCodecsTests::boolCodecAcceptsStrictBooleanSpellings()
 {
-    using skygate::ui::internal::boolFromSettingValue;
+    using skygate::ui::internal::SkySettingsValueCodecs;
 
-    QCOMPARE(boolFromSettingValue(QVariant(true)), std::optional<bool>(true));
-    QCOMPARE(boolFromSettingValue(QVariant(" yes ")), std::optional<bool>(true));
-    QCOMPARE(boolFromSettingValue(QVariant("ON")), std::optional<bool>(true));
-    QCOMPARE(boolFromSettingValue(QVariant("0")), std::optional<bool>(false));
-    QCOMPARE(boolFromSettingValue(QVariant("off")), std::optional<bool>(false));
-    QVERIFY(!boolFromSettingValue(QVariant()).has_value());
-    QVERIFY(!boolFromSettingValue(QVariant("maybe")).has_value());
+    QCOMPARE(SkySettingsValueCodecs::boolFromSettingValue(QVariant(true)), std::optional<bool>(true));
+    QCOMPARE(SkySettingsValueCodecs::boolFromSettingValue(QVariant(" yes ")), std::optional<bool>(true));
+    QCOMPARE(SkySettingsValueCodecs::boolFromSettingValue(QVariant("ON")), std::optional<bool>(true));
+    QCOMPARE(SkySettingsValueCodecs::boolFromSettingValue(QVariant("0")), std::optional<bool>(false));
+    QCOMPARE(SkySettingsValueCodecs::boolFromSettingValue(QVariant("off")), std::optional<bool>(false));
+    QVERIFY(!SkySettingsValueCodecs::boolFromSettingValue(QVariant()).has_value());
+    QVERIFY(!SkySettingsValueCodecs::boolFromSettingValue(QVariant("maybe")).has_value());
 }
 
 void SkySettingsCodecsTests::primitiveReadersFallBackForMissingInvalidValues()
@@ -67,17 +67,17 @@ void SkySettingsCodecsTests::primitiveReadersFallBackForMissingInvalidValues()
     settings.setValue("goodDouble", "42.5");
 
     using namespace skygate::ui::internal;
-    QCOMPARE(readBoolSetting(settings, "missingBool", false), false);
-    QCOMPARE(readDoubleSetting(settings, "missingDouble", 9.0), 9.0);
-    QCOMPARE(readDoubleSetting(settings, "goodDouble", 0.0), 42.5);
+    QCOMPARE(SkySettingsValueCodecs::readBoolSetting(settings, "missingBool", false), false);
+    QCOMPARE(SkySettingsValueCodecs::readDoubleSetting(settings, "missingDouble", 9.0), 9.0);
+    QCOMPARE(SkySettingsValueCodecs::readDoubleSetting(settings, "goodDouble", 0.0), 42.5);
 
     ignoreFallbackWarnings(6);
-    QCOMPARE(readBoolSetting(settings, "badBool", true), true);
-    QCOMPARE(readDoubleSetting(settings, "badDouble", 12.0), 12.0);
-    QCOMPARE(readIntSetting(settings, "badInt", 7), 7);
-    QCOMPARE(readLongLongSetting(settings, "badLongLong", -3), -3);
-    QCOMPARE(readULongLongSetting(settings, "badULongLong", 8), 8ULL);
-    QCOMPARE(readNonBlankStringSetting(settings, "blankPath", "fallback"), QString("fallback"));
+    QCOMPARE(SkySettingsValueCodecs::readBoolSetting(settings, "badBool", true), true);
+    QCOMPARE(SkySettingsValueCodecs::readDoubleSetting(settings, "badDouble", 12.0), 12.0);
+    QCOMPARE(SkySettingsValueCodecs::readIntSetting(settings, "badInt", 7), 7);
+    QCOMPARE(SkySettingsValueCodecs::readLongLongSetting(settings, "badLongLong", -3), -3);
+    QCOMPARE(SkySettingsValueCodecs::readULongLongSetting(settings, "badULongLong", 8), 8ULL);
+    QCOMPARE(SkySettingsValueCodecs::readNonBlankStringSetting(settings, "blankPath", "fallback"), QString("fallback"));
 }
 
 void SkySettingsCodecsTests::splitAndMergeStateSnapshotPreservesTypedDomains()
@@ -125,7 +125,7 @@ void SkySettingsCodecsTests::splitAndMergeStateSnapshotPreservesTypedDomains()
     snapshot.ephemeris.updateManifestUrl = "https://example.invalid/ephemeris.json";
     snapshot.ephemerisSettingsPresent = true;
 
-    const auto domains = skygate::ui::internal::splitStateSnapshot(snapshot);
+    const auto domains = skygate::ui::internal::SkySettingsSnapshotCodecs::splitStateSnapshot(snapshot);
     QCOMPARE(domains.timeline.live, false);
     QCOMPARE(domains.search.toolbarCollapsed, true);
     QCOMPARE(domains.view.themeId, QString("paper"));
@@ -139,7 +139,7 @@ void SkySettingsCodecsTests::splitAndMergeStateSnapshotPreservesTypedDomains()
     QCOMPARE(domains.ephemeris.preferredDataProfileId, QString("long-range"));
     QCOMPARE(domains.ephemerisSettingsPresent, true);
 
-    const auto merged = skygate::ui::internal::mergeStateSnapshot(domains);
+    const auto merged = skygate::ui::internal::SkySettingsSnapshotCodecs::mergeStateSnapshot(domains);
     QCOMPARE(merged.live, snapshot.live);
     QCOMPARE(merged.timelineToolbarCollapsed, snapshot.timelineToolbarCollapsed);
     QCOMPARE(merged.searchToolbarCollapsed, snapshot.searchToolbarCollapsed);
@@ -164,13 +164,13 @@ void SkySettingsCodecsTests::stateSnapshotLoadRequiresVersionAppliesDefaults()
     QVERIFY(dir.isValid());
     QSettings settings = makeSettings(dir);
 
-    QVERIFY(!skygate::ui::internal::loadStateSnapshot(settings).has_value());
+    QVERIFY(!skygate::ui::internal::SkySettingsSnapshotCodecs::loadStateSnapshot(settings).has_value());
 
     settings.setValue("skyContext/version", 3);
     settings.setValue("skyContext/searchToolbarCollapsed", true);
     settings.setValue("skyContext/overlayLayers/altAzGrid", false);
 
-    const auto loaded = skygate::ui::internal::loadStateSnapshot(settings);
+    const auto loaded = skygate::ui::internal::SkySettingsSnapshotCodecs::loadStateSnapshot(settings);
     QVERIFY(loaded.has_value());
     QCOMPARE(loaded->live, true);
     QCOMPARE(loaded->searchToolbarCollapsed, true);
@@ -196,7 +196,7 @@ void SkySettingsCodecsTests::stateSnapshotMigratesLegacyShortRangeProfileId()
     settings.setValue("skyContext/version", 3);
     settings.setValue("skyContext/ephemeris/preferredDataProfileId", "modern");
 
-    const auto loaded = skygate::ui::internal::loadStateSnapshot(settings);
+    const auto loaded = skygate::ui::internal::SkySettingsSnapshotCodecs::loadStateSnapshot(settings);
     QVERIFY(loaded.has_value());
     QCOMPARE(loaded->ephemeris.preferredDataProfileId, QString("de440s-short-range"));
 }
@@ -214,8 +214,8 @@ void SkySettingsCodecsTests::savingBlankLogPathStoresDefaultPath()
     snapshot.ephemeris.correctionPresetId = "  ";
     snapshot.ephemeris.preferredDataProfileId = "";
 
-    skygate::ui::internal::saveStateSnapshot(settings, snapshot);
-    const auto loaded = skygate::ui::internal::loadStateSnapshot(settings);
+    skygate::ui::internal::SkySettingsSnapshotCodecs::saveStateSnapshot(settings, snapshot);
+    const auto loaded = skygate::ui::internal::SkySettingsSnapshotCodecs::loadStateSnapshot(settings);
     QVERIFY(loaded.has_value());
     QCOMPARE(loaded->logToTerminal, false);
     QCOMPARE(loaded->logToFile, true);
@@ -233,8 +233,8 @@ void SkySettingsCodecsTests::ephemerisEngineKindRoundTripsBothStableIds()
 
     SkyPersistedStateSnapshot snapshot;
     snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
-    skygate::ui::internal::saveStateSnapshot(settings, snapshot);
-    auto loaded = skygate::ui::internal::loadStateSnapshot(settings);
+    skygate::ui::internal::SkySettingsSnapshotCodecs::saveStateSnapshot(settings, snapshot);
+    auto loaded = skygate::ui::internal::SkySettingsSnapshotCodecs::loadStateSnapshot(settings);
     QVERIFY(loaded.has_value());
     QCOMPARE(settings.value("skyContext/ephemeris/engineKind").toString(), QString("simple"));
     QCOMPARE(
@@ -243,8 +243,8 @@ void SkySettingsCodecsTests::ephemerisEngineKindRoundTripsBothStableIds()
     );
 
     snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    skygate::ui::internal::saveStateSnapshot(settings, snapshot);
-    loaded = skygate::ui::internal::loadStateSnapshot(settings);
+    skygate::ui::internal::SkySettingsSnapshotCodecs::saveStateSnapshot(settings, snapshot);
+    loaded = skygate::ui::internal::SkySettingsSnapshotCodecs::loadStateSnapshot(settings);
     QVERIFY(loaded.has_value());
     QCOMPARE(settings.value("skyContext/ephemeris/engineKind").toString(), QString("highPrecision"));
     QCOMPARE(
@@ -269,7 +269,7 @@ void SkySettingsCodecsTests::engineKindParsesLegacyAliasesAndCaseInsensitive()
     };
     for (const QString& alias : highPrecisionAliases) {
         settings.setValue("skyContext/ephemeris/engineKind", alias);
-        const auto loaded = skygate::ui::internal::loadStateSnapshot(settings);
+        const auto loaded = skygate::ui::internal::SkySettingsSnapshotCodecs::loadStateSnapshot(settings);
         QVERIFY(loaded.has_value());
         QCOMPARE(
             static_cast<std::uint8_t>(loaded->ephemeris.engineKind),
@@ -278,7 +278,7 @@ void SkySettingsCodecsTests::engineKindParsesLegacyAliasesAndCaseInsensitive()
     }
 
     settings.setValue("skyContext/ephemeris/engineKind", QStringLiteral("SIMPLE"));
-    const auto simpleLoaded = skygate::ui::internal::loadStateSnapshot(settings);
+    const auto simpleLoaded = skygate::ui::internal::SkySettingsSnapshotCodecs::loadStateSnapshot(settings);
     QVERIFY(simpleLoaded.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(simpleLoaded->ephemeris.engineKind),
@@ -294,7 +294,7 @@ void SkySettingsCodecsTests::engineKindUnknownIdFallsBackToDefaultDescriptor()
     settings.setValue("skyContext/version", 3);
     settings.setValue("skyContext/ephemeris/engineKind", QStringLiteral("experimental"));
 
-    const auto loaded = skygate::ui::internal::loadStateSnapshot(settings);
+    const auto loaded = skygate::ui::internal::SkySettingsSnapshotCodecs::loadStateSnapshot(settings);
     QVERIFY(loaded.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(loaded->ephemeris.engineKind),

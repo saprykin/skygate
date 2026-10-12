@@ -1,5 +1,5 @@
 #include "SkySelectionMarkerBuilder.hpp"
-#include "SkySceneShared.hpp"
+#include "SkySceneLookupKey.hpp"
 #include "SkySelectionMarker.hpp"
 #include "SkySelectionOverlayInput.hpp"
 #include "math/SphericalGeometry.hpp"
@@ -29,7 +29,8 @@ std::optional<QPointF> selectedBodyPoint(
     const QString& targetId
 )
 {
-    const auto stateIndexIt = stateIndexByBodyId.constFind(normalizedSceneLookupKey(targetId));
+    const auto stateIndexIt =
+        stateIndexByBodyId.constFind(skygate::ui::internal::SkySceneLookupKey::normalized(targetId));
     if (stateIndexIt == stateIndexByBodyId.cend()) {
         return std::nullopt;
     }
@@ -55,7 +56,7 @@ std::optional<QPointF> selectedConstellationPoint(
     const QString& targetId
 )
 {
-    const QString normalizedTargetId = normalizedSceneLookupKey(targetId);
+    const QString normalizedTargetId = skygate::ui::internal::SkySceneLookupKey::normalized(targetId);
     if (normalizedTargetId.isEmpty()) {
         return std::nullopt;
     }
@@ -64,7 +65,7 @@ std::optional<QPointF> selectedConstellationPoint(
         anchorGroups.begin(),
         anchorGroups.end(),
         [&normalizedTargetId](const skygate::ephemeris::ConstellationAnchorGroup& anchorGroup) {
-            return normalizedSceneLookupKey(anchorGroup.first) == normalizedTargetId;
+            return skygate::ui::internal::SkySceneLookupKey::normalized(anchorGroup.first) == normalizedTargetId;
         }
     );
     if (anchorGroupIt == anchorGroups.end()) {
@@ -74,7 +75,8 @@ std::optional<QPointF> selectedConstellationPoint(
     skygate::core::Vector3d sum;
     int validAnchorCount = 0;
     for (const std::string& hipId : anchorGroupIt->second) {
-        const auto stateIndexIt = stateIndexByBodyId.constFind(normalizedSceneLookupKey(hipId));
+        const auto stateIndexIt =
+            stateIndexByBodyId.constFind(skygate::ui::internal::SkySceneLookupKey::normalized(hipId));
         if (stateIndexIt == stateIndexByBodyId.cend()) {
             continue;
         }
@@ -133,10 +135,10 @@ SkySelectionMarker SkySelectionMarkerBuilder::build(const SkySelectionOverlayInp
     }
 
     std::optional<QPointF> markerPoint;
-    if (normalizedSceneLookupKey(targetKind) == "body") {
+    if (skygate::ui::internal::SkySceneLookupKey::normalized(targetKind) == "body") {
         markerPoint =
             selectedBodyPoint(*input.snapshot, *input.stateIndexByBodyId, *input.preparedProjection, targetId);
-    } else if (normalizedSceneLookupKey(targetKind) == "constellationlabel") {
+    } else if (skygate::ui::internal::SkySceneLookupKey::normalized(targetKind) == "constellationlabel") {
         markerPoint = selectedConstellationPoint(
             *input.snapshot,
             *input.stateIndexByBodyId,

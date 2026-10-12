@@ -392,7 +392,7 @@ void appendFrameGlyphs(
 
 namespace skygate::ui::internal {
 
-std::vector<SkyViewportLineSegment> buildSkyViewportLineSegments(const SkyViewportGeometryInput& input)
+std::vector<SkyViewportLineSegment> SkyViewportGeometry::buildLineSegments(const SkyViewportGeometryInput& input)
 {
     const double maxSegmentLength = std::max(input.viewportWidth, input.viewportHeight) * 0.30;
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;

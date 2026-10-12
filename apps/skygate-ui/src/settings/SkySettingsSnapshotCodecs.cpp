@@ -40,16 +40,21 @@ void saveTimelineSettings(QSettings& settings, const SkyTimelineSettingsSnapshot
 SkyTimelineSettingsSnapshot loadTimelineSettings(QSettings& settings)
 {
     SkyTimelineSettingsSnapshot snapshot;
-    snapshot.live = readBoolSetting(settings, settingsKey("live"), snapshot.live);
-    snapshot.toolbarCollapsed =
-        readBoolSetting(settings, settingsKey("timelineToolbarCollapsed"), snapshot.toolbarCollapsed);
-    snapshot.speedMultiplier = readDoubleSetting(settings, settingsKey("speedMultiplier"), snapshot.speedMultiplier);
-    snapshot.stepSeconds = readIntSetting(settings, settingsKey("stepSeconds"), snapshot.stepSeconds);
-    snapshot.utcEpochMicros =
-        settings.contains(settingsKey("utcEpochMicros"))
-            ? readLongLongSetting(settings, settingsKey("utcEpochMicros"), snapshot.utcEpochMicros)
-            : readLongLongSetting(settings, settingsKey("utcEpochSeconds"), snapshot.utcEpochMicros / 1'000'000)
-                  * 1'000'000;
+    snapshot.live = SkySettingsValueCodecs::readBoolSetting(settings, settingsKey("live"), snapshot.live);
+    snapshot.toolbarCollapsed = SkySettingsValueCodecs::readBoolSetting(
+        settings, settingsKey("timelineToolbarCollapsed"), snapshot.toolbarCollapsed
+    );
+    snapshot.speedMultiplier =
+        SkySettingsValueCodecs::readDoubleSetting(settings, settingsKey("speedMultiplier"), snapshot.speedMultiplier);
+    snapshot.stepSeconds =
+        SkySettingsValueCodecs::readIntSetting(settings, settingsKey("stepSeconds"), snapshot.stepSeconds);
+    snapshot.utcEpochMicros = settings.contains(settingsKey("utcEpochMicros"))
+                                  ? SkySettingsValueCodecs::readLongLongSetting(
+                                        settings, settingsKey("utcEpochMicros"), snapshot.utcEpochMicros
+                                    )
+                                  : SkySettingsValueCodecs::readLongLongSetting(
+                                        settings, settingsKey("utcEpochSeconds"), snapshot.utcEpochMicros / 1'000'000
+                                    ) * 1'000'000;
     return snapshot;
 }
 
@@ -61,8 +66,9 @@ void saveSearchSettings(QSettings& settings, const SkySearchSettingsSnapshot& sn
 SkySearchSettingsSnapshot loadSearchSettings(QSettings& settings)
 {
     SkySearchSettingsSnapshot snapshot;
-    snapshot.toolbarCollapsed =
-        readBoolSetting(settings, settingsKey("searchToolbarCollapsed"), snapshot.toolbarCollapsed);
+    snapshot.toolbarCollapsed = SkySettingsValueCodecs::readBoolSetting(
+        settings, settingsKey("searchToolbarCollapsed"), snapshot.toolbarCollapsed
+    );
     return snapshot;
 }
 
@@ -79,12 +85,16 @@ void saveViewSettings(QSettings& settings, const SkyViewSettingsSnapshot& snapsh
 SkyViewSettingsSnapshot loadViewSettings(QSettings& settings)
 {
     SkyViewSettingsSnapshot snapshot;
-    snapshot.magnitudeCutoff = readDoubleSetting(settings, settingsKey("magnitudeCutoff"), snapshot.magnitudeCutoff);
-    snapshot.centerAltitudeDeg =
-        readDoubleSetting(settings, settingsKey("viewCenterAltitudeDeg"), snapshot.centerAltitudeDeg);
-    snapshot.centerAzimuthDeg =
-        readDoubleSetting(settings, settingsKey("viewCenterAzimuthDeg"), snapshot.centerAzimuthDeg);
-    snapshot.fieldOfViewDeg = readDoubleSetting(settings, settingsKey("viewFieldOfViewDeg"), snapshot.fieldOfViewDeg);
+    snapshot.magnitudeCutoff =
+        SkySettingsValueCodecs::readDoubleSetting(settings, settingsKey("magnitudeCutoff"), snapshot.magnitudeCutoff);
+    snapshot.centerAltitudeDeg = SkySettingsValueCodecs::readDoubleSetting(
+        settings, settingsKey("viewCenterAltitudeDeg"), snapshot.centerAltitudeDeg
+    );
+    snapshot.centerAzimuthDeg = SkySettingsValueCodecs::readDoubleSetting(
+        settings, settingsKey("viewCenterAzimuthDeg"), snapshot.centerAzimuthDeg
+    );
+    snapshot.fieldOfViewDeg =
+        SkySettingsValueCodecs::readDoubleSetting(settings, settingsKey("viewFieldOfViewDeg"), snapshot.fieldOfViewDeg);
     snapshot.projectionTypeText = settings.value(settingsKey("projectionType"), snapshot.projectionTypeText).toString();
     snapshot.themeId = settings.value(settingsKey("themeId"), snapshot.themeId).toString();
     return snapshot;
@@ -103,9 +113,12 @@ void saveLocationSettings(QSettings& settings, const SkyLocationSettingsSnapshot
 SkyLocationSettingsSnapshot loadLocationSettings(QSettings& settings)
 {
     SkyLocationSettingsSnapshot snapshot;
-    snapshot.latitudeDeg = readDoubleSetting(settings, settingsKey("latitudeDeg"), snapshot.latitudeDeg);
-    snapshot.longitudeDeg = readDoubleSetting(settings, settingsKey("longitudeDeg"), snapshot.longitudeDeg);
-    snapshot.elevationMeters = readDoubleSetting(settings, settingsKey("elevationMeters"), snapshot.elevationMeters);
+    snapshot.latitudeDeg =
+        SkySettingsValueCodecs::readDoubleSetting(settings, settingsKey("latitudeDeg"), snapshot.latitudeDeg);
+    snapshot.longitudeDeg =
+        SkySettingsValueCodecs::readDoubleSetting(settings, settingsKey("longitudeDeg"), snapshot.longitudeDeg);
+    snapshot.elevationMeters =
+        SkySettingsValueCodecs::readDoubleSetting(settings, settingsKey("elevationMeters"), snapshot.elevationMeters);
     snapshot.sourceText = settings.value(settingsKey("locationSource"), snapshot.sourceText).toString();
     snapshot.selectedCityId = settings.value(settingsKey("selectedCityId"), snapshot.selectedCityId).toString();
     snapshot.displayTimeZoneId =
@@ -130,23 +143,33 @@ void saveOverlaySettings(QSettings& settings, const SkyOverlayLayerVisibility& v
 SkyOverlayLayerVisibility loadOverlaySettings(QSettings& settings)
 {
     SkyOverlayLayerVisibility visibility;
-    visibility.horizon = readBoolSetting(settings, settingsKey("overlayLayers/horizon"), visibility.horizon);
-    visibility.altAzGrid = readBoolSetting(settings, settingsKey("overlayLayers/altAzGrid"), visibility.altAzGrid);
-    visibility.constellationLines =
-        readBoolSetting(settings, settingsKey("overlayLayers/constellationLines"), visibility.constellationLines);
-    visibility.constellationLabels =
-        readBoolSetting(settings, settingsKey("overlayLayers/constellationLabels"), visibility.constellationLabels);
-    visibility.ecliptic = readBoolSetting(settings, settingsKey("overlayLayers/ecliptic"), visibility.ecliptic);
-    visibility.celestialEquator =
-        readBoolSetting(settings, settingsKey("overlayLayers/celestialEquator"), visibility.celestialEquator);
-    visibility.circumpolarBoundary =
-        readBoolSetting(settings, settingsKey("overlayLayers/circumpolarBoundary"), visibility.circumpolarBoundary);
-    visibility.solarSystemLabels =
-        readBoolSetting(settings, settingsKey("overlayLayers/solarSystemLabels"), visibility.solarSystemLabels);
-    visibility.deepSkyObjects =
-        readBoolSetting(settings, settingsKey("overlayLayers/deepSkyObjects"), visibility.deepSkyObjects);
-    visibility.deepSkyLabels =
-        readBoolSetting(settings, settingsKey("overlayLayers/deepSkyLabels"), visibility.deepSkyLabels);
+    visibility.horizon =
+        SkySettingsValueCodecs::readBoolSetting(settings, settingsKey("overlayLayers/horizon"), visibility.horizon);
+    visibility.altAzGrid =
+        SkySettingsValueCodecs::readBoolSetting(settings, settingsKey("overlayLayers/altAzGrid"), visibility.altAzGrid);
+    visibility.constellationLines = SkySettingsValueCodecs::readBoolSetting(
+        settings, settingsKey("overlayLayers/constellationLines"), visibility.constellationLines
+    );
+    visibility.constellationLabels = SkySettingsValueCodecs::readBoolSetting(
+        settings, settingsKey("overlayLayers/constellationLabels"), visibility.constellationLabels
+    );
+    visibility.ecliptic =
+        SkySettingsValueCodecs::readBoolSetting(settings, settingsKey("overlayLayers/ecliptic"), visibility.ecliptic);
+    visibility.celestialEquator = SkySettingsValueCodecs::readBoolSetting(
+        settings, settingsKey("overlayLayers/celestialEquator"), visibility.celestialEquator
+    );
+    visibility.circumpolarBoundary = SkySettingsValueCodecs::readBoolSetting(
+        settings, settingsKey("overlayLayers/circumpolarBoundary"), visibility.circumpolarBoundary
+    );
+    visibility.solarSystemLabels = SkySettingsValueCodecs::readBoolSetting(
+        settings, settingsKey("overlayLayers/solarSystemLabels"), visibility.solarSystemLabels
+    );
+    visibility.deepSkyObjects = SkySettingsValueCodecs::readBoolSetting(
+        settings, settingsKey("overlayLayers/deepSkyObjects"), visibility.deepSkyObjects
+    );
+    visibility.deepSkyLabels = SkySettingsValueCodecs::readBoolSetting(
+        settings, settingsKey("overlayLayers/deepSkyLabels"), visibility.deepSkyLabels
+    );
     return visibility;
 }
 
@@ -161,10 +184,12 @@ void saveCatalogSourceSettings(QSettings& settings, const SkyCatalogSourceSettin
 SkyCatalogSourceSettingsSnapshot loadCatalogSourceSettings(QSettings& settings)
 {
     SkyCatalogSourceSettingsSnapshot snapshot;
-    snapshot.starPresetIndex = readIntSetting(settings, settingsKey("catalogPresetIndex"), snapshot.starPresetIndex);
+    snapshot.starPresetIndex =
+        SkySettingsValueCodecs::readIntSetting(settings, settingsKey("catalogPresetIndex"), snapshot.starPresetIndex);
     snapshot.starUrlText = settings.value(settingsKey("catalogUrlText"), snapshot.starUrlText).toString();
-    snapshot.deepSkyPresetIndex =
-        readIntSetting(settings, settingsKey("deepSkyCatalogPresetIndex"), snapshot.deepSkyPresetIndex);
+    snapshot.deepSkyPresetIndex = SkySettingsValueCodecs::readIntSetting(
+        settings, settingsKey("deepSkyCatalogPresetIndex"), snapshot.deepSkyPresetIndex
+    );
     snapshot.deepSkyUrlText = settings.value(settingsKey("deepSkyCatalogUrlText"), snapshot.deepSkyUrlText).toString();
     return snapshot;
 }
@@ -182,9 +207,11 @@ void saveLoggingSettings(QSettings& settings, const SkyLoggingSettingsSnapshot& 
 SkyLoggingSettingsSnapshot loadLoggingSettings(QSettings& settings)
 {
     SkyLoggingSettingsSnapshot snapshot;
-    snapshot.logToTerminal = readBoolSetting(settings, settingsKey("logging/logToTerminal"), snapshot.logToTerminal);
-    snapshot.logToFile = readBoolSetting(settings, settingsKey("logging/logToFile"), snapshot.logToFile);
-    snapshot.logFilePath = readNonBlankStringSetting(
+    snapshot.logToTerminal =
+        SkySettingsValueCodecs::readBoolSetting(settings, settingsKey("logging/logToTerminal"), snapshot.logToTerminal);
+    snapshot.logToFile =
+        SkySettingsValueCodecs::readBoolSetting(settings, settingsKey("logging/logToFile"), snapshot.logToFile);
+    snapshot.logFilePath = SkySettingsValueCodecs::readNonBlankStringSetting(
         settings, settingsKey("logging/logFilePath"), skygate::ui::SkyLogging::defaultLogFilePath()
     );
     return snapshot;
@@ -225,8 +252,9 @@ readCorrectionFlags(QSettings& settings, const QString& key, const EphemerisCorr
 {
     constexpr std::uint32_t kSupportedCorrectionMask =
         static_cast<std::uint32_t>(EphemerisCorrectionFlags::apparentTopocentric());
-    const qulonglong rawFlags =
-        readULongLongSetting(settings, key, static_cast<qulonglong>(static_cast<std::uint32_t>(fallback)));
+    const qulonglong rawFlags = SkySettingsValueCodecs::readULongLongSetting(
+        settings, key, static_cast<qulonglong>(static_cast<std::uint32_t>(fallback))
+    );
     if ((rawFlags & ~static_cast<qulonglong>(kSupportedCorrectionMask)) != 0ULL) {
         return fallback;
     }
@@ -263,17 +291,22 @@ SkyEphemerisUserSettingsSnapshot loadEphemerisUserSettings(QSettings& settings)
         readCorrectionFlags(settings, settingsKey("ephemeris/correctionFlags"), snapshot.correctionFlags);
     snapshot.correctionPresetId =
         normalizedNonBlankSetting(settings, settingsKey("ephemeris/correctionPresetId"), snapshot.correctionPresetId);
-    snapshot.fallbackToSimpleEngine =
-        readBoolSetting(settings, settingsKey("ephemeris/fallbackToSimpleEngine"), snapshot.fallbackToSimpleEngine);
-    snapshot.refractionEnabled =
-        readBoolSetting(settings, settingsKey("ephemeris/refractionEnabled"), snapshot.refractionEnabled);
-    snapshot.atmosphericPressureHpa =
-        readDoubleSetting(settings, settingsKey("ephemeris/atmosphericPressureHpa"), snapshot.atmosphericPressureHpa);
-    snapshot.atmosphericTemperatureC =
-        readDoubleSetting(settings, settingsKey("ephemeris/atmosphericTemperatureC"), snapshot.atmosphericTemperatureC);
-    snapshot.relativeHumidity =
-        readDoubleSetting(settings, settingsKey("ephemeris/relativeHumidity"), snapshot.relativeHumidity);
-    snapshot.observingWavelengthMicrometers = readDoubleSetting(
+    snapshot.fallbackToSimpleEngine = SkySettingsValueCodecs::readBoolSetting(
+        settings, settingsKey("ephemeris/fallbackToSimpleEngine"), snapshot.fallbackToSimpleEngine
+    );
+    snapshot.refractionEnabled = SkySettingsValueCodecs::readBoolSetting(
+        settings, settingsKey("ephemeris/refractionEnabled"), snapshot.refractionEnabled
+    );
+    snapshot.atmosphericPressureHpa = SkySettingsValueCodecs::readDoubleSetting(
+        settings, settingsKey("ephemeris/atmosphericPressureHpa"), snapshot.atmosphericPressureHpa
+    );
+    snapshot.atmosphericTemperatureC = SkySettingsValueCodecs::readDoubleSetting(
+        settings, settingsKey("ephemeris/atmosphericTemperatureC"), snapshot.atmosphericTemperatureC
+    );
+    snapshot.relativeHumidity = SkySettingsValueCodecs::readDoubleSetting(
+        settings, settingsKey("ephemeris/relativeHumidity"), snapshot.relativeHumidity
+    );
+    snapshot.observingWavelengthMicrometers = SkySettingsValueCodecs::readDoubleSetting(
         settings, settingsKey("ephemeris/observingWavelengthMicrometers"), snapshot.observingWavelengthMicrometers
     );
     snapshot.preferredDataProfileId = normalizedNonBlankSetting(
@@ -282,8 +315,9 @@ SkyEphemerisUserSettingsSnapshot loadEphemerisUserSettings(QSettings& settings)
     if (snapshot.preferredDataProfileId == QStringLiteral("modern")) {
         snapshot.preferredDataProfileId = QStringLiteral("de440s-short-range");
     }
-    snapshot.onlineUpdatesEnabled =
-        readBoolSetting(settings, settingsKey("ephemeris/onlineUpdatesEnabled"), snapshot.onlineUpdatesEnabled);
+    snapshot.onlineUpdatesEnabled = SkySettingsValueCodecs::readBoolSetting(
+        settings, settingsKey("ephemeris/onlineUpdatesEnabled"), snapshot.onlineUpdatesEnabled
+    );
     snapshot.updatePresetId =
         normalizedNonBlankSetting(settings, settingsKey("ephemeris/updatePresetId"), snapshot.updatePresetId);
     snapshot.updateManifestUrl =
@@ -310,7 +344,7 @@ SkyEphemerisUserSettingsSnapshot loadEphemerisUserSettings(QSettings& settings)
 
 }  // namespace
 
-SkyStateSettingsSnapshot splitStateSnapshot(const SkyPersistedStateSnapshot& snapshot)
+SkyStateSettingsSnapshot SkySettingsSnapshotCodecs::splitStateSnapshot(const SkyPersistedStateSnapshot& snapshot)
 {
     SkyStateSettingsSnapshot domains;
     domains.timeline.live = snapshot.live;
@@ -344,7 +378,7 @@ SkyStateSettingsSnapshot splitStateSnapshot(const SkyPersistedStateSnapshot& sna
     return domains;
 }
 
-SkyPersistedStateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapshot& domains)
+SkyPersistedStateSnapshot SkySettingsSnapshotCodecs::mergeStateSnapshot(const SkyStateSettingsSnapshot& domains)
 {
     SkyPersistedStateSnapshot snapshot;
     snapshot.live = domains.timeline.live;
@@ -378,7 +412,7 @@ SkyPersistedStateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapshot& dom
     return snapshot;
 }
 
-void saveStateSnapshot(QSettings& settings, const SkyPersistedStateSnapshot& snapshot)
+void SkySettingsSnapshotCodecs::saveStateSnapshot(QSettings& settings, const SkyPersistedStateSnapshot& snapshot)
 {
     const SkyStateSettingsSnapshot domains = splitStateSnapshot(snapshot);
     settings.setValue(settingsKey("version"), SkyPersistedStateSnapshot::kSettingsVersion);
@@ -392,7 +426,7 @@ void saveStateSnapshot(QSettings& settings, const SkyPersistedStateSnapshot& sna
     saveEphemerisUserSettings(settings, domains.ephemeris);
 }
 
-std::optional<SkyPersistedStateSnapshot> loadStateSnapshot(QSettings& settings)
+std::optional<SkyPersistedStateSnapshot> SkySettingsSnapshotCodecs::loadStateSnapshot(QSettings& settings)
 {
     if (!settings.contains(settingsKey("version"))) {
         return std::nullopt;

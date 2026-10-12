@@ -4,6 +4,9 @@ class QString;
 
 namespace skygate::ui {
 
-void setMacDockIcon(const QString& iconFilePath);
+class MacDockIcon final {
+public:
+    static void setIcon(const QString& iconFilePath);
+};
 
 }  // namespace skygate::ui

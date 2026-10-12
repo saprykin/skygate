@@ -7,6 +7,9 @@
 
 namespace skygate::ui::internal {
 
-[[nodiscard]] std::vector<SkyViewportLineSegment> buildSkyViewportLineSegments(const SkyViewportGeometryInput& input);
+class SkyViewportGeometry final {
+public:
+    [[nodiscard]] static std::vector<SkyViewportLineSegment> buildLineSegments(const SkyViewportGeometryInput& input);
+};
 
 }  // namespace skygate::ui::internal

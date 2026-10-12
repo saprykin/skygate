@@ -9,6 +9,7 @@
 #include "SkyViewportGeometryInput.hpp"
 #include "SkyViewportLineSegment.hpp"
 #include "SkyViewportSceneGraph.hpp"
+#include "SkyViewportSceneRootNode.hpp"
 
 #include <memory>
 #include <mutex>
@@ -76,15 +77,15 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
     }
 
     if (renderData == nullptr || !renderData->preparedProjection.has_value()) {
-        skygate::ui::internal::clearSkyViewportChildNodes(rootNode->lineRoot());
-        skygate::ui::internal::clearSkyViewportChildNodes(rootNode->pointRoot());
-        skygate::ui::internal::syncSkyViewportLineNodes(rootNode->lineRoot(), {});
-        skygate::ui::internal::syncSkyViewportPointNodes(rootNode->pointRoot(), {});
+        skygate::ui::internal::SkyViewportSceneGraph::clearChildNodes(rootNode->lineRoot());
+        skygate::ui::internal::SkyViewportSceneGraph::clearChildNodes(rootNode->pointRoot());
+        skygate::ui::internal::SkyViewportSceneGraph::syncLineNodes(rootNode->lineRoot(), {});
+        skygate::ui::internal::SkyViewportSceneGraph::syncPointNodes(rootNode->pointRoot(), {});
         return rootNode;
     }
 
     const std::vector<skygate::ui::internal::SkyViewportLineSegment> lineSegments =
-        skygate::ui::internal::buildSkyViewportLineSegments(
+        skygate::ui::internal::SkyViewportGeometry::buildLineSegments(
             skygate::ui::internal::SkyViewportGeometryInput{
                 .projection = *renderData->preparedProjection,
                 .viewportWidth = renderData->viewportWidth,
@@ -98,10 +99,10 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
             }
         );
 
-    skygate::ui::internal::clearSkyViewportChildNodes(rootNode->lineRoot());
-    skygate::ui::internal::clearSkyViewportChildNodes(rootNode->pointRoot());
-    skygate::ui::internal::syncSkyViewportLineNodes(rootNode->lineRoot(), lineSegments);
-    skygate::ui::internal::syncSkyViewportPointNodes(
+    skygate::ui::internal::SkyViewportSceneGraph::clearChildNodes(rootNode->lineRoot());
+    skygate::ui::internal::SkyViewportSceneGraph::clearChildNodes(rootNode->pointRoot());
+    skygate::ui::internal::SkyViewportSceneGraph::syncLineNodes(rootNode->lineRoot(), lineSegments);
+    skygate::ui::internal::SkyViewportSceneGraph::syncPointNodes(
         rootNode->pointRoot(), std::span<const SkyRenderPoint>(renderData->points.data(), renderData->points.size())
     );
 

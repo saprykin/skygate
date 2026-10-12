@@ -14,7 +14,7 @@
 
 namespace skygate::ui::internal {
 
-QString celestialBodyTypeText(const skygate::ephemeris::BaseCelestialBody& body)
+QString SkyObjectInspectorFormatters::celestialBodyTypeText(const skygate::ephemeris::BaseCelestialBody& body)
 {
     if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject) {
         const std::optional<skygate::ephemeris::DeepSkyObjectInfo>& deepSkyObject = body.deepSkyObjectValue();
@@ -26,17 +26,17 @@ QString celestialBodyTypeText(const skygate::ephemeris::BaseCelestialBody& body)
     return QString::fromUtf8(skygate::ephemeris::BaseCelestialBody::kindLabel(body.kind));
 }
 
-QString formatFiniteNumber(const double value, const int precision)
+QString SkyObjectInspectorFormatters::formatFiniteNumber(const double value, const int precision)
 {
     return std::isfinite(value) ? QString::number(value, 'f', precision) : QString("--");
 }
 
-QString formatMagnitude(const double value)
+QString SkyObjectInspectorFormatters::formatMagnitude(const double value)
 {
     return formatFiniteNumber(value, 1);
 }
 
-QString formatHorizontalCoordinate(const skygate::core::HorizontalCoordinate& horizontal)
+QString SkyObjectInspectorFormatters::formatHorizontalCoordinate(const skygate::core::HorizontalCoordinate& horizontal)
 {
     return QString("%1 / %2 deg")
         .arg(formatFiniteNumber(horizontal.altitudeDeg, 1), formatFiniteNumber(horizontal.azimuthDeg, 1));
@@ -201,19 +201,19 @@ QString formatDate(const skygate::core::AstronomicalEpoch& epoch)
 
 }  // namespace
 
-QString formatEquatorialCoordinate(const skygate::core::EquatorialCoordinate& equatorial)
+QString SkyObjectInspectorFormatters::formatEquatorialCoordinate(const skygate::core::EquatorialCoordinate& equatorial)
 {
     return QString("%1 / %2").arg(
         formatRightAscension(equatorial.rightAscensionHours), formatDeclination(equatorial.declinationDeg)
     );
 }
 
-QString formatUtcTime(const skygate::core::UtcTimePoint& utcTime)
+QString SkyObjectInspectorFormatters::formatUtcTime(const skygate::core::UtcTimePoint& utcTime)
 {
     return QString("%1 UTC").arg(SkyQtTimeCodec::formatDateTimeText(SkyQtTimeCodec::toQDateTimeUtc(utcTime)));
 }
 
-QString formatObservationEvent(const skygate::ephemeris::ObservationEvent& event)
+QString SkyObjectInspectorFormatters::formatObservationEvent(const skygate::ephemeris::ObservationEvent& event)
 {
     if (event.status == skygate::ephemeris::ObservationEventStatus::Type::Available && event.utcTime.has_value()) {
         return formatUtcTime(*event.utcTime);
@@ -222,8 +222,9 @@ QString formatObservationEvent(const skygate::ephemeris::ObservationEvent& event
     return formatObservationStatus(event.status);
 }
 
-QString
-formatObservationEvent(const skygate::ephemeris::ObservationEvent& event, const SkyTimeController* timeController)
+QString SkyObjectInspectorFormatters::formatObservationEvent(
+    const skygate::ephemeris::ObservationEvent& event, const SkyTimeController* timeController
+)
 {
     if (event.status == skygate::ephemeris::ObservationEventStatus::Type::Available && event.utcTime.has_value()
         && timeController != nullptr) {
@@ -233,7 +234,7 @@ formatObservationEvent(const skygate::ephemeris::ObservationEvent& event, const 
     return formatObservationEvent(event);
 }
 
-QString formatObservationCulmination(
+QString SkyObjectInspectorFormatters::formatObservationCulmination(
     const skygate::ephemeris::ObservationEvent& culmination, const SkyTimeController* timeController
 )
 {
@@ -250,7 +251,7 @@ QString formatObservationCulmination(
     return formatObservationStatus(culmination.status);
 }
 
-QString angularSizeText(const skygate::ephemeris::DeepSkyObjectInfo& deepSkyObject)
+QString SkyObjectInspectorFormatters::angularSizeText(const skygate::ephemeris::DeepSkyObjectInfo& deepSkyObject)
 {
     if (deepSkyObject.majorAxisArcmin.has_value() && deepSkyObject.minorAxisArcmin.has_value()) {
         return QString("%1 x %2").arg(
@@ -267,7 +268,7 @@ QString angularSizeText(const skygate::ephemeris::DeepSkyObjectInfo& deepSkyObje
     return {};
 }
 
-QString aliasesText(const skygate::ephemeris::BaseCelestialBody& body)
+QString SkyObjectInspectorFormatters::aliasesText(const skygate::ephemeris::BaseCelestialBody& body)
 {
     if (!body.deepSkyObjectValue().has_value()) {
         return {};
@@ -288,12 +289,14 @@ QString aliasesText(const skygate::ephemeris::BaseCelestialBody& body)
     return aliases.join(", ");
 }
 
-QString formatEphemerisStatus(const skygate::ephemeris::EphemerisEngineQueryStatus::Type status)
+QString
+SkyObjectInspectorFormatters::formatEphemerisStatus(const skygate::ephemeris::EphemerisEngineQueryStatus::Type status)
 {
     return titleCaseAscii(skygate::ephemeris::EphemerisEngineQueryStatus::displayName(status));
 }
 
-QString formatEphemerisWarnings(const skygate::ephemeris::EphemerisEngineQueryResult& metadata)
+QString
+SkyObjectInspectorFormatters::formatEphemerisWarnings(const skygate::ephemeris::EphemerisEngineQueryResult& metadata)
 {
     using Code = skygate::ephemeris::EphemerisEngineWarning::Code;
 
@@ -319,7 +322,7 @@ QString formatEphemerisWarnings(const skygate::ephemeris::EphemerisEngineQueryRe
     return warnings.join("\n");
 }
 
-QString formatEphemerisDateRange(const skygate::ephemeris::EphemerisDateRange& range)
+QString SkyObjectInspectorFormatters::formatEphemerisDateRange(const skygate::ephemeris::EphemerisDateRange& range)
 {
     const QString rangeText = QString("%1 to %2").arg(formatDate(range.start), formatDate(range.end));
     if (range.displayName.empty()) {
@@ -329,7 +332,7 @@ QString formatEphemerisDateRange(const skygate::ephemeris::EphemerisDateRange& r
     return QString("%1: %2").arg(QString::fromStdString(range.displayName), rangeText);
 }
 
-QString formatAngularUncertaintyArcsec(const double arcsec)
+QString SkyObjectInspectorFormatters::formatAngularUncertaintyArcsec(const double arcsec)
 {
     if (!std::isfinite(arcsec)) {
         return {};
@@ -341,7 +344,8 @@ QString formatAngularUncertaintyArcsec(const double arcsec)
     return QString("%1 arcsec").arg(QString::number(arcsec, 'f', arcsec >= 10.0 ? 1 : 2));
 }
 
-QString formatCorrectionSummary(const skygate::ephemeris::EphemerisEngineQueryResult& metadata)
+QString
+SkyObjectInspectorFormatters::formatCorrectionSummary(const skygate::ephemeris::EphemerisEngineQueryResult& metadata)
 {
     QStringList parts;
 
@@ -363,7 +367,7 @@ QString formatCorrectionSummary(const skygate::ephemeris::EphemerisEngineQueryRe
     return parts.join("; ");
 }
 
-QString sourceLabelForBodyIndex(
+QString SkyObjectInspectorFormatters::sourceLabelForBodyIndex(
     const std::span<const QString> sourceIds,
     const std::vector<QStringList>* contributorSourceIds,
     const QHash<QString, QString>& sourceTitles,

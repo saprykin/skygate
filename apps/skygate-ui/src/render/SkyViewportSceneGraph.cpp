@@ -1,7 +1,6 @@
 #include "SkyViewportSceneGraph.hpp"
 #include "SkyRenderPoint.hpp"
 #include "SkyViewportLineSegment.hpp"
-
 #include "math/Geometry2d.hpp"
 
 #include <QSGFlatColorMaterial>
@@ -84,25 +83,7 @@ void appendBucketNode(QSGNode* rootNode, const VertexBucket& bucket)
 
 namespace skygate::ui::internal {
 
-SkyViewportSceneRootNode::SkyViewportSceneRootNode()
-{
-    m_lineRoot = new QSGNode();
-    m_pointRoot = new QSGNode();
-    appendChildNode(m_lineRoot);
-    appendChildNode(m_pointRoot);
-}
-
-QSGNode* SkyViewportSceneRootNode::lineRoot() const noexcept
-{
-    return m_lineRoot;
-}
-
-QSGNode* SkyViewportSceneRootNode::pointRoot() const noexcept
-{
-    return m_pointRoot;
-}
-
-void clearSkyViewportChildNodes(QSGNode* rootNode)
+void SkyViewportSceneGraph::clearChildNodes(QSGNode* rootNode)
 {
     if (rootNode == nullptr) {
         return;
@@ -117,7 +98,7 @@ void clearSkyViewportChildNodes(QSGNode* rootNode)
     }
 }
 
-void syncSkyViewportLineNodes(QSGNode* rootNode, const std::span<const SkyViewportLineSegment> lineSegments)
+void SkyViewportSceneGraph::syncLineNodes(QSGNode* rootNode, const std::span<const SkyViewportLineSegment> lineSegments)
 {
     if (rootNode == nullptr) {
         return;
@@ -173,7 +154,7 @@ void syncSkyViewportLineNodes(QSGNode* rootNode, const std::span<const SkyViewpo
     }
 }
 
-void syncSkyViewportPointNodes(QSGNode* rootNode, const std::span<const SkyRenderPoint> points)
+void SkyViewportSceneGraph::syncPointNodes(QSGNode* rootNode, const std::span<const SkyRenderPoint> points)
 {
     if (rootNode == nullptr) {
         return;
