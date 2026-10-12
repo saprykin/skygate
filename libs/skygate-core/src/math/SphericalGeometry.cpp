@@ -5,6 +5,12 @@
 #include <cmath>
 
 namespace skygate::core {
+namespace {
+
+// Direction used when a rotated or interpolated vector collapses to zero length.
+constexpr Vector3d kZenithFallbackDirection{.x = 0.0, .y = 0.0, .z = 1.0};
+
+}  // namespace
 
 Vector3d SphericalGeometry::horizontalToUnitVector(const HorizontalCoordinate& coordinate) noexcept
 {
@@ -25,6 +31,38 @@ HorizontalCoordinate SphericalGeometry::horizontalFromUnitVector(const Vector3d&
         .altitudeDeg = AngleMath::toDegrees(std::asin(std::clamp(vector.z, -1.0, 1.0))),
         .azimuthDeg = AngleMath::normalizeDegrees(AngleMath::toDegrees(std::atan2(vector.x, vector.y))),
     };
+}
+
+Vector3d
+SphericalGeometry::rotatedAroundAxis(const Vector3d& vector, const Vector3d& axis, const double angleRad) noexcept
+{
+    const double cosAngle = std::cos(angleRad);
+    const double sinAngle = std::sin(angleRad);
+    const Vector3d axisCrossVector = axis.cross(vector);
+    const double axisDotVector = axis.dot(vector);
+    const Vector3d rotated =
+        (vector * cosAngle) + (axisCrossVector * sinAngle) + (axis * (axisDotVector * (1.0 - cosAngle)));
+    return rotated.normalized().value_or(kZenithFallbackDirection);
+}
+
+double
+SphericalGeometry::angularSeparationDegrees(const HorizontalCoordinate& lhs, const HorizontalCoordinate& rhs) noexcept
+{
+    const Vector3d lhsVector = horizontalToUnitVector(lhs.normalizedAzimuth());
+    const Vector3d rhsVector = horizontalToUnitVector(rhs.normalizedAzimuth());
+    const double dot = std::clamp(lhsVector.dot(rhsVector), -1.0, 1.0);
+    return AngleMath::toDegrees(std::acos(dot));
+}
+
+HorizontalCoordinate SphericalGeometry::interpolateHorizontalCoordinate(
+    const HorizontalCoordinate& previous, const HorizontalCoordinate& next, const double fraction
+) noexcept
+{
+    // Interpolates along the chord between the unit vectors and renormalizes.
+    const Vector3d previousVector = horizontalToUnitVector(previous);
+    const Vector3d nextVector = horizontalToUnitVector(next);
+    const Vector3d interpolated = previousVector + ((nextVector - previousVector) * fraction);
+    return horizontalFromUnitVector(interpolated.normalized().value_or(kZenithFallbackDirection));
 }
 
 bool SphericalGeometry::tryBuildProjectionBasis(
