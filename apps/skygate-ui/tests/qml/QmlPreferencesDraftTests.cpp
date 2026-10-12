@@ -1,4 +1,5 @@
 #include "QmlPreferencesTestSupport.hpp"
+#include "SkyPersistedStateSnapshot.hpp"
 
 class QmlPreferencesDraftTests final : public QObject {
     Q_OBJECT
@@ -330,9 +331,7 @@ void QmlPreferencesDraftTests::saveAndRestoreState()
 void QmlPreferencesDraftTests::malformedSavedEphemerisSettingsFallBackInDraft()
 {
     QSettings settings;
-    settings.setValue(
-        QStringLiteral("skyContext/version"), skygate::ui::internal::SkyContextControllerConstants::kSettingsVersion
-    );
+    settings.setValue(QStringLiteral("skyContext/version"), SkyPersistedStateSnapshot::kSettingsVersion);
     settings.setValue(QStringLiteral("skyContext/ephemeris/engineKind"), QStringLiteral("experimental"));
     settings.setValue(QStringLiteral("skyContext/ephemeris/correctionFlags"), QStringLiteral("full"));
     settings.setValue(QStringLiteral("skyContext/ephemeris/refractionEnabled"), QStringLiteral("sometimes"));

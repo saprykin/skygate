@@ -374,7 +374,7 @@ SkyPersistedStateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapshot& dom
 void saveStateSnapshot(QSettings& settings, const SkyPersistedStateSnapshot& snapshot)
 {
     const SkyStateSettingsSnapshot domains = splitStateSnapshot(snapshot);
-    settings.setValue(settingsKey("version"), SkyContextControllerConstants::kSettingsVersion);
+    settings.setValue(settingsKey("version"), SkyPersistedStateSnapshot::kSettingsVersion);
     saveTimelineSettings(settings, domains.timeline);
     saveSearchSettings(settings, domains.search);
     saveViewSettings(settings, domains.view);

@@ -1,5 +1,6 @@
 #include "SkyContextControllerTestSupport.hpp"
 #include "SkyDeviceLocationAcquisition.hpp"
+#include "SkyPersistedStateSnapshot.hpp"
 
 class SkyContextControllerViewLocationTests final : public QObject {
     Q_OBJECT
@@ -12,6 +13,7 @@ private slots:
     void selectingCityUpdatesCoordinatesKeepsElevation();
     void manualCoordinateEditSwitchesToCustom();
     void invalidSavedCityFallsBackToCustom();
+    void defaultsMatchPersistedState();
     void defaultsLocationSourceByPositioningAvailability();
     void currentDevicePositionSourceAppliesUpdates();
     void devicePositionSourceReportsErrorsIgnoresInvalid();
@@ -107,6 +109,15 @@ void SkyContextControllerViewLocationTests::invalidSavedCityFallsBackToCustom()
     QCOMPARE(controller->latitudeText(), QString("12.345678"));
     QCOMPARE(controller->longitudeText(), QString("98.765432"));
     QCOMPARE(controller->elevationText(), QString("150.0"));
+}
+
+void SkyContextControllerViewLocationTests::defaultsMatchPersistedState()
+{
+    const auto controller = createController();
+
+    QCOMPARE(controller->stepSeconds(), SkyPersistedStateSnapshot::kDefaultStepSeconds);
+    QCOMPARE(controller->magnitudeCutoff(), SkyPersistedStateSnapshot::kDefaultMagnitudeCutoff);
+    QCOMPARE(controller->viewFieldOfViewDeg(), SkyPersistedStateSnapshot::kDefaultFieldOfViewDeg);
 }
 
 void SkyContextControllerViewLocationTests::defaultsLocationSourceByPositioningAvailability()

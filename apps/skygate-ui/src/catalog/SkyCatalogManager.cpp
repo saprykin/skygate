@@ -6,6 +6,7 @@
 #include "catalog/CatalogDownloadCancellation.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
+#include "catalog/SkyCatalogCollectionStore.hpp"
 #include "catalog/SkyCatalogImportWorkflow.hpp"
 #include "catalog/SkyCatalogPresets.hpp"
 #include "catalog/SkyCatalogRuntime.hpp"
@@ -1147,7 +1148,7 @@ void SkyCatalogManager::persistCatalogCache() const
                 SkyContextCatalogCodec::serializeConstellationLineRows(ownedRelatedData.lineRefVector());
             entry.constellationAnchorGroupRows =
                 SkyContextCatalogCodec::serializeConstellationAnchorGroupRows(ownedRelatedData.anchorGroupVector());
-            entry.constellationLineSchemaVersion = SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
+            entry.constellationLineSchemaVersion = SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
             entry.constellationCount = ownedRelatedData.count();
         }
         request.sources.push_back(std::move(entry));

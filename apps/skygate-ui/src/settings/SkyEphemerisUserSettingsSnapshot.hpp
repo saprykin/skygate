@@ -2,6 +2,7 @@
 
 #include "engine/EphemerisCorrectionFlags.hpp"
 #include "engine/EphemerisEngineKind.hpp"
+#include "engine/EphemerisEngineOptions.hpp"
 
 #include <QString>
 
@@ -14,10 +15,11 @@ struct SkyEphemerisUserSettingsSnapshot final {
     QString correctionPresetId = QStringLiteral("apparent-topocentric");
     bool fallbackToSimpleEngine = true;
     bool refractionEnabled = true;
-    double atmosphericPressureHpa = 1013.25;
-    double atmosphericTemperatureC = 10.0;
-    double relativeHumidity = 0.0;
-    double observingWavelengthMicrometers = 0.55;
+    double atmosphericPressureHpa = skygate::ephemeris::EphemerisEngineOptions::kDefaultAtmosphericPressureHpa;
+    double atmosphericTemperatureC = skygate::ephemeris::EphemerisEngineOptions::kDefaultAtmosphericTemperatureC;
+    double relativeHumidity = skygate::ephemeris::EphemerisEngineOptions::kDefaultRelativeHumidity;
+    double observingWavelengthMicrometers =
+        skygate::ephemeris::EphemerisEngineOptions::kDefaultObservingWavelengthMicrometers;
     QString preferredDataProfileId = QStringLiteral("de440s-short-range");
     bool onlineUpdatesEnabled = true;
     QString updatePresetId = QStringLiteral("bundled");

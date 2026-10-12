@@ -11,6 +11,19 @@
 
 namespace {
 
+constexpr std::size_t kStarDecimationMinStateCount = 30000U;
+constexpr double kStarDecimationMinFovDeg = 35.0;
+// Field width above the gate at which the cell size reaches its full range.
+constexpr double kStarDecimationCellSizeFovSpanDeg = 95.0;
+constexpr double kStarDecimationCellSizeBasePx = 2.5;
+constexpr double kStarDecimationCellSizeRangePx = 4.5;
+// Cell sizes scale with the viewport relative to a reference area tuned here,
+// independently of the default window size.
+constexpr double kStarDecimationScaleReferenceWidthPx = 1100.0;
+constexpr double kStarDecimationScaleReferenceHeightPx = 760.0;
+constexpr double kStarDecimationViewportScaleMin = 0.85;
+constexpr double kStarDecimationViewportScaleMax = 1.35;
+
 struct DecimatedStarPoint final {
     SkyRenderPoint point;
     double visualMagnitude = 0.0;
@@ -24,18 +37,24 @@ struct DecimatedStarPoint final {
     const double viewportHeight
 )
 {
-    if (stateCount < 30000U || viewportWidth <= 0.0 || viewportHeight <= 0.0) {
+    if (stateCount < kStarDecimationMinStateCount || viewportWidth <= 0.0 || viewportHeight <= 0.0) {
         return 0.0;
     }
 
-    if (projectionParams.fovDeg <= 35.0) {
+    if (projectionParams.fovDeg <= kStarDecimationMinFovDeg) {
         return 0.0;
     }
 
-    const double normalizedFov = std::clamp((projectionParams.fovDeg - 35.0) / 95.0, 0.0, 1.0);
-    const double baseCellSize = 2.5 + (normalizedFov * 4.5);
-    const double viewportScale =
-        std::clamp(skygate::core::Geometry2d::areaScale(viewportWidth, viewportHeight, 1100.0, 760.0), 0.85, 1.35);
+    const double normalizedFov =
+        std::clamp((projectionParams.fovDeg - kStarDecimationMinFovDeg) / kStarDecimationCellSizeFovSpanDeg, 0.0, 1.0);
+    const double baseCellSize = kStarDecimationCellSizeBasePx + (normalizedFov * kStarDecimationCellSizeRangePx);
+    const double viewportScale = std::clamp(
+        skygate::core::Geometry2d::areaScale(
+            viewportWidth, viewportHeight, kStarDecimationScaleReferenceWidthPx, kStarDecimationScaleReferenceHeightPx
+        ),
+        kStarDecimationViewportScaleMin,
+        kStarDecimationViewportScaleMax
+    );
     return baseCellSize * viewportScale;
 }
 

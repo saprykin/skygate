@@ -7,7 +7,6 @@
 #include "SettingsTestFixture.hpp"
 #include "SkyCatalogManager.hpp"
 #include "SkyCatalogSourceInstance.hpp"
-#include "SkyContextControllerSupport.hpp"
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
@@ -404,7 +403,7 @@ void SkyCatalogManagerRelatedPersistenceTests::removedOwnerRelatedDataDoesNotRet
     legacy.constellationLineRows = "hip_26311|hip_26727\n";
     legacy.constellationAnchorGroupRows = "Lyra|hip_26311,hip_26727\n";
     legacy.constellationLineSchemaVersion =
-        skygate::ui::internal::SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
+        skygate::ui::internal::SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
     legacy.constellationCount = 1U;
     QVERIFY(store.saveCatalogCache(legacy));
 
@@ -514,7 +513,7 @@ void SkyCatalogManagerRelatedPersistenceTests::migratesPriorSingleOwnerRelatedPa
     star.constellationLineRows = "hip_27989|hip_25336\nhip_25336|hip_25930\n";
     star.constellationAnchorGroupRows = "Orion|hip_27989,hip_25336\n";
     star.constellationLineSchemaVersion =
-        skygate::ui::internal::SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
+        skygate::ui::internal::SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
     star.constellationCount = 1U;
     snapshot.sources.push_back(std::move(star));
 

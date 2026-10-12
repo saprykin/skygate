@@ -11,6 +11,7 @@
 #include <QLoggingCategory>
 #include <QSaveFile>
 #include <QSettings>
+#include <QStandardPaths>
 
 #include <optional>
 
@@ -26,6 +27,43 @@ constexpr int kDefaultMainWindowWidth = 1100;
 constexpr int kDefaultMainWindowHeight = 760;
 constexpr int kMinimumMainWindowWidth = 560;
 constexpr int kMinimumMainWindowHeight = 420;
+
+// Legacy two-slot catalog cache files, kept under their original names so an
+// older installation still restores.
+constexpr const char* kCatalogCacheFileName = "catalog-cache-v2.txt";
+constexpr const char* kDeepSkyCatalogCacheFileName = "deep-sky-catalog-cache-v1.txt";
+constexpr const char* kCatalogBinaryCacheFileName = "catalog-cache-v3.bin";
+constexpr const char* kDeepSkyBinaryCatalogCacheFileName = "deep-sky-catalog-cache-v2.bin";
+
+QString appDataCachePath(const char* fileName)
+{
+    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (appDataPath.isEmpty()) {
+        return {};
+    }
+
+    return QDir(appDataPath).filePath(QString::fromUtf8(fileName));
+}
+
+QString defaultCatalogCachePath()
+{
+    return appDataCachePath(kCatalogCacheFileName);
+}
+
+QString defaultDeepSkyCatalogCachePath()
+{
+    return appDataCachePath(kDeepSkyCatalogCacheFileName);
+}
+
+QString defaultCatalogBinaryCachePath()
+{
+    return appDataCachePath(kCatalogBinaryCacheFileName);
+}
+
+QString defaultDeepSkyBinaryCatalogCachePath()
+{
+    return appDataCachePath(kDeepSkyBinaryCatalogCacheFileName);
+}
 
 QString appSettingsKey(const char* name)
 {
@@ -125,14 +163,13 @@ bool SkySettingsStore::clearCatalogCache() const
 {
     QSettings settings;
     const QString configuredPath =
-        settings.value(SkyContextSettings::key("catalogCachePath"), SkyContextSettings::defaultCatalogCachePath())
-            .toString();
-    const QString defaultPath = SkyContextSettings::defaultCatalogCachePath();
+        settings.value(SkyContextSettings::key("catalogCachePath"), defaultCatalogCachePath()).toString();
+    const QString defaultPath = defaultCatalogCachePath();
 
     QStringList cachePaths;
     appendCachePath(cachePaths, configuredPath);
     appendCachePath(cachePaths, defaultPath);
-    appendCachePath(cachePaths, SkyContextSettings::defaultCatalogBinaryCachePath());
+    appendCachePath(cachePaths, defaultCatalogBinaryCachePath());
 
     if (!defaultPath.isEmpty()) {
         const QFileInfo defaultInfo(defaultPath);
@@ -171,14 +208,10 @@ bool SkySettingsStore::clearDeepSkyCatalogCache() const
     QStringList cachePaths;
     appendCachePath(
         cachePaths,
-        settings
-            .value(
-                SkyContextSettings::key("deepSkyCatalogCachePath"), SkyContextSettings::defaultDeepSkyCatalogCachePath()
-            )
-            .toString()
+        settings.value(SkyContextSettings::key("deepSkyCatalogCachePath"), defaultDeepSkyCatalogCachePath()).toString()
     );
-    appendCachePath(cachePaths, SkyContextSettings::defaultDeepSkyCatalogCachePath());
-    appendCachePath(cachePaths, SkyContextSettings::defaultDeepSkyBinaryCatalogCachePath());
+    appendCachePath(cachePaths, defaultDeepSkyCatalogCachePath());
+    appendCachePath(cachePaths, defaultDeepSkyBinaryCatalogCachePath());
 
     const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
     settings.remove(SkyContextSettings::key("deepSkyCatalogCachePath"));
@@ -203,14 +236,9 @@ bool SkySettingsStore::saveCatalogCache(const SkyCatalogLegacyCacheSnapshot& sna
 
     QSettings settings;
     const QString configuredPath =
-        settings.value(SkyContextSettings::key("catalogCachePath"), SkyContextSettings::defaultCatalogCachePath())
-            .toString();
+        settings.value(SkyContextSettings::key("catalogCachePath"), defaultCatalogCachePath()).toString();
     const QString configuredDeepSkyPath =
-        settings
-            .value(
-                SkyContextSettings::key("deepSkyCatalogCachePath"), SkyContextSettings::defaultDeepSkyCatalogCachePath()
-            )
-            .toString();
+        settings.value(SkyContextSettings::key("deepSkyCatalogCachePath"), defaultDeepSkyCatalogCachePath()).toString();
     const auto writePayload = [](const QString& path, const QByteArray& payload) {
         if (path.isEmpty() || payload.isEmpty()) {
             return true;
@@ -253,15 +281,15 @@ bool SkySettingsStore::saveCatalogCache(const SkyCatalogLegacyCacheSnapshot& sna
     if (!writePayload(configuredDeepSkyPath, snapshot.deepSkyCatalogPayload)) {
         return false;
     }
-    const QString configuredBinaryPath = SkyContextSettings::defaultCatalogBinaryCachePath();
-    const QString configuredDeepSkyBinaryPath = SkyContextSettings::defaultDeepSkyBinaryCatalogCachePath();
+    const QString configuredBinaryPath = defaultCatalogBinaryCachePath();
+    const QString configuredDeepSkyBinaryPath = defaultDeepSkyBinaryCatalogCachePath();
     if (!writePayload(configuredBinaryPath, snapshot.catalogBinaryPayload)) {
         return false;
     }
     if (!writePayload(configuredDeepSkyBinaryPath, snapshot.deepSkyBinaryPayload)) {
         return false;
     }
-    settings.setValue(SkyContextSettings::key("version"), SkyContextControllerConstants::kSettingsVersion);
+    settings.setValue(SkyContextSettings::key("version"), SkyPersistedStateSnapshot::kSettingsVersion);
     if (!snapshot.catalogPayload.isEmpty()) {
         settings.setValue(SkyContextSettings::key("catalogCachePath"), configuredPath);
     }
@@ -306,8 +334,7 @@ std::optional<SkyCatalogLegacyCacheSnapshot> SkySettingsStore::loadCatalogCache(
 {
     QSettings settings;
     const QString configuredPath =
-        settings.value(SkyContextSettings::key("catalogCachePath"), SkyContextSettings::defaultCatalogCachePath())
-            .toString();
+        settings.value(SkyContextSettings::key("catalogCachePath"), defaultCatalogCachePath()).toString();
 
     SkyCatalogLegacyCacheSnapshot snapshot;
     QFile cacheFile(configuredPath);
@@ -319,11 +346,7 @@ std::optional<SkyCatalogLegacyCacheSnapshot> SkySettingsStore::loadCatalogCache(
     }
 
     const QString configuredDeepSkyPath =
-        settings
-            .value(
-                SkyContextSettings::key("deepSkyCatalogCachePath"), SkyContextSettings::defaultDeepSkyCatalogCachePath()
-            )
-            .toString();
+        settings.value(SkyContextSettings::key("deepSkyCatalogCachePath"), defaultDeepSkyCatalogCachePath()).toString();
     QFile deepSkyCacheFile(configuredDeepSkyPath);
     if (!configuredDeepSkyPath.isEmpty() && deepSkyCacheFile.exists() && deepSkyCacheFile.open(QIODevice::ReadOnly)) {
         snapshot.deepSkyCatalogPayload = deepSkyCacheFile.readAll();
@@ -332,7 +355,7 @@ std::optional<SkyCatalogLegacyCacheSnapshot> SkySettingsStore::loadCatalogCache(
             << "Failed to open deep-sky catalog cache" << configuredDeepSkyPath << deepSkyCacheFile.errorString();
     }
 
-    const QString configuredBinaryPath = SkyContextSettings::defaultCatalogBinaryCachePath();
+    const QString configuredBinaryPath = defaultCatalogBinaryCachePath();
     QFile binaryCacheFile(configuredBinaryPath);
     if (!configuredBinaryPath.isEmpty() && binaryCacheFile.exists() && binaryCacheFile.open(QIODevice::ReadOnly)) {
         snapshot.catalogBinaryPayload = binaryCacheFile.readAll();
@@ -341,7 +364,7 @@ std::optional<SkyCatalogLegacyCacheSnapshot> SkySettingsStore::loadCatalogCache(
             << "Failed to open binary star catalog cache" << configuredBinaryPath << binaryCacheFile.errorString();
     }
 
-    const QString configuredDeepSkyBinaryPath = SkyContextSettings::defaultDeepSkyBinaryCatalogCachePath();
+    const QString configuredDeepSkyBinaryPath = defaultDeepSkyBinaryCatalogCachePath();
     QFile deepSkyBinaryCacheFile(configuredDeepSkyBinaryPath);
     if (!configuredDeepSkyBinaryPath.isEmpty() && deepSkyBinaryCacheFile.exists()
         && deepSkyBinaryCacheFile.open(QIODevice::ReadOnly)) {
@@ -406,7 +429,7 @@ bool SkySettingsStore::clearCatalogSourceCache(const QString& instanceId) const
 bool SkySettingsStore::saveEphemerisDataCache(const SkyEphemerisDataCacheSnapshot& snapshot) const
 {
     QSettings settings;
-    settings.setValue(SkyContextSettings::key("version"), SkyContextControllerConstants::kSettingsVersion);
+    settings.setValue(SkyContextSettings::key("version"), SkyPersistedStateSnapshot::kSettingsVersion);
     settings.setValue(ephemerisDataCacheKey("installedKernelAssetId"), snapshot.installedKernelAssetId);
     settings.setValue(ephemerisDataCacheKey("installedKernelProfileId"), snapshot.installedKernelProfileId);
     settings.setValue(ephemerisDataCacheKey("installedKernelPath"), snapshot.installedKernelPath);

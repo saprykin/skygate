@@ -17,7 +17,7 @@ struct SkyTimelineSettingsSnapshot final {
     bool live = true;
     bool toolbarCollapsed = false;
     double speedMultiplier = 1.0;
-    int stepSeconds = 60;
+    int stepSeconds = SkyPersistedStateSnapshot::kDefaultStepSeconds;
     qint64 utcEpochMicros = 0;
 };
 
@@ -26,10 +26,10 @@ struct SkySearchSettingsSnapshot final {
 };
 
 struct SkyViewSettingsSnapshot final {
-    double magnitudeCutoff = 6.0;
-    double centerAltitudeDeg = 0.0;
-    double centerAzimuthDeg = 0.0;
-    double fieldOfViewDeg = 100.0;
+    double magnitudeCutoff = SkyPersistedStateSnapshot::kDefaultMagnitudeCutoff;
+    double centerAltitudeDeg = SkyPersistedStateSnapshot::kLegacyViewCenterAltitudeDeg;
+    double centerAzimuthDeg = SkyPersistedStateSnapshot::kLegacyViewCenterAzimuthDeg;
+    double fieldOfViewDeg = SkyPersistedStateSnapshot::kDefaultFieldOfViewDeg;
     QString projectionTypeText;
     QString themeId;
 };

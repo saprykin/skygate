@@ -35,6 +35,8 @@ namespace {
 
 Q_LOGGING_CATEGORY(skygateEphemerisUpdateLog, "skygate.ephemeris.update")
 
+constexpr int kUtcTickIntervalMs = 1000;
+
 using skygate::ephemeris::EphemerisCorrectionFlags;
 using skygate::ephemeris::EphemerisEngineDescriptorRegistry;
 using skygate::ephemeris::EphemerisEngineKind;
@@ -379,7 +381,7 @@ SkyContextController::SkyContextController(
     }
     updateLocationStatusText();
 
-    m_timer.setInterval(SkyContextControllerConstants::kTickIntervalMs);
+    m_timer.setInterval(kUtcTickIntervalMs);
     m_timer.setTimerType(Qt::PreciseTimer);
     connect(&m_timer, &QTimer::timeout, this, &SkyContextController::tickUtcTime);
     m_timer.start();
