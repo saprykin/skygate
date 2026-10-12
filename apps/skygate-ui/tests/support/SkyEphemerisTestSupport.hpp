@@ -2,12 +2,12 @@
 
 #include "EquatorialCoordinate.hpp"
 #include "ObservationContext.hpp"
-#include "SkyContextController.hpp"
-#include "SkyTimeController.hpp"
+#include "app/SkyContextController.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/IStarCatalog.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
+#include "time/SkyTimeController.hpp"
 
 #include <QString>
 

@@ -1,13 +1,13 @@
 #include "ITimeSource.hpp"
-#include "SkyContextController.hpp"
-#include "SkyEphemerisTestSupport.hpp"
-#include "SkyObjectSearchModel.hpp"
-#include "SkyOverlayLayerSettings.hpp"
-#include "SkyRenderLine.hpp"
-#include "SkyRenderPoint.hpp"
-#include "SkySceneModel.hpp"
-#include "SkySceneModelTestSupport.hpp"
 #include "UtcTimeCodec.hpp"
+#include "app/SkyContextController.hpp"
+#include "render/SkyRenderLine.hpp"
+#include "render/SkyRenderPoint.hpp"
+#include "scene/SkySceneModel.hpp"
+#include "search/SkyObjectSearchModel.hpp"
+#include "support/SkyEphemerisTestSupport.hpp"
+#include "support/SkySceneModelTestSupport.hpp"
+#include "theme/SkyOverlayLayerSettings.hpp"
 
 #include <QtTest>
 

@@ -1,4 +1,4 @@
-#include "QmlRenderingTestSupport.hpp"
+#include "support/QmlRenderingTestSupport.hpp"
 
 class QmlMainWindowRenderingTests final : public QObject {
     Q_OBJECT

@@ -1,15 +1,15 @@
 #include "CelestialBodyCatalog.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
-#include "SkyObjectTrailBuilder.hpp"
-#include "SkyRenderLine.hpp"
-#include "TrailBuilderTestEngine.hpp"
-#include "TrailBuilderTestScenario.hpp"
-#include "TrailRenderQuery.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "engine/SimpleEphemerisGuidanceStrategy.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "math/ViewportMath.hpp"
+#include "render/SkyRenderLine.hpp"
+#include "selection/SkyObjectTrailBuilder.hpp"
+#include "support/TrailBuilderTestEngine.hpp"
+#include "support/TrailBuilderTestScenario.hpp"
+#include "support/TrailRenderQuery.hpp"
 
 #include <QtTest/QtTest>
 

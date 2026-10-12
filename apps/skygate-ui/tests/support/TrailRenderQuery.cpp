@@ -1,6 +1,6 @@
 #include "TrailRenderQuery.hpp"
-#include "SkyRenderLabel.hpp"
-#include "SkyRenderLine.hpp"
+#include "render/SkyRenderLabel.hpp"
+#include "render/SkyRenderLine.hpp"
 
 #include <algorithm>
 #include <cmath>

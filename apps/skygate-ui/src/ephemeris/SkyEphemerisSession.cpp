@@ -1,6 +1,4 @@
 #include "SkyEphemerisSession.hpp"
-
-#include "SkyQtTimeCodec.hpp"
 #include "UtcTimeCodec.hpp"
 #include "composition/EphemerisBackendResourceCache.hpp"
 #include "composition/EphemerisGuidanceComposition.hpp"
@@ -12,6 +10,7 @@
 #include "factory/EphemerisEngineFactoryRequest.hpp"
 #include "factory/EphemerisEngineReplacementPolicy.hpp"
 #include "time/CalendarTime.hpp"
+#include "time/SkyQtTimeCodec.hpp"
 
 #include <QDateTime>
 

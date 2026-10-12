@@ -3,13 +3,13 @@
 #include "DeviceLocationTestSupport.hpp"
 #include "ITimeSource.hpp"
 #include "SettingsTestFixture.hpp"
-#include "SkyContextController.hpp"
-#include "SkyContextTimeCodec.hpp"
-#include "SkyLogging.hpp"
-#include "SkyOverlayLayerSettings.hpp"
-#include "SkyTimeController.hpp"
+#include "app/SkyContextController.hpp"
+#include "app/SkyContextTimeCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "diagnostics/SkyLogging.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
+#include "theme/SkyOverlayLayerSettings.hpp"
+#include "time/SkyTimeController.hpp"
 
 #include <QCoreApplication>
 #include <QDateTime>

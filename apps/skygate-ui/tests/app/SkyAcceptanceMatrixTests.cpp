@@ -1,14 +1,14 @@
-#include "CatalogCacheTestSupport.hpp"
-#include "SettingsTestFixture.hpp"
-#include "SkyEphemerisDataManager.hpp"
-#include "SkySettingsStore.hpp"
 #include "StaticCalcephKernelProvider.hpp"
+#include "engine/IEarthOrientationProvider.hpp"
+#include "engine/ITimeScaleService.hpp"
+#include "ephemeris/SkyEphemerisDataManager.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/CatalogCacheTestSupport.hpp"
+#include "support/SettingsTestFixture.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
-#include "engine/IEarthOrientationProvider.hpp"
-#include "engine/ITimeScaleService.hpp"
 
 #include <QDir>
 #include <QFile>

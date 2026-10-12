@@ -6,10 +6,10 @@
 #include "EphemerisSnapshot.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "PreparedProjection.hpp"
-#include "SkyOverlayLayerVisibility.hpp"
 #include "SkyRenderFrame.hpp"
 #include "SkyRenderHorizontalLookup.hpp"
-#include "SkyThemeRenderPalette.hpp"
+#include "theme/SkyOverlayLayerVisibility.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 namespace skygate::ui::internal {
 

@@ -6,10 +6,9 @@
 #include "SkyCatalogSourceInstance.hpp"
 #include "SkyCatalogSourceRecord.hpp"
 #include "SkyConstellationLineImportResult.hpp"
-#include "SkySettingsStore.hpp"
-
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/IStarCatalog.hpp"
+#include "settings/SkySettingsStore.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QByteArray>

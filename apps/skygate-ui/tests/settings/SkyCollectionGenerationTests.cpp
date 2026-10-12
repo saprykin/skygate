@@ -1,11 +1,11 @@
-#include "CatalogCacheTestSupport.hpp"
-#include "CatalogCollectionCacheFixture.hpp"
-#include "LogCapture.hpp"
-#include "SettingsTestFixture.hpp"
-#include "SkySettingsStore.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/CatalogCacheTestSupport.hpp"
+#include "support/CatalogCollectionCacheFixture.hpp"
+#include "support/LogCapture.hpp"
+#include "support/SettingsTestFixture.hpp"
 
 #include <QDir>
 #include <QFile>

@@ -1,9 +1,9 @@
 #include "SkyConstellationRenderBuilder.hpp"
-#include "SkyContextRenderStyle.hpp"
 #include "SkyRenderLabelBuilder.hpp"
 #include "SkyRenderLine.hpp"
-#include "SkyThemeRenderPalette.hpp"
+#include "app/SkyContextRenderStyle.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <algorithm>
 #include <array>

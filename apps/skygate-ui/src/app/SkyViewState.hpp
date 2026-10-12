@@ -2,8 +2,8 @@
 
 #include "IProjection.hpp"
 #include "ProjectionType.hpp"
-#include "SkyPersistedStateSnapshot.hpp"
 #include "math/ViewportMath.hpp"
+#include "settings/SkyPersistedStateSnapshot.hpp"
 
 #include <memory>
 

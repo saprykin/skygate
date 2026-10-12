@@ -1,17 +1,17 @@
 #pragma once
 
 #include "QmlTestSupport.hpp"
-#include "SkyThemeRenderPalette.hpp"
-
-#include <algorithm>
-#include <cmath>
-#include <optional>
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <QColor>
 #include <QDateTime>
 #include <QList>
 #include <QRect>
 #include <QTimeZone>
+
+#include <algorithm>
+#include <cmath>
+#include <optional>
 
 using namespace skygate::ui::tests;
 

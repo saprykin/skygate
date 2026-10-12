@@ -1,15 +1,14 @@
 #include "CatalogCacheFixture.hpp"
-#include "SkyCatalogCollectionPersistRequest.hpp"
-#include "SkyCatalogCollectionRestoreResult.hpp"
-#include "SkyCatalogSourcePersistEntry.hpp"
-#include "SkyCatalogSourceRestoreEntry.hpp"
-
 #include "CatalogTestPayloads.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "catalog/SkyCatalogCollectionPersistRequest.hpp"
+#include "catalog/SkyCatalogCollectionRestoreResult.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
+#include "catalog/SkyCatalogSourcePersistEntry.hpp"
+#include "catalog/SkyCatalogSourceRestoreEntry.hpp"
 
 #include <QString>
 #include <QStringList>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SkyPersistedStateSnapshot.hpp"
+#include "settings/SkyPersistedStateSnapshot.hpp"
 
 namespace skygate::ui::internal {
 

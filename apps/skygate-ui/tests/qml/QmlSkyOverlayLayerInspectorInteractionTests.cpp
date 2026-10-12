@@ -1,4 +1,4 @@
-#include "QmlOverlayRenderingTestSupport.hpp"
+#include "support/QmlOverlayRenderingTestSupport.hpp"
 
 class QmlSkyOverlayLayerInspectorInteractionTests final : public QmlOverlayRenderingTestBase {
     Q_OBJECT

@@ -1,7 +1,7 @@
-#include "SkySceneModelTestSupport.hpp"
-#include "SkyRenderPoint.hpp"
 #include "engine/EphemerisEngineQueries.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "render/SkyRenderPoint.hpp"
+#include "support/SkySceneModelTestSupport.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <QtTest>

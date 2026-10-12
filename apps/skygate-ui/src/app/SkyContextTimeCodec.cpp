@@ -1,5 +1,5 @@
 #include "SkyContextTimeCodec.hpp"
-#include "SkyQtTimeCodec.hpp"
+#include "time/SkyQtTimeCodec.hpp"
 
 namespace skygate::ui::internal {
 

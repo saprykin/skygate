@@ -1,19 +1,18 @@
 #pragma once
 
-#include "SkyContextController.hpp"
-#include "SkyOverlayLayerVisibility.hpp"
-#include "SkySceneModel.hpp"
-#include "SkyViewportItem.hpp"
+#include "app/SkyContextController.hpp"
+#include "render/SkyViewportItem.hpp"
+#include "scene/SkySceneModel.hpp"
+#include "theme/SkyOverlayLayerVisibility.hpp"
 
-#include <QtTest/QtTest>
-
-#include <QCoreApplication>
 #include <QColor>
+#include <QCoreApplication>
 #include <QRectF>
 #include <QSGFlatColorMaterial>
 #include <QSGGeometryNode>
 #include <QSGNode>
 #include <QStringList>
+#include <QtTest/QtTest>
 
 #include <cstddef>
 #include <memory>

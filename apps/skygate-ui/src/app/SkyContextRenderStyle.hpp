@@ -1,7 +1,7 @@
 #pragma once
 
 #include "BaseCelestialBody.hpp"
-#include "SkyThemeRenderPalette.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <QColor>
 

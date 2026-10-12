@@ -1,9 +1,9 @@
 #include "CelestialBodyCatalog.hpp"
 #include "DistantCelestialBody.hpp"
-#include "SkyRenderBuilders.hpp"
-#include "SkyRenderLabel.hpp"
-#include "SkyThemeRenderPalette.hpp"
 #include "math/ViewportMath.hpp"
+#include "render/SkyRenderBuilders.hpp"
+#include "render/SkyRenderLabel.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <QtTest/QtTest>
 

@@ -1,5 +1,5 @@
-#include "QmlPreferencesTestSupport.hpp"
-#include "SkyPersistedStateSnapshot.hpp"
+#include "settings/SkyPersistedStateSnapshot.hpp"
+#include "support/QmlPreferencesTestSupport.hpp"
 
 class QmlPreferencesDraftTests final : public QObject {
     Q_OBJECT

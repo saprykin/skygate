@@ -1,8 +1,8 @@
-#include "CatalogRuntimeFixture.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/IStarCatalog.hpp"
 #include "catalog/SkyCatalogRuntime.hpp"
+#include "support/CatalogRuntimeFixture.hpp"
 
 #include <QLocale>
 #include <QtTest/QtTest>

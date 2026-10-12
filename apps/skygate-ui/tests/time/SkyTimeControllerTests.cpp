@@ -1,15 +1,13 @@
-#include <QtTest>
-
-#include "SkyLiveClock.hpp"
-#include "SkyContextUtcDateTimeTextCodec.hpp"
-#include "SkyQtTimeCodec.hpp"
-#include "SkyTimeController.hpp"
-
 #include "ITimeSource.hpp"
 #include "UtcTimeCodec.hpp"
+#include "app/SkyContextUtcDateTimeTextCodec.hpp"
+#include "time/SkyLiveClock.hpp"
+#include "time/SkyQtTimeCodec.hpp"
+#include "time/SkyTimeController.hpp"
 
 #include <QSignalSpy>
 #include <QTimeZone>
+#include <QtTest>
 
 #include <chrono>
 

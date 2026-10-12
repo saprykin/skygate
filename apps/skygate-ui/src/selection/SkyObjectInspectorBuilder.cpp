@@ -1,13 +1,13 @@
 #include "SkyObjectInspectorBuilder.hpp"
-#include "SkyInspectorField.hpp"
-#include "SkySelectedObjectInspector.hpp"
-#include "SkySelectionOverlayInput.hpp"
-#include "engine/EphemerisComputationPolicy.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "ObservationEventCalculator.hpp"
 #include "SkyObjectInspectorFormatters.hpp"
-#include "SkyPerformanceLogging.hpp"
-#include "SkySceneLookupKey.hpp"
+#include "SkySelectionOverlayInput.hpp"
+#include "diagnostics/SkyPerformanceLogging.hpp"
+#include "engine/EphemerisComputationPolicy.hpp"
+#include "scene/SkyInspectorField.hpp"
+#include "scene/SkySceneLookupKey.hpp"
+#include "scene/SkySelectedObjectInspector.hpp"
 
 #include <QElapsedTimer>
 

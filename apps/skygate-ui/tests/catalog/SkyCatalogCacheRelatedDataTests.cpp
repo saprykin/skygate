@@ -1,12 +1,12 @@
-#include "CatalogCacheFixture.hpp"
-#include "CatalogTestPayloads.hpp"
-#include "SettingsTestFixture.hpp"
-#include "SkyCatalogCollectionPersistRequest.hpp"
-#include "SkyCatalogSourcePersistEntry.hpp"
-#include "SkySettingsStore.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
+#include "catalog/SkyCatalogCollectionPersistRequest.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
+#include "catalog/SkyCatalogSourcePersistEntry.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/CatalogCacheFixture.hpp"
+#include "support/CatalogTestPayloads.hpp"
+#include "support/SettingsTestFixture.hpp"
 
 #include <QDir>
 #include <QRegularExpression>

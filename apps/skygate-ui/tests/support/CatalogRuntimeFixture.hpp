@@ -2,10 +2,10 @@
 
 #include "DistantCelestialBody.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
-#include "SkyCatalogRuntimeBuildOptions.hpp"
-#include "SkyCatalogRuntimeResult.hpp"
 #include "catalog/IStarCatalog.hpp"
 #include "catalog/SkyCatalogRuntime.hpp"
+#include "catalog/SkyCatalogRuntimeBuildOptions.hpp"
+#include "catalog/SkyCatalogRuntimeResult.hpp"
 
 #include <QString>
 

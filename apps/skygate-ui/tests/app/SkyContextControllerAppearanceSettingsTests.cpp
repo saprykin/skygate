@@ -1,4 +1,4 @@
-#include "SkyContextControllerTestSupport.hpp"
+#include "support/SkyContextControllerTestSupport.hpp"
 
 class SkyContextControllerAppearanceSettingsTests final : public QObject {
     Q_OBJECT

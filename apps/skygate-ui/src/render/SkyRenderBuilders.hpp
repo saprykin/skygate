@@ -6,9 +6,9 @@
 #include "EphemerisSnapshot.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "PreparedProjection.hpp"
-#include "SkyOverlayLayerVisibility.hpp"
 #include "SkyRenderFrame.hpp"
-#include "SkyThemeRenderPalette.hpp"
+#include "theme/SkyOverlayLayerVisibility.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <span>

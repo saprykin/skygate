@@ -1,14 +1,13 @@
 #pragma once
 
-#include "SkyInspectorField.hpp"
-#include "SkyOverlayItem.hpp"
-#include "SkySelectedObjectInspector.hpp"
-#include "SkySelectionMarker.hpp"
-
-#include <QtTest/QtTest>
+#include "scene/SkyInspectorField.hpp"
+#include "scene/SkyOverlayItem.hpp"
+#include "scene/SkySelectedObjectInspector.hpp"
+#include "scene/SkySelectionMarker.hpp"
 
 #include <QVariantList>
 #include <QVariantMap>
+#include <QtTest/QtTest>
 
 #include <cstddef>
 

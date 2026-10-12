@@ -3,8 +3,8 @@
 #include "PreparedProjection.hpp"
 #include "SkyRenderFrame.hpp"
 #include "SkyRenderHorizontalLookup.hpp"
-#include "SkyThemeRenderPalette.hpp"
 #include "math/RectOccupancyGrid.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <span>

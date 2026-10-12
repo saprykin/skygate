@@ -6,13 +6,13 @@
 #include "EphemerisSnapshot.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "PreparedProjection.hpp"
-#include "SkyOverlayLayerVisibility.hpp"
 #include "SkyRenderFrame.hpp"
 #include "SkyRenderGlyph.hpp"
 #include "SkyRenderLabel.hpp"
-#include "SkyThemeRenderPalette.hpp"
 #include "math/Geometry2d.hpp"
 #include "math/RectOccupancyGrid.hpp"
+#include "theme/SkyOverlayLayerVisibility.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <QColor>
 

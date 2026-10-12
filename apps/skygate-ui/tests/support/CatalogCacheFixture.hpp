@@ -1,9 +1,9 @@
 #pragma once
 
-#include "SkyCatalogCollectionPersistRequest.hpp"
-#include "SkyCatalogCollectionRestoreResult.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
 #include "catalog/SkyCatalogCollectionCacheSnapshot.hpp"
+#include "catalog/SkyCatalogCollectionPersistRequest.hpp"
+#include "catalog/SkyCatalogCollectionRestoreResult.hpp"
 
 #include <QString>
 

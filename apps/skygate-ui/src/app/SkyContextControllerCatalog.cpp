@@ -1,6 +1,5 @@
 #include "SkyContextController.hpp"
-
-#include "SkyCatalogManager.hpp"
+#include "catalog/SkyCatalogManager.hpp"
 
 void SkyContextController::loadCatalogPreset(const QString& presetId)
 {

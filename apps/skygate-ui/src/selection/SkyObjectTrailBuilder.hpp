@@ -2,7 +2,7 @@
 
 #include "SkyObjectTrailInput.hpp"
 #include "SkyObjectTrailSampler.hpp"
-#include "SkyRenderFrame.hpp"
+#include "render/SkyRenderFrame.hpp"
 
 class SkyObjectTrailBuilder final {
 public:

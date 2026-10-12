@@ -1,13 +1,13 @@
-#include "MacDockIcon.hpp"
-#include "SkyContextController.hpp"
-#include "SkyLogging.hpp"
-#include "SkyLoggingConfiguration.hpp"
-#include "SkySceneModel.hpp"
-#include "SkySettingsStore.hpp"
-#include "SkyViewportItem.hpp"
+#include "app/SkyContextController.hpp"
 #include "catalog/CatalogFactory.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
+#include "diagnostics/SkyLogging.hpp"
+#include "diagnostics/SkyLoggingConfiguration.hpp"
 #include "engine/EphemerisDataManifest.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
+#include "platform/MacDockIcon.hpp"
+#include "render/SkyViewportItem.hpp"
+#include "scene/SkySceneModel.hpp"
+#include "settings/SkySettingsStore.hpp"
 
 #include <QDir>
 #include <QFile>

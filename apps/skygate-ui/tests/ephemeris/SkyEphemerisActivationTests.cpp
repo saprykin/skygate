@@ -1,9 +1,9 @@
-#include "EphemerisDataCacheSnapshotFixture.hpp"
-#include "SettingsTestFixture.hpp"
-#include "SkyEphemerisDataManager.hpp"
-#include "SkySettingsStore.hpp"
-#include "StagedEphemerisAssetFixture.hpp"
 #include "engine/EphemerisDataManifest.hpp"
+#include "ephemeris/SkyEphemerisDataManager.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/EphemerisDataCacheSnapshotFixture.hpp"
+#include "support/SettingsTestFixture.hpp"
+#include "support/StagedEphemerisAssetFixture.hpp"
 
 #include <QByteArray>
 #include <QDir>

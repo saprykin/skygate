@@ -1,17 +1,16 @@
 #pragma once
 
-#include "SkySceneFramePipelineInput.hpp"
-#include "SkySceneFramePipelineResult.hpp"
-
-#include "engine/EphemerisEngineKind.hpp"
-#include "engine/EphemerisEngineOptions.hpp"
 #include "EphemerisSnapshot.hpp"
 #include "GeoLocation.hpp"
 #include "PreparedProjection.hpp"
 #include "ProjectionType.hpp"
-#include "SkyOverlayLayerVisibility.hpp"
-#include "SkyRenderFrame.hpp"
+#include "SkySceneFramePipelineInput.hpp"
+#include "SkySceneFramePipelineResult.hpp"
 #include "UtcTimePoint.hpp"
+#include "engine/EphemerisEngineKind.hpp"
+#include "engine/EphemerisEngineOptions.hpp"
+#include "render/SkyRenderFrame.hpp"
+#include "theme/SkyOverlayLayerVisibility.hpp"
 
 #include <QHash>
 #include <QString>

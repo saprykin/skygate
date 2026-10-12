@@ -1,16 +1,16 @@
 #pragma once
 
 #include "CelestialReferenceCalculator.hpp"
-#include "SkyContextController.hpp"
 #include "SkyEphemerisTestSupport.hpp"
-#include "SkyOverlayLayerSettings.hpp"
-#include "SkyRenderBuilders.hpp"
-#include "SkyRenderLabel.hpp"
-#include "SkySceneModel.hpp"
 #include "SkySceneModelTestHarness.hpp"
-#include "SkyThemeRepository.hpp"
-#include "SkyTimeController.hpp"
+#include "app/SkyContextController.hpp"
 #include "math/ViewportMath.hpp"
+#include "render/SkyRenderBuilders.hpp"
+#include "render/SkyRenderLabel.hpp"
+#include "scene/SkySceneModel.hpp"
+#include "theme/SkyOverlayLayerSettings.hpp"
+#include "theme/SkyThemeRepository.hpp"
+#include "time/SkyTimeController.hpp"
 
 #include <QtTest>
 

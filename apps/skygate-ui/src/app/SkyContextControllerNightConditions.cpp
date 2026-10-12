@@ -5,8 +5,8 @@
 #include "SkyNightConditionSunRow.hpp"
 #include "SkyNightConditionsAdapter.hpp"
 #include "SkyNightConditionsData.hpp"
-#include "SkyTimeController.hpp"
 #include "SolarAltitudeThresholds.hpp"
+#include "time/SkyTimeController.hpp"
 
 #include <QDateTime>
 

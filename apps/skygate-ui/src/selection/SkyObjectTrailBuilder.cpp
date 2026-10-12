@@ -1,10 +1,10 @@
 #include "SkyObjectTrailBuilder.hpp"
 #include "SkyObjectTrailInput.hpp"
-#include "SkyPerformanceLogging.hpp"
-#include "SkyRenderLabelBuilder.hpp"
-#include "SkyRenderLine.hpp"
+#include "diagnostics/SkyPerformanceLogging.hpp"
 #include "math/LinePattern.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
+#include "render/SkyRenderLabelBuilder.hpp"
+#include "render/SkyRenderLine.hpp"
 
 #include <QColor>
 #include <QElapsedTimer>

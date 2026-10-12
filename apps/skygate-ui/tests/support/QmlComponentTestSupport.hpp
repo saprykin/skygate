@@ -1,8 +1,8 @@
 #pragma once
 
 #include "QmlTestPaths.hpp"
-#include "SkyContextController.hpp"
-#include "SkySceneModel.hpp"
+#include "app/SkyContextController.hpp"
+#include "scene/SkySceneModel.hpp"
 
 #include <QByteArray>
 #include <QCoreApplication>

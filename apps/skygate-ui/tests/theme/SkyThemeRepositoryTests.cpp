@@ -1,11 +1,10 @@
-#include "SkyThemeDefinition.hpp"
-#include "SkyThemeRepository.hpp"
-
-#include <QtTest>
+#include "theme/SkyThemeDefinition.hpp"
+#include "theme/SkyThemeRepository.hpp"
 
 #include <QFile>
 #include <QRegularExpression>
 #include <QTemporaryDir>
+#include <QtTest>
 
 using namespace skygate::ui::internal;
 

@@ -1,13 +1,12 @@
-#include <QtTest>
-
-#include "SettingsTestFixture.hpp"
-#include "SkyLogging.hpp"
-#include "SkyLoggingConfiguration.hpp"
+#include "diagnostics/SkyLogging.hpp"
+#include "diagnostics/SkyLoggingConfiguration.hpp"
+#include "support/SettingsTestFixture.hpp"
 
 #include <QDir>
 #include <QFile>
 #include <QLoggingCategory>
 #include <QRegularExpression>
+#include <QtTest>
 
 #include <thread>
 #include <vector>

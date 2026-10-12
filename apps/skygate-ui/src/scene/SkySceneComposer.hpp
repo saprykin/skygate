@@ -1,13 +1,13 @@
 #pragma once
 
-#include "SkyObjectTrailBuilder.hpp"
 #include "SkyOverlayItem.hpp"
 #include "SkySceneCompositionInput.hpp"
 #include "SkySceneCompositionResult.hpp"
 #include "SkySceneFrameData.hpp"
 #include "SkySceneFramePipelineResult.hpp"
-#include "SkySelectionOverlayBuilder.hpp"
-#include "SkySelectionOverlayInput.hpp"
+#include "selection/SkyObjectTrailBuilder.hpp"
+#include "selection/SkySelectionOverlayBuilder.hpp"
+#include "selection/SkySelectionOverlayInput.hpp"
 
 #include <QString>
 

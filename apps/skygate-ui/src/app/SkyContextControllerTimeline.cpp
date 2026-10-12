@@ -3,10 +3,10 @@
 #include "SkyContextProjectionTypeCodec.hpp"
 #include "SkyContextTimeCodec.hpp"
 #include "SkyContextUtcDateTimeTextCodec.hpp"
-#include "SkyDeviceLocationAcquisition.hpp"
-#include "SkyTimeController.hpp"
 #include "engine/EphemerisComputationPolicy.hpp"
+#include "location/SkyDeviceLocationAcquisition.hpp"
 #include "math/ViewportMath.hpp"
+#include "time/SkyTimeController.hpp"
 
 #include <algorithm>
 #include <chrono>

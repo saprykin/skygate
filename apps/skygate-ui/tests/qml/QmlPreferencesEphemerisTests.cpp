@@ -1,5 +1,5 @@
-#include "QmlPreferencesTestSupport.hpp"
 #include "engine/EphemerisDataManifest.hpp"
+#include "support/QmlPreferencesTestSupport.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <QDir>

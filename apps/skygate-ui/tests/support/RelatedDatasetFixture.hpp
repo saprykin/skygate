@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SkyCatalogSourceInstance.hpp"
+#include "catalog/SkyCatalogSourceInstance.hpp"
 
 #include <QByteArray>
 #include <QList>

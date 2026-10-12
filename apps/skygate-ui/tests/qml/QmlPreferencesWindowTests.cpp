@@ -1,4 +1,4 @@
-#include "QmlPreferencesTestSupport.hpp"
+#include "support/QmlPreferencesTestSupport.hpp"
 
 class QmlPreferencesWindowTests final : public QObject {
     Q_OBJECT

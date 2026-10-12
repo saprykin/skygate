@@ -1,6 +1,6 @@
-#include "CatalogCacheTestSupport.hpp"
-#include "SettingsTestFixture.hpp"
-#include "SkySettingsStore.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/CatalogCacheTestSupport.hpp"
+#include "support/SettingsTestFixture.hpp"
 
 #include <QSettings>
 #include <QtTest/QtTest>

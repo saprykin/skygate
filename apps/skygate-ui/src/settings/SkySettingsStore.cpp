@@ -1,8 +1,7 @@
 #include "SkySettingsStore.hpp"
-#include "SkyContextSettings.hpp"
-
 #include "SkySettingsSnapshotCodecs.hpp"
 #include "SkySettingsValueCodecs.hpp"
+#include "app/SkyContextSettings.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
 
 #include <QDir>

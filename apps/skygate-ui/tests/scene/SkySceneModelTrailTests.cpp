@@ -1,6 +1,6 @@
-#include "ConstellationTestSupport.hpp"
-#include "SkyRenderPoint.hpp"
-#include "SkySceneModelTestSupport.hpp"
+#include "render/SkyRenderPoint.hpp"
+#include "support/ConstellationTestSupport.hpp"
+#include "support/SkySceneModelTestSupport.hpp"
 
 #include <QtTest>
 

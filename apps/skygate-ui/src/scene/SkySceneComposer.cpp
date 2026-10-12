@@ -1,17 +1,17 @@
 #include "SkySceneComposer.hpp"
 #include "CelestialReferenceCalculator.hpp"
-#include "SkyObjectTrailInput.hpp"
 #include "SkyOverlayItem.hpp"
-#include "SkyPerformanceLogging.hpp"
-#include "SkyRenderLabel.hpp"
 #include "SkySceneCompositionInput.hpp"
 #include "SkySceneCompositionResult.hpp"
 #include "SkySceneFrameData.hpp"
 #include "SkySceneFramePipelineResult.hpp"
-#include "SkySelectionOverlayInput.hpp"
-#include "SkyThemeRenderPalette.hpp"
+#include "diagnostics/SkyPerformanceLogging.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "math/Geometry2d.hpp"
+#include "render/SkyRenderLabel.hpp"
+#include "selection/SkyObjectTrailInput.hpp"
+#include "selection/SkySelectionOverlayInput.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <QColor>
 #include <QElapsedTimer>
