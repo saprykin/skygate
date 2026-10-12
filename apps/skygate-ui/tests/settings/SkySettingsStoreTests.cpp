@@ -28,6 +28,7 @@ private slots:
     void savesAndLoadsNegativeUtcEpochMicros();
     void loadsLegacyUtcEpochSecondsAsMicros();
     void savesLoadsAndDefaultsMainWindowSize();
+    void defaultsRoundTripThroughStore();
     void malformedStateValuesFallBackToDefaults();
     void partialStateAndUnknownOverlayKeysAreTolerated();
     void malformedEphemerisUserSettingsFallBackToDefaults();
@@ -193,6 +194,30 @@ void SkySettingsStoreTests::savesLoadsAndDefaultsMainWindowSize()
 
     QVERIFY(store.saveMainWindowSize(QSize(300, 300)));
     QCOMPARE(store.loadMainWindowSize(), QSize(1100, 760));
+}
+
+void SkySettingsStoreTests::defaultsRoundTripThroughStore()
+{
+    QSettings settings;
+    settings.clear();
+
+    const SkySettingsStore store;
+    const SkyPersistedStateSnapshot defaults;
+    QVERIFY(store.saveState(defaults));
+
+    const auto loadedSnapshot = store.loadState();
+    QVERIFY(loadedSnapshot.has_value());
+    QCOMPARE(loadedSnapshot->stepSeconds, defaults.stepSeconds);
+    QCOMPARE(loadedSnapshot->magnitudeCutoff, defaults.magnitudeCutoff);
+    QCOMPARE(loadedSnapshot->viewFieldOfViewDeg, defaults.viewFieldOfViewDeg);
+    QCOMPARE(loadedSnapshot->viewCenterAltitudeDeg, defaults.viewCenterAltitudeDeg);
+    QCOMPARE(loadedSnapshot->viewCenterAzimuthDeg, defaults.viewCenterAzimuthDeg);
+    QCOMPARE(loadedSnapshot->ephemeris.atmosphericPressureHpa, defaults.ephemeris.atmosphericPressureHpa);
+    QCOMPARE(loadedSnapshot->ephemeris.atmosphericTemperatureC, defaults.ephemeris.atmosphericTemperatureC);
+    QCOMPARE(loadedSnapshot->ephemeris.relativeHumidity, defaults.ephemeris.relativeHumidity);
+    QCOMPARE(
+        loadedSnapshot->ephemeris.observingWavelengthMicrometers, defaults.ephemeris.observingWavelengthMicrometers
+    );
 }
 
 void SkySettingsStoreTests::malformedStateValuesFallBackToDefaults()

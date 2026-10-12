@@ -1,7 +1,6 @@
 #include "CatalogCacheFixture.hpp"
 #include "CatalogTestPayloads.hpp"
 #include "SettingsTestFixture.hpp"
-#include "SkyContextControllerSupport.hpp"
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
@@ -28,7 +27,7 @@ namespace {
 constexpr int kCurrentCollectionSchemaVersion =
     skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
 constexpr int kCurrentConstellationSchemaVersion =
-    skygate::ui::internal::SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
+    skygate::ui::internal::SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
 
 }  // namespace
 

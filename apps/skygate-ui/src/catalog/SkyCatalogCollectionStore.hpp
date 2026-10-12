@@ -21,6 +21,8 @@ public:
     // carry no parse contract. An older record loads with the defined defaults
     // and the caller rewrites it in the current format.
     static constexpr int kCollectionSchemaVersion = 3;
+    // Related constellation datasets on disk carry their own format version.
+    static constexpr int kConstellationLineCacheSchemaVersion = 4;
 
     [[nodiscard]] bool save(const SkyCatalogCollectionCacheSnapshot& snapshot) const;
     [[nodiscard]] SkyCatalogCollectionCacheLoadResult load() const;

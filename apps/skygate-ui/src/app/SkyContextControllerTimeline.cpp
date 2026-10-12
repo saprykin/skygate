@@ -11,6 +11,15 @@
 
 using namespace skygate::ui::internal;
 
+namespace {
+
+constexpr int kLiveRecomputeThrottleIntervalMs = 10000;
+// Qt wheel deltas count eighths of a degree; 120 units is one detent.
+constexpr double kWheelAngleDeltaPerStep = 120.0;
+constexpr double kWheelZoomStepScale = 0.90;
+
+}  // namespace
+
 QDateTime SkyContextController::currentUtcDateTime() const
 {
     return SkyContextTimeCodec::toQDateTimeUtc(currentUtcTime());
@@ -54,7 +63,7 @@ bool SkyContextController::liveRecomputeThrottled(const skygate::core::UtcTimePo
 
     const auto elapsedTimelineTime = nextUtc - m_lastLiveRecomputeUtc.value();
     return std::abs(std::chrono::duration_cast<std::chrono::milliseconds>(elapsedTimelineTime).count())
-           < SkyContextControllerConstants::kThrottledLiveRecomputeIntervalMs;
+           < kLiveRecomputeThrottleIntervalMs;
 }
 
 void SkyContextController::markLiveRecomputeTick(const skygate::core::UtcTimePoint& nextUtc)
@@ -167,8 +176,8 @@ void SkyContextController::zoomViewByWheelDelta(const int wheelDeltaY)
         return;
     }
 
-    const double wheelSteps = static_cast<double>(wheelDeltaY) / SkyContextControllerConstants::kWheelAngleDeltaStep;
-    const double zoomMultiplier = std::pow(SkyContextControllerConstants::kWheelZoomStepScale, wheelSteps);
+    const double wheelSteps = static_cast<double>(wheelDeltaY) / kWheelAngleDeltaPerStep;
+    const double zoomMultiplier = std::pow(kWheelZoomStepScale, wheelSteps);
     setViewFieldOfViewDeg(m_view.fieldOfViewDeg() * zoomMultiplier);
 }
 

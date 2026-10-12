@@ -8,6 +8,49 @@
 
 namespace {
 
+// Above this field width a deep-sky label needs a common name; catalog-only
+// names are too dense to read.
+constexpr double kCommonNameRequiredAboveFovDeg = 20.0;
+// No deep-sky labels above this field width. At or below the close-up width
+// every candidate is allowed.
+constexpr double kWideFieldLabelCutoffFovDeg = 60.0;
+constexpr double kCloseUpLabelFovDeg = 2.0;
+constexpr std::size_t kCloseUpLabelBudget = 1000U;
+constexpr std::size_t kNarrowFieldLabelBudget = 150U;
+
+struct DeepSkyLabelBudgetTier final {
+    double minFovDeg;
+    std::size_t baseBudget;
+};
+
+// Budget tiers for the remaining field widths: the first tier the field width
+// exceeds wins. The narrowest tier always matches once the close-up case has
+// returned.
+constexpr DeepSkyLabelBudgetTier kDeepSkyLabelBudgetTiers[] = {
+    {.minFovDeg = 35.0, .baseBudget = 18U},
+    {.minFovDeg = 20.0, .baseBudget = 32U},
+    {.minFovDeg = 10.0, .baseBudget = 60U},
+    {.minFovDeg = 5.0, .baseBudget = 100U},
+    {.minFovDeg = 2.0, .baseBudget = kNarrowFieldLabelBudget},
+};
+
+// Label budgets scale with the viewport relative to a reference area tuned
+// here, independently of the default window size.
+constexpr double kLabelScaleReferenceWidthPx = 1100.0;
+constexpr double kLabelScaleReferenceHeightPx = 760.0;
+constexpr double kLabelViewportScaleMin = 0.70;
+constexpr double kLabelViewportScaleMax = 1.35;
+
+constexpr double kMessierLabelScore = 1000.0;
+constexpr double kCommonNameLabelScore = 700.0;
+// Magnitudes fainter than this add no brightness score.
+constexpr double kFaintestScoredMagnitude = 14.0;
+constexpr double kMagnitudeScoreMax = 16.0;
+constexpr double kMagnitudeScoreWeight = 12.0;
+constexpr double kMajorAxisScoreMaxArcmin = 120.0;
+constexpr double kMajorAxisScoreWeightPerArcmin = 0.75;
+constexpr double kCenterDistanceScoreWeight = 120.0;
+
 struct DeepSkyLabelCandidate final {
     std::size_t glyphIndex = 0;
     double score = 0.0;
@@ -74,32 +117,34 @@ struct DeepSkyLabelCandidate final {
         return true;
     }
 
-    return fovDeg <= 20.0;
+    return fovDeg <= kCommonNameRequiredAboveFovDeg;
 }
 
 [[nodiscard]] std::size_t
 deepSkyLabelBudget(const double fovDeg, const double viewportWidth, const double viewportHeight)
 {
-    if (fovDeg > 60.0) {
+    if (fovDeg > kWideFieldLabelCutoffFovDeg) {
         return 0U;
     }
-    if (fovDeg <= 2.0) {
-        return 1000U;
+    if (fovDeg <= kCloseUpLabelFovDeg) {
+        return kCloseUpLabelBudget;
     }
 
-    std::size_t baseBudget = 150U;
-    if (fovDeg > 35.0) {
-        baseBudget = 18U;
-    } else if (fovDeg > 20.0) {
-        baseBudget = 32U;
-    } else if (fovDeg > 10.0) {
-        baseBudget = 60U;
-    } else if (fovDeg > 5.0) {
-        baseBudget = 100U;
+    std::size_t baseBudget = kNarrowFieldLabelBudget;
+    for (const DeepSkyLabelBudgetTier& tier : kDeepSkyLabelBudgetTiers) {
+        if (fovDeg > tier.minFovDeg) {
+            baseBudget = tier.baseBudget;
+            break;
+        }
     }
 
-    const double viewportScale =
-        std::clamp(skygate::core::Geometry2d::areaScale(viewportWidth, viewportHeight, 1100.0, 760.0), 0.70, 1.35);
+    const double viewportScale = std::clamp(
+        skygate::core::Geometry2d::areaScale(
+            viewportWidth, viewportHeight, kLabelScaleReferenceWidthPx, kLabelScaleReferenceHeightPx
+        ),
+        kLabelViewportScaleMin,
+        kLabelViewportScaleMax
+    );
     return static_cast<std::size_t>(std::max(1.0, static_cast<double>(baseBudget) * viewportScale));
 }
 
@@ -112,17 +157,19 @@ deepSkyLabelBudget(const double fovDeg, const double viewportWidth, const double
 {
     double score = 0.0;
     if (isMessierObject(body)) {
-        score += 1000.0;
+        score += kMessierLabelScore;
     } else if (hasCommonNameAlias(body)) {
-        score += 700.0;
+        score += kCommonNameLabelScore;
     }
 
     if (std::isfinite(body.visualMagnitude)) {
-        score += std::clamp(14.0 - body.visualMagnitude, 0.0, 16.0) * 12.0;
+        score += std::clamp(kFaintestScoredMagnitude - body.visualMagnitude, 0.0, kMagnitudeScoreMax)
+                 * kMagnitudeScoreWeight;
     }
 
     if (body.deepSkyObjectValue().has_value()) {
-        score += std::clamp(body.deepSkyObjectValue()->majorAxisArcmin.value_or(0.0), 0.0, 120.0) * 0.75;
+        score += std::clamp(body.deepSkyObjectValue()->majorAxisArcmin.value_or(0.0), 0.0, kMajorAxisScoreMaxArcmin)
+                 * kMajorAxisScoreWeightPerArcmin;
     }
 
     const double centerX = viewportWidth * 0.5;
@@ -131,7 +178,7 @@ deepSkyLabelBudget(const double fovDeg, const double viewportWidth, const double
         skygate::core::Geometry2d::squaredDistance2d(glyph.x, glyph.y, centerX, centerY)
         / std::max(1.0, viewportWidth * viewportWidth + viewportHeight * viewportHeight);
 
-    return score - (normalizedDistanceSquared * 120.0);
+    return score - (normalizedDistanceSquared * kCenterDistanceScoreWeight);
 }
 
 }  // namespace

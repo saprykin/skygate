@@ -5,6 +5,7 @@
 #include "SkyContextControllerSupport.hpp"
 #include "SkySettingsStore.hpp"
 
+#include "catalog/SkyCatalogCollectionStore.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QByteArray>
@@ -84,7 +85,7 @@ stellariumConstellationIndexJsonPayload(const QList<QPair<QString, QList<int>>>&
     snapshot.constellationAnchorGroupRows =
         skygate::ui::internal::SkyContextCatalogCodec::serializeConstellationAnchorGroupRows(anchorGroups);
     snapshot.constellationLineSchemaVersion =
-        skygate::ui::internal::SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
+        skygate::ui::internal::SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
     snapshot.constellationCount = 1U;
 
     SkyPersistedStateSnapshot stateSnapshot;

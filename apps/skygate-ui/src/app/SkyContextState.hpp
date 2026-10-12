@@ -4,6 +4,7 @@
 #include "ObservationContext.hpp"
 #include "ProjectionType.hpp"
 #include "SkyContextControllerSupport.hpp"
+#include "SkyPersistedStateSnapshot.hpp"
 #include "math/ViewportMath.hpp"
 
 #include <QString>
@@ -18,14 +19,17 @@ struct SkyTimelineState final {
     bool catchingUpToCurrentUtc = false;
     double speedMultiplier = 1.0;
     double speedRemainderSeconds = 0.0;
-    int stepSeconds = 60;
+    int stepSeconds = SkyPersistedStateSnapshot::kDefaultStepSeconds;
 };
 
 struct SkyViewState final {
-    double magnitudeCutoff = 6.0;
+    static constexpr double kMagnitudeCutoffMin = -2.0;
+    static constexpr double kMagnitudeCutoffMax = 12.0;
+
+    double magnitudeCutoff = SkyPersistedStateSnapshot::kDefaultMagnitudeCutoff;
     double centerAltitudeDeg = skygate::core::ViewportMath::kDefaultCenterAltitudeDeg;
     double centerAzimuthDeg = skygate::core::ViewportMath::kDefaultCenterAzimuthDeg;
-    double fieldOfViewDeg = 100.0;
+    double fieldOfViewDeg = SkyPersistedStateSnapshot::kDefaultFieldOfViewDeg;
     skygate::core::ProjectionType projectionType = skygate::core::ProjectionType::Stereographic;
     std::unique_ptr<skygate::core::IProjection> projection;
 };

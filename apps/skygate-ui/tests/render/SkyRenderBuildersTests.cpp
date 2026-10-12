@@ -131,6 +131,25 @@ bool labelsContainText(const std::vector<SkyRenderLabel>& labels, const QString&
     return false;
 }
 
+void alignStatesToCenter(FrameFixture& fixture)
+{
+    for (auto& state : fixture.snapshot.states) {
+        state.horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.0};
+    }
+}
+
+std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> makeStarField(const int count)
+{
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies;
+    bodies.reserve(static_cast<std::size_t>(count));
+    for (int index = 0; index < count; ++index) {
+        bodies.push_back(
+            makeBody("star_" + std::to_string(index), "Star", skygate::ephemeris::BaseCelestialBody::Kind::Star, 6.0)
+        );
+    }
+    return bodies;
+}
+
 }  // namespace
 
 class SkyRenderBuildersTests final : public QObject {
@@ -138,9 +157,13 @@ class SkyRenderBuildersTests final : public QObject {
 
 private slots:
     void starDecimationKeepsBrighterStarInScreenCell();
+    void starDecimationStartsAtThirtyThousandStates();
+    void starDecimationStartsAboveThirtyFiveDegFov();
     void deepSkyVisibilityAndGlyphPolicyFollowRules();
     void deepSkyGlyphRendersJustOutsideViewport();
     void deepSkyLabelsPreferNamedAndRespectVisibility();
+    void deepSkyAliasOnlyLabelsNeedNarrowField();
+    void deepSkyLabelsStopAboveSixtyDegreesFov();
     void constellationGeometryRespectsRefsAndVisibility();
     void constellationLineRendersWithEndpointsOutside();
 };
@@ -166,6 +189,28 @@ void SkyRenderBuildersTests::starDecimationKeepsBrighterStarInScreenCell()
 
     QCOMPARE(frame.points.size(), 1U);
     QCOMPARE(frame.points.front().bodyIndex, 1U);
+}
+
+void SkyRenderBuildersTests::starDecimationStartsAtThirtyThousandStates()
+{
+    auto belowFixture = makeFixture(makeStarField(29999), 120.0);
+    alignStatesToCenter(belowFixture);
+    QCOMPARE(buildFrame(belowFixture).points.size(), 29999U);
+
+    auto thresholdFixture = makeFixture(makeStarField(30000), 120.0);
+    alignStatesToCenter(thresholdFixture);
+    QCOMPARE(buildFrame(thresholdFixture).points.size(), 1U);
+}
+
+void SkyRenderBuildersTests::starDecimationStartsAboveThirtyFiveDegFov()
+{
+    auto atFixture = makeFixture(makeStarField(30000), 35.0);
+    alignStatesToCenter(atFixture);
+    QCOMPARE(buildFrame(atFixture).points.size(), 30000U);
+
+    auto aboveFixture = makeFixture(makeStarField(30000), 36.0);
+    alignStatesToCenter(aboveFixture);
+    QCOMPARE(buildFrame(aboveFixture).points.size(), 1U);
 }
 
 void SkyRenderBuildersTests::deepSkyVisibilityAndGlyphPolicyFollowRules()
@@ -238,6 +283,48 @@ void SkyRenderBuildersTests::deepSkyLabelsPreferNamedAndRespectVisibility()
     hidden.deepSkyLabels = false;
     frame = buildFrame(fixture, hidden);
     QVERIFY(!labelsContainText(frame.labels, "M31"));
+}
+
+void SkyRenderBuildersTests::deepSkyAliasOnlyLabelsNeedNarrowField()
+{
+    auto fixture = makeFixture(
+        {
+            makeDeepSkyBody(
+                "ngc_100", "NGC 100", 6.0, skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy, {"NGC 100"}
+            ),
+        },
+        20.0
+    );
+    QVERIFY(labelsContainText(buildFrame(fixture).labels, "NGC 100"));
+
+    auto widerFixture = makeFixture(
+        {
+            makeDeepSkyBody(
+                "ngc_100", "NGC 100", 6.0, skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy, {"NGC 100"}
+            ),
+        },
+        21.0
+    );
+    QVERIFY(!labelsContainText(buildFrame(widerFixture).labels, "NGC 100"));
+}
+
+void SkyRenderBuildersTests::deepSkyLabelsStopAboveSixtyDegreesFov()
+{
+    auto fixture = makeFixture(
+        {
+            makeDeepSkyBody("messier_031", "M31", 6.0),
+        },
+        60.0
+    );
+    QVERIFY(labelsContainText(buildFrame(fixture).labels, "M31"));
+
+    auto widerFixture = makeFixture(
+        {
+            makeDeepSkyBody("messier_031", "M31", 6.0),
+        },
+        61.0
+    );
+    QVERIFY(!labelsContainText(buildFrame(widerFixture).labels, "M31"));
 }
 
 void SkyRenderBuildersTests::constellationGeometryRespectsRefsAndVisibility()

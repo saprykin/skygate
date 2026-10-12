@@ -30,22 +30,6 @@ enum class SkyContextLocationSource {
     Custom,
 };
 
-class SkyContextControllerConstants final {
-public:
-    static constexpr int kTickIntervalMs = 1000;
-    static constexpr int kThrottledLiveRecomputeIntervalMs = 10000;
-    static constexpr int kSettingsVersion = 3;
-    static constexpr int kConstellationLineCacheSchemaVersion = 4;
-    static constexpr double kWheelZoomStepScale = 0.90;
-    static constexpr double kWheelAngleDeltaStep = 120.0;
-    static constexpr double kMagnitudeCutoffMin = -2.0;
-    static constexpr double kMagnitudeCutoffMax = 12.0;
-    static constexpr const char* kCatalogCacheFileName = "catalog-cache-v2.txt";
-    static constexpr const char* kDeepSkyCatalogCacheFileName = "deep-sky-catalog-cache-v1.txt";
-    static constexpr const char* kCatalogBinaryCacheFileName = "catalog-cache-v3.bin";
-    static constexpr const char* kDeepSkyBinaryCatalogCacheFileName = "deep-sky-catalog-cache-v2.bin";
-};
-
 class SkyContextTextFormatter final {
 public:
     [[nodiscard]] static QString formatCoordinate(double value);
@@ -89,10 +73,6 @@ public:
 class SkyContextSettings final {
 public:
     [[nodiscard]] static QString key(const QString& name);
-    [[nodiscard]] static QString defaultCatalogCachePath();
-    [[nodiscard]] static QString defaultDeepSkyCatalogCachePath();
-    [[nodiscard]] static QString defaultCatalogBinaryCachePath();
-    [[nodiscard]] static QString defaultDeepSkyBinaryCatalogCachePath();
 };
 
 class SkyContextCatalogCodec final {

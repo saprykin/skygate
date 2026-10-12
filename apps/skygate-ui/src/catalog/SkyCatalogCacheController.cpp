@@ -245,7 +245,7 @@ void SkyCatalogCacheController::appendRestoredSource(
                 << sourceRecord.instanceId;
         } else if (
             sourceRecord.constellationLineSchemaVersion
-            < SkyContextControllerConstants::kConstellationLineCacheSchemaVersion
+            < SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion
         ) {
             qCWarning(skygateCatalogCacheLog).noquote()
                 << "Saved related constellation dataset predates the current row format; restoring source without "

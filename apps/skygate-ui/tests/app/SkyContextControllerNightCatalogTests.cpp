@@ -1,5 +1,6 @@
 #include "SkyContextControllerTestSupport.hpp"
 #include "UtcTimeCodec.hpp"
+#include "catalog/SkyCatalogCollectionStore.hpp"
 
 #include <cmath>
 #include <memory>
@@ -331,7 +332,7 @@ void SkyContextControllerNightCatalogTests::restoresCachedCatalogConstellationCo
     cacheSnapshot.constellationLineRows = "hyg_1|hyg_1\n";
     cacheSnapshot.constellationAnchorGroupRows = "Demo|hyg_1\n";
     cacheSnapshot.constellationLineSchemaVersion =
-        skygate::ui::internal::SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
+        skygate::ui::internal::SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
     cacheSnapshot.constellationCount = 88;
     QVERIFY(store.saveCatalogCache(cacheSnapshot));
 

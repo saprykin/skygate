@@ -22,6 +22,13 @@ public:
         ObservingWavelengthMicrometers
     };
 
+    // Named so option consumers that keep their own default snapshot stay in
+    // sync with the engine.
+    static constexpr double kDefaultAtmosphericPressureHpa = 1013.25;
+    static constexpr double kDefaultAtmosphericTemperatureC = 10.0;
+    static constexpr double kDefaultRelativeHumidity = 0.0;
+    static constexpr double kDefaultObservingWavelengthMicrometers = 0.55;
+
     EphemerisEngineOptions() = default;
 
     void setEngineKind(EphemerisEngineKind::Type engineKind)
@@ -132,10 +139,10 @@ private:
     EphemerisCorrectionFlags m_correctionFlags = EphemerisCorrectionFlags::apparentTopocentric();
     bool m_fallbackToSimpleEngine = true;
     bool m_enableAtmosphericRefraction = true;
-    double m_atmosphericPressureHpa = 1013.25;
-    double m_atmosphericTemperatureC = 10.0;
-    double m_relativeHumidity = 0.0;
-    double m_observingWavelengthMicrometers = 0.55;
+    double m_atmosphericPressureHpa = kDefaultAtmosphericPressureHpa;
+    double m_atmosphericTemperatureC = kDefaultAtmosphericTemperatureC;
+    double m_relativeHumidity = kDefaultRelativeHumidity;
+    double m_observingWavelengthMicrometers = kDefaultObservingWavelengthMicrometers;
     std::uint32_t m_specifiedMask = 0U;
 };
 

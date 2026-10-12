@@ -142,11 +142,8 @@ skygate::core::ProjectionType SkyViewController::projectionType() const noexcept
 
 bool SkyViewController::setMagnitudeCutoff(const double magnitudeCutoff) noexcept
 {
-    const double clamped = std::clamp(
-        magnitudeCutoff,
-        SkyContextControllerConstants::kMagnitudeCutoffMin,
-        SkyContextControllerConstants::kMagnitudeCutoffMax
-    );
+    const double clamped =
+        std::clamp(magnitudeCutoff, SkyViewState::kMagnitudeCutoffMin, SkyViewState::kMagnitudeCutoffMax);
     if (std::abs(m_state.magnitudeCutoff - clamped) < 1e-9) {
         return false;
     }

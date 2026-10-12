@@ -3,9 +3,7 @@
 #include "catalog/constellation/ConstellationDataCodec.hpp"
 
 #include <QDate>
-#include <QDir>
 #include <QRegularExpression>
-#include <QStandardPaths>
 #include <QTime>
 #include <QTimeZone>
 
@@ -199,47 +197,6 @@ QString SkyContextUtcDateTimeTextCodec::formatDate(const QDateTime& utcTime)
 QString SkyContextSettings::key(const QString& name)
 {
     return QString("skyContext/%1").arg(name);
-}
-
-QString SkyContextSettings::defaultCatalogCachePath()
-{
-    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (appDataPath.isEmpty()) {
-        return {};
-    }
-
-    return QDir(appDataPath).filePath(QString::fromUtf8(SkyContextControllerConstants::kCatalogCacheFileName));
-}
-
-QString SkyContextSettings::defaultDeepSkyCatalogCachePath()
-{
-    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (appDataPath.isEmpty()) {
-        return {};
-    }
-
-    return QDir(appDataPath).filePath(QString::fromUtf8(SkyContextControllerConstants::kDeepSkyCatalogCacheFileName));
-}
-
-QString SkyContextSettings::defaultCatalogBinaryCachePath()
-{
-    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (appDataPath.isEmpty()) {
-        return {};
-    }
-
-    return QDir(appDataPath).filePath(QString::fromUtf8(SkyContextControllerConstants::kCatalogBinaryCacheFileName));
-}
-
-QString SkyContextSettings::defaultDeepSkyBinaryCatalogCachePath()
-{
-    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (appDataPath.isEmpty()) {
-        return {};
-    }
-
-    return QDir(appDataPath)
-        .filePath(QString::fromUtf8(SkyContextControllerConstants::kDeepSkyBinaryCatalogCacheFileName));
 }
 
 QByteArray
