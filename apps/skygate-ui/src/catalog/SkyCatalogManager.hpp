@@ -1,7 +1,11 @@
 #pragma once
 
+#include "SkyCatalogRuntimeBuildOptions.hpp"
+#include "SkyCatalogRuntimeResult.hpp"
+#include "SkyCatalogSourceImportResult.hpp"
 #include "SkyCatalogSourceInstance.hpp"
 #include "SkyCatalogSourceRecord.hpp"
+#include "SkyConstellationLineImportResult.hpp"
 #include "SkySettingsStore.hpp"
 
 #include "catalog/CatalogCompositionPolicy.hpp"

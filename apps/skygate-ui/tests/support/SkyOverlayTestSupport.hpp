@@ -1,6 +1,9 @@
 #pragma once
 
-#include "SkySceneOverlayData.hpp"
+#include "SkyInspectorField.hpp"
+#include "SkyOverlayItem.hpp"
+#include "SkySelectedObjectInspector.hpp"
+#include "SkySelectionMarker.hpp"
 
 #include <QtTest/QtTest>
 

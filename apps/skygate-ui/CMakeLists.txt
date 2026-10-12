@@ -30,6 +30,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/selection/SkyHitTargetIndex.hpp
     src/diagnostics/SkyLogging.cpp
     src/diagnostics/SkyLogging.hpp
+    src/diagnostics/SkyLoggingConfiguration.hpp
     src/diagnostics/SkyPerformanceLogging.cpp
     src/diagnostics/SkyPerformanceLogging.hpp
     src/ephemeris/SkyEphemerisCacheController.cpp
@@ -47,29 +48,40 @@ qt_add_library(skygate-ui-lib STATIC
     src/ephemeris/SkyEphemerisUpdateWorkflow.hpp
     src/selection/SkyObjectTrailBuilder.cpp
     src/selection/SkyObjectTrailBuilder.hpp
+    src/selection/SkyObjectTrailInput.hpp
     src/selection/SkyObjectTrailSampler.cpp
     src/selection/SkyObjectTrailSampler.hpp
     src/selection/SkyObjectTrailSamplingInput.hpp
     src/catalog/SkyCatalogManager.cpp
     src/catalog/SkyCatalogManager.hpp
-    src/scene/SkySceneComposition.cpp
-    src/scene/SkySceneComposition.hpp
+    src/scene/SkyInspectorField.hpp
+    src/scene/SkyOverlayItem.hpp
+    src/scene/SkySceneComposer.cpp
+    src/scene/SkySceneComposer.hpp
+    src/scene/SkySceneCompositionInput.hpp
+    src/scene/SkySceneCompositionResult.hpp
+    src/scene/SkySceneFrameData.hpp
     src/scene/SkySceneFramePipeline.cpp
     src/scene/SkySceneFramePipeline.hpp
+    src/scene/SkySceneFramePipelineInput.hpp
+    src/scene/SkySceneFramePipelineResult.hpp
     src/scene/SkySceneModel.cpp
     src/scene/SkySceneModel.hpp
     src/scene/SkySceneOverlayAdapter.cpp
     src/scene/SkySceneOverlayAdapter.hpp
-    src/scene/SkySceneOverlayData.hpp
     src/scene/SkySceneShared.hpp
+    src/scene/SkySelectedObjectInspector.hpp
+    src/scene/SkySelectionMarker.hpp
     src/app/SkyNightConditionsAdapter.hpp
     src/app/SkyNightConditionsData.hpp
+    src/app/SkyNightConditionSunRow.hpp
     src/selection/SkyObjectInspectorBuilder.cpp
     src/selection/SkyObjectInspectorBuilder.hpp
     src/selection/SkyObjectInspectorFormatters.cpp
     src/selection/SkyObjectInspectorFormatters.hpp
     src/selection/SkySelectionOverlayBuilder.cpp
     src/selection/SkySelectionOverlayBuilder.hpp
+    src/selection/SkySelectionOverlayInput.hpp
     src/selection/SkySelectionMarkerBuilder.cpp
     src/selection/SkySelectionMarkerBuilder.hpp
     src/theme/SkyThemeOptionsAdapter.hpp
@@ -77,8 +89,18 @@ qt_add_library(skygate-ui-lib STATIC
     src/selection/SkyTrailTargetResolver.hpp
     src/render/SkyConstellationRenderBuilder.cpp
     src/render/SkyConstellationRenderBuilder.hpp
-    src/theme/SkyTheme.cpp
-    src/theme/SkyTheme.hpp
+    src/theme/SkyThemeDefinition.cpp
+    src/theme/SkyThemeDefinition.hpp
+    src/theme/SkyThemeDescriptor.hpp
+    src/theme/SkyThemeJsonCodec.cpp
+    src/theme/SkyThemeJsonCodec.hpp
+    src/theme/SkyThemeOption.hpp
+    src/theme/SkyThemePalette.cpp
+    src/theme/SkyThemePalette.hpp
+    src/theme/SkyThemeRenderPalette.hpp
+    src/theme/SkyThemeRepository.cpp
+    src/theme/SkyThemeRepository.hpp
+    src/theme/SkyThemeUiPalette.hpp
     src/time/SkyTimeController.cpp
     src/time/SkyTimeController.hpp
     src/time/SkyLiveClock.cpp
@@ -89,10 +111,13 @@ qt_add_library(skygate-ui-lib STATIC
     src/time/TimeZoneAliasCatalog.hpp
     src/time/TimeZoneCatalogModel.cpp
     src/time/TimeZoneCatalogModel.hpp
+    src/time/TimeZoneCatalogEntry.hpp
     src/catalog/SkyCatalogCacheController.cpp
     src/catalog/SkyCatalogCacheController.hpp
     src/catalog/SkyCatalogCollectionCacheLoadResult.hpp
     src/catalog/SkyCatalogCollectionCacheSnapshot.hpp
+    src/catalog/SkyCatalogCollectionPersistRequest.hpp
+    src/catalog/SkyCatalogCollectionRestoreResult.hpp
     src/catalog/SkyCatalogCollectionStore.cpp
     src/catalog/SkyCatalogCollectionStore.hpp
     src/catalog/SkyCatalogLegacyCacheSnapshot.hpp
@@ -101,6 +126,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/SkyCatalogConstellationStore.hpp
     src/catalog/SkyCatalogRuntime.cpp
     src/catalog/SkyCatalogRuntime.hpp
+    src/catalog/SkyCatalogRuntimeBuildOptions.hpp
+    src/catalog/SkyCatalogRuntimeResult.hpp
     src/catalog/SkyCatalogSourceRecord.cpp
     src/catalog/SkyCatalogSourceRecord.hpp
     src/catalog/CatalogDownloadCancellation.cpp
@@ -109,6 +136,11 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/CatalogDownloadService.hpp
     src/catalog/SkyCatalogImportWorkflow.cpp
     src/catalog/SkyCatalogImportWorkflow.hpp
+    src/catalog/SkyCatalogSourceImportResult.hpp
+    src/catalog/SkyCatalogSourcePersistEntry.hpp
+    src/catalog/SkyCatalogSourceRestoreEntry.hpp
+    src/catalog/SkyConstellationLineImportResult.cpp
+    src/catalog/SkyConstellationLineImportResult.hpp
     src/catalog/SkyCatalogPresets.cpp
     src/catalog/SkyCatalogPresets.hpp
     src/catalog/SkyCatalogSourceDescriptor.cpp
@@ -125,27 +157,65 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/CatalogPayloadParseService.hpp
     src/app/SkyContextController.cpp
     src/app/SkyContextController.hpp
+    src/app/SkyContextCatalogCodec.cpp
+    src/app/SkyContextCatalogCodec.hpp
     src/app/SkyContextControllerCatalog.cpp
-    src/app/SkyContextDomainControllers.cpp
-    src/app/SkyContextDomainControllers.hpp
     src/app/SkyContextControllerNightConditions.cpp
     src/app/SkyContextControllerSearch.cpp
-    src/app/SkyContextState.hpp
+    src/app/SkyContextControllerSettings.cpp
+    src/app/SkyContextControllerTimeline.cpp
+    src/app/SkyContextLocationSource.hpp
+    src/app/SkyContextLocationSourceCodec.cpp
+    src/app/SkyContextLocationSourceCodec.hpp
+    src/app/SkyContextProjectionTypeCodec.cpp
+    src/app/SkyContextProjectionTypeCodec.hpp
+    src/app/SkyContextRenderStyle.cpp
+    src/app/SkyContextRenderStyle.hpp
+    src/app/SkyContextSettings.cpp
+    src/app/SkyContextSettings.hpp
+    src/app/SkyContextTextFormatter.cpp
+    src/app/SkyContextTextFormatter.hpp
+    src/app/SkyContextTimeCodec.cpp
+    src/app/SkyContextTimeCodec.hpp
+    src/app/SkyContextUtcDateTimeTextCodec.cpp
+    src/app/SkyContextUtcDateTimeTextCodec.hpp
+    src/app/SkyLocationController.cpp
+    src/app/SkyLocationController.hpp
+    src/app/SkyLocationState.hpp
+    src/app/SkySearchController.cpp
+    src/app/SkySearchController.hpp
+    src/app/SkySearchState.hpp
+    src/app/SkySelectedCityChange.hpp
+    src/app/SkyTimelineController.cpp
+    src/app/SkyTimelineController.hpp
+    src/app/SkyTimelineState.hpp
+    src/app/SkyViewController.cpp
+    src/app/SkyViewController.hpp
+    src/app/SkyViewState.hpp
     src/render/SkyRenderBodyBuilder.cpp
     src/render/SkyRenderBodyBuilder.hpp
     src/render/SkyRenderBuilders.cpp
     src/render/SkyRenderBuilders.hpp
     src/render/SkyRenderFrame.hpp
+    src/render/SkyRenderGlyph.hpp
+    src/render/SkyRenderLabel.hpp
+    src/render/SkyRenderLine.hpp
+    src/render/SkyRenderPoint.hpp
     src/render/SkyRenderHorizontalLookup.cpp
     src/render/SkyRenderHorizontalLookup.hpp
     src/render/SkyRenderLabels.cpp
     src/render/SkyRenderLabels.hpp
     src/app/SkyContextControllerSettings.cpp
-    src/app/SkyContextControllerSupport.cpp
-    src/app/SkyContextControllerSupport.hpp
     src/app/SkyContextControllerTimeline.cpp
     src/settings/SkySettingsSnapshotCodecs.cpp
     src/settings/SkySettingsSnapshotCodecs.hpp
+    src/settings/SkyCatalogSourceSettingsSnapshot.hpp
+    src/settings/SkyLocationSettingsSnapshot.hpp
+    src/settings/SkyLoggingSettingsSnapshot.hpp
+    src/settings/SkySearchSettingsSnapshot.hpp
+    src/settings/SkyStateSettingsSnapshot.hpp
+    src/settings/SkyTimelineSettingsSnapshot.hpp
+    src/settings/SkyViewSettingsSnapshot.hpp
     src/settings/SkySettingsStore.cpp
     src/settings/SkySettingsStore.hpp
     src/settings/SkyEphemerisUserSettingsSnapshot.hpp
@@ -154,6 +224,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/settings/SkySettingsValueCodecs.hpp
     src/render/SkyViewportGeometry.cpp
     src/render/SkyViewportGeometry.hpp
+    src/render/SkyViewportGeometryInput.hpp
+    src/render/SkyViewportLineSegment.hpp
     src/render/SkyViewportItem.cpp
     src/render/SkyViewportItem.hpp
     src/render/SkyViewportSceneGraph.cpp

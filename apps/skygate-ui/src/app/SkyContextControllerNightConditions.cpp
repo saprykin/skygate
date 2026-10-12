@@ -1,7 +1,10 @@
 #include "NightConditionsCalculator.hpp"
 #include "SkyContextController.hpp"
-#include "SkyContextControllerSupport.hpp"
+#include "SkyContextTextFormatter.hpp"
+#include "SkyContextTimeCodec.hpp"
+#include "SkyNightConditionSunRow.hpp"
 #include "SkyNightConditionsAdapter.hpp"
+#include "SkyNightConditionsData.hpp"
 #include "SkyTimeController.hpp"
 #include "SolarAltitudeThresholds.hpp"
 

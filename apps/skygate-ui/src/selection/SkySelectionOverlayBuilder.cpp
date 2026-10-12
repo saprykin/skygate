@@ -1,4 +1,7 @@
 #include "SkySelectionOverlayBuilder.hpp"
+#include "SkySelectedObjectInspector.hpp"
+#include "SkySelectionMarker.hpp"
+#include "SkySelectionOverlayInput.hpp"
 
 #include "SkyObjectInspectorBuilder.hpp"
 #include "SkySelectionMarkerBuilder.hpp"

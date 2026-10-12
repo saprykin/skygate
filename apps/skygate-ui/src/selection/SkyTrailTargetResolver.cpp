@@ -1,4 +1,5 @@
 #include "SkyTrailTargetResolver.hpp"
+#include "SkySelectionOverlayInput.hpp"
 
 #include "SkySceneShared.hpp"
 

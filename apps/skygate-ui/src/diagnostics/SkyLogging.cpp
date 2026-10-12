@@ -1,4 +1,5 @@
 #include "SkyLogging.hpp"
+#include "SkyLoggingConfiguration.hpp"
 
 #include <QCoreApplication>
 #include <QDateTime>

@@ -1,4 +1,6 @@
 #include "CatalogRuntimeFixture.hpp"
+#include "SkyCatalogRuntimeBuildOptions.hpp"
+#include "SkyCatalogRuntimeResult.hpp"
 
 #include "BaseCelestialBody.hpp"
 #include "CelestialBodyCatalog.hpp"

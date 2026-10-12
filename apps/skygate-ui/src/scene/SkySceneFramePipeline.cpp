@@ -1,4 +1,7 @@
 #include "SkySceneFramePipeline.hpp"
+#include "SkyRenderBuilders.hpp"
+#include "SkySceneFramePipelineInput.hpp"
+#include "SkySceneFramePipelineResult.hpp"
 #include "SkySceneShared.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "math/ViewportMath.hpp"

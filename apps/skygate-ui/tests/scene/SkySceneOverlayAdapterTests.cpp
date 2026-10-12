@@ -1,5 +1,8 @@
 #include "SkySceneOverlayAdapter.hpp"
+#include "SkyOverlayItem.hpp"
 #include "SkyOverlayTestSupport.hpp"
+#include "SkySelectedObjectInspector.hpp"
+#include "SkySelectionMarker.hpp"
 
 #include <QtTest/QtTest>
 

@@ -1,4 +1,5 @@
 #include "TimeZoneCatalogModel.hpp"
+#include "TimeZoneCatalogEntry.hpp"
 
 #include "TimeZoneAliasCatalog.hpp"
 

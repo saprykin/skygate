@@ -1,6 +1,7 @@
 #include "MacDockIcon.hpp"
 #include "SkyContextController.hpp"
 #include "SkyLogging.hpp"
+#include "SkyLoggingConfiguration.hpp"
 #include "SkySceneModel.hpp"
 #include "SkySettingsStore.hpp"
 #include "SkyViewportItem.hpp"

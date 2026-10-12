@@ -1,6 +1,8 @@
 #include "CatalogCacheFixture.hpp"
 #include "CatalogTestPayloads.hpp"
 #include "SettingsTestFixture.hpp"
+#include "SkyCatalogCollectionPersistRequest.hpp"
+#include "SkyCatalogSourcePersistEntry.hpp"
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"

@@ -1,51 +1,13 @@
 #pragma once
 
-#include "BaseCelestialBody.hpp"
-#include "CelestialBodyState.hpp"
-#include "DistantCelestialBody.hpp"
-#include "EphemerisSnapshot.hpp"
-#include "ObservationContext.hpp"
-#include "OwnGalaxyCelestialBody.hpp"
-#include "PreparedProjection.hpp"
-#include "SkySceneOverlayData.hpp"
-#include "engine/IEphemerisEngine.hpp"
-#include "engine/IEphemerisGuidanceStrategy.hpp"
-#include "catalog/constellation/ConstellationData.hpp"
+#include "SkySelectedObjectInspector.hpp"
+#include "SkySelectionMarker.hpp"
+#include "SkySelectionOverlayInput.hpp"
 
-#include <QHash>
 #include <QString>
-#include <QStringList>
 
 #include <cstdint>
-#include <memory>
 #include <optional>
-#include <span>
-#include <vector>
-
-class SkyTimeController;
-
-struct SkySelectionOverlayInput final {
-    const skygate::ephemeris::EphemerisSnapshot* snapshot = nullptr;
-    const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
-    const SkyTimeController* timeController = nullptr;
-    const skygate::core::PreparedProjection* preparedProjection = nullptr;
-    const QHash<QString, std::size_t>* stateIndexByBodyId = nullptr;
-    std::optional<skygate::core::ObservationContext> skyContext;
-    std::optional<skygate::ephemeris::EphemerisRequest> ephemerisRequest;
-    std::span<const skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups;
-    std::span<const QString> catalogSourceIds;
-    const std::vector<QStringList>* catalogSourceContributors = nullptr;
-    QHash<QString, QString> catalogSourceTitles;
-    QString selectedObjectTargetId;
-    QString selectedSearchTargetKind;
-    QString selectedSearchTargetId;
-    QString trackedTargetKind;
-    QString trackedTargetId;
-    double inspectorPinnedX = 0.0;
-    double inspectorPinnedY = 0.0;
-    bool inspectorPinned = false;
-    std::shared_ptr<skygate::ephemeris::IEphemerisGuidanceStrategy> guidanceStrategy;
-};
 
 class SkySelectionOverlayBuilder final {
 public:

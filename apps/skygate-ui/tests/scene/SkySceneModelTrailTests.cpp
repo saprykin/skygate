@@ -1,4 +1,5 @@
 #include "ConstellationTestSupport.hpp"
+#include "SkyRenderPoint.hpp"
 #include "SkySceneModelTestSupport.hpp"
 
 #include <QtTest>

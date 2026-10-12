@@ -5,6 +5,8 @@
 #include "CatalogTestPayloads.hpp"
 #include "FakeNetworkAccessManager.hpp"
 #include "LogCapture.hpp"
+#include "SkyCatalogSourceImportResult.hpp"
+#include "SkyConstellationLineImportResult.hpp"
 
 #include "catalog/SkyCatalogImportWorkflow.hpp"
 #include "catalog/SkyCatalogSourceDescriptor.hpp"

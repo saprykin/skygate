@@ -1,6 +1,5 @@
 #include "CatalogSourceFactsQuery.hpp"
-
-#include "SkyContextControllerSupport.hpp"
+#include "SkyContextCatalogCodec.hpp"
 
 #include <QCryptographicHash>
 #include <QDir>

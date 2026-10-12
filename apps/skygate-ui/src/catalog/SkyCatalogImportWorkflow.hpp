@@ -1,6 +1,8 @@
 #pragma once
 
+#include "SkyCatalogSourceImportResult.hpp"
 #include "SkyCatalogSourceInstance.hpp"
+#include "SkyConstellationLineImportResult.hpp"
 
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/CatalogLoadResult.hpp"
@@ -22,27 +24,6 @@ class QObject;
 class CatalogCoordinator;
 
 namespace skygate::ui::internal {
-
-struct SkyCatalogSourceImportResult final {
-    QByteArray payload;
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
-    skygate::ephemeris::CatalogLoadDiagnostics diagnostics;
-    std::size_t foundObjectCount = 0;
-    QString sourceLabel;
-    QString sourceId;
-    QString sourceVersion;
-    QString sourceUrl;
-    QString errorText;
-};
-
-struct SkyConstellationLineImportResult final {
-    std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs;
-    std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups;
-    std::size_t constellationCount = 0;
-    QString statusSuffix;
-
-    [[nodiscard]] bool hasCustomLines() const noexcept;
-};
 
 // Downloads and parses one configured source instance.
 //

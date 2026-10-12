@@ -1,8 +1,8 @@
 #pragma once
 
 #include "SettingsTestFixture.hpp"
+#include "SkyContextCatalogCodec.hpp"
 #include "SkyContextController.hpp"
-#include "SkyContextControllerSupport.hpp"
 #include "SkySettingsStore.hpp"
 
 #include "catalog/SkyCatalogCollectionStore.hpp"

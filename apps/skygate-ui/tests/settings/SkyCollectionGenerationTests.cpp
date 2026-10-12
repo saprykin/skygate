@@ -2,7 +2,6 @@
 #include "CatalogCollectionCacheFixture.hpp"
 #include "LogCapture.hpp"
 #include "SettingsTestFixture.hpp"
-#include "SkyContextControllerSupport.hpp"
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"

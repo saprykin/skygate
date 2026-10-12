@@ -8,7 +8,7 @@
 #include "PreparedProjection.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
 #include "SkyRenderFrame.hpp"
-#include "SkyTheme.hpp"
+#include "SkyThemeRenderPalette.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <span>

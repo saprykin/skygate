@@ -1,6 +1,8 @@
 #pragma once
 
-#include "SkySceneOverlayData.hpp"
+#include "SkyOverlayItem.hpp"
+#include "SkySelectedObjectInspector.hpp"
+#include "SkySelectionMarker.hpp"
 
 #include <QVariantList>
 #include <QVariantMap>

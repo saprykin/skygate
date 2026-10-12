@@ -1,13 +1,11 @@
 #pragma once
 
+#include "TimeZoneCatalogEntry.hpp"
+
 #include <QAbstractListModel>
 #include <QDateTime>
 #include <QString>
 #include <QVector>
-
-struct TimeZoneCatalogEntry final {
-    QString id;
-};
 
 class TimeZoneCatalogModel final : public QAbstractListModel {
     Q_OBJECT

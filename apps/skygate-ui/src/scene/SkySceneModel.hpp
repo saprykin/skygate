@@ -3,7 +3,13 @@
 #include "ObservationContext.hpp"
 #include "PreparedProjection.hpp"
 #include "SkyHitTargetIndex.hpp"
-#include "SkySceneComposition.hpp"
+#include "SkyRenderGlyph.hpp"
+#include "SkyRenderLine.hpp"
+#include "SkyRenderPoint.hpp"
+#include "SkySceneComposer.hpp"
+#include "SkySceneCompositionInput.hpp"
+#include "SkySceneFrameData.hpp"
+#include "SkySceneFramePipeline.hpp"
 #include "SkySceneOverlayAdapter.hpp"
 
 #include <QMetaObject>

@@ -1,6 +1,8 @@
 #include "SkyCatalogImportWorkflow.hpp"
 #include "CatalogCoordinator.hpp"
 #include "CatalogParseOptions.hpp"
+#include "SkyCatalogSourceImportResult.hpp"
+#include "SkyConstellationLineImportResult.hpp"
 #include "catalog/CatalogIdentity.hpp"
 #include "catalog/stellarium/StellariumConstellationParser.hpp"
 
@@ -20,11 +22,6 @@ std::string_view payloadView(const QByteArray& payload)
 }
 
 }  // namespace
-
-bool SkyConstellationLineImportResult::hasCustomLines() const noexcept
-{
-    return !lineRefs.empty();
-}
 
 SkyCatalogImportWorkflow::SkyCatalogImportWorkflow(QNetworkAccessManager* networkAccessManager)
     : m_catalogCoordinator(std::make_unique<CatalogCoordinator>(networkAccessManager))

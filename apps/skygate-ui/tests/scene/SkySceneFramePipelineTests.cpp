@@ -1,5 +1,6 @@
 #include "CelestialBodyCatalog.hpp"
 #include "SkySceneFramePipeline.hpp"
+#include "SkySceneFramePipelineInput.hpp"
 #include "engine/EphemerisEngineQueries.hpp"
 #include "engine/IEphemerisEngine.hpp"
 

@@ -8,7 +8,9 @@
 #include "PreparedProjection.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
 #include "SkyRenderFrame.hpp"
-#include "SkyTheme.hpp"
+#include "SkyRenderGlyph.hpp"
+#include "SkyRenderLabel.hpp"
+#include "SkyThemeRenderPalette.hpp"
 #include "math/Geometry2d.hpp"
 #include "math/RectOccupancyGrid.hpp"
 

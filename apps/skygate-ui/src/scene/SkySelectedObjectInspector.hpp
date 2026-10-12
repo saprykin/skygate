@@ -1,30 +1,10 @@
 #pragma once
 
-#include <QColor>
+#include "SkyInspectorField.hpp"
+
 #include <QString>
 
 #include <vector>
-
-struct SkyOverlayItem final {
-    QString kind;
-    double x = 0.0;
-    double y = 0.0;
-    QString text;
-    QColor color;
-};
-
-struct SkySelectionMarker final {
-    bool visible = false;
-    QString kind;
-    double x = 0.0;
-    double y = 0.0;
-};
-
-struct SkyInspectorField final {
-    QString label;
-    QString value;
-    QString tooltip;
-};
 
 struct SkySelectedObjectInspector final {
     bool visible = false;

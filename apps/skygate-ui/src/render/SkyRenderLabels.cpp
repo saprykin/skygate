@@ -1,4 +1,7 @@
 #include "SkyRenderLabels.hpp"
+#include "SkyRenderGlyph.hpp"
+#include "SkyRenderLabel.hpp"
+#include "SkyThemeRenderPalette.hpp"
 
 #include <algorithm>
 #include <cctype>

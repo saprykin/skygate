@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SkyObjectTrailBuilder.hpp"
+#include "SkyObjectTrailInput.hpp"
 
 #include <optional>
 

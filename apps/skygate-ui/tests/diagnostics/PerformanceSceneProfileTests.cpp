@@ -5,6 +5,7 @@
 #include "PerformanceGuardChecks.hpp"
 #include "PerformanceGuardScenario.hpp"
 #include "SkyContextController.hpp"
+#include "SkyRenderPoint.hpp"
 #include "SkySceneModel.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SkySelectionOverlayBuilder.hpp"
+#include "SkySelectionOverlayInput.hpp"
 
 #include <cstdint>
 #include <optional>

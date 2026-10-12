@@ -1,7 +1,7 @@
 #include <QtTest>
 
-#include "SkyContextControllerSupport.hpp"
 #include "SkyLiveClock.hpp"
+#include "SkyContextUtcDateTimeTextCodec.hpp"
 #include "SkyQtTimeCodec.hpp"
 #include "SkyTimeController.hpp"
 

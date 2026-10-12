@@ -1,0 +1,183 @@
+#include "SkyThemeRepository.hpp"
+#include "SkyThemeDefinition.hpp"
+#include "SkyThemeDescriptor.hpp"
+#include "SkyThemeJsonCodec.hpp"
+#include "SkyThemeOption.hpp"
+#include "SkyThemeOptionsAdapter.hpp"
+
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonValue>
+#include <QLoggingCategory>
+#include <QMutex>
+#include <QMutexLocker>
+
+void initSkygateThemeResources()
+{
+    Q_INIT_RESOURCE(themes);
+}
+
+namespace skygate::ui::internal {
+namespace {
+
+Q_LOGGING_CATEGORY(skygateThemeLog, "skygate.theme")
+
+[[nodiscard]] std::optional<QByteArray> readResourceBytes(const QString& resourcePath, const QString& description)
+{
+    QFile file(resourcePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qCWarning(skygateThemeLog).noquote() << "Failed to open" << description << resourcePath;
+        return std::nullopt;
+    }
+    return file.readAll();
+}
+
+void ensureThemeResourcesInitialized()
+{
+    static QMutex mutex;
+    static bool initialized = false;
+
+    const QMutexLocker locker(&mutex);
+    if (initialized) {
+        return;
+    }
+
+    initSkygateThemeResources();
+    initialized = true;
+}
+
+}  // namespace
+
+SkyThemeRepository::SkyThemeRepository(const QString& manifestResourcePath)
+    : m_fallbackTheme(SkyThemeDefinition::builtInDefault())
+{
+    ensureThemeResourcesInitialized();
+    loadManifest(manifestResourcePath);
+    ensureDefaultTheme();
+}
+
+const SkyThemeDefinition& SkyThemeRepository::themeById(const QString& id) const noexcept
+{
+    const QString requestedId = id.trimmed();
+    if (!requestedId.isEmpty()) {
+        for (const auto& theme : m_themes) {
+            if (theme.id == requestedId) {
+                return theme;
+            }
+        }
+
+        qCWarning(skygateThemeLog).noquote() << "Unknown theme id" << requestedId << "- using default theme";
+    }
+
+    return defaultTheme();
+}
+
+const SkyThemeDefinition& SkyThemeRepository::defaultTheme() const noexcept
+{
+    if (m_defaultThemeIndex >= 0 && m_defaultThemeIndex < static_cast<qsizetype>(m_themes.size())) {
+        return m_themes[static_cast<std::size_t>(m_defaultThemeIndex)];
+    }
+    return m_fallbackTheme;
+}
+
+QVariantList SkyThemeRepository::themeOptions() const
+{
+    const auto options = themeOptionData();
+    const SkyThemeOptionsAdapter adapter;
+    return adapter.themeOptions(options);
+}
+
+std::vector<SkyThemeOption> SkyThemeRepository::themeOptionData() const
+{
+    std::vector<SkyThemeOption> options;
+    options.reserve(m_themes.size());
+    for (const auto& theme : m_themes) {
+        options.push_back(SkyThemeOption{.id = theme.id, .label = theme.displayName});
+    }
+
+    if (options.empty()) {
+        options.push_back(SkyThemeOption{.id = m_fallbackTheme.id, .label = m_fallbackTheme.displayName});
+    }
+    return options;
+}
+
+void SkyThemeRepository::loadManifest(const QString& manifestResourcePath)
+{
+    const std::optional<QByteArray> manifestBytes = readResourceBytes(manifestResourcePath, "theme manifest");
+    if (!manifestBytes.has_value()) {
+        return;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument manifestDocument = QJsonDocument::fromJson(manifestBytes.value(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !manifestDocument.isObject()) {
+        qCWarning(skygateThemeLog).noquote()
+            << "Failed to parse theme manifest" << manifestResourcePath << parseError.errorString();
+        return;
+    }
+
+    const QJsonObject manifestObject = manifestDocument.object();
+    const QString defaultThemeId = manifestObject.value("defaultThemeId").toString().trimmed();
+    const QJsonArray themeArray = manifestObject.value("themes").toArray();
+    for (const QJsonValue& themeValue : themeArray) {
+        if (!themeValue.isObject()) {
+            continue;
+        }
+
+        const QJsonObject themeObject = themeValue.toObject();
+        const QString id = themeObject.value("id").toString().trimmed();
+        const QString resourcePath = themeObject.value("resourcePath").toString().trimmed();
+        if (id.isEmpty() || resourcePath.isEmpty()) {
+            qCWarning(skygateThemeLog).noquote()
+                << "Skipping invalid theme descriptor in manifest" << manifestResourcePath;
+            continue;
+        }
+
+        const std::optional<QByteArray> themeBytes = readResourceBytes(resourcePath, "theme");
+        if (!themeBytes.has_value()) {
+            continue;
+        }
+
+        const std::optional<SkyThemeDefinition> parsedTheme =
+            SkyThemeJsonCodec::parseTheme(themeBytes.value(), resourcePath);
+        if (!parsedTheme.has_value()) {
+            continue;
+        }
+
+        if (parsedTheme->id != id) {
+            qCWarning(skygateThemeLog).noquote()
+                << "Theme manifest id mismatch for" << resourcePath << "- expected" << id << "got" << parsedTheme->id;
+            continue;
+        }
+
+        if (parsedTheme->id == defaultThemeId) {
+            m_defaultThemeIndex = static_cast<qsizetype>(m_themes.size());
+        }
+        m_descriptors.push_back(SkyThemeDescriptor{.id = id, .resourcePath = resourcePath});
+        m_themes.push_back(parsedTheme.value());
+    }
+}
+
+void SkyThemeRepository::ensureDefaultTheme()
+{
+    if (m_themes.empty()) {
+        m_themes.push_back(m_fallbackTheme);
+        m_defaultThemeIndex = 0;
+        return;
+    }
+
+    if (m_defaultThemeIndex < 0 || m_defaultThemeIndex >= static_cast<qsizetype>(m_themes.size())) {
+        for (qsizetype index = 0; index < static_cast<qsizetype>(m_themes.size()); ++index) {
+            if (m_themes[static_cast<std::size_t>(index)].id == m_fallbackTheme.id) {
+                m_defaultThemeIndex = index;
+                return;
+            }
+        }
+
+        m_defaultThemeIndex = 0;
+    }
+}
+
+}  // namespace skygate::ui::internal

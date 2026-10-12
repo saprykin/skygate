@@ -1,4 +1,5 @@
 #include "SkySceneModelTestSupport.hpp"
+#include "SkyRenderGlyph.hpp"
 #include "catalog/CatalogComposer.hpp"
 
 #include <QtTest>

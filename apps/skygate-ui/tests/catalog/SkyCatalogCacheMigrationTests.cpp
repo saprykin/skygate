@@ -3,6 +3,7 @@
 #include "CatalogTestPayloads.hpp"
 #include "LogCapture.hpp"
 #include "SettingsTestFixture.hpp"
+#include "SkyCatalogCollectionPersistRequest.hpp"
 #include "SkyCatalogSourceInstance.hpp"
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
