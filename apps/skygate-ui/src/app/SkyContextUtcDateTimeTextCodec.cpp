@@ -2,22 +2,10 @@
 #include "time/SkyQtTimeCodec.hpp"
 
 #include <QDate>
-#include <QRegularExpression>
 #include <QTime>
 #include <QTimeZone>
 
 namespace skygate::ui::internal {
-namespace {
-
-const QRegularExpression& utcDateInputPattern()
-{
-    static const QRegularExpression pattern(
-        R"(^(\d{4,})-(\d{2})-(\d{2})(?:\s+(BCE|BC))?$)", QRegularExpression::CaseInsensitiveOption
-    );
-    return pattern;
-}
-
-}  // namespace
 
 bool SkyContextUtcDateTimeTextCodec::ParseResult::isValid() const noexcept
 {
@@ -27,7 +15,7 @@ bool SkyContextUtcDateTimeTextCodec::ParseResult::isValid() const noexcept
 SkyContextUtcDateTimeTextCodec::ParseResult
 SkyContextUtcDateTimeTextCodec::parse(const QString& utcDateText, const QString& utcTimeText)
 {
-    const QRegularExpressionMatch dateMatch = utcDateInputPattern().match(utcDateText.trimmed());
+    const QRegularExpressionMatch dateMatch = SkyQtTimeCodec::dateInputPattern().match(utcDateText.trimmed());
     if (!dateMatch.hasMatch()) {
         return {.utcDateTime = {}, .errorText = "Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates."};
     }

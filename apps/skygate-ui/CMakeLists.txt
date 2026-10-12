@@ -206,8 +206,6 @@ qt_add_library(skygate-ui-lib STATIC
     src/render/SkyRenderHorizontalLookup.hpp
     src/render/SkyRenderLabelBuilder.cpp
     src/render/SkyRenderLabelBuilder.hpp
-    src/app/SkyContextControllerSettings.cpp
-    src/app/SkyContextControllerTimeline.cpp
     src/settings/SkySettingsSnapshotCodecs.cpp
     src/settings/SkySettingsSnapshotCodecs.hpp
     src/settings/SkyCatalogSourceSettingsSnapshot.hpp
