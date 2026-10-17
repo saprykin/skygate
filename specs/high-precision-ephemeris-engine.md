@@ -230,6 +230,7 @@ The public API includes:
 - `EphemerisPrecisionPolicy`
 - `EphemerisRequest`
 - `AstronomicalEpoch`
+- `AstronomicalEpochRange`
 - `TimeScale`
 
 `IEphemerisEngine` exposes:

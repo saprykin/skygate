@@ -2,8 +2,9 @@
 
 How configured catalog sources become an active catalog, and how the
 collection survives restart. The classes involved are `SkyCatalogManager`
-(lifecycle owner), `SkyCatalogRuntime` (active composition), and
-`SkyCatalogCacheController` (persistence and migration).
+(lifecycle owner), `SkyCatalogRuntime` (active composition),
+`SkyCatalogCacheController` (restore and migration decisions), and
+`SkyCatalogCollectionStore` (durable collection storage).
 
 ## Source identity
 
@@ -64,6 +65,41 @@ rule, independent of composition policy and payload origin, and no other
 instance's dataset is touched. A rejected update keeps the previously
 accepted dataset.
 
+## Cancellation scope
+
+The public cancel action applies to the collection's active catalog download
+and its pending related-data downloads. Every started transfer carries an
+operation handle retained by the source-operation record, so cancellation
+aborts exactly those replies. A network manager can be shared with requests
+of other owners; those transfers keep running.
+
+The source-operation record owns its cancel handle before startup publishes
+the busy or downloading state or calls a status handler. Status handlers run
+synchronously, so a receiver can cancel during startup. After every such
+callback the startup reacquires the operation by instance ID and revision
+and checks the handle. The download service checks it again before issuing
+the next request, and the coordinator checks it before dispatching parsing.
+A cancellation there ends the startup before it creates a transfer that a
+later cancel could no longer reach.
+
+Cancellation marks the operation terminal before the abort. A transfer
+aborted this way neither falls back to another candidate URL nor starts
+parsing, and a completion already queued or a parse already underway is
+discarded by the operation revision check. An ordinary transfer failure
+keeps the candidate fallback untouched. The abort is synchronous as well:
+the finished callback can run before the cancel call returns, and it sees
+the handle as canceled.
+
+Retiring an operation is stronger than rejecting its late results. A
+revision guard only drops a result that arrives; retirement also terminates
+the transfer that would produce it. It advances the revision first, then
+cancels and releases both owned handles, then resets the pending related
+state. Reload and update of an instance, disabling it, removal after an
+accepted runtime removal, a live restore that replaces the operation
+collection, and the public cancel all retire the work they displace. A
+rejected runtime transition and a rejected removal keep the source and its
+pending work.
+
 ## Configuration versus payload cache
 
 Durable configuration and disposable payload data are separate stores.
@@ -80,6 +116,14 @@ reports its own error without erasing siblings.
 
 ## Persistence and recovery
 
+`SkyCatalogCollectionStore` owns the durable collection: the generation
+manifest, the generation-scoped source records in `QSettings`, and the
+per-instance payload sidecar files. It allocates each save's generation,
+reads the committed generation, removes superseded data, and evicts one
+source's payload. `SkyCatalogCacheController` decides how a loaded
+snapshot is validated and migrated; it reads the legacy two-slot cache
+only to migrate it.
+
 The collection configuration (instance identity, order, policy, enabled
 state, parse options, attribution, bundled flag) is stored in `QSettings`
 as a versioned snapshot. An empty snapshot is still written, so an
@@ -93,8 +137,10 @@ committed generation. Until that manifest is published the previous
 generation stays active, so a failure while staging any payload file,
 while storing records, or while publishing the manifest leaves the last
 committed collection loadable instead of pairing old records with new
-payloads. Removing the superseded generation afterwards is best effort
-because the manifest alone decides which generation is committed.
+payloads. A failed save also discards the files it staged and removes the
+generation records it wrote. Removing the superseded generation after a
+successful commit is best effort because the manifest alone decides which
+generation is committed.
 
 Restores read the manifest-named generation, prefer each source's binary
 snapshot, and fall back to parsing the raw payload with the stored parse
@@ -111,13 +157,14 @@ Loading the collection returns one of three explicit states:
 
 A durable committed-generation record proves a collection was committed
 even when the manifest is gone, and a staged-but-uncommitted generation is
-never chosen as the current collection. A collection already committed in
-the older flat format is Loaded on its own terms: while its version marker
-and source records are intact, generation groups staged by an interrupted
-upgrade are ignored with a diagnostic, their records and payloads are
-never promoted, and the flat records load with their versions, order, IDs,
-and options. Only when generation records actually replaced the flat
-records does the stale marker make the committed configuration unusable.
+never chosen as the current collection. A collection that holds flat
+records instead of generation records is Loaded on its own terms: while
+its version marker and source records are intact, generation groups
+staged by an interrupted save are ignored with a diagnostic, their records
+and payloads are never promoted, and the flat records load with their
+versions, order, IDs, and options. Only when generation records replaced
+the flat records does the stale marker make the committed configuration
+unusable.
 
 Related constellation datasets are stored per owning source and restored
 before the active related view is composed.
