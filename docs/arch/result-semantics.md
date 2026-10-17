@@ -61,6 +61,11 @@ outside them are not rejected at the interface but produce out-of-range or
 degraded metadata (for example the `DataOutOfRange` warning), and runtime
 fallback may substitute the simple engine when the caller allows it.
 
+The interval itself is a `skygate::core::AstronomicalEpochRange` with
+inclusive boundaries; it is valid when both endpoints are finite and
+ordered, and a default-constructed interval is empty. `EphemerisDateRange`
+wraps that interval with the data set labels `id` and `displayName`.
+
 ## Thread safety of const methods
 
 Shared const ownership (`std::shared_ptr<const IEphemerisEngine>`) does not

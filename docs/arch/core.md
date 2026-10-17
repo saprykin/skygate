@@ -38,7 +38,12 @@ boundaries.
   - `DashedLineBuilder` for dash generation
   - `ProjectedPolylineBuilder` for projection-aware polyline splitting
 - `SphericalGeometry`: spherical/vector helpers shared by projection and
-  ephemeris code.
+  ephemeris code. It converts horizontal coordinates to and from unit
+  vectors, builds a projection basis, rotates a vector around an axis,
+  measures the angular separation of two directions, and interpolates
+  between directions along the chord between their unit vectors. A rotated
+  or interpolated vector that collapses to zero length falls back to the
+  zenith direction.
 
 `PreparedProjection` is the preferred high-throughput path in the current
 UI. The `IProjection` strategies still exist as a clean abstraction
