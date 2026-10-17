@@ -203,7 +203,6 @@ void SkyContextController::resetViewDirection()
 void SkyContextController::goLiveNow()
 {
     setCurrentUtcTime(currentUtcTime());
-    m_timeline.resetSpeedProgress();
     m_timeline.setCatchingUpToCurrentUtc(false);
     setLive(true);
 }
@@ -344,10 +343,6 @@ void SkyContextController::tickUtcTime()
 
     if (catchingUpToCurrentUtc) {
         m_timeline.setCatchingUpToCurrentUtc(nextUtc < currentWallUtc);
-        if (!m_timeline.catchingUpToCurrentUtc()) {
-            m_timeline.resetSpeedProgress();
-        }
-
         setCurrentUtcTime(nextUtc);
         m_liveClock.resetAnchor(nextUtc);
         markLiveRecomputeTick(nextUtc);
@@ -355,7 +350,6 @@ void SkyContextController::tickUtcTime()
     }
 
     m_timeline.setCatchingUpToCurrentUtc(false);
-    m_timeline.resetSpeedProgress();
     setCurrentUtcTime(nextUtc);
     markLiveRecomputeTick(nextUtc);
 }
@@ -364,10 +358,6 @@ void SkyContextController::stepBySeconds(const int stepSeconds)
 {
     if (stepSeconds == 0) {
         return;
-    }
-
-    if (!m_timeline.live()) {
-        m_timeline.resetSpeedProgress();
     }
 
     setCurrentUtcTime(m_location.utcTime() + std::chrono::seconds(stepSeconds));

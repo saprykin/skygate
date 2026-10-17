@@ -17,9 +17,6 @@ public:
     [[nodiscard]] bool setSpeedMultiplier(double speedMultiplier) noexcept;
     [[nodiscard]] bool setStepSeconds(int stepSeconds) noexcept;
     void setCatchingUpToCurrentUtc(bool catchingUpToCurrentUtc) noexcept;
-    void resetSpeedProgress() noexcept;
-    void addSpeedRemainderSeconds(double seconds) noexcept;
-    [[nodiscard]] int takeWholeSpeedRemainderSeconds() noexcept;
     void startLiveAtCurrentUtc() noexcept;
 
 private:
