@@ -1,4 +1,5 @@
 #include "SkyEphemerisCacheController.hpp"
+#include "SkyEphemerisPathSegmentPolicy.hpp"
 
 #include "engine/EphemerisDataActivation.hpp"
 #include "engine/EphemerisDataFileUtilities.hpp"
@@ -93,28 +94,6 @@ void markCanceled(StagedUpdateActivationResult& result, QString diagnostic)
     addDiagnostic(result, std::move(diagnostic));
 }
 
-QString safePathSegment(QString value)
-{
-    value = value.trimmed();
-    QString result;
-    result.reserve(value.size());
-    for (const QChar character : value) {
-        if (character.isLetterOrNumber() || character == QLatin1Char('-') || character == QLatin1Char('_')
-            || character == QLatin1Char('.')) {
-            result.push_back(character);
-        } else {
-            result.push_back(QLatin1Char('_'));
-        }
-    }
-    while (result.contains(QStringLiteral(".."))) {
-        result.replace(QStringLiteral(".."), QStringLiteral("."));
-    }
-    if (result.isEmpty() || result == QStringLiteral(".")) {
-        return QStringLiteral("update");
-    }
-    return result;
-}
-
 QString defaultRevisionToken(const EphemerisDataManifest& manifest, const EphemerisDataManifest::Profile& profile)
 {
     QStringList parts;
@@ -127,7 +106,9 @@ QString defaultRevisionToken(const EphemerisDataManifest& manifest, const Epheme
     if (!profile.id.empty()) {
         parts.push_back(stringToQString(profile.id));
     }
-    return safePathSegment(parts.isEmpty() ? QStringLiteral("update") : parts.join(QLatin1Char('-')));
+    return SkyEphemerisPathSegmentPolicy::spellPathSegment(
+        parts.isEmpty() ? QStringLiteral("update") : parts.join(QLatin1Char('-')), QStringLiteral("update")
+    );
 }
 
 bool pathContains(const std::filesystem::path& root, const QString& path)
@@ -362,9 +343,10 @@ SkyEphemerisCacheController::StagedUpdateActivationResult SkyEphemerisCacheContr
         return result;
     }
 
-    const QString revisionToken = safePathSegment(
+    const QString revisionToken = SkyEphemerisPathSegmentPolicy::spellPathSegment(
         request.revisionToken.trimmed().isEmpty() ? defaultRevisionToken(*request.manifest, *profile)
-                                                  : request.revisionToken
+                                                  : request.revisionToken,
+        QStringLiteral("update")
     );
     const std::filesystem::path revisionCacheRoot =
         activationCacheRoot(pathFromQString(request.writableCacheRoot), revisionToken, activeSnapshot);
