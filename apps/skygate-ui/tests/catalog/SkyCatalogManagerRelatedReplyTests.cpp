@@ -18,9 +18,11 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QPointer>
 #include <QRegularExpression>
 #include <QSignalSpy>
+#include <QUrl>
 #include <QtTest/QtTest>
 
 #include <algorithm>
@@ -61,6 +63,9 @@ private slots:
     void outOfOrderRelatedRepliesPopulateTheirOwnSources();
     void reloadOrRemoveOtherSourceKeepsPendingReply();
     void lateReplyToRemovedRelatedDeclarationIsRejected();
+    void cancelFromRelatedStartupStatusLeavesNoRequest();
+    void removeSourceRetiresPendingRelatedTransfer();
+    void reloadSourceRetiresPendingRelatedTransfer();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -325,10 +330,17 @@ void SkyCatalogManagerRelatedReplyTests::failedUpdateSupersedesItsPendingRelated
         QRegularExpression("Catalog source failed https://example\\.test/superseded-update\\.csv .* HTTP 404")
     );
     manager.loadSource(rejected, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    // Retiring the previous incarnation terminates its pending related
+    // transfer instead of letting it run on with a result that can no longer
+    // be accepted.
+    QVERIFY(!relatedReply.isNull());
+    QVERIFY(relatedReply->isAborted());
     QTRY_VERIFY(!manager.downloadingCatalog());
 
     const QString statusAfterFailure = manager.statusText();
-    relatedReply->finishNow();
+    if (!relatedReply.isNull()) {
+        relatedReply->finishNow();
+    }
     QCoreApplication::processEvents();
     QCoreApplication::processEvents();
 
@@ -622,6 +634,8 @@ void SkyCatalogManagerRelatedReplyTests::readdedOwnerRejectsPreviousIncarnationR
     // ID; only this incarnation's revision may accept the related response.
     manager.removeSource(sourceId);
     QVERIFY(!manager.sourceInstanceIds().contains(sourceId));
+    QVERIFY(!staleReply.isNull());
+    QVERIFY(staleReply->isAborted());
 
     skygate::ui::internal::SkyCatalogSourceInstance second =
         RelatedDatasetFixture::relatedDatasetInstance(catalogUrl, relatedUrl);
@@ -648,8 +662,9 @@ void SkyCatalogManagerRelatedReplyTests::readdedOwnerRejectsPreviousIncarnationR
     const QByteArray persistedLineRows = currentRecord->constellationLineRows;
     QVERIFY(!persistedLineRows.isEmpty());
 
-    QVERIFY(!staleReply.isNull());
-    staleReply->finishNow();
+    if (!staleReply.isNull()) {
+        staleReply->finishNow();
+    }
     QCoreApplication::processEvents();
     QCoreApplication::processEvents();
 
@@ -940,18 +955,25 @@ void SkyCatalogManagerRelatedReplyTests::lateReplyToRemovedRelatedDeclarationIsR
     updated.version = QStringLiteral("v2");
     updated.urls = QStringList{updateUrl};
     updated.relatedDatasetUrls.clear();
+    QPointer<skygate::ui::tests::FakeNetworkReply> lateReply =
+        FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, relatedUrl);
+    QVERIFY(!lateReply.isNull());
+
     manager.loadSource(updated, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    // The superseded transfer is aborted by the update, so its result can no
+    // longer reach the manager at all.
+    QVERIFY(!lateReply.isNull());
+    QVERIFY(lateReply->isAborted());
     QTRY_VERIFY(!manager.downloadingCatalog());
     QVERIFY(manager.constellationLineRefs().empty());
     QVERIFY(manager.constellationAnchorGroups().empty());
 
-    // The late reply belongs to the superseded revision and cannot attach
-    // data or change the published related view.
+    // A completion delivered for the retired transfer cannot attach data or
+    // change the published related view.
     const int changesBeforeLateReply = catalogSpy.count();
-    skygate::ui::tests::FakeNetworkReply* lateReply =
-        FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, relatedUrl);
-    QVERIFY(lateReply != nullptr);
-    lateReply->finishNow();
+    if (!lateReply.isNull()) {
+        lateReply->finishNow();
+    }
     QCoreApplication::processEvents();
     QCoreApplication::processEvents();
     QCOMPARE(catalogSpy.count(), changesBeforeLateReply);
@@ -959,6 +981,260 @@ void SkyCatalogManagerRelatedReplyTests::lateReplyToRemovedRelatedDeclarationIsR
     QVERIFY(manager.constellationAnchorGroups().empty());
     QVERIFY(ConstellationAnchorGroupLookup::find(manager, "Orion") == nullptr);
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Late Update Star")));
+}
+
+void SkyCatalogManagerRelatedReplyTests::cancelFromRelatedStartupStatusLeavesNoRequest()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/related-startup-cancel-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/related-startup-cancel-lines.json");
+    const QString fallbackRelatedUrl = QStringLiteral("https://example.test/related-startup-cancel-fallback.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        catalogUrl,
+        {.payload = skygate::ui::tests::sampleHygCsvPayload(
+             {.hip = 903001, .properName = "Related Startup Star", .mag = "1.0"}
+         )}
+    );
+    networkAccessManager.enqueueResponse(
+        relatedUrl, {.payload = RelatedDatasetFixture::orionRelatedDatasetPayload(), .manualFinish = true}
+    );
+    networkAccessManager.enqueueResponse(
+        fallbackRelatedUrl, {.payload = RelatedDatasetFixture::lyraRelatedDatasetPayload()}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+
+    bool canceledFromRelatedStartup = false;
+    QObject::connect(
+        &manager,
+        &SkyCatalogManager::statusTextChanged,
+        &manager,
+        [&manager, &canceledFromRelatedStartup, &relatedUrl]() {
+            if (!canceledFromRelatedStartup && manager.statusText().contains(relatedUrl)) {
+                canceledFromRelatedStartup = true;
+                manager.cancelCatalogDownload();
+            }
+        }
+    );
+
+    skygate::ui::internal::SkyCatalogSourceInstance source =
+        RelatedDatasetFixture::relatedDatasetInstance(catalogUrl, relatedUrl);
+    source.relatedDatasetUrls = QStringList{relatedUrl, fallbackRelatedUrl};
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+
+    QTRY_VERIFY(canceledFromRelatedStartup);
+    QCoreApplication::processEvents();
+
+    QVERIFY(!manager.downloadingCatalog());
+    QVERIFY(!manager.catalogProcessing());
+    QCOMPARE(networkAccessManager.requestedUrls(), QStringList{catalogUrl});
+    QVERIFY(FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, relatedUrl) == nullptr);
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    QCOMPARE(manager.statusText(), QStringLiteral("Catalog: Download canceled."));
+    QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Related Startup Star")));
+
+    const auto revisionAfterCancel = manager.catalogRevision();
+    const int catalogChangesAfterCancel = catalogSpy.count();
+    QCoreApplication::processEvents();
+    QCOMPARE(manager.catalogRevision(), revisionAfterCancel);
+    QCOMPARE(catalogSpy.count(), catalogChangesAfterCancel);
+}
+
+void SkyCatalogManagerRelatedReplyTests::removeSourceRetiresPendingRelatedTransfer()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/retire-removed-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/retire-removed-lines.json");
+    const QString fallbackRelatedUrl = QStringLiteral("https://example.test/retire-removed-fallback.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    // The reply stays open until the test completes it, so the abort is
+    // observed on the transfer itself rather than on a queued result.
+    networkAccessManager.enqueueResponse(
+        relatedUrl,
+        {.error = QNetworkReply::HostNotFoundError,
+         .errorText = QStringLiteral("No fake response registered"),
+         .httpStatusCode = 404,
+         .manualFinish = true}
+    );
+    networkAccessManager.enqueueResponse(
+        fallbackRelatedUrl, {.payload = RelatedDatasetFixture::lyraRelatedDatasetPayload()}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+    QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
+
+    skygate::ui::internal::SkyCatalogSourceInstance source =
+        RelatedDatasetFixture::relatedDatasetInstance(catalogUrl, relatedUrl);
+    source.relatedDatasetUrls = QStringList{relatedUrl, fallbackRelatedUrl};
+    const QString instanceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QVERIFY(FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, relatedUrl) != nullptr);
+
+    QPointer<skygate::ui::tests::FakeNetworkReply> relatedReply =
+        FakeReplyQuery::findReplyForUrl(networkAccessManager, relatedUrl);
+    QVERIFY(!relatedReply.isNull());
+
+    manager.removeSource(instanceId);
+    QVERIFY(!manager.sourceInstanceIds().contains(instanceId));
+
+    const auto revisionAfterRemoval = manager.catalogRevision();
+    const int catalogChangesAfterRemoval = catalogSpy.count();
+    const QString statusAfterRemoval = manager.statusText();
+    const int statusChangesAfterRemoval = statusSpy.count();
+
+    const bool replyStillRunning = !relatedReply.isNull() && !relatedReply->isFinished();
+    const bool replyAborted = !relatedReply.isNull() && relatedReply->isAborted();
+    if (!relatedReply.isNull()) {
+        relatedReply->finishNow();
+    }
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+
+    const bool fallbackStarted = networkAccessManager.requestedUrls().contains(fallbackRelatedUrl);
+    QVERIFY2(
+        !replyStillRunning && replyAborted && !fallbackStarted,
+        qPrintable(QString("old_reply_running=%1 old_reply_aborted=%2 fallback_started=%3")
+                       .arg(replyStillRunning ? 1 : 0)
+                       .arg(replyAborted ? 1 : 0)
+                       .arg(fallbackStarted ? 1 : 0))
+    );
+
+    QCOMPARE(networkAccessManager.requestedUrls().size(), 2);
+    QCOMPARE(networkAccessManager.abortedUrls(), QStringList{relatedUrl});
+    QCOMPARE(manager.catalogRevision(), revisionAfterRemoval);
+    QCOMPARE(catalogSpy.count(), catalogChangesAfterRemoval);
+    QCOMPARE(manager.statusText(), statusAfterRemoval);
+    QCOMPARE(statusSpy.count(), statusChangesAfterRemoval);
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+}
+
+void SkyCatalogManagerRelatedReplyTests::reloadSourceRetiresPendingRelatedTransfer()
+{
+    const QString sourceUrl = QStringLiteral("https://example.test/retire-reload-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/retire-reload-lines.json");
+    const QString fallbackRelatedUrl = QStringLiteral("https://example.test/retire-reload-fallback.json");
+    const QString firstUpdateUrl = QStringLiteral("https://example.test/retire-reload-update-1.csv");
+    const QString secondUpdateUrl = QStringLiteral("https://example.test/retire-reload-update-2.csv");
+    const QString siblingUrl = QStringLiteral("https://example.test/retire-reload-sibling-stars.csv");
+    const QString siblingRelatedUrl = QStringLiteral("https://example.test/retire-reload-sibling-lines.json");
+    const QString unrelatedUrl = QStringLiteral("https://example.test/retire-reload-unrelated.csv");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(sourceUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(
+        relatedUrl, {.payload = RelatedDatasetFixture::orionRelatedDatasetPayload(), .manualFinish = true}
+    );
+    networkAccessManager.enqueueResponse(firstUpdateUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(
+        relatedUrl, {.payload = RelatedDatasetFixture::orionRelatedDatasetPayload(), .manualFinish = true}
+    );
+    networkAccessManager.enqueueResponse(secondUpdateUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(siblingUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(
+        siblingRelatedUrl, {.payload = RelatedDatasetFixture::lyraRelatedDatasetPayload(), .manualFinish = true}
+    );
+    networkAccessManager.enqueueResponse(unrelatedUrl, {.manualFinish = true});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    skygate::ui::internal::SkyCatalogSourceInstance source =
+        RelatedDatasetFixture::relatedDatasetInstance(sourceUrl, relatedUrl);
+    source.relatedDatasetUrls = QStringList{relatedUrl, fallbackRelatedUrl};
+    const QString instanceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QVERIFY(FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, relatedUrl) != nullptr);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sibling =
+        RelatedDatasetFixture::relatedDatasetInstance(siblingUrl, siblingRelatedUrl);
+    manager.loadSource(sibling, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QPointer<skygate::ui::tests::FakeNetworkReply> siblingReply =
+        FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, siblingRelatedUrl);
+    QVERIFY(!siblingReply.isNull());
+
+    networkAccessManager.get(QNetworkRequest(QUrl(unrelatedUrl)));
+    QPointer<skygate::ui::tests::FakeNetworkReply> unrelatedReply =
+        FakeReplyQuery::findReplyForUrl(networkAccessManager, unrelatedUrl);
+    QVERIFY(!unrelatedReply.isNull());
+    QVERIFY(!unrelatedReply->isFinished());
+
+    QPointer<skygate::ui::tests::FakeNetworkReply> firstRelatedReply =
+        FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, relatedUrl);
+    QVERIFY(!firstRelatedReply.isNull());
+
+    // Reloading the same instance retires its pending related transfer before
+    // the replacement record takes over.
+    skygate::ui::internal::SkyCatalogSourceInstance firstUpdate = source;
+    firstUpdate.urls = QStringList{firstUpdateUrl};
+    manager.loadSource(firstUpdate, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    const bool firstReplyWasRunning = !firstRelatedReply.isNull() && !firstRelatedReply->isFinished();
+    const bool firstReplyAborted = !firstRelatedReply.isNull() && firstRelatedReply->isAborted();
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_VERIFY(FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, relatedUrl) != nullptr);
+
+    QVERIFY2(
+        !firstReplyWasRunning && firstReplyAborted,
+        qPrintable(QString("first_reload_running=%1 first_reload_aborted=%2")
+                       .arg(firstReplyWasRunning ? 1 : 0)
+                       .arg(firstReplyAborted ? 1 : 0))
+    );
+    QCOMPARE(networkAccessManager.requestedUrls().count(fallbackRelatedUrl), 0);
+    QVERIFY(!siblingReply.isNull());
+    QVERIFY(!siblingReply->isFinished());
+    QVERIFY(!siblingReply->isAborted());
+    QVERIFY(!unrelatedReply->isFinished());
+
+    QPointer<skygate::ui::tests::FakeNetworkReply> secondRelatedReply =
+        FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, relatedUrl);
+    QVERIFY(!secondRelatedReply.isNull());
+
+    // A replacement that declares no related data retires the remaining
+    // transfer and starts no new related request.
+    skygate::ui::internal::SkyCatalogSourceInstance secondUpdate = firstUpdate;
+    secondUpdate.urls = QStringList{secondUpdateUrl};
+    secondUpdate.relatedDatasetUrls.clear();
+    manager.loadSource(secondUpdate, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    const bool secondReplyWasRunning = !secondRelatedReply.isNull() && !secondRelatedReply->isFinished();
+    const bool secondReplyAborted = !secondRelatedReply.isNull() && secondRelatedReply->isAborted();
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QCoreApplication::processEvents();
+
+    QVERIFY2(
+        !secondReplyWasRunning && secondReplyAborted,
+        qPrintable(QString("second_reload_running=%1 second_reload_aborted=%2")
+                       .arg(secondReplyWasRunning ? 1 : 0)
+                       .arg(secondReplyAborted ? 1 : 0))
+    );
+    QCOMPARE(networkAccessManager.requestedUrls().count(relatedUrl), 2);
+    QCOMPARE(networkAccessManager.requestedUrls().count(fallbackRelatedUrl), 0);
+    QCOMPARE(networkAccessManager.requestedUrls().count(secondUpdateUrl), 1);
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    QVERIFY(!siblingReply.isNull());
+    QVERIFY(!siblingReply->isFinished());
+    QVERIFY(!siblingReply->isAborted());
+    QVERIFY(!unrelatedReply->isFinished());
+    QVERIFY(!unrelatedReply->isAborted());
+
+    siblingReply->finishNow();
+    QTRY_VERIFY(ConstellationAnchorGroupLookup::find(manager, "Lyra") != nullptr);
+    QVERIFY(!siblingReply.isNull());
+    QVERIFY(!siblingReply->isAborted());
+
+    unrelatedReply->finishNow();
+    QTRY_VERIFY(!unrelatedReply.isNull() && unrelatedReply->isFinished());
+    QVERIFY(!unrelatedReply->isAborted());
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogManagerRelatedReplyTests)

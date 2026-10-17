@@ -42,9 +42,10 @@ public:
     explicit CatalogCoordinator(QNetworkAccessManager* networkAccessManager);
     ~CatalogCoordinator();
 
-    // Returns the cancellation handle of the started download, or null when
-    // no download was started.
-    std::shared_ptr<CatalogDownloadCancellation> downloadCatalogFromUrls(
+    // Starts the download with the caller's cancellation handle so the owner
+    // can hold it before any status callback runs.
+    void downloadCatalogFromUrls(
+        const std::shared_ptr<CatalogDownloadCancellation>& cancellation,
         const QStringList& urlTexts,
         CatalogParseOptions parseOptions,
         QObject* callbackContext,
@@ -52,7 +53,8 @@ public:
         CompletionHandler completionHandler
     ) const;
 
-    std::shared_ptr<CatalogDownloadCancellation> downloadRawDataFromUrls(
+    void downloadRawDataFromUrls(
+        const std::shared_ptr<CatalogDownloadCancellation>& cancellation,
         const QStringList& urlTexts,
         QObject* callbackContext,
         StatusHandler statusHandler,

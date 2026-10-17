@@ -1066,6 +1066,10 @@ void SkyCatalogManagerCompositionTests::combinedFactsSurviveRejectionReorderRawR
         QRegularExpression("Catalog source failed https://example\\.test/combined-update-stars\\.csv .* HTTP 404")
     );
     manager.loadSource(rejected, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    // Retiring the still-pending replacement terminates its transfer, so the
+    // dataset it carried cannot arrive after the rejection.
+    QVERIFY(!pendingReplacement.isNull());
+    QVERIFY(pendingReplacement->isAborted());
     QTRY_VERIFY(!manager.downloadingCatalog());
 
     const QVector<SkyCatalogManager::SourceViewEntry> failedView = manager.sourceViewEntries();
@@ -1083,8 +1087,9 @@ void SkyCatalogManagerCompositionTests::combinedFactsSurviveRejectionReorderRawR
     CatalogNotificationRecorder::assertMatchesRuntime(manager, observations.back());
 
     // The superseded replacement cannot publish its dataset after the failure.
-    QVERIFY(!pendingReplacement.isNull());
-    pendingReplacement->finishNow();
+    if (!pendingReplacement.isNull()) {
+        pendingReplacement->finishNow();
+    }
     QCoreApplication::processEvents();
     QCoreApplication::processEvents();
     QCOMPARE(catalogSpy.count(), changesBeforeRejectedUpdate);

@@ -1,5 +1,6 @@
 #include "CatalogCoordinator.hpp"
 
+#include "catalog/CatalogDownloadCancellation.hpp"
 #include "catalog/CatalogDownloadService.hpp"
 #include "catalog/CatalogPayloadParseService.hpp"
 
@@ -67,7 +68,8 @@ CatalogCoordinator::CatalogCoordinator(QNetworkAccessManager* networkAccessManag
 
 CatalogCoordinator::~CatalogCoordinator() = default;
 
-std::shared_ptr<CatalogDownloadCancellation> CatalogCoordinator::downloadCatalogFromUrls(
+void CatalogCoordinator::downloadCatalogFromUrls(
+    const std::shared_ptr<CatalogDownloadCancellation>& cancellation,
     const QStringList& urlTexts,
     CatalogParseOptions parseOptions,
     QObject* callbackContext,
@@ -79,14 +81,15 @@ std::shared_ptr<CatalogDownloadCancellation> CatalogCoordinator::downloadCatalog
         DownloadResult result;
         result.errorText = "Catalog: Network unavailable";
         completionHandler(std::move(result));
-        return nullptr;
+        return;
     }
 
-    return m_downloadService->downloadFirstSuccessfulFromUrls(
+    m_downloadService->downloadFirstSuccessfulFromUrls(
+        cancellation,
         urlTexts,
         callbackContext,
         statusHandler,
-        [this, callbackContext, statusHandler, parseOptions = std::move(parseOptions), completionHandler](
+        [this, cancellation, callbackContext, statusHandler, parseOptions = std::move(parseOptions), completionHandler](
             CatalogDownloadService::DownloadResult downloadResult
         ) mutable {
             if (downloadResult.payload.isEmpty()) {
@@ -100,6 +103,11 @@ std::shared_ptr<CatalogDownloadCancellation> CatalogCoordinator::downloadCatalog
 
             if (statusHandler) {
                 statusHandler("Catalog: Processing downloaded catalog...");
+                // A synchronous cancellation from the status notification
+                // must stop the parse from being dispatched.
+                if (cancellation->isCanceled()) {
+                    return;
+                }
             }
 
             QObject* const contextObject =
@@ -153,7 +161,8 @@ std::shared_ptr<CatalogDownloadCancellation> CatalogCoordinator::downloadCatalog
     );
 }
 
-std::shared_ptr<CatalogDownloadCancellation> CatalogCoordinator::downloadRawDataFromUrls(
+void CatalogCoordinator::downloadRawDataFromUrls(
+    const std::shared_ptr<CatalogDownloadCancellation>& cancellation,
     const QStringList& urlTexts,
     QObject* callbackContext,
     StatusHandler statusHandler,
@@ -164,10 +173,11 @@ std::shared_ptr<CatalogDownloadCancellation> CatalogCoordinator::downloadRawData
         RawDownloadResult result;
         result.errorText = "Catalog: Network unavailable";
         completionHandler(std::move(result));
-        return nullptr;
+        return;
     }
 
-    return m_downloadService->downloadFirstSuccessfulFromUrls(
+    m_downloadService->downloadFirstSuccessfulFromUrls(
+        cancellation,
         urlTexts,
         callbackContext,
         statusHandler,
