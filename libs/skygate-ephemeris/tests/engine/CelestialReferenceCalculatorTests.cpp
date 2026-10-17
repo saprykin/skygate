@@ -5,9 +5,40 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdint>
+#include <initializer_list>
+#include <limits>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
+
+namespace {
+
+skygate::ephemeris::EphemerisSnapshot
+makeAnchorSnapshot(const std::initializer_list<std::pair<std::string, skygate::core::HorizontalCoordinate>> bodies)
+{
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> catalogBodies;
+    std::vector<skygate::ephemeris::CelestialBodyState> states;
+    catalogBodies.reserve(bodies.size());
+    states.reserve(bodies.size());
+    std::uint32_t bodyIndex = 0U;
+    for (const auto& [id, horizontal] : bodies) {
+        skygate::ephemeris::OwnGalaxyCelestialBody body;
+        body.id = id;
+        body.displayName = id;
+        catalogBodies.push_back(std::move(body));
+        states.push_back(skygate::ephemeris::CelestialBodyState{.bodyIndex = bodyIndex, .horizontal = horizontal});
+        ++bodyIndex;
+    }
+
+    skygate::ephemeris::EphemerisSnapshot snapshot;
+    snapshot.catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(std::move(catalogBodies));
+    snapshot.states = std::move(states);
+    return snapshot;
+}
+
+}  // namespace
 
 class CelestialReferenceCalculatorTests final : public QObject {
     Q_OBJECT
@@ -17,6 +48,11 @@ private slots:
     void declinationCircleFallsBackForNonPositiveCounts();
     void circumpolarBoundaryDeclinationFollowsHemisphere();
     void constellationAnchorCentroidAveragesAnchorVectors();
+    void constellationAnchorCentroidSkipsMissingAnchors();
+    void constellationAnchorCentroidSkipsNonFiniteAnchors();
+    void constellationAnchorCentroidCountsDuplicateIds();
+    void constellationAnchorCentroidKeepsFirstBodyState();
+    void constellationAnchorCentroidKeepsCancelResidue();
 };
 
 void CelestialReferenceCalculatorTests::computesFiniteEclipticAndEquatorialPoints()
@@ -107,6 +143,97 @@ void CelestialReferenceCalculatorTests::constellationAnchorCentroidAveragesAncho
     QVERIFY(center.has_value());
     QVERIFY(std::abs(center->altitudeDeg) < 1e-9);
     QVERIFY(std::abs(center->azimuthDeg - 45.0) < 1e-9);
+}
+
+void CelestialReferenceCalculatorTests::constellationAnchorCentroidSkipsMissingAnchors()
+{
+    const auto snapshot = makeAnchorSnapshot({{"hip_1", {.altitudeDeg = 0.0, .azimuthDeg = 90.0}}});
+
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> withAbsentAnchor{{"Demo", {"hip_lost", " HIP_1 "}}};
+    const auto center =
+        skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(snapshot, withAbsentAnchor, "demo");
+    QVERIFY(center.has_value());
+    QVERIFY(std::abs(center->altitudeDeg) < 1e-9);
+    QVERIFY(std::abs(center->azimuthDeg - 90.0) < 1e-9);
+
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> absentOnly{{"Demo", {"hip_lost"}}};
+    QVERIFY(
+        !skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(snapshot, absentOnly, "demo").has_value()
+    );
+
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> withoutAnchors{{"Demo", {}}};
+    QVERIFY(!skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(snapshot, withoutAnchors, "demo")
+                 .has_value());
+}
+
+void CelestialReferenceCalculatorTests::constellationAnchorCentroidSkipsNonFiniteAnchors()
+{
+    const double notANumber = std::numeric_limits<double>::quiet_NaN();
+    const auto snapshot = makeAnchorSnapshot({
+        {"hip_1", {.altitudeDeg = 0.0, .azimuthDeg = 90.0}},
+        {"hip_2", {.altitudeDeg = notANumber, .azimuthDeg = notANumber}},
+    });
+
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> mixedAnchors{{"Demo", {"hip_1", "hip_2"}}};
+    const auto center =
+        skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(snapshot, mixedAnchors, "demo");
+    QVERIFY(center.has_value());
+    QVERIFY(std::abs(center->altitudeDeg) < 1e-9);
+    QVERIFY(std::abs(center->azimuthDeg - 90.0) < 1e-9);
+
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> nonFiniteOnly{{"Demo", {"hip_2"}}};
+    QVERIFY(!skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(snapshot, nonFiniteOnly, "demo")
+                 .has_value());
+}
+
+void CelestialReferenceCalculatorTests::constellationAnchorCentroidCountsDuplicateIds()
+{
+    const auto snapshot = makeAnchorSnapshot({{"hip_1", {.altitudeDeg = 0.0, .azimuthDeg = 0.0}}});
+
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> singleAnchor{{"Demo", {"hip_1"}}};
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> duplicateAnchors{{"Demo", {"hip_1", " HIP_1 "}}};
+    const auto center =
+        skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(snapshot, duplicateAnchors, "demo");
+    const auto singleCenter =
+        skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(snapshot, singleAnchor, "demo");
+
+    QVERIFY(center.has_value());
+    QVERIFY(singleCenter.has_value());
+    QVERIFY(std::abs(center->altitudeDeg - singleCenter->altitudeDeg) < 1e-9);
+    QVERIFY(std::abs(center->azimuthDeg - singleCenter->azimuthDeg) < 1e-9);
+}
+
+void CelestialReferenceCalculatorTests::constellationAnchorCentroidKeepsFirstBodyState()
+{
+    const auto snapshot = makeAnchorSnapshot({
+        {"hip_1", {.altitudeDeg = 0.0, .azimuthDeg = 0.0}},
+        {" HIP_1 ", {.altitudeDeg = 0.0, .azimuthDeg = 90.0}},
+    });
+
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups{{"Demo", {"hip_1"}}};
+    const auto center =
+        skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(snapshot, anchorGroups, "DEMO");
+    QVERIFY(center.has_value());
+    QVERIFY(std::abs(center->altitudeDeg) < 1e-9);
+    QVERIFY(std::abs(center->azimuthDeg) < 1e-9);
+}
+
+void CelestialReferenceCalculatorTests::constellationAnchorCentroidKeepsCancelResidue()
+{
+    const auto snapshot = makeAnchorSnapshot({
+        {"hip_1", {.altitudeDeg = 0.0, .azimuthDeg = 0.0}},
+        {"hip_2", {.altitudeDeg = 0.0, .azimuthDeg = 180.0}},
+    });
+
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> oppositeAnchors{{"Demo", {"hip_1", "hip_2"}}};
+    const auto center =
+        skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(snapshot, oppositeAnchors, "demo");
+
+    // Opposite horizon anchors leave a floating-point residue that still
+    // normalizes, so the centroid stays defined instead of collapsing.
+    QVERIFY(center.has_value());
+    QVERIFY(std::abs(center->altitudeDeg) < 1e-9);
+    QVERIFY(std::abs(center->azimuthDeg - 90.0) < 1e-6);
 }
 
 QTEST_GUILESS_MAIN(CelestialReferenceCalculatorTests)

@@ -1,7 +1,6 @@
 #include "SkySelectionMarkerBuilder.hpp"
+#include "ConstellationReferenceCalculator.hpp"
 #include "SkySelectionOverlayInput.hpp"
-#include "math/SphericalGeometry.hpp"
-#include "math/Vector3d.hpp"
 #include "scene/SkySceneLookupKey.hpp"
 #include "scene/SkySelectionMarker.hpp"
 
@@ -72,8 +71,7 @@ std::optional<QPointF> selectedConstellationPoint(
         return std::nullopt;
     }
 
-    skygate::core::Vector3d sum;
-    int validAnchorCount = 0;
+    skygate::ephemeris::ConstellationReferenceCalculator::AnchorCentroidAccumulator accumulator;
     for (const std::string& hipId : anchorGroupIt->second) {
         const auto stateIndexIt =
             stateIndexByBodyId.constFind(skygate::ui::internal::SkySceneLookupKey::normalized(hipId));
@@ -81,28 +79,15 @@ std::optional<QPointF> selectedConstellationPoint(
             continue;
         }
 
-        const auto& horizontal = snapshot.states.at(*stateIndexIt).horizontal;
-        if (!horizontal.isFinite()) {
-            continue;
-        }
-
-        const auto vector = skygate::core::SphericalGeometry::horizontalToUnitVector(horizontal);
-        sum += vector;
-        ++validAnchorCount;
+        accumulator.addAnchor(snapshot.states.at(*stateIndexIt).horizontal);
     }
 
-    if (validAnchorCount == 0) {
+    const auto center = accumulator.centroid();
+    if (!center.has_value()) {
         return std::nullopt;
     }
 
-    const auto normalizedVector = sum.normalized();
-    if (!normalizedVector.has_value()) {
-        return std::nullopt;
-    }
-
-    const skygate::core::HorizontalCoordinate center =
-        skygate::core::SphericalGeometry::horizontalFromUnitVector(*normalizedVector);
-    const auto projected = preparedProjection.project(center);
+    const auto projected = preparedProjection.project(*center);
     if (!projected.isVisible) {
         return std::nullopt;
     }
