@@ -4,7 +4,7 @@
 
 namespace skygate::ui::internal {
 
-class SkyContextSettings final {
+class SkySettingsKeyBuilder final {
 public:
     [[nodiscard]] static QString key(const QString& name);
 };

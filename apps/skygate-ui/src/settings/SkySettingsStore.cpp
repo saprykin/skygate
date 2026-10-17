@@ -1,7 +1,7 @@
 #include "SkySettingsStore.hpp"
+#include "SkySettingsKeyBuilder.hpp"
 #include "SkySettingsSnapshotCodecs.hpp"
 #include "SkySettingsValueCodecs.hpp"
-#include "app/SkyContextSettings.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
 
 #include <QDir>
@@ -71,7 +71,7 @@ QString appSettingsKey(const char* name)
 
 QString ephemerisDataCacheKey(const char* name)
 {
-    return SkyContextSettings::key(QStringLiteral("ephemerisData/%1").arg(QString::fromUtf8(name)));
+    return SkySettingsKeyBuilder::key(QStringLiteral("ephemerisData/%1").arg(QString::fromUtf8(name)));
 }
 
 QSize normalizedMainWindowSize(const QSize& size) noexcept
@@ -162,7 +162,7 @@ bool SkySettingsStore::clearCatalogCache() const
 {
     QSettings settings;
     const QString configuredPath =
-        settings.value(SkyContextSettings::key("catalogCachePath"), defaultCatalogCachePath()).toString();
+        settings.value(SkySettingsKeyBuilder::key("catalogCachePath"), defaultCatalogCachePath()).toString();
     const QString defaultPath = defaultCatalogCachePath();
 
     QStringList cachePaths;
@@ -182,14 +182,14 @@ bool SkySettingsStore::clearCatalogCache() const
 
     const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
 
-    settings.remove(SkyContextSettings::key("catalogCachePath"));
-    settings.remove(SkyContextSettings::key("catalogBinaryCachePath"));
-    settings.remove(SkyContextSettings::key("catalogBinarySchemaVersion"));
-    settings.remove(SkyContextSettings::key("catalogSourceLabel"));
-    settings.remove(SkyContextSettings::key("catalogConstellationLineRefs"));
-    settings.remove(SkyContextSettings::key("catalogConstellationAnchorGroups"));
-    settings.remove(SkyContextSettings::key("catalogConstellationLineSchemaVersion"));
-    settings.remove(SkyContextSettings::key("catalogConstellationCount"));
+    settings.remove(SkySettingsKeyBuilder::key("catalogCachePath"));
+    settings.remove(SkySettingsKeyBuilder::key("catalogBinaryCachePath"));
+    settings.remove(SkySettingsKeyBuilder::key("catalogBinarySchemaVersion"));
+    settings.remove(SkySettingsKeyBuilder::key("catalogSourceLabel"));
+    settings.remove(SkySettingsKeyBuilder::key("catalogConstellationLineRefs"));
+    settings.remove(SkySettingsKeyBuilder::key("catalogConstellationAnchorGroups"));
+    settings.remove(SkySettingsKeyBuilder::key("catalogConstellationLineSchemaVersion"));
+    settings.remove(SkySettingsKeyBuilder::key("catalogConstellationCount"));
     settings.sync();
     if (settings.status() != QSettings::NoError) {
         qCWarning(skygateCatalogCacheLog) << "Failed to clear star catalog cache settings";
@@ -207,15 +207,16 @@ bool SkySettingsStore::clearDeepSkyCatalogCache() const
     QStringList cachePaths;
     appendCachePath(
         cachePaths,
-        settings.value(SkyContextSettings::key("deepSkyCatalogCachePath"), defaultDeepSkyCatalogCachePath()).toString()
+        settings.value(SkySettingsKeyBuilder::key("deepSkyCatalogCachePath"), defaultDeepSkyCatalogCachePath())
+            .toString()
     );
     appendCachePath(cachePaths, defaultDeepSkyCatalogCachePath());
     appendCachePath(cachePaths, defaultDeepSkyBinaryCatalogCachePath());
 
     const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
-    settings.remove(SkyContextSettings::key("deepSkyCatalogCachePath"));
-    settings.remove(SkyContextSettings::key("deepSkyBinaryCatalogCachePath"));
-    settings.remove(SkyContextSettings::key("deepSkyCatalogSourceLabel"));
+    settings.remove(SkySettingsKeyBuilder::key("deepSkyCatalogCachePath"));
+    settings.remove(SkySettingsKeyBuilder::key("deepSkyBinaryCatalogCachePath"));
+    settings.remove(SkySettingsKeyBuilder::key("deepSkyCatalogSourceLabel"));
     settings.sync();
     if (settings.status() != QSettings::NoError) {
         qCWarning(skygateCatalogCacheLog) << "Failed to clear deep-sky catalog cache settings";
@@ -235,9 +236,10 @@ bool SkySettingsStore::saveCatalogCache(const SkyCatalogLegacyCacheSnapshot& sna
 
     QSettings settings;
     const QString configuredPath =
-        settings.value(SkyContextSettings::key("catalogCachePath"), defaultCatalogCachePath()).toString();
+        settings.value(SkySettingsKeyBuilder::key("catalogCachePath"), defaultCatalogCachePath()).toString();
     const QString configuredDeepSkyPath =
-        settings.value(SkyContextSettings::key("deepSkyCatalogCachePath"), defaultDeepSkyCatalogCachePath()).toString();
+        settings.value(SkySettingsKeyBuilder::key("deepSkyCatalogCachePath"), defaultDeepSkyCatalogCachePath())
+            .toString();
     const auto writePayload = [](const QString& path, const QByteArray& payload) {
         if (path.isEmpty() || payload.isEmpty()) {
             return true;
@@ -288,35 +290,38 @@ bool SkySettingsStore::saveCatalogCache(const SkyCatalogLegacyCacheSnapshot& sna
     if (!writePayload(configuredDeepSkyBinaryPath, snapshot.deepSkyBinaryPayload)) {
         return false;
     }
-    settings.setValue(SkyContextSettings::key("version"), SkyPersistedStateSnapshot::kSettingsVersion);
+    settings.setValue(SkySettingsKeyBuilder::key("version"), SkyPersistedStateSnapshot::kSettingsVersion);
     if (!snapshot.catalogPayload.isEmpty()) {
-        settings.setValue(SkyContextSettings::key("catalogCachePath"), configuredPath);
+        settings.setValue(SkySettingsKeyBuilder::key("catalogCachePath"), configuredPath);
     }
     if (!snapshot.deepSkyCatalogPayload.isEmpty()) {
-        settings.setValue(SkyContextSettings::key("deepSkyCatalogCachePath"), configuredDeepSkyPath);
+        settings.setValue(SkySettingsKeyBuilder::key("deepSkyCatalogCachePath"), configuredDeepSkyPath);
     }
     if (!snapshot.catalogBinaryPayload.isEmpty()) {
-        settings.setValue(SkyContextSettings::key("catalogBinaryCachePath"), configuredBinaryPath);
-        settings.setValue(SkyContextSettings::key("catalogBinarySchemaVersion"), snapshot.catalogBinarySchemaVersion);
+        settings.setValue(SkySettingsKeyBuilder::key("catalogBinaryCachePath"), configuredBinaryPath);
+        settings.setValue(
+            SkySettingsKeyBuilder::key("catalogBinarySchemaVersion"), snapshot.catalogBinarySchemaVersion
+        );
     }
     if (!snapshot.deepSkyBinaryPayload.isEmpty()) {
-        settings.setValue(SkyContextSettings::key("deepSkyBinaryCatalogCachePath"), configuredDeepSkyBinaryPath);
+        settings.setValue(SkySettingsKeyBuilder::key("deepSkyBinaryCatalogCachePath"), configuredDeepSkyBinaryPath);
     }
     if (!snapshot.catalogPayload.isEmpty()) {
-        settings.setValue(SkyContextSettings::key("catalogSourceLabel"), snapshot.sourceLabel);
-        settings.setValue(SkyContextSettings::key("catalogConstellationLineRefs"), snapshot.constellationLineRows);
+        settings.setValue(SkySettingsKeyBuilder::key("catalogSourceLabel"), snapshot.sourceLabel);
+        settings.setValue(SkySettingsKeyBuilder::key("catalogConstellationLineRefs"), snapshot.constellationLineRows);
         settings.setValue(
-            SkyContextSettings::key("catalogConstellationAnchorGroups"), snapshot.constellationAnchorGroupRows
+            SkySettingsKeyBuilder::key("catalogConstellationAnchorGroups"), snapshot.constellationAnchorGroupRows
         );
         settings.setValue(
-            SkyContextSettings::key("catalogConstellationLineSchemaVersion"), snapshot.constellationLineSchemaVersion
+            SkySettingsKeyBuilder::key("catalogConstellationLineSchemaVersion"), snapshot.constellationLineSchemaVersion
         );
         settings.setValue(
-            SkyContextSettings::key("catalogConstellationCount"), static_cast<qulonglong>(snapshot.constellationCount)
+            SkySettingsKeyBuilder::key("catalogConstellationCount"),
+            static_cast<qulonglong>(snapshot.constellationCount)
         );
     }
     if (!snapshot.deepSkyCatalogPayload.isEmpty()) {
-        settings.setValue(SkyContextSettings::key("deepSkyCatalogSourceLabel"), snapshot.deepSkySourceLabel);
+        settings.setValue(SkySettingsKeyBuilder::key("deepSkyCatalogSourceLabel"), snapshot.deepSkySourceLabel);
     }
     settings.sync();
     if (settings.status() != QSettings::NoError) {
@@ -333,7 +338,7 @@ std::optional<SkyCatalogLegacyCacheSnapshot> SkySettingsStore::loadCatalogCache(
 {
     QSettings settings;
     const QString configuredPath =
-        settings.value(SkyContextSettings::key("catalogCachePath"), defaultCatalogCachePath()).toString();
+        settings.value(SkySettingsKeyBuilder::key("catalogCachePath"), defaultCatalogCachePath()).toString();
 
     SkyCatalogLegacyCacheSnapshot snapshot;
     QFile cacheFile(configuredPath);
@@ -345,7 +350,8 @@ std::optional<SkyCatalogLegacyCacheSnapshot> SkySettingsStore::loadCatalogCache(
     }
 
     const QString configuredDeepSkyPath =
-        settings.value(SkyContextSettings::key("deepSkyCatalogCachePath"), defaultDeepSkyCatalogCachePath()).toString();
+        settings.value(SkySettingsKeyBuilder::key("deepSkyCatalogCachePath"), defaultDeepSkyCatalogCachePath())
+            .toString();
     QFile deepSkyCacheFile(configuredDeepSkyPath);
     if (!configuredDeepSkyPath.isEmpty() && deepSkyCacheFile.exists() && deepSkyCacheFile.open(QIODevice::ReadOnly)) {
         snapshot.deepSkyCatalogPayload = deepSkyCacheFile.readAll();
@@ -381,24 +387,25 @@ std::optional<SkyCatalogLegacyCacheSnapshot> SkySettingsStore::loadCatalogCache(
 
     if (!snapshot.catalogPayload.isEmpty()) {
         snapshot.sourceLabel =
-            settings.value(SkyContextSettings::key("catalogSourceLabel"), QString("Saved")).toString();
+            settings.value(SkySettingsKeyBuilder::key("catalogSourceLabel"), QString("Saved")).toString();
     }
     if (!snapshot.deepSkyCatalogPayload.isEmpty()) {
         snapshot.deepSkySourceLabel =
-            settings.value(SkyContextSettings::key("deepSkyCatalogSourceLabel"), QString("Saved deep sky")).toString();
+            settings.value(SkySettingsKeyBuilder::key("deepSkyCatalogSourceLabel"), QString("Saved deep sky"))
+                .toString();
     }
     snapshot.constellationLineRows =
-        settings.value(SkyContextSettings::key("catalogConstellationLineRefs")).toByteArray();
+        settings.value(SkySettingsKeyBuilder::key("catalogConstellationLineRefs")).toByteArray();
     snapshot.constellationAnchorGroupRows =
-        settings.value(SkyContextSettings::key("catalogConstellationAnchorGroups")).toByteArray();
+        settings.value(SkySettingsKeyBuilder::key("catalogConstellationAnchorGroups")).toByteArray();
     snapshot.constellationLineSchemaVersion = SkySettingsValueCodecs::readIntSetting(
-        settings, SkyContextSettings::key("catalogConstellationLineSchemaVersion"), 0
+        settings, SkySettingsKeyBuilder::key("catalogConstellationLineSchemaVersion"), 0
     );
     snapshot.constellationCount = static_cast<std::size_t>(SkySettingsValueCodecs::readULongLongSetting(
-        settings, SkyContextSettings::key("catalogConstellationCount"), static_cast<qulonglong>(0)
+        settings, SkySettingsKeyBuilder::key("catalogConstellationCount"), static_cast<qulonglong>(0)
     ));
     snapshot.catalogBinarySchemaVersion =
-        SkySettingsValueCodecs::readIntSetting(settings, SkyContextSettings::key("catalogBinarySchemaVersion"), 0);
+        SkySettingsValueCodecs::readIntSetting(settings, SkySettingsKeyBuilder::key("catalogBinarySchemaVersion"), 0);
     qCInfo(skygateCatalogCacheLog).noquote()
         << "Catalog cache loaded: starBytes" << snapshot.catalogPayload.size() << "deepSkyBytes"
         << snapshot.deepSkyCatalogPayload.size() << "starBinaryBytes" << snapshot.catalogBinaryPayload.size()
@@ -429,7 +436,7 @@ bool SkySettingsStore::clearCatalogSourceCache(const QString& instanceId) const
 bool SkySettingsStore::saveEphemerisDataCache(const SkyEphemerisDataCacheSnapshot& snapshot) const
 {
     QSettings settings;
-    settings.setValue(SkyContextSettings::key("version"), SkyPersistedStateSnapshot::kSettingsVersion);
+    settings.setValue(SkySettingsKeyBuilder::key("version"), SkyPersistedStateSnapshot::kSettingsVersion);
     settings.setValue(ephemerisDataCacheKey("installedKernelAssetId"), snapshot.installedKernelAssetId);
     settings.setValue(ephemerisDataCacheKey("installedKernelProfileId"), snapshot.installedKernelProfileId);
     settings.setValue(ephemerisDataCacheKey("installedKernelPath"), snapshot.installedKernelPath);
@@ -497,7 +504,7 @@ SkyEphemerisDataCacheSnapshot SkySettingsStore::loadEphemerisDataCache() const
 bool SkySettingsStore::clearEphemerisDataCache() const
 {
     QSettings settings;
-    settings.remove(SkyContextSettings::key("ephemerisData"));
+    settings.remove(SkySettingsKeyBuilder::key("ephemerisData"));
     settings.sync();
     if (settings.status() != QSettings::NoError) {
         qCWarning(skygateEphemerisDataCacheLog) << "Failed to clear ephemeris data cache metadata";

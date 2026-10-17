@@ -7,7 +7,7 @@
 
 namespace skygate::ui::internal {
 
-class SkyContextRenderStyle final {
+class SkyRenderStylePolicy final {
 public:
     [[nodiscard]] static double pointSizeForMagnitude(double magnitude);
     [[nodiscard]] static QColor

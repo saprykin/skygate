@@ -1,16 +1,16 @@
 #pragma once
 
-#include "SkyPersistedStateSnapshot.hpp"
+#include "SkyTimelineViewDefaultsPolicy.hpp"
 
 #include <QString>
 
 namespace skygate::ui::internal {
 
 struct SkyViewSettingsSnapshot final {
-    double magnitudeCutoff = SkyPersistedStateSnapshot::kDefaultMagnitudeCutoff;
-    double centerAltitudeDeg = SkyPersistedStateSnapshot::kLegacyViewCenterAltitudeDeg;
-    double centerAzimuthDeg = SkyPersistedStateSnapshot::kLegacyViewCenterAzimuthDeg;
-    double fieldOfViewDeg = SkyPersistedStateSnapshot::kDefaultFieldOfViewDeg;
+    double magnitudeCutoff = SkyTimelineViewDefaultsPolicy::kDefaultMagnitudeCutoff;
+    double centerAltitudeDeg = SkyTimelineViewDefaultsPolicy::kLegacyViewCenterAltitudeDeg;
+    double centerAzimuthDeg = SkyTimelineViewDefaultsPolicy::kLegacyViewCenterAzimuthDeg;
+    double fieldOfViewDeg = SkyTimelineViewDefaultsPolicy::kDefaultFieldOfViewDeg;
     QString projectionTypeText;
     QString themeId;
 };

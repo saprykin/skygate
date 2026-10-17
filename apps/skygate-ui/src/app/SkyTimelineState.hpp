@@ -1,6 +1,6 @@
 #pragma once
 
-#include "settings/SkyPersistedStateSnapshot.hpp"
+#include "settings/SkyTimelineViewDefaultsPolicy.hpp"
 
 namespace skygate::ui::internal {
 
@@ -10,7 +10,7 @@ struct SkyTimelineState final {
     bool catchingUpToCurrentUtc = false;
     double speedMultiplier = 1.0;
     double speedRemainderSeconds = 0.0;
-    int stepSeconds = SkyPersistedStateSnapshot::kDefaultStepSeconds;
+    int stepSeconds = SkyTimelineViewDefaultsPolicy::kDefaultStepSeconds;
 };
 
 }  // namespace skygate::ui::internal

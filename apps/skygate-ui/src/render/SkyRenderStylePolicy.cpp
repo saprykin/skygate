@@ -1,17 +1,17 @@
-#include "SkyContextRenderStyle.hpp"
+#include "SkyRenderStylePolicy.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
 
 #include <algorithm>
 
 namespace skygate::ui::internal {
 
-double SkyContextRenderStyle::pointSizeForMagnitude(const double magnitude)
+double SkyRenderStylePolicy::pointSizeForMagnitude(const double magnitude)
 {
     const double normalizedBrightness = std::clamp(1.0 - ((magnitude + 1.5) / 8.0), 0.2, 1.0);
     return 1.8 + normalizedBrightness * 5.0;
 }
 
-QColor SkyContextRenderStyle::colorForBodyType(
+QColor SkyRenderStylePolicy::colorForBodyType(
     const skygate::ephemeris::BaseCelestialBody::Kind type, const SkyThemeRenderPalette& renderPalette
 )
 {
@@ -33,7 +33,7 @@ QColor SkyContextRenderStyle::colorForBodyType(
     return renderPalette.bodyStar;
 }
 
-QColor SkyContextRenderStyle::constellationLineColor(const SkyThemeRenderPalette& renderPalette)
+QColor SkyRenderStylePolicy::constellationLineColor(const SkyThemeRenderPalette& renderPalette)
 {
     return renderPalette.constellationLine;
 }

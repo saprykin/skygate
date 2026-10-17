@@ -3,11 +3,11 @@
 #include "SkyLocationSettingsSnapshot.hpp"
 #include "SkyLoggingSettingsSnapshot.hpp"
 #include "SkySearchSettingsSnapshot.hpp"
+#include "SkySettingsKeyBuilder.hpp"
 #include "SkySettingsValueCodecs.hpp"
 #include "SkyStateSettingsSnapshot.hpp"
 #include "SkyTimelineSettingsSnapshot.hpp"
 #include "SkyViewSettingsSnapshot.hpp"
-#include "app/SkyContextSettings.hpp"
 #include "diagnostics/SkyLogging.hpp"
 #include "engine/EphemerisEngineDescriptorRegistry.hpp"
 
@@ -25,7 +25,7 @@ using skygate::ephemeris::EphemerisEngineKind;
 
 QString settingsKey(const char* name)
 {
-    return SkyContextSettings::key(QString::fromUtf8(name));
+    return SkySettingsKeyBuilder::key(QString::fromUtf8(name));
 }
 
 void saveTimelineSettings(QSettings& settings, const SkyTimelineSettingsSnapshot& snapshot)

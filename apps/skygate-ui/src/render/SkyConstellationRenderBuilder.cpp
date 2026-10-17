@@ -1,7 +1,7 @@
 #include "SkyConstellationRenderBuilder.hpp"
 #include "SkyRenderLabelBuilder.hpp"
 #include "SkyRenderLine.hpp"
-#include "app/SkyContextRenderStyle.hpp"
+#include "SkyRenderStylePolicy.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
 
@@ -29,7 +29,7 @@ void SkyConstellationRenderBuilder::appendLines(
     const double maxSegmentLength = std::max(viewportWidth, viewportHeight) * 0.90;
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
     const skygate::core::ProjectedPolylineBuilder lineBuilder;
-    const QColor lineColor = SkyContextRenderStyle::constellationLineColor(renderTheme);
+    const QColor lineColor = SkyRenderStylePolicy::constellationLineColor(renderTheme);
 
     for (const auto& lineRef : lineRefs) {
         const auto* startHorizontal = horizontalLookup.findHorizontal(lineRef.first);

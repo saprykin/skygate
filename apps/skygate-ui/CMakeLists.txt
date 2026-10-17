@@ -158,8 +158,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/CatalogPayloadParseService.hpp
     src/app/SkyContextController.cpp
     src/app/SkyContextController.hpp
-    src/app/SkyContextCatalogCodec.cpp
-    src/app/SkyContextCatalogCodec.hpp
+    src/catalog/SkyCatalogRelatedDataCodec.cpp
+    src/catalog/SkyCatalogRelatedDataCodec.hpp
     src/app/SkyContextControllerCatalog.cpp
     src/app/SkyContextControllerNightConditions.cpp
     src/app/SkyContextControllerSearch.cpp
@@ -170,10 +170,11 @@ qt_add_library(skygate-ui-lib STATIC
     src/app/SkyContextLocationSourceCodec.hpp
     src/app/SkyContextProjectionTypeCodec.cpp
     src/app/SkyContextProjectionTypeCodec.hpp
-    src/app/SkyContextRenderStyle.cpp
-    src/app/SkyContextRenderStyle.hpp
-    src/app/SkyContextSettings.cpp
-    src/app/SkyContextSettings.hpp
+    src/render/SkyRenderStylePolicy.cpp
+    src/render/SkyRenderStylePolicy.hpp
+    src/settings/SkySettingsKeyBuilder.cpp
+    src/settings/SkySettingsKeyBuilder.hpp
+    src/settings/SkyTimelineViewDefaultsPolicy.hpp
     src/app/SkyContextTextFormatter.cpp
     src/app/SkyContextTextFormatter.hpp
     src/app/SkyContextTimeCodec.cpp

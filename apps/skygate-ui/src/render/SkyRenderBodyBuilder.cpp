@@ -1,7 +1,7 @@
 #include "SkyRenderBodyBuilder.hpp"
 #include "SkyRenderGlyph.hpp"
 #include "SkyRenderPoint.hpp"
-#include "app/SkyContextRenderStyle.hpp"
+#include "SkyRenderStylePolicy.hpp"
 #include "math/Geometry2d.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
 
@@ -98,11 +98,11 @@ struct DecimatedStarPoint final {
     point.x = projected.x;
     point.y = projected.y;
     point.bodyIndex = bodyIndex;
-    point.sizePx = skygate::ui::internal::SkyContextRenderStyle::pointSizeForMagnitude(body.visualMagnitude);
+    point.sizePx = skygate::ui::internal::SkyRenderStylePolicy::pointSizeForMagnitude(body.visualMagnitude);
     if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::Constellation) {
         point.sizePx = std::max(point.sizePx, 3.0);
     }
-    point.color = skygate::ui::internal::SkyContextRenderStyle::colorForBodyType(body.kind, renderTheme);
+    point.color = skygate::ui::internal::SkyRenderStylePolicy::colorForBodyType(body.kind, renderTheme);
     return point;
 }
 
@@ -168,7 +168,7 @@ struct DecimatedStarPoint final {
     }
     glyph.rotationDeg = info.positionAngleDeg.value_or(0.0);
     glyph.widthPx = 1.25;
-    glyph.color = skygate::ui::internal::SkyContextRenderStyle::colorForBodyType(body.kind, renderTheme);
+    glyph.color = skygate::ui::internal::SkyRenderStylePolicy::colorForBodyType(body.kind, renderTheme);
     return glyph;
 }
 

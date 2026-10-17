@@ -1,9 +1,9 @@
 #pragma once
 
 #include "SettingsTestFixture.hpp"
-#include "app/SkyContextCatalogCodec.hpp"
 #include "app/SkyContextController.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
+#include "catalog/SkyCatalogRelatedDataCodec.hpp"
 #include "settings/SkySettingsStore.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
@@ -80,9 +80,9 @@ stellariumConstellationIndexJsonPayload(const QList<QPair<QString, QList<int>>>&
     snapshot.sourceLabel = QStringLiteral("Test HYG");
     snapshot.catalogPayload = orionHygCsvPayload();
     snapshot.constellationLineRows =
-        skygate::ui::internal::SkyContextCatalogCodec::serializeConstellationLineRows(lineRefs);
+        skygate::ui::internal::SkyCatalogRelatedDataCodec::serializeConstellationLineRows(lineRefs);
     snapshot.constellationAnchorGroupRows =
-        skygate::ui::internal::SkyContextCatalogCodec::serializeConstellationAnchorGroupRows(anchorGroups);
+        skygate::ui::internal::SkyCatalogRelatedDataCodec::serializeConstellationAnchorGroupRows(anchorGroups);
     snapshot.constellationLineSchemaVersion =
         skygate::ui::internal::SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
     snapshot.constellationCount = 1U;

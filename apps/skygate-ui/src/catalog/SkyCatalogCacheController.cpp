@@ -5,9 +5,9 @@
 #include "SkyCatalogCollectionRestoreResult.hpp"
 #include "SkyCatalogCollectionStore.hpp"
 #include "SkyCatalogPresets.hpp"
+#include "SkyCatalogRelatedDataCodec.hpp"
 #include "SkyCatalogSourcePersistEntry.hpp"
 #include "SkyCatalogSourceRestoreEntry.hpp"
-#include "app/SkyContextCatalogCodec.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogIdentity.hpp"
@@ -256,10 +256,10 @@ void SkyCatalogCacheController::appendRestoredSource(
                 << sourceRecord.instanceId;
         } else {
             std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs =
-                SkyContextCatalogCodec::parseConstellationLineRows(payloadView(sourceRecord.constellationLineRows));
+                SkyCatalogRelatedDataCodec::parseConstellationLineRows(payloadView(sourceRecord.constellationLineRows));
             std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups;
             if (!sourceRecord.constellationAnchorGroupRows.isEmpty()) {
-                anchorGroups = SkyContextCatalogCodec::parseConstellationAnchorGroupRows(
+                anchorGroups = SkyCatalogRelatedDataCodec::parseConstellationAnchorGroupRows(
                     payloadView(sourceRecord.constellationAnchorGroupRows)
                 );
             }
