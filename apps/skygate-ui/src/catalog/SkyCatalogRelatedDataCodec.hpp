@@ -9,7 +9,7 @@
 
 namespace skygate::ui::internal {
 
-class SkyContextCatalogCodec final {
+class SkyCatalogRelatedDataCodec final {
 public:
     [[nodiscard]] static QByteArray
     serializeConstellationLineRows(const std::vector<std::pair<std::string, std::string>>& lineRefs);

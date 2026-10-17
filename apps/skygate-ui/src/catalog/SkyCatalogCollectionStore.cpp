@@ -1,6 +1,6 @@
 #include "SkyCatalogCollectionStore.hpp"
-#include "app/SkyContextSettings.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
+#include "settings/SkySettingsKeyBuilder.hpp"
 #include "settings/SkySettingsValueCodecs.hpp"
 
 #include <QCryptographicHash>
@@ -83,7 +83,7 @@ skygate::ephemeris::CatalogSourceType readCatalogSourceSchemaHint(QSettings& set
 QString catalogCollectionCacheDirectory(QSettings& settings)
 {
     const QString configuredPath =
-        settings.value(SkyContextSettings::key("catalogCollectionCachePath"), defaultCatalogCollectionCachePath())
+        settings.value(SkySettingsKeyBuilder::key("catalogCollectionCachePath"), defaultCatalogCollectionCachePath())
             .toString();
     return configuredPath.isEmpty() ? defaultCatalogCollectionCachePath() : configuredPath;
 }
@@ -145,7 +145,7 @@ QString catalogCollectionRecordsStoredKey()
 // masquerade as committed configuration.
 QString catalogCollectionCommittedGenerationKey()
 {
-    return SkyContextSettings::key(QStringLiteral("catalogCollectionCommittedGeneration"));
+    return SkySettingsKeyBuilder::key(QStringLiteral("catalogCollectionCommittedGeneration"));
 }
 
 QString catalogCollectionManifestPath(const QString& directory)
@@ -747,7 +747,7 @@ SkyCatalogCollectionCacheLoadResult SkyCatalogCollectionStore::load() const
         }
         // Collections written before generations were published keep their
         // version marker and records directly in the settings file.
-        if (!settings.contains(SkyContextSettings::key("catalogCollectionVersion"))) {
+        if (!settings.contains(SkySettingsKeyBuilder::key("catalogCollectionVersion"))) {
             // Generation groups or sidecars left behind by an interrupted first
             // save are not proof that a collection was ever committed, so the
             // outcome stays first use while the ignored data remains
@@ -786,10 +786,11 @@ SkyCatalogCollectionCacheLoadResult SkyCatalogCollectionStore::load() const
             return result;
         }
         result.snapshot.schemaVersion = SkySettingsValueCodecs::readIntSetting(
-            settings, SkyContextSettings::key("catalogCollectionVersion"), kCollectionSchemaVersion
+            settings, SkySettingsKeyBuilder::key("catalogCollectionVersion"), kCollectionSchemaVersion
         );
-        result.snapshot.binarySchemaVersion =
-            SkySettingsValueCodecs::readIntSetting(settings, SkyContextSettings::key("catalogBinarySchemaVersion"), 0);
+        result.snapshot.binarySchemaVersion = SkySettingsValueCodecs::readIntSetting(
+            settings, SkySettingsKeyBuilder::key("catalogBinarySchemaVersion"), 0
+        );
         recordsGroup = QStringLiteral("catalogSources");
     }
 
@@ -838,9 +839,9 @@ bool SkyCatalogCollectionStore::clear() const
     const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
 
     settings.remove(QStringLiteral("catalogSources"));
-    settings.remove(SkyContextSettings::key("catalogCollectionVersion"));
-    settings.remove(SkyContextSettings::key("catalogBinarySchemaVersion"));
-    settings.remove(SkyContextSettings::key("catalogCollectionCachePath"));
+    settings.remove(SkySettingsKeyBuilder::key("catalogCollectionVersion"));
+    settings.remove(SkySettingsKeyBuilder::key("catalogBinarySchemaVersion"));
+    settings.remove(SkySettingsKeyBuilder::key("catalogCollectionCachePath"));
     settings.remove(catalogCollectionCommittedGenerationKey());
     settings.sync();
     if (settings.status() != QSettings::NoError) {

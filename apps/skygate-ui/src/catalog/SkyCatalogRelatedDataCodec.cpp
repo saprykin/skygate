@@ -1,21 +1,22 @@
-#include "SkyContextCatalogCodec.hpp"
+#include "SkyCatalogRelatedDataCodec.hpp"
 #include "catalog/constellation/ConstellationDataCodec.hpp"
 
 namespace skygate::ui::internal {
 
-QByteArray
-SkyContextCatalogCodec::serializeConstellationLineRows(const std::vector<std::pair<std::string, std::string>>& lineRefs)
+QByteArray SkyCatalogRelatedDataCodec::serializeConstellationLineRows(
+    const std::vector<std::pair<std::string, std::string>>& lineRefs
+)
 {
     return QByteArray::fromStdString(skygate::ephemeris::ConstellationDataCodec::serializeLineRows(lineRefs));
 }
 
 std::vector<std::pair<std::string, std::string>>
-SkyContextCatalogCodec::parseConstellationLineRows(const std::string_view rows)
+SkyCatalogRelatedDataCodec::parseConstellationLineRows(const std::string_view rows)
 {
     return skygate::ephemeris::ConstellationDataCodec::parseLineRows(rows);
 }
 
-QByteArray SkyContextCatalogCodec::serializeConstellationAnchorGroupRows(
+QByteArray SkyCatalogRelatedDataCodec::serializeConstellationAnchorGroupRows(
     const std::vector<std::pair<std::string, std::vector<std::string>>>& anchorGroups
 )
 {
@@ -25,7 +26,7 @@ QByteArray SkyContextCatalogCodec::serializeConstellationAnchorGroupRows(
 }
 
 std::vector<std::pair<std::string, std::vector<std::string>>>
-SkyContextCatalogCodec::parseConstellationAnchorGroupRows(const std::string_view rows)
+SkyCatalogRelatedDataCodec::parseConstellationAnchorGroupRows(const std::string_view rows)
 {
     return skygate::ephemeris::ConstellationDataCodec::parseAnchorGroupRows(rows);
 }

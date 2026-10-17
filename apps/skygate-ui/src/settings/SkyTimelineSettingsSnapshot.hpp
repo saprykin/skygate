@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SkyPersistedStateSnapshot.hpp"
+#include "SkyTimelineViewDefaultsPolicy.hpp"
 
 #include <QtGlobal>
 
@@ -10,7 +10,7 @@ struct SkyTimelineSettingsSnapshot final {
     bool live = true;
     bool toolbarCollapsed = false;
     double speedMultiplier = 1.0;
-    int stepSeconds = SkyPersistedStateSnapshot::kDefaultStepSeconds;
+    int stepSeconds = SkyTimelineViewDefaultsPolicy::kDefaultStepSeconds;
     qint64 utcEpochMicros = 0;
 };
 

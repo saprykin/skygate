@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SkyEphemerisUserSettingsSnapshot.hpp"
+#include "SkyTimelineViewDefaultsPolicy.hpp"
 #include "theme/SkyOverlayLayerVisibility.hpp"
 
 #include <QString>
@@ -11,16 +12,14 @@
 struct SkyPersistedStateSnapshot final {
     // Version stamped on the persisted settings group.
     static constexpr int kSettingsVersion = 3;
-    // Defaults shared with the runtime domain state and the per-domain
-    // settings snapshots, so each value has one owner.
-    static constexpr int kDefaultStepSeconds = 60;
-    static constexpr double kDefaultMagnitudeCutoff = 6.0;
-    static constexpr double kDefaultFieldOfViewDeg = 100.0;
-    // A versioned settings file without the view-center keys restores at the
-    // horizon facing north, while a fresh runtime state starts at altitude 45,
-    // azimuth 180. The persistence fallback stays a separate constant.
-    static constexpr double kLegacyViewCenterAltitudeDeg = 0.0;
-    static constexpr double kLegacyViewCenterAzimuthDeg = 0.0;
+    // The values live in SkyTimelineViewDefaultsPolicy; these names stay
+    // part of the aggregate interface.
+    static constexpr int kDefaultStepSeconds =
+        skygate::ui::internal::SkyTimelineViewDefaultsPolicy::kDefaultStepSeconds;
+    static constexpr double kDefaultMagnitudeCutoff =
+        skygate::ui::internal::SkyTimelineViewDefaultsPolicy::kDefaultMagnitudeCutoff;
+    static constexpr double kDefaultFieldOfViewDeg =
+        skygate::ui::internal::SkyTimelineViewDefaultsPolicy::kDefaultFieldOfViewDeg;
 
     bool live = true;
     bool timelineToolbarCollapsed = false;
@@ -28,8 +27,8 @@ struct SkyPersistedStateSnapshot final {
     double speedMultiplier = 1.0;
     int stepSeconds = kDefaultStepSeconds;
     double magnitudeCutoff = kDefaultMagnitudeCutoff;
-    double viewCenterAltitudeDeg = kLegacyViewCenterAltitudeDeg;
-    double viewCenterAzimuthDeg = kLegacyViewCenterAzimuthDeg;
+    double viewCenterAltitudeDeg = skygate::ui::internal::SkyTimelineViewDefaultsPolicy::kLegacyViewCenterAltitudeDeg;
+    double viewCenterAzimuthDeg = skygate::ui::internal::SkyTimelineViewDefaultsPolicy::kLegacyViewCenterAzimuthDeg;
     double viewFieldOfViewDeg = kDefaultFieldOfViewDeg;
     qint64 utcEpochMicros = 0;
     double latitudeDeg = 0.0;

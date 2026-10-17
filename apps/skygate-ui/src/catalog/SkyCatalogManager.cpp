@@ -1,6 +1,7 @@
 #include "SkyCatalogManager.hpp"
 #include "SkyCatalogCollectionPersistRequest.hpp"
 #include "SkyCatalogConstellationStore.hpp"
+#include "SkyCatalogRelatedDataCodec.hpp"
 #include "SkyCatalogRuntimeBuildOptions.hpp"
 #include "SkyCatalogRuntimeResult.hpp"
 #include "SkyCatalogSourceImportResult.hpp"
@@ -9,7 +10,6 @@
 #include "SkyCatalogSourceRecord.hpp"
 #include "SkyCatalogSourceRestoreEntry.hpp"
 #include "SkyConstellationLineImportResult.hpp"
-#include "app/SkyContextCatalogCodec.hpp"
 #include "catalog/CatalogDownloadCancellation.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
@@ -1218,9 +1218,9 @@ void SkyCatalogManager::persistCatalogCache() const
             && (!ownedRelatedData.lineRefVector().empty() || !ownedRelatedData.anchorGroupVector().empty()
                 || ownedRelatedData.count() > 0U)) {
             entry.constellationLineRows =
-                SkyContextCatalogCodec::serializeConstellationLineRows(ownedRelatedData.lineRefVector());
+                SkyCatalogRelatedDataCodec::serializeConstellationLineRows(ownedRelatedData.lineRefVector());
             entry.constellationAnchorGroupRows =
-                SkyContextCatalogCodec::serializeConstellationAnchorGroupRows(ownedRelatedData.anchorGroupVector());
+                SkyCatalogRelatedDataCodec::serializeConstellationAnchorGroupRows(ownedRelatedData.anchorGroupVector());
             entry.constellationLineSchemaVersion = SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
             entry.constellationCount = ownedRelatedData.count();
         }

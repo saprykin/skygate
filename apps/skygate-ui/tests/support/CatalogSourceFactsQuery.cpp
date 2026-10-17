@@ -1,5 +1,5 @@
 #include "CatalogSourceFactsQuery.hpp"
-#include "app/SkyContextCatalogCodec.hpp"
+#include "catalog/SkyCatalogRelatedDataCodec.hpp"
 
 #include <QCryptographicHash>
 #include <QDir>
@@ -85,7 +85,7 @@ QString CatalogSourceFactsQuery::durableTitle(const QString& title)
 std::vector<skygate::ephemeris::ConstellationLineRef>
 CatalogSourceFactsQuery::relatedLineRefs(const SkyCatalogSourceCacheRecord& record)
 {
-    return skygate::ui::internal::SkyContextCatalogCodec::parseConstellationLineRows(
+    return skygate::ui::internal::SkyCatalogRelatedDataCodec::parseConstellationLineRows(
         std::string_view(
             record.constellationLineRows.constData(), static_cast<std::size_t>(record.constellationLineRows.size())
         )
