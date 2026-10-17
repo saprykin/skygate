@@ -445,7 +445,7 @@ void SkyCatalogManager::retrySource(const QString& instanceId)
 
 void SkyCatalogManager::cancelCatalogDownload()
 {
-    if (!m_downloadingCatalog && !hasPendingConstellationWork()) {
+    if (!m_downloadingCatalog && !hasPendingConstellationWork() && m_activeDownloadInstanceId.isEmpty()) {
         return;
     }
 
@@ -685,15 +685,16 @@ void SkyCatalogManager::loadSourceInstance(
     invalidatePendingSourceWork(instance.instanceId);
     const std::uint64_t revision = operation->revision;
 
-    // The cancel handle exists before any startup notification is published,
-    // so a receiver of the busy state or the downloading state can cancel the
-    // startup before its first request is issued.
+    // The active identity and the cancel handle are published before the first
+    // row notification, so a receiver of that notification can cancel the
+    // startup and leave the row without a request.
     std::shared_ptr<CatalogDownloadCancellation> catalogCancellation;
     if (!instance.urls.isEmpty()) {
         catalogCancellation = std::make_shared<CatalogDownloadCancellation>();
         operation->catalogCancellation = catalogCancellation;
     }
 
+    m_activeDownloadInstanceId = instance.instanceId;
     operation->busy = true;
     operation->hasError = false;
     operation->statusText = instance.urls.isEmpty() ? QStringLiteral("Loading...") : QStringLiteral("Downloading...");
@@ -707,15 +708,20 @@ void SkyCatalogManager::loadSourceInstance(
         if (catalogCancellation != nullptr) {
             catalogCancellation->cancel();
         }
+        if (operation == nullptr && m_activeDownloadInstanceId == instance.instanceId) {
+            m_activeDownloadInstanceId.clear();
+        }
         return;
     }
 
     if (instance.urls.isEmpty()) {
+        m_activeDownloadInstanceId.clear();
         applyBundledSource(*operation, policy);
         return;
     }
 
     if (m_importWorkflow == nullptr || !m_importWorkflow->isAvailable()) {
+        m_activeDownloadInstanceId.clear();
         operation->busy = false;
         operation->hasError = true;
         operation->statusText = QStringLiteral("Network unavailable");
@@ -725,7 +731,6 @@ void SkyCatalogManager::loadSourceInstance(
         return;
     }
 
-    m_activeDownloadInstanceId = instance.instanceId;
     setCatalogProcessing(false);
     setDownloadingCatalog(true);
 
@@ -734,6 +739,7 @@ void SkyCatalogManager::loadSourceInstance(
         catalogCancellation->cancel();
         return;
     }
+    m_activeDownloadInstanceId = instance.instanceId;
     if (catalogCancellation->isCanceled()) {
         operation->catalogCancellation.reset();
         return;
