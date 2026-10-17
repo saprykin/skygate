@@ -3,6 +3,7 @@
 #include "ILocationPermissionGate.hpp"
 
 #include <QObject>
+#include <QPointer>
 #include <QString>
 
 #include <memory>
@@ -29,7 +30,9 @@ public:
     // Uses `positionSource` for later acquisitions without taking ownership. A
     // null source disables the platform default, so acquisition reports the
     // device source as unavailable; when no source is configured, the platform
-    // default is created on the first start.
+    // default is created on the first start and owned by the acquisition.
+    // Replacing a source disconnects the previous one; a pending permission
+    // completion for the old source is ignored.
     void setPositionSource(QGeoPositionInfoSource* positionSource) noexcept;
     // When disabled, the acquisition skips the permission handshake and starts
     // the update directly.
@@ -42,15 +45,20 @@ signals:
 
 private:
     void applyPositionInfo(const QGeoPositionInfo& positionInfo);
+    void connectPositionSource();
+    [[nodiscard]] QGeoPositionInfoSource* livePositionSource() noexcept;
+    void releasePositionSource() noexcept;
     void requestOneShotUpdate();
 
 private:
     std::unique_ptr<ILocationPermissionGate> m_ownedPermissionGate;
     ILocationPermissionGate* m_permissionGate = nullptr;
-    QGeoPositionInfoSource* m_positionSource = nullptr;
+    QPointer<QObject> m_positionSourceGuard;
+    QGeoPositionInfoSource* m_ownedPositionSource = nullptr;
     bool m_positionSourceConfigured = false;
     bool m_sourceSignalsConnected = false;
     bool m_permissionRequestsEnabled = true;
+    quint64 m_sourceRevision = 0;
 };
 
 }  // namespace skygate::ui::internal
