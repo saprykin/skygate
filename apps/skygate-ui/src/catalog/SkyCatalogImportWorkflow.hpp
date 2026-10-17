@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SkyCatalogImportStatus.hpp"
 #include "SkyCatalogSourceImportResult.hpp"
 #include "SkyCatalogSourceInstance.hpp"
 #include "SkyConstellationLineImportResult.hpp"
@@ -33,7 +34,7 @@ namespace skygate::ui::internal {
 // instead of being retried against a different source.
 class SkyCatalogImportWorkflow final {
 public:
-    using StatusHandler = std::function<void(const QString&)>;
+    using StatusHandler = std::function<void(const SkyCatalogImportStatus&)>;
     using SourceCompletionHandler = std::function<void(SkyCatalogSourceImportResult)>;
     using ConstellationCompletionHandler = std::function<void(SkyConstellationLineImportResult)>;
 

@@ -20,7 +20,6 @@ public:
     [[nodiscard]] static QString sourcePayloadUnavailable();
     [[nodiscard]] static QString
     unavailableSourceSummary(const QString& baseStatusText, std::size_t unavailableSourceCount);
-    [[nodiscard]] static bool isProcessingStatus(const QString& statusText);
     [[nodiscard]] static QString
     brightnessFilterSummary(const QString& baseStatusText, std::size_t selectedBodyCount, std::size_t parsedBodyCount);
     [[nodiscard]] static QString constellationLineSummary(const QString& catalogSummaryText, QString statusText);

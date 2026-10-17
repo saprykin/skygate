@@ -68,11 +68,6 @@ SkyCatalogText::unavailableSourceSummary(const QString& baseStatusText, const st
         .arg(baseStatusText, locale.toString(static_cast<qulonglong>(unavailableSourceCount)));
 }
 
-bool SkyCatalogText::isProcessingStatus(const QString& statusText)
-{
-    return statusText.startsWith("Catalog: Processing", Qt::CaseInsensitive);
-}
-
 QString SkyCatalogText::brightnessFilterSummary(
     const QString& baseStatusText, const std::size_t selectedBodyCount, const std::size_t parsedBodyCount
 )

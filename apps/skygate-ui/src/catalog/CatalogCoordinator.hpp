@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CatalogParseOptions.hpp"
+#include "SkyCatalogImportStatus.hpp"
 
 #include "catalog/CatalogLoadResult.hpp"
 #include "catalog/IStarCatalog.hpp"
@@ -34,7 +35,7 @@ public:
         QString errorText;
     };
 
-    using StatusHandler = std::function<void(const QString&)>;
+    using StatusHandler = std::function<void(const skygate::ui::internal::SkyCatalogImportStatus&)>;
     using CompletionHandler = std::function<void(DownloadResult)>;
     using RawCompletionHandler = std::function<void(RawDownloadResult)>;
 

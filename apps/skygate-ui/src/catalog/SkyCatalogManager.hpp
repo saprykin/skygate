@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SkyCatalogImportStatus.hpp"
 #include "SkyCatalogRuntimeBuildOptions.hpp"
 #include "SkyCatalogRuntimeResult.hpp"
 #include "SkyCatalogSourceImportResult.hpp"
@@ -272,7 +273,9 @@ private:
     void setStatusText(const QString& statusText);
     void setDownloadingCatalog(bool downloadingCatalog);
     void setCatalogProcessing(bool catalogProcessing);
-    void handleCatalogImportStatus(const QString& instanceId, std::uint64_t revision, const QString& statusText);
+    void handleCatalogImportStatus(
+        const QString& instanceId, std::uint64_t revision, const skygate::ui::internal::SkyCatalogImportStatus& status
+    );
     void downloadConstellationLinesAfterCatalog(
         const QString& instanceId,
         std::uint64_t revision,

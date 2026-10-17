@@ -750,8 +750,8 @@ void SkyCatalogManager::loadSourceInstance(
         instance,
         policy,
         this,
-        [this, instanceId = instance.instanceId, revision](const QString& statusText) {
-            handleCatalogImportStatus(instanceId, revision, statusText);
+        [this, instanceId = instance.instanceId, revision](const SkyCatalogImportStatus& status) {
+            handleCatalogImportStatus(instanceId, revision, status);
         },
         [this, instanceId = instance.instanceId, revision, policy, relatedDatasetUrls = instance.relatedDatasetUrls](
             SkyCatalogSourceImportResult result
@@ -967,9 +967,9 @@ void SkyCatalogManager::downloadConstellationLinesAfterCatalog(
         relatedCancellation,
         constellationLineUrlTexts,
         this,
-        [this, catalogSummaryText, instanceId, revision](const QString& statusText) {
+        [this, catalogSummaryText, instanceId, revision](const SkyCatalogImportStatus& status) {
             if (isOperationCurrent(instanceId, revision)) {
-                handleConstellationLineImportStatus(catalogSummaryText, statusText);
+                handleConstellationLineImportStatus(catalogSummaryText, status.text);
             }
         },
         [this, catalogSummaryText, instanceId, revision](SkyConstellationLineImportResult lineResult) {
@@ -1113,21 +1113,21 @@ void SkyCatalogManager::setCatalogProcessing(const bool catalogProcessing)
 }
 
 void SkyCatalogManager::handleCatalogImportStatus(
-    const QString& instanceId, const std::uint64_t revision, const QString& statusText
+    const QString& instanceId, const std::uint64_t revision, const SkyCatalogImportStatus& status
 )
 {
     if (!isOperationCurrent(instanceId, revision)) {
         return;
     }
 
-    setStatusText(statusText);
+    setStatusText(status.text);
     // A receiver of the status notification can cancel synchronously; the
     // canceled state must survive the rest of the status handling.
     if (!isOperationCurrent(instanceId, revision)) {
         return;
     }
 
-    setCatalogProcessing(SkyCatalogText::isProcessingStatus(statusText));
+    setCatalogProcessing(status.isProcessing());
     SourceOperation* operation = findOperation(instanceId);
     if (operation == nullptr || operation->revision != revision) {
         return;
@@ -1135,7 +1135,7 @@ void SkyCatalogManager::handleCatalogImportStatus(
 
     operation->busy = true;
     operation->hasError = false;
-    operation->statusText = statusText;
+    operation->statusText = status.text;
     emit sourcesChanged();
 }
 

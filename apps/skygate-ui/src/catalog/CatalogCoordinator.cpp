@@ -13,6 +13,8 @@
 #include <memory>
 #include <utility>
 
+using skygate::ui::internal::SkyCatalogImportStatus;
+
 namespace {
 
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
@@ -88,7 +90,16 @@ void CatalogCoordinator::downloadCatalogFromUrls(
         cancellation,
         urlTexts,
         callbackContext,
-        statusHandler,
+        [statusHandler](const QString& statusText) {
+            if (statusHandler) {
+                statusHandler(
+                    SkyCatalogImportStatus{
+                        .text = statusText,
+                        .phase = SkyCatalogImportStatus::Phase::Downloading,
+                    }
+                );
+            }
+        },
         [this, cancellation, callbackContext, statusHandler, parseOptions = std::move(parseOptions), completionHandler](
             CatalogDownloadService::DownloadResult downloadResult
         ) mutable {
@@ -102,7 +113,12 @@ void CatalogCoordinator::downloadCatalogFromUrls(
             }
 
             if (statusHandler) {
-                statusHandler("Catalog: Processing downloaded catalog...");
+                statusHandler(
+                    SkyCatalogImportStatus{
+                        .text = QStringLiteral("Catalog: Processing downloaded catalog..."),
+                        .phase = SkyCatalogImportStatus::Phase::Processing,
+                    }
+                );
                 // A synchronous cancellation from the status notification
                 // must stop the parse from being dispatched.
                 if (cancellation->isCanceled()) {
@@ -132,7 +148,12 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                     }
 
                     const QString countText = QLocale::system().toString(static_cast<qulonglong>(parsedObjectCount));
-                    statusHandler(QString("Catalog: Processing... %1 objects parsed").arg(countText));
+                    statusHandler(
+                        SkyCatalogImportStatus{
+                            .text = QString("Catalog: Processing... %1 objects parsed").arg(countText),
+                            .phase = SkyCatalogImportStatus::Phase::Processing,
+                        }
+                    );
                 },
                 [sourceUrl, payload, statusHandler, completionHandler = std::move(completionHandler)](
                     skygate::ephemeris::CatalogLoadResult loadResult
@@ -143,7 +164,12 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                         result.sourceUrl = sourceUrl;
                         qCWarning(skygateCatalogParseLog).noquote() << result.errorText;
                         if (statusHandler) {
-                            statusHandler(result.errorText);
+                            statusHandler(
+                                SkyCatalogImportStatus{
+                                    .text = result.errorText,
+                                    .phase = SkyCatalogImportStatus::Phase::Failed,
+                                }
+                            );
                         }
                         completionHandler(std::move(result));
                         return;
@@ -180,7 +206,16 @@ void CatalogCoordinator::downloadRawDataFromUrls(
         cancellation,
         urlTexts,
         callbackContext,
-        statusHandler,
+        [statusHandler](const QString& statusText) {
+            if (statusHandler) {
+                statusHandler(
+                    SkyCatalogImportStatus{
+                        .text = statusText,
+                        .phase = SkyCatalogImportStatus::Phase::Downloading,
+                    }
+                );
+            }
+        },
         [completionHandler](CatalogDownloadService::DownloadResult downloadResult) mutable {
             RawDownloadResult result;
             result.payload = std::move(downloadResult.payload);
