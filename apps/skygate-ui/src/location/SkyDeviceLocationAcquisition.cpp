@@ -32,7 +32,18 @@ SkyDeviceLocationAcquisition::SkyDeviceLocationAcquisition(
 
 void SkyDeviceLocationAcquisition::setPositionSource(QGeoPositionInfoSource* positionSource) noexcept
 {
-    m_positionSource = positionSource;
+#if SKYGATE_HAS_POSITIONING
+    if (livePositionSource() == positionSource) {
+        m_positionSourceConfigured = true;
+        return;
+    }
+
+    releasePositionSource();
+    m_positionSourceGuard = positionSource;
+    ++m_sourceRevision;
+#else
+    static_cast<void>(positionSource);
+#endif
     m_positionSourceConfigured = true;
 }
 
@@ -46,26 +57,20 @@ void SkyDeviceLocationAcquisition::start()
 #if SKYGATE_HAS_POSITIONING
     emit statusTextChanged(QStringLiteral("Location: Initializing"));
 
-    if (m_positionSource == nullptr && !m_positionSourceConfigured) {
-        m_positionSource = QGeoPositionInfoSource::createDefaultSource(this);
+    if (livePositionSource() == nullptr && !m_positionSourceConfigured) {
+        QGeoPositionInfoSource* const createdSource = QGeoPositionInfoSource::createDefaultSource(this);
+        if (createdSource != nullptr) {
+            m_positionSourceGuard = createdSource;
+            m_ownedPositionSource = createdSource;
+            ++m_sourceRevision;
+        }
     }
-    if (m_positionSource == nullptr) {
+    if (livePositionSource() == nullptr) {
         emit statusTextChanged(QStringLiteral("Location: Device source unavailable"));
         return;
     }
 
-    if (!m_sourceSignalsConnected) {
-        connect(
-            m_positionSource,
-            &QGeoPositionInfoSource::positionUpdated,
-            this,
-            &SkyDeviceLocationAcquisition::applyPositionInfo
-        );
-        connect(m_positionSource, &QGeoPositionInfoSource::errorOccurred, this, [this](QGeoPositionInfoSource::Error) {
-            emit statusTextChanged(QStringLiteral("Location: Update failed"));
-        });
-        m_sourceSignalsConnected = true;
-    }
+    connectPositionSource();
 
     if (!m_permissionRequestsEnabled) {
         requestOneShotUpdate();
@@ -84,8 +89,22 @@ void SkyDeviceLocationAcquisition::start()
     }
 
     if (permissionStatus == Qt::PermissionStatus::Undetermined) {
+        const quint64 sourceRevision = m_sourceRevision;
         emit statusTextChanged(QStringLiteral("Location: Waiting for permission"));
-        m_permissionGate->request(this, [this](const Qt::PermissionStatus requestedStatus) {
+        if (sourceRevision != m_sourceRevision) {
+            return;
+        }
+
+        m_permissionGate->request(this, [this, sourceRevision](const Qt::PermissionStatus requestedStatus) {
+            if (sourceRevision != m_sourceRevision) {
+                return;
+            }
+
+            if (livePositionSource() == nullptr) {
+                emit statusTextChanged(QStringLiteral("Location: Device source unavailable"));
+                return;
+            }
+
             if (requestedStatus == Qt::PermissionStatus::Granted) {
                 requestOneShotUpdate();
                 return;
@@ -100,6 +119,62 @@ void SkyDeviceLocationAcquisition::start()
 #else
     emit statusTextChanged(QStringLiteral("Location: Positioning unavailable"));
 #endif
+}
+
+void SkyDeviceLocationAcquisition::connectPositionSource()
+{
+#if SKYGATE_HAS_POSITIONING
+    QGeoPositionInfoSource* const source = livePositionSource();
+    if (source == nullptr || m_sourceSignalsConnected) {
+        return;
+    }
+
+    connect(
+        source, &QGeoPositionInfoSource::positionUpdated, this, [this, source](const QGeoPositionInfo& positionInfo) {
+            if (livePositionSource() == source) {
+                applyPositionInfo(positionInfo);
+            }
+        }
+    );
+    connect(source, &QGeoPositionInfoSource::errorOccurred, this, [this, source](QGeoPositionInfoSource::Error) {
+        if (livePositionSource() == source) {
+            emit statusTextChanged(QStringLiteral("Location: Update failed"));
+        }
+    });
+    m_sourceSignalsConnected = true;
+#endif
+}
+
+QGeoPositionInfoSource* SkyDeviceLocationAcquisition::livePositionSource() noexcept
+{
+#if SKYGATE_HAS_POSITIONING
+    if (m_positionSourceGuard.isNull()) {
+        m_ownedPositionSource = nullptr;
+        m_sourceSignalsConnected = false;
+        return nullptr;
+    }
+
+    return static_cast<QGeoPositionInfoSource*>(m_positionSourceGuard.data());
+#else
+    return nullptr;
+#endif
+}
+
+void SkyDeviceLocationAcquisition::releasePositionSource() noexcept
+{
+#if SKYGATE_HAS_POSITIONING
+    QGeoPositionInfoSource* const source = livePositionSource();
+    if (source != nullptr) {
+        disconnect(source, nullptr, this, nullptr);
+    }
+
+    QGeoPositionInfoSource* const ownedSource = m_ownedPositionSource;
+    m_ownedPositionSource = nullptr;
+    delete ownedSource;
+
+    m_positionSourceGuard = nullptr;
+#endif
+    m_sourceSignalsConnected = false;
 }
 
 void SkyDeviceLocationAcquisition::applyPositionInfo(const QGeoPositionInfo& positionInfo)
@@ -124,6 +199,14 @@ void SkyDeviceLocationAcquisition::requestOneShotUpdate()
 {
 #if SKYGATE_HAS_POSITIONING
     emit statusTextChanged(QStringLiteral("Location: Locating"));
-    m_positionSource->requestUpdate(kUpdateTimeoutMs);
+
+    QGeoPositionInfoSource* const source = livePositionSource();
+    if (source == nullptr) {
+        emit statusTextChanged(QStringLiteral("Location: Device source unavailable"));
+        return;
+    }
+
+    connectPositionSource();
+    source->requestUpdate(kUpdateTimeoutMs);
 #endif
 }
