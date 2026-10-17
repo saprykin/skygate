@@ -1,13 +1,39 @@
 #include "ConstellationReferenceCalculator.hpp"
 #include "StringUtilities.hpp"
 #include "math/SphericalGeometry.hpp"
-#include "math/Vector3d.hpp"
 
 #include <algorithm>
 #include <string>
 #include <unordered_map>
 
 namespace skygate::ephemeris {
+
+void ConstellationReferenceCalculator::AnchorCentroidAccumulator::addAnchor(
+    const skygate::core::HorizontalCoordinate& horizontal
+) noexcept
+{
+    if (!horizontal.isFinite()) {
+        return;
+    }
+
+    m_directionSum += skygate::core::SphericalGeometry::horizontalToUnitVector(horizontal);
+    ++m_validAnchorCount;
+}
+
+std::optional<skygate::core::HorizontalCoordinate>
+ConstellationReferenceCalculator::AnchorCentroidAccumulator::centroid() const noexcept
+{
+    if (m_validAnchorCount == 0) {
+        return std::nullopt;
+    }
+
+    const auto normalizedDirection = m_directionSum.normalized();
+    if (!normalizedDirection.has_value()) {
+        return std::nullopt;
+    }
+
+    return skygate::core::SphericalGeometry::horizontalFromUnitVector(*normalizedDirection);
+}
 
 std::optional<skygate::core::HorizontalCoordinate> ConstellationReferenceCalculator::anchorCentroid(
     const EphemerisSnapshot& snapshot,
@@ -36,29 +62,17 @@ std::optional<skygate::core::HorizontalCoordinate> ConstellationReferenceCalcula
         horizontalByBodyId.insert({StringUtilities::normalizedLookupKey(body.id), state.horizontal});
     }
 
-    skygate::core::Vector3d sum;
-    int validAnchorCount = 0;
+    AnchorCentroidAccumulator accumulator;
     for (const std::string& hipId : anchorGroupIt->second) {
         const auto horizontalIt = horizontalByBodyId.find(StringUtilities::normalizedLookupKey(hipId));
-        if (horizontalIt == horizontalByBodyId.end() || !horizontalIt->second.isFinite()) {
+        if (horizontalIt == horizontalByBodyId.end()) {
             continue;
         }
 
-        const auto vector = skygate::core::SphericalGeometry::horizontalToUnitVector(horizontalIt->second);
-        sum += vector;
-        ++validAnchorCount;
+        accumulator.addAnchor(horizontalIt->second);
     }
 
-    if (validAnchorCount == 0) {
-        return std::nullopt;
-    }
-
-    const auto normalizedVector = sum.normalized();
-    if (!normalizedVector.has_value()) {
-        return std::nullopt;
-    }
-
-    return skygate::core::SphericalGeometry::horizontalFromUnitVector(*normalizedVector);
+    return accumulator.centroid();
 }
 
 }  // namespace skygate::ephemeris

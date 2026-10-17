@@ -406,6 +406,14 @@ SkySelectionOverlayInput makeInput(const OverlayFixture& fixture)
     };
 }
 
+SkySelectionOverlayInput makeConstellationInput(const OverlayFixture& fixture, const QString& targetId)
+{
+    SkySelectionOverlayInput input = makeInput(fixture);
+    input.selectedSearchTargetKind = "constellationLabel";
+    input.selectedSearchTargetId = targetId;
+    return input;
+}
+
 }  // namespace
 
 class SkySelectionOverlayBuilderTests final : public QObject {
@@ -414,6 +422,11 @@ class SkySelectionOverlayBuilderTests final : public QObject {
 private slots:
     void markerPrioritySelectedThenTrackedThenSearch();
     void constellationAnchorMarkerUsesAnchorGroups();
+    void constellationMarkerResolvesMixedCaseIds();
+    void constellationMarkerCountsDuplicateIds();
+    void constellationMarkerSkipsMissingIds();
+    void constellationMarkerSkipsNonFiniteStates();
+    void constellationMarkerKeepsCancelResidue();
     void inspectorFormatsSourceAliasesAndFallbacks();
     void inspectorSurfacesEphemerisMetadataAndWarnings();
     void inspectorUsesHighPrecisionStateForSelectedObject();
@@ -461,6 +474,113 @@ void SkySelectionOverlayBuilderTests::constellationAnchorMarkerUsesAnchorGroups(
 
     input.selectedSearchTargetId = "Missing";
     QVERIFY(!builder.buildSelectionMarkerData(input).visible);
+}
+
+void SkySelectionOverlayBuilderTests::constellationMarkerResolvesMixedCaseIds()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    const SkySelectionMarker baseline = builder.buildSelectionMarkerData(makeConstellationInput(fixture, "orion"));
+    QVERIFY(baseline.visible);
+
+    fixture.anchorGroups = {{"  ORION  ", {" SELECTED ", "Tracked"}}};
+    auto mixedCaseInput = makeConstellationInput(fixture, " Orion ");
+    mixedCaseInput.selectedSearchTargetKind = " constellationLabel ";
+    const SkySelectionMarker mixedCase = builder.buildSelectionMarkerData(mixedCaseInput);
+
+    QVERIFY(mixedCase.visible);
+    QVERIFY(std::abs(mixedCase.x - baseline.x) < 1e-9);
+    QVERIFY(std::abs(mixedCase.y - baseline.y) < 1e-9);
+}
+
+void SkySelectionOverlayBuilderTests::constellationMarkerCountsDuplicateIds()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    fixture.anchorGroups = {{"Orion", {"selected"}}};
+    auto input = makeConstellationInput(fixture, "Orion");
+    const SkySelectionMarker singleAnchor = builder.buildSelectionMarkerData(input);
+    QVERIFY(singleAnchor.visible);
+
+    // Both spellings resolve to the same state, so the anchor contributes
+    // twice and leaves the direction unchanged.
+    fixture.anchorGroups = {{"Orion", {"selected", "SELECTED"}}};
+    input = makeConstellationInput(fixture, "Orion");
+    const SkySelectionMarker duplicateAnchors = builder.buildSelectionMarkerData(input);
+
+    QVERIFY(duplicateAnchors.visible);
+    QVERIFY(std::abs(duplicateAnchors.x - singleAnchor.x) < 1e-9);
+    QVERIFY(std::abs(duplicateAnchors.y - singleAnchor.y) < 1e-9);
+}
+
+void SkySelectionOverlayBuilderTests::constellationMarkerSkipsMissingIds()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    fixture.anchorGroups = {{"Orion", {"selected"}}};
+    auto input = makeConstellationInput(fixture, "Orion");
+    const SkySelectionMarker singleAnchor = builder.buildSelectionMarkerData(input);
+    QVERIFY(singleAnchor.visible);
+
+    fixture.anchorGroups = {{"Orion", {"selected", "hip_missing"}}};
+    input = makeConstellationInput(fixture, "Orion");
+    const SkySelectionMarker withMissingAnchor = builder.buildSelectionMarkerData(input);
+
+    QVERIFY(withMissingAnchor.visible);
+    QVERIFY(std::abs(withMissingAnchor.x - singleAnchor.x) < 1e-9);
+    QVERIFY(std::abs(withMissingAnchor.y - singleAnchor.y) < 1e-9);
+
+    fixture.anchorGroups = {{"Orion", {"hip_missing"}}};
+    input = makeConstellationInput(fixture, "Orion");
+    QVERIFY(!builder.buildSelectionMarkerData(input).visible);
+}
+
+void SkySelectionOverlayBuilderTests::constellationMarkerSkipsNonFiniteStates()
+{
+    const double notANumber = std::numeric_limits<double>::quiet_NaN();
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    fixture.anchorGroups = {{"Orion", {"selected"}}};
+    auto input = makeConstellationInput(fixture, "Orion");
+    const SkySelectionMarker singleAnchor = builder.buildSelectionMarkerData(input);
+    QVERIFY(singleAnchor.visible);
+
+    fixture.anchorGroups = {{"Orion", {"selected", "tracked"}}};
+    fixture.snapshot.states[1].horizontal = {.altitudeDeg = notANumber, .azimuthDeg = notANumber};
+    input = makeConstellationInput(fixture, "Orion");
+    const SkySelectionMarker withNonFiniteAnchor = builder.buildSelectionMarkerData(input);
+
+    QVERIFY(withNonFiniteAnchor.visible);
+    QVERIFY(std::abs(withNonFiniteAnchor.x - singleAnchor.x) < 1e-9);
+    QVERIFY(std::abs(withNonFiniteAnchor.y - singleAnchor.y) < 1e-9);
+
+    fixture.snapshot.states[0].horizontal = {.altitudeDeg = notANumber, .azimuthDeg = notANumber};
+    input = makeConstellationInput(fixture, "Orion");
+    QVERIFY(!builder.buildSelectionMarkerData(input).visible);
+}
+
+void SkySelectionOverlayBuilderTests::constellationMarkerKeepsCancelResidue()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    fixture.snapshot.states[0].horizontal = {.altitudeDeg = 0.0, .azimuthDeg = 0.0};
+    fixture.snapshot.states[1].horizontal = {.altitudeDeg = 0.0, .azimuthDeg = 180.0};
+    fixture.anchorGroups = {{"Orion", {"selected", "tracked"}}};
+    fixture.projection = skygate::core::PreparedProjection::create(
+        skygate::core::ProjectionType::Stereographic,
+        skygate::core::ViewportMath::buildProjectionParams(1000.0, 800.0, 0.0, 90.0, 90.0)
+    );
+    QVERIFY(fixture.projection.has_value());
+
+    const SkySelectionMarker marker = builder.buildSelectionMarkerData(makeConstellationInput(fixture, "Orion"));
+
+    // Opposite horizon anchors leave a floating-point residue that still
+    // normalizes, so the marker keeps a direction instead of disappearing.
+    const skygate::core::ScreenPoint expected = fixture.projection->project({.altitudeDeg = 0.0, .azimuthDeg = 90.0});
+    QVERIFY(expected.isVisible);
+    QVERIFY(marker.visible);
+    QVERIFY(std::abs(marker.x - expected.x) < 1e-6);
+    QVERIFY(std::abs(marker.y - expected.y) < 1e-6);
 }
 
 void SkySelectionOverlayBuilderTests::inspectorFormatsSourceAliasesAndFallbacks()
