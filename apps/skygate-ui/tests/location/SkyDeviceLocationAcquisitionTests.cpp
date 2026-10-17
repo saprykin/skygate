@@ -29,6 +29,11 @@ private slots:
     void ignoresCompletionAfterSourceDestruction();
     void ignoresCompletionAfterNullSourceReplacement();
     void repeatedStartsKeepSingleSourceConnection();
+    void replacementDuringLocatingStopsDispatch();
+    void nullReplacementDuringLocatingStopsDispatch();
+    void sourceDestructionDuringLocatingStopsDispatch();
+    void replacementDuringGrantedStartStopsDispatch();
+    void replacementDuringDisabledStartStopsDispatch();
 #endif
 };
 
@@ -331,6 +336,217 @@ void SkyDeviceLocationAcquisitionTests::repeatedStartsKeepSingleSourceConnection
     positionSource.publishPosition(51.5074, -0.1278, 35.0);
 
     QCOMPARE(acquiredCount, 1);
+}
+
+void SkyDeviceLocationAcquisitionTests::replacementDuringLocatingStopsDispatch()
+{
+    auto permissionGate = std::make_unique<FakeLocationPermissionGate>();
+    permissionGate->setStatus(Qt::PermissionStatus::Undetermined);
+    FakeLocationPermissionGate* permissionGateHandle = permissionGate.get();
+    SkyDeviceLocationAcquisition acquisition(std::move(permissionGate));
+    FakePositionSource firstSource;
+    FakePositionSource secondSource;
+    acquisition.setPositionSource(&firstSource);
+    bool replaced = false;
+    connect(
+        &acquisition,
+        &SkyDeviceLocationAcquisition::statusTextChanged,
+        &acquisition,
+        [&acquisition, &secondSource, &replaced](const QString& statusText) {
+            if (replaced || statusText != QStringLiteral("Location: Locating")) {
+                return;
+            }
+
+            replaced = true;
+            acquisition.setPositionSource(&secondSource);
+        }
+    );
+    QGeoCoordinate acquiredCoordinate;
+    int acquiredCount = 0;
+    connect(
+        &acquisition,
+        &SkyDeviceLocationAcquisition::positionAcquired,
+        &acquisition,
+        [&acquiredCoordinate, &acquiredCount](const QGeoCoordinate& coordinate) {
+            acquiredCoordinate = coordinate;
+            ++acquiredCount;
+        }
+    );
+
+    acquisition.start();
+    permissionGateHandle->completeRequest(Qt::PermissionStatus::Granted);
+
+    QVERIFY(replaced);
+    QCOMPARE(firstSource.requestCount(), 0);
+    QCOMPARE(secondSource.requestCount(), 0);
+
+    acquisition.start();
+    permissionGateHandle->completeRequest(Qt::PermissionStatus::Granted);
+
+    QCOMPARE(secondSource.requestCount(), 1);
+
+    secondSource.publishPosition(48.8566, 2.3522, 35.0);
+
+    QCOMPARE(acquiredCount, 1);
+    QCOMPARE(acquiredCoordinate.latitude(), 48.8566);
+    QCOMPARE(acquiredCoordinate.longitude(), 2.3522);
+}
+
+void SkyDeviceLocationAcquisitionTests::nullReplacementDuringLocatingStopsDispatch()
+{
+    auto permissionGate = std::make_unique<FakeLocationPermissionGate>();
+    permissionGate->setStatus(Qt::PermissionStatus::Undetermined);
+    FakeLocationPermissionGate* permissionGateHandle = permissionGate.get();
+    SkyDeviceLocationAcquisition acquisition(std::move(permissionGate));
+    FakePositionSource positionSource;
+    acquisition.setPositionSource(&positionSource);
+    QSignalSpy statusSpy(&acquisition, &SkyDeviceLocationAcquisition::statusTextChanged);
+    bool replaced = false;
+    connect(
+        &acquisition,
+        &SkyDeviceLocationAcquisition::statusTextChanged,
+        &acquisition,
+        [&acquisition, &replaced](const QString& statusText) {
+            if (replaced || statusText != QStringLiteral("Location: Locating")) {
+                return;
+            }
+
+            replaced = true;
+            acquisition.setPositionSource(nullptr);
+        }
+    );
+
+    acquisition.start();
+    permissionGateHandle->completeRequest(Qt::PermissionStatus::Granted);
+
+    QVERIFY(replaced);
+    QCOMPARE(positionSource.requestCount(), 0);
+    QCOMPARE(statusSpy.count(), 3);
+
+    acquisition.start();
+
+    QCOMPARE(statusSpy.count(), 5);
+    QCOMPARE(statusSpy.last().at(0).toString(), QString("Location: Device source unavailable"));
+    QCOMPARE(positionSource.requestCount(), 0);
+}
+
+void SkyDeviceLocationAcquisitionTests::sourceDestructionDuringLocatingStopsDispatch()
+{
+    auto permissionGate = std::make_unique<FakeLocationPermissionGate>();
+    FakeLocationPermissionGate* permissionGateHandle = permissionGate.get();
+    SkyDeviceLocationAcquisition acquisition(std::move(permissionGate));
+    auto positionSource = std::make_unique<FakePositionSource>();
+    acquisition.setPositionSource(positionSource.get());
+    QSignalSpy statusSpy(&acquisition, &SkyDeviceLocationAcquisition::statusTextChanged);
+    bool destroyed = false;
+    connect(
+        &acquisition,
+        &SkyDeviceLocationAcquisition::statusTextChanged,
+        &acquisition,
+        [&positionSource, &destroyed](const QString& statusText) {
+            if (destroyed || statusText != QStringLiteral("Location: Locating")) {
+                return;
+            }
+
+            destroyed = true;
+            positionSource.reset();
+        }
+    );
+
+    acquisition.start();
+    QVERIFY(permissionGateHandle->hasPendingRequest());
+    QCOMPARE(positionSource->requestCount(), 0);
+
+    permissionGateHandle->completeRequest(Qt::PermissionStatus::Granted);
+
+    QVERIFY(destroyed);
+    QCOMPARE(statusSpy.count(), 4);
+    QCOMPARE(statusSpy.last().at(0).toString(), QString("Location: Device source unavailable"));
+}
+
+void SkyDeviceLocationAcquisitionTests::replacementDuringGrantedStartStopsDispatch()
+{
+    auto permissionGate = std::make_unique<FakeLocationPermissionGate>();
+    permissionGate->setStatus(Qt::PermissionStatus::Granted);
+    SkyDeviceLocationAcquisition acquisition(std::move(permissionGate));
+    FakePositionSource firstSource;
+    FakePositionSource secondSource;
+    acquisition.setPositionSource(&firstSource);
+    bool replaced = false;
+    connect(
+        &acquisition,
+        &SkyDeviceLocationAcquisition::statusTextChanged,
+        &acquisition,
+        [&acquisition, &secondSource, &replaced](const QString& statusText) {
+            if (replaced || statusText != QStringLiteral("Location: Locating")) {
+                return;
+            }
+
+            replaced = true;
+            acquisition.setPositionSource(&secondSource);
+        }
+    );
+    QGeoCoordinate acquiredCoordinate;
+    int acquiredCount = 0;
+    connect(
+        &acquisition,
+        &SkyDeviceLocationAcquisition::positionAcquired,
+        &acquisition,
+        [&acquiredCoordinate, &acquiredCount](const QGeoCoordinate& coordinate) {
+            acquiredCoordinate = coordinate;
+            ++acquiredCount;
+        }
+    );
+
+    acquisition.start();
+
+    QVERIFY(replaced);
+    QCOMPARE(firstSource.requestCount(), 0);
+    QCOMPARE(secondSource.requestCount(), 0);
+
+    acquisition.start();
+
+    QCOMPARE(secondSource.requestCount(), 1);
+
+    secondSource.publishPosition(40.7128, -74.0060, 10.0);
+
+    QCOMPARE(acquiredCount, 1);
+    QCOMPARE(acquiredCoordinate.latitude(), 40.7128);
+}
+
+void SkyDeviceLocationAcquisitionTests::replacementDuringDisabledStartStopsDispatch()
+{
+    auto permissionGate = std::make_unique<FakeLocationPermissionGate>();
+    permissionGate->setStatus(Qt::PermissionStatus::Denied);
+    SkyDeviceLocationAcquisition acquisition(std::move(permissionGate));
+    FakePositionSource firstSource;
+    FakePositionSource secondSource;
+    acquisition.setPositionSource(&firstSource);
+    acquisition.setPermissionRequestsEnabled(false);
+    bool replaced = false;
+    connect(
+        &acquisition,
+        &SkyDeviceLocationAcquisition::statusTextChanged,
+        &acquisition,
+        [&acquisition, &secondSource, &replaced](const QString& statusText) {
+            if (replaced || statusText != QStringLiteral("Location: Locating")) {
+                return;
+            }
+
+            replaced = true;
+            acquisition.setPositionSource(&secondSource);
+        }
+    );
+
+    acquisition.start();
+
+    QVERIFY(replaced);
+    QCOMPARE(firstSource.requestCount(), 0);
+    QCOMPARE(secondSource.requestCount(), 0);
+
+    acquisition.start();
+
+    QCOMPARE(secondSource.requestCount(), 1);
 }
 
 #endif
