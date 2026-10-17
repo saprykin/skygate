@@ -1,5 +1,6 @@
 #include "SkyEphemerisUpdateWorkflow.hpp"
 #include "SkyEphemerisDataManager.hpp"
+#include "SkyEphemerisPathSegmentPolicy.hpp"
 
 #include <QByteArray>
 #include <QDir>
@@ -119,25 +120,6 @@ profileProgressName(const EphemerisDataManifest& manifest, const EphemerisDataMa
     return sentenceFragment(
         profile.displayName.empty() ? QString::fromStdString(profile.id) : QString::fromStdString(profile.displayName)
     );
-}
-
-[[nodiscard]] QString safeEphemerisPathSegment(QString value)
-{
-    value = value.trimmed();
-    QString result;
-    result.reserve(value.size());
-    for (const QChar character : value) {
-        if (character.isLetterOrNumber() || character == QLatin1Char('-') || character == QLatin1Char('_')
-            || character == QLatin1Char('.')) {
-            result.push_back(character);
-        } else {
-            result.push_back(QLatin1Char('_'));
-        }
-    }
-    while (result.contains(QStringLiteral(".."))) {
-        result.replace(QStringLiteral(".."), QStringLiteral("."));
-    }
-    return result.isEmpty() || result == QStringLiteral(".") ? QStringLiteral("profile") : result;
 }
 
 }  // namespace
@@ -458,7 +440,8 @@ bool SkyEphemerisUpdateWorkflow::updateProfile(const QString& profileId, const Q
     }
 
     const QString stagedRoot =
-        m_writableCacheRoot + QStringLiteral("/staging/") + safeEphemerisPathSegment(normalizedProfileId);
+        m_writableCacheRoot + QStringLiteral("/staging/")
+        + SkyEphemerisPathSegmentPolicy::spellPathSegment(normalizedProfileId, QStringLiteral("profile"));
     QDir stagingDirectory(stagedRoot);
     if (stagingDirectory.exists() && !stagingDirectory.removeRecursively()) {
         qCWarning(skygateEphemerisUpdateLog).noquote()

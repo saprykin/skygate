@@ -1,5 +1,6 @@
 #include "engine/EphemerisDataManifest.hpp"
 #include "ephemeris/SkyEphemerisDataManager.hpp"
+#include "ephemeris/SkyEphemerisPathSegmentPolicy.hpp"
 #include "ephemeris/SkyEphemerisUpdateWorkflow.hpp"
 #include "settings/SkySettingsStore.hpp"
 #include "support/FakeNetworkAccessManager.hpp"
@@ -119,6 +120,12 @@ private slots:
     void init();
     void destroysCleanlyWhileUpdateIsPending();
     void updateIsUnavailableWithoutManifest();
+    void spellPathSegmentTrimsWhitespace();
+    void spellPathSegmentReplacesPunctuation();
+    void spellPathSegmentKeepsUnicodeLettersAndDigits();
+    void spellPathSegmentCollapsesRepeatedDots();
+    void spellPathSegmentFallsBackWhenEmpty();
+    void spellPathSegmentFallsBackForSingleDot();
 
 private:
     SettingsTestFixture m_settings;
@@ -189,6 +196,75 @@ void SkyEphemerisUpdateWorkflowTests::updateIsUnavailableWithoutManifest()
     QVERIFY(!workflow.updateProfile(QStringLiteral("de440s-short-range"), QString()));
     QVERIFY(!workflow.isUpdateInProgress());
     QCOMPARE(workflow.statusText(), QString("Ephemeris data: Update manifest unavailable"));
+}
+
+void SkyEphemerisUpdateWorkflowTests::spellPathSegmentTrimsWhitespace()
+{
+    QCOMPARE(
+        SkyEphemerisPathSegmentPolicy::spellPathSegment(
+            QStringLiteral(" \t de440s-short-range \n"), QStringLiteral("profile")
+        ),
+        QStringLiteral("de440s-short-range")
+    );
+}
+
+void SkyEphemerisUpdateWorkflowTests::spellPathSegmentReplacesPunctuation()
+{
+    QCOMPARE(
+        SkyEphemerisPathSegmentPolicy::spellPathSegment(QStringLiteral("a/b:c d\\e-f_g.h"), QStringLiteral("profile")),
+        QStringLiteral("a_b_c_d_e-f_g.h")
+    );
+    QCOMPARE(
+        SkyEphemerisPathSegmentPolicy::spellPathSegment(QStringLiteral("/"), QStringLiteral("profile")),
+        QStringLiteral("_")
+    );
+}
+
+void SkyEphemerisUpdateWorkflowTests::spellPathSegmentKeepsUnicodeLettersAndDigits()
+{
+    QCOMPARE(
+        SkyEphemerisPathSegmentPolicy::spellPathSegment(QString::fromUtf8("δ-Kerné ٢٠٢٦"), QStringLiteral("profile")),
+        QString::fromUtf8("δ-Kerné_٢٠٢٦")
+    );
+}
+
+void SkyEphemerisUpdateWorkflowTests::spellPathSegmentCollapsesRepeatedDots()
+{
+    QCOMPARE(
+        SkyEphemerisPathSegmentPolicy::spellPathSegment(QStringLiteral("a..b....c"), QStringLiteral("profile")),
+        QStringLiteral("a.b.c")
+    );
+    QCOMPARE(
+        SkyEphemerisPathSegmentPolicy::spellPathSegment(QStringLiteral("a/..b"), QStringLiteral("profile")),
+        QStringLiteral("a_.b")
+    );
+}
+
+void SkyEphemerisUpdateWorkflowTests::spellPathSegmentFallsBackWhenEmpty()
+{
+    QCOMPARE(
+        SkyEphemerisPathSegmentPolicy::spellPathSegment(QString(), QStringLiteral("profile")), QStringLiteral("profile")
+    );
+    QCOMPARE(
+        SkyEphemerisPathSegmentPolicy::spellPathSegment(QStringLiteral(" \t\n "), QStringLiteral("update")),
+        QStringLiteral("update")
+    );
+}
+
+void SkyEphemerisUpdateWorkflowTests::spellPathSegmentFallsBackForSingleDot()
+{
+    QCOMPARE(
+        SkyEphemerisPathSegmentPolicy::spellPathSegment(QStringLiteral("."), QStringLiteral("profile")),
+        QStringLiteral("profile")
+    );
+    QCOMPARE(
+        SkyEphemerisPathSegmentPolicy::spellPathSegment(QStringLiteral(" . "), QStringLiteral("update")),
+        QStringLiteral("update")
+    );
+    QCOMPARE(
+        SkyEphemerisPathSegmentPolicy::spellPathSegment(QStringLiteral("..."), QStringLiteral("update")),
+        QStringLiteral("update")
+    );
 }
 
 QTEST_GUILESS_MAIN(SkyEphemerisUpdateWorkflowTests)
