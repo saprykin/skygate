@@ -2,18 +2,23 @@
 #include "catalog/CatalogCoordinator.hpp"
 #include "catalog/CatalogDownloadCancellation.hpp"
 #include "catalog/CatalogParseOptions.hpp"
+#include "catalog/SkyCatalogImportStatus.hpp"
 #include "support/AsyncTestSupport.hpp"
 #include "support/CatalogTestPayloads.hpp"
 #include "support/FakeNetworkAccessManager.hpp"
 
+#include <QCoreApplication>
+#include <QThreadPool>
 #include <QtTest/QtTest>
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <utility>
+#include <vector>
 
 using namespace skygate::ui::tests;
+using skygate::ui::internal::SkyCatalogImportStatus;
 
 namespace {
 
@@ -34,6 +39,7 @@ private slots:
     void missingOpenNgcColumnsDoNotClaimHyg();
     void loadsArchiveMemberNamedByParseOptions();
     void reportsContradictorySchemaHintWithSourceUrl();
+    void cancelsParsingFromFirstProcessingStatus();
 };
 
 void CatalogCoordinatorDownloadTests::parsesSuccessfulDownloadedCatalog()
@@ -43,14 +49,14 @@ void CatalogCoordinatorDownloadTests::parsesSuccessfulDownloadedCatalog()
     CatalogCoordinator coordinator(&networkAccessManager);
 
     CatalogCoordinator::DownloadResult finalResult;
-    QStringList statuses;
+    std::vector<SkyCatalogImportStatus> statuses;
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
             newCancellation(),
             {"https://example.test/catalog.csv"},
             CatalogParseOptions{},
             this,
-            [&statuses](const QString& status) { statuses.push_back(status); },
+            [&statuses](const SkyCatalogImportStatus& status) { statuses.push_back(status); },
             [&finalResult, &loop](CatalogCoordinator::DownloadResult result) {
                 finalResult = std::move(result);
                 loop.quit();
@@ -62,8 +68,12 @@ void CatalogCoordinatorDownloadTests::parsesSuccessfulDownloadedCatalog()
     QCOMPARE(finalResult.diagnostics.parsedBodyCount, 1U);
     QCOMPARE(finalResult.sourceUrl, QString("https://example.test/catalog.csv"));
     QVERIFY(finalResult.errorText.isEmpty());
-    QVERIFY(std::any_of(statuses.begin(), statuses.end(), [](const QString& status) {
-        return status.startsWith("Catalog: Processing");
+    QVERIFY(std::any_of(statuses.begin(), statuses.end(), [](const SkyCatalogImportStatus& status) {
+        return status.phase == SkyCatalogImportStatus::Phase::Processing
+               && status.text.startsWith("Catalog: Processing");
+    }));
+    QVERIFY(std::none_of(statuses.begin(), statuses.end(), [](const SkyCatalogImportStatus& status) {
+        return status.text.startsWith("Catalog: Processing") && !status.isProcessing();
     }));
 }
 
@@ -76,7 +86,7 @@ void CatalogCoordinatorDownloadTests::reportsParseFailureWithSourceUrl()
     CatalogCoordinator coordinator(&networkAccessManager);
 
     CatalogCoordinator::DownloadResult finalResult;
-    QStringList statuses;
+    std::vector<SkyCatalogImportStatus> statuses;
     QTest::ignoreMessage(
         QtWarningMsg,
         "HYG CSV skipped 1 rows with invalid numeric values; samples: row 2 ra='not-ra' dec='2.0' mag='3.0'"
@@ -93,7 +103,7 @@ void CatalogCoordinatorDownloadTests::reportsParseFailureWithSourceUrl()
             {"https://example.test/bad.csv"},
             CatalogParseOptions{},
             this,
-            [&statuses](const QString& status) { statuses.push_back(status); },
+            [&statuses](const SkyCatalogImportStatus& status) { statuses.push_back(status); },
             [&finalResult, &loop](CatalogCoordinator::DownloadResult result) {
                 finalResult = std::move(result);
                 loop.quit();
@@ -104,7 +114,48 @@ void CatalogCoordinatorDownloadTests::reportsParseFailureWithSourceUrl()
     QVERIFY(finalResult.catalog == nullptr);
     QVERIFY(finalResult.errorText.contains("https://example.test/bad.csv"));
     QVERIFY(finalResult.errorText.contains("parse failed"));
-    QCOMPARE(statuses.back(), finalResult.errorText);
+    QCOMPARE(statuses.back().text, finalResult.errorText);
+    QCOMPARE(statuses.back().phase, SkyCatalogImportStatus::Phase::Failed);
+}
+
+void CatalogCoordinatorDownloadTests::cancelsParsingFromFirstProcessingStatus()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/processing-cancel.csv");
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = sampleHygCsvPayload(), .manualFinish = true});
+    CatalogCoordinator coordinator(&networkAccessManager);
+
+    const auto cancellation = newCancellation();
+    std::vector<SkyCatalogImportStatus> statuses;
+    int completionCount = 0;
+    coordinator.downloadCatalogFromUrls(
+        cancellation,
+        {catalogUrl},
+        CatalogParseOptions{},
+        this,
+        [&statuses, &cancellation](const SkyCatalogImportStatus& status) {
+            statuses.push_back(status);
+            if (status.phase == SkyCatalogImportStatus::Phase::Processing) {
+                cancellation->cancel();
+            }
+        },
+        [&completionCount](CatalogCoordinator::DownloadResult) { ++completionCount; }
+    );
+
+    QCOMPARE(networkAccessManager.issuedReplies().size(), 1);
+    networkAccessManager.issuedReplies().front()->finishNow();
+    QThreadPool::globalInstance()->waitForDone();
+    QCoreApplication::processEvents();
+
+    QVERIFY(cancellation->isCanceled());
+    QCOMPARE(completionCount, 0);
+    QVERIFY(std::any_of(statuses.begin(), statuses.end(), [](const SkyCatalogImportStatus& status) {
+        return status.text == QStringLiteral("Catalog: Processing downloaded catalog...")
+               && status.phase == SkyCatalogImportStatus::Phase::Processing;
+    }));
+    QVERIFY(std::none_of(statuses.begin(), statuses.end(), [](const SkyCatalogImportStatus& status) {
+        return status.text.contains(QStringLiteral("objects parsed"));
+    }));
 }
 
 void CatalogCoordinatorDownloadTests::gzipUnknownInnerSchemaUsesFormatNeutralWording()

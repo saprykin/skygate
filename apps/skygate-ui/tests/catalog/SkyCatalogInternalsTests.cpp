@@ -1,4 +1,5 @@
 #include "catalog/SkyCatalogConstellationStore.hpp"
+#include "catalog/SkyCatalogImportStatus.hpp"
 #include "catalog/SkyCatalogText.hpp"
 
 #include <QtTest/QtTest>
@@ -13,6 +14,7 @@ class SkyCatalogInternalsTests final : public QObject {
 private slots:
     void catalogTextFormatsStableStatusMessages();
     void catalogTextComposesSummaryDetails();
+    void catalogImportStatusKeepsPhaseIndependentOfText();
     void constellationStoreKeepsCustomRefsAndCounts();
     void constellationStoreClearDropsRefsAndCounts();
 };
@@ -30,8 +32,31 @@ void SkyCatalogInternalsTests::catalogTextFormatsStableStatusMessages()
     QCOMPARE(SkyCatalogText::starCacheClearResult(false), QString("Catalog: Star catalog cache clear failed"));
     QCOMPARE(SkyCatalogText::deepSkyCacheClearResult(true), QString("Catalog: Deep-sky catalog cache cleared"));
     QCOMPARE(SkyCatalogText::deepSkyCacheClearResult(false), QString("Catalog: Deep-sky catalog cache clear failed"));
-    QVERIFY(SkyCatalogText::isProcessingStatus("catalog: processing stars"));
-    QVERIFY(!SkyCatalogText::isProcessingStatus("Catalog: Ready"));
+}
+
+void SkyCatalogInternalsTests::catalogImportStatusKeepsPhaseIndependentOfText()
+{
+    using skygate::ui::internal::SkyCatalogImportStatus;
+
+    const SkyCatalogImportStatus renamedProcessing{
+        .text = QStringLiteral("Renamed processing wording"),
+        .phase = SkyCatalogImportStatus::Phase::Processing,
+    };
+    const SkyCatalogImportStatus originalProcessing{
+        .text = QStringLiteral("Catalog: Processing... 4 objects parsed"),
+        .phase = SkyCatalogImportStatus::Phase::Processing,
+    };
+
+    QCOMPARE(renamedProcessing.phase, originalProcessing.phase);
+    QVERIFY(renamedProcessing.isProcessing());
+    QVERIFY(originalProcessing.isProcessing());
+
+    // Processing-looking text does not make a download-phase event busy.
+    const SkyCatalogImportStatus downloadWithProcessingText{
+        .text = QStringLiteral("Catalog: Processing... still downloading"),
+        .phase = SkyCatalogImportStatus::Phase::Downloading,
+    };
+    QVERIFY(!downloadWithProcessingText.isProcessing());
 }
 
 void SkyCatalogInternalsTests::catalogTextComposesSummaryDetails()

@@ -1,6 +1,7 @@
 #include "BaseCelestialBody.hpp"
 #include "CatalogArchiveTestSupport.hpp"
 #include "catalog/CatalogDownloadCancellation.hpp"
+#include "catalog/SkyCatalogImportStatus.hpp"
 #include "catalog/SkyCatalogImportWorkflow.hpp"
 #include "catalog/SkyCatalogSourceDescriptor.hpp"
 #include "catalog/SkyCatalogSourceImportResult.hpp"
@@ -132,7 +133,9 @@ void SkyCatalogImportWorkflowTests::parsesConstellationPayloads()
             newCancellation(),
             {"https://example.test/index.json"},
             this,
-            [&statuses](const QString& status) { statuses.push_back(status); },
+            [&statuses](const skygate::ui::internal::SkyCatalogImportStatus& status) {
+                statuses.push_back(status.text);
+            },
             [&finalResult, &loop](skygate::ui::internal::SkyConstellationLineImportResult result) {
                 finalResult = std::move(result);
                 loop.quit();

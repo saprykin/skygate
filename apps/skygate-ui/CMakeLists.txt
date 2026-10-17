@@ -135,6 +135,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/CatalogDownloadCancellation.hpp
     src/catalog/CatalogDownloadService.cpp
     src/catalog/CatalogDownloadService.hpp
+    src/catalog/SkyCatalogImportStatus.hpp
     src/catalog/SkyCatalogImportWorkflow.cpp
     src/catalog/SkyCatalogImportWorkflow.hpp
     src/catalog/SkyCatalogSourceImportResult.hpp
