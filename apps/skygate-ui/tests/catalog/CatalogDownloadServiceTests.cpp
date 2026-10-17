@@ -21,6 +21,11 @@ namespace {
 constexpr qsizetype kCatalogByteLimit = 128U << 20U;
 constexpr qsizetype kOverLimitPayloadBytes = kCatalogByteLimit + 4 * 1024 * 1024;
 
+std::shared_ptr<CatalogDownloadCancellation> newCancellation()
+{
+    return std::make_shared<CatalogDownloadCancellation>();
+}
+
 // Captures fixture state while the reply still exists: the service schedules
 // reply deletion after completion, so the values must be read from a finished
 // handler.
@@ -58,6 +63,7 @@ private slots:
     void stopsRetryAfterDestroyedCallbackContext();
     void fallsBackWhenReplyAbortsWithoutCancellation();
     void explicitCancellationStopsFallbackChain();
+    void statusCancellationStopsFallbackCandidate();
     void completesConcurrentRequestsIndependently();
     void concurrentFallbackChainsRemainIsolated();
     void successReleasesCompletionCapture();
@@ -74,7 +80,7 @@ void CatalogDownloadServiceTests::invalidUrlCompletesWithoutNetworkRequest()
     bool completed = false;
     QTest::ignoreMessage(QtWarningMsg, "Catalog download aborted: no valid source URLs");
     service.downloadFirstSuccessfulFromUrls(
-        {"  "}, this, {}, [&completed](CatalogDownloadService::DownloadResult result) {
+        newCancellation(), {"  "}, this, {}, [&completed](CatalogDownloadService::DownloadResult result) {
             completed = true;
             QVERIFY(result.payload.isEmpty());
             QCOMPARE(result.errorText, QString("Catalog: Invalid URL"));
@@ -97,6 +103,7 @@ void CatalogDownloadServiceTests::logsStartAndSuccessAtInfoLevel()
     LogCapture capture(QtInfoMsg);
     runAsync([&](QEventLoop& loop) {
         service.downloadFirstSuccessfulFromUrls(
+            newCancellation(),
             {"https://example.test/catalog.csv"},
             this,
             {},
@@ -132,6 +139,7 @@ void CatalogDownloadServiceTests::retriesUntilFirstSuccessfulPayload()
     QTest::ignoreMessage(QtWarningMsg, "Catalog source failed https://example.test/fail.csv Unknown error HTTP 404");
     runAsync([&](QEventLoop& loop) {
         service.downloadFirstSuccessfulFromUrls(
+            newCancellation(),
             {"https://example.test/fail.csv", "https://example.test/ok.csv"},
             this,
             [&statuses](const QString& status) { statuses.push_back(status); },
@@ -168,6 +176,7 @@ void CatalogDownloadServiceTests::rejectsEmptyAndOversizedPayloads()
     );
     runAsync([&](QEventLoop& loop) {
         service.downloadFirstSuccessfulFromUrls(
+            newCancellation(),
             {"https://example.test/empty.csv", "https://example.test/too-large.csv"},
             this,
             [&statuses](const QString& status) { statuses.push_back(status); },
@@ -198,6 +207,7 @@ void CatalogDownloadServiceTests::acceptsPayloadAtExactLimit()
     CatalogDownloadService::DownloadResult finalResult;
     runAsync([&](QEventLoop& loop) {
         service.downloadFirstSuccessfulFromUrls(
+            newCancellation(),
             {"https://example.test/at-limit.csv"},
             this,
             {},
@@ -233,6 +243,7 @@ void CatalogDownloadServiceTests::rejectsPayloadOneByteOverLimitWithoutLength()
     );
     runAsync([&](QEventLoop& loop) {
         service.downloadFirstSuccessfulFromUrls(
+            newCancellation(),
             {"https://example.test/over-limit.csv"},
             this,
             {},
@@ -272,6 +283,7 @@ void CatalogDownloadServiceTests::rejectsPayloadWithUnderstatedLength()
     );
     runAsync([&](QEventLoop& loop) {
         service.downloadFirstSuccessfulFromUrls(
+            newCancellation(),
             {"https://example.test/understated.csv"},
             this,
             {},
@@ -310,6 +322,7 @@ void CatalogDownloadServiceTests::rejectsExcessiveDeclaredLength()
     );
     runAsync([&](QEventLoop& loop) {
         service.downloadFirstSuccessfulFromUrls(
+            newCancellation(),
             {"https://example.test/declared-too-large.csv"},
             this,
             {},
@@ -344,12 +357,13 @@ void CatalogDownloadServiceTests::fallsBackAfterOversizedCandidate()
 
     CatalogDownloadService::DownloadResult finalResult;
     std::shared_ptr<ReplyAbortState> abortState;
-    std::shared_ptr<CatalogDownloadCancellation> cancellation;
+    const auto cancellation = std::make_shared<CatalogDownloadCancellation>();
     QTest::ignoreMessage(
         QtWarningMsg, "Catalog source declared size over limit https://example.test/oversized.csv 138412032"
     );
     runAsync([&](QEventLoop& loop) {
-        cancellation = service.downloadFirstSuccessfulFromUrls(
+        service.downloadFirstSuccessfulFromUrls(
+            cancellation,
             {"https://example.test/oversized.csv", "https://example.test/ok.csv"},
             this,
             {},
@@ -388,6 +402,7 @@ void CatalogDownloadServiceTests::doesNotCallDestroyedCallbackContext()
     bool completionCalled = false;
     auto callbackContext = std::make_unique<QObject>();
     service.downloadFirstSuccessfulFromUrls(
+        newCancellation(),
         {"https://example.test/slow.csv"},
         callbackContext.get(),
         [&statusCalled](const QString&) { statusCalled = true; },
@@ -421,6 +436,7 @@ void CatalogDownloadServiceTests::stopsRetryAfterDestroyedCallbackContext()
     bool completionCalled = false;
     auto callbackContext = std::make_unique<QObject>();
     service.downloadFirstSuccessfulFromUrls(
+        newCancellation(),
         {"https://example.test/slow-fail.csv", "https://example.test/should-not-start.csv"},
         callbackContext.get(),
         {},
@@ -456,6 +472,7 @@ void CatalogDownloadServiceTests::fallsBackWhenReplyAbortsWithoutCancellation()
     QStringList statuses;
     bool completed = false;
     service.downloadFirstSuccessfulFromUrls(
+        newCancellation(),
         {"https://example.test/cancelled.csv", "https://example.test/ok-after-cancel.csv"},
         this,
         [&statuses](const QString& status) { statuses.push_back(status); },
@@ -502,7 +519,9 @@ void CatalogDownloadServiceTests::explicitCancellationStopsFallbackChain()
 
     int completionCount = 0;
     QStringList statuses;
-    const std::shared_ptr<CatalogDownloadCancellation> cancellation = service.downloadFirstSuccessfulFromUrls(
+    const auto cancellation = std::make_shared<CatalogDownloadCancellation>();
+    service.downloadFirstSuccessfulFromUrls(
+        cancellation,
         {"https://example.test/pending.csv", "https://example.test/after-cancel.csv"},
         this,
         [&statuses](const QString& status) { statuses.push_back(status); },
@@ -527,6 +546,51 @@ void CatalogDownloadServiceTests::explicitCancellationStopsFallbackChain()
     }));
 }
 
+void CatalogDownloadServiceTests::statusCancellationStopsFallbackCandidate()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/first-fail.csv",
+        {.error = QNetworkReply::ContentNotFoundError,
+         .errorText = "not found",
+         .httpStatusCode = 404,
+         .manualFinish = true}
+    );
+    networkAccessManager.enqueueResponse(
+        "https://example.test/fallback.csv",
+        {.payload = sampleHygCsvPayload({1, 1, "Fallback", "1.0", "2.0", "3.0"}), .manualFinish = true}
+    );
+    CatalogDownloadService service(&networkAccessManager);
+
+    int completionCount = 0;
+    const auto cancellation = std::make_shared<CatalogDownloadCancellation>();
+    QTest::ignoreMessage(
+        QtWarningMsg, "Catalog source failed https://example.test/first-fail.csv Unknown error HTTP 404"
+    );
+    service.downloadFirstSuccessfulFromUrls(
+        cancellation,
+        {"https://example.test/first-fail.csv", "https://example.test/fallback.csv"},
+        this,
+        [&cancellation](const QString& status) {
+            if (status.contains("fallback.csv")) {
+                cancellation->cancel();
+            }
+        },
+        [&completionCount](CatalogDownloadService::DownloadResult) { ++completionCount; }
+    );
+    QCOMPARE(networkAccessManager.requestedUrls(), QStringList({"https://example.test/first-fail.csv"}));
+
+    FakeNetworkReply* firstReply = onlyIssuedReply(networkAccessManager);
+    firstReply->finishNow();
+    QCoreApplication::processEvents();
+
+    QVERIFY(cancellation->isCanceled());
+    QCOMPARE(completionCount, 0);
+    QCOMPARE(networkAccessManager.requestedUrls(), QStringList({"https://example.test/first-fail.csv"}));
+    QCOMPARE(networkAccessManager.issuedReplies().size(), 1);
+    QVERIFY(networkAccessManager.abortedUrls().isEmpty());
+}
+
 void CatalogDownloadServiceTests::completesConcurrentRequestsIndependently()
 {
     FakeNetworkAccessManager networkAccessManager;
@@ -544,6 +608,7 @@ void CatalogDownloadServiceTests::completesConcurrentRequestsIndependently()
     bool firstCompleted = false;
     bool secondCompleted = false;
     service.downloadFirstSuccessfulFromUrls(
+        newCancellation(),
         {"https://example.test/first.csv"},
         this,
         {},
@@ -553,6 +618,7 @@ void CatalogDownloadServiceTests::completesConcurrentRequestsIndependently()
         }
     );
     service.downloadFirstSuccessfulFromUrls(
+        newCancellation(),
         {"https://example.test/second.csv"},
         this,
         {},
@@ -594,6 +660,7 @@ void CatalogDownloadServiceTests::concurrentFallbackChainsRemainIsolated()
     QTest::ignoreMessage(QtWarningMsg, "Catalog source returned empty data https://example.test/b-fail.csv");
     QTest::ignoreMessage(QtWarningMsg, "Catalog source failed https://example.test/a-fail.csv Unknown error HTTP 404");
     service.downloadFirstSuccessfulFromUrls(
+        newCancellation(),
         {"https://example.test/a-fail.csv", "https://example.test/a-ok.csv"},
         this,
         {},
@@ -603,6 +670,7 @@ void CatalogDownloadServiceTests::concurrentFallbackChainsRemainIsolated()
         }
     );
     service.downloadFirstSuccessfulFromUrls(
+        newCancellation(),
         {"https://example.test/b-fail.csv", "https://example.test/b-ok.csv"},
         this,
         {},
@@ -632,7 +700,9 @@ void CatalogDownloadServiceTests::successReleasesCompletionCapture()
     int completionCount = 0;
     CatalogDownloadService::CompletionHandler completionHandler =
         [capture, &completionCount](CatalogDownloadService::DownloadResult) { ++completionCount; };
-    service.downloadFirstSuccessfulFromUrls({"https://example.test/catalog.csv"}, this, {}, completionHandler);
+    service.downloadFirstSuccessfulFromUrls(
+        newCancellation(), {"https://example.test/catalog.csv"}, this, {}, completionHandler
+    );
     completionHandler = {};
 
     QTRY_COMPARE(completionCount, 1);
@@ -666,7 +736,11 @@ void CatalogDownloadServiceTests::exhaustedRetriesReleaseCompletionCapture()
             errorText = result.errorText;
         };
     service.downloadFirstSuccessfulFromUrls(
-        {"https://example.test/a-fail.csv", "https://example.test/b-fail.csv"}, this, {}, completionHandler
+        newCancellation(),
+        {"https://example.test/a-fail.csv", "https://example.test/b-fail.csv"},
+        this,
+        {},
+        completionHandler
     );
     completionHandler = {};
 
@@ -697,7 +771,7 @@ void CatalogDownloadServiceTests::invalidCandidatesReleaseCompletionCapture()
             sourceUrl = result.sourceUrl;
         };
     service.downloadFirstSuccessfulFromUrls(
-        {"invalid url", "  ", "https://example.test/ok.csv"}, this, {}, completionHandler
+        newCancellation(), {"invalid url", "  ", "https://example.test/ok.csv"}, this, {}, completionHandler
     );
     completionHandler = {};
 
@@ -724,7 +798,7 @@ void CatalogDownloadServiceTests::callbackContextDestructionReleasesCapture()
         [capture, &completionCount](CatalogDownloadService::DownloadResult) { ++completionCount; };
     auto callbackContext = std::make_unique<QObject>();
     service.downloadFirstSuccessfulFromUrls(
-        {"https://example.test/slow.csv"}, callbackContext.get(), {}, completionHandler
+        newCancellation(), {"https://example.test/slow.csv"}, callbackContext.get(), {}, completionHandler
     );
     completionHandler = {};
 

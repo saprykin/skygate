@@ -257,19 +257,22 @@ private:
     // runtime transition may call this, so persistence never pairs attempted
     // options with previously accepted bytes.
     static void commitAcceptedSourceFacts(SourceOperation& operation, QByteArray payload);
-    // Supersedes the pending work of one instance: callbacks already captured
-    // for its current operation revision are rejected and its pending related
-    // download is no longer tracked. Other instances keep their revisions and
-    // their in-flight work.
+    // Marks one instance's pending work terminal: the revision advances first
+    // so a completion that runs during the abort is already stale, then both
+    // owned transfers are canceled and released, and pending related state is
+    // reset. Other instances keep their revisions and their in-flight work.
+    void retireSourceOperation(SourceOperation& operation);
+    // Retires the instance's pending work before its record is replaced or
+    // erased.
     void invalidatePendingSourceWork(const QString& instanceId);
-    // Supersedes every instance's pending work; only the global cancel does.
+    // Retires every instance's pending work; only the global cancel does.
     void invalidateAllPendingSourceWork();
     [[nodiscard]] bool hasPendingConstellationWork() const;
     void setSourceEnabled(const QString& instanceId, bool enabled);
     void setStatusText(const QString& statusText);
     void setDownloadingCatalog(bool downloadingCatalog);
     void setCatalogProcessing(bool catalogProcessing);
-    void handleCatalogImportStatus(const QString& instanceId, const QString& statusText);
+    void handleCatalogImportStatus(const QString& instanceId, std::uint64_t revision, const QString& statusText);
     void downloadConstellationLinesAfterCatalog(
         const QString& instanceId,
         std::uint64_t revision,

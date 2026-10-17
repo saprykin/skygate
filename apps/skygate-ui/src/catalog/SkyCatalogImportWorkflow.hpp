@@ -43,11 +43,12 @@ public:
 
     [[nodiscard]] bool isAvailable() const noexcept;
 
-    // Starts the download and returns the handle that cancels it, or null
-    // when no download was started. A canceled download stops without
-    // reporting a completion; an ordinary failure is reported through the
-    // completion result.
-    std::shared_ptr<CatalogDownloadCancellation> downloadSource(
+    // Starts the download with the caller's cancellation handle so the owner
+    // can hold it before any status callback runs. A canceled download stops
+    // without reporting a completion; an ordinary failure is reported through
+    // the completion result.
+    void downloadSource(
+        const std::shared_ptr<CatalogDownloadCancellation>& cancellation,
         const SkyCatalogSourceInstance& source,
         skygate::ephemeris::CatalogCompositionPolicy policy,
         QObject* callbackContext,
@@ -55,7 +56,8 @@ public:
         SourceCompletionHandler completionHandler
     ) const;
 
-    std::shared_ptr<CatalogDownloadCancellation> downloadConstellationLines(
+    void downloadConstellationLines(
+        const std::shared_ptr<CatalogDownloadCancellation>& cancellation,
         const QStringList& urlTexts,
         QObject* callbackContext,
         StatusHandler statusHandler,

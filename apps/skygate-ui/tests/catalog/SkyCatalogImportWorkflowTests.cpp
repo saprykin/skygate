@@ -1,5 +1,6 @@
 #include "BaseCelestialBody.hpp"
 #include "CatalogArchiveTestSupport.hpp"
+#include "catalog/CatalogDownloadCancellation.hpp"
 #include "catalog/SkyCatalogImportWorkflow.hpp"
 #include "catalog/SkyCatalogSourceDescriptor.hpp"
 #include "catalog/SkyCatalogSourceImportResult.hpp"
@@ -23,6 +24,11 @@
 using namespace skygate::ui::tests;
 
 namespace {
+
+std::shared_ptr<CatalogDownloadCancellation> newCancellation()
+{
+    return std::make_shared<CatalogDownloadCancellation>();
+}
 
 // A gzip-compressed HYG CSV row; decodes to the single star object hip_42.
 constexpr std::array<unsigned char, 73> kHygGzip{
@@ -97,6 +103,7 @@ void SkyCatalogImportWorkflowTests::runSourceDownload(
     const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
     runAsync([&](QEventLoop& loop) {
         workflow.downloadSource(
+            newCancellation(),
             source,
             skygate::ephemeris::CatalogCompositionPolicy::Merge,
             this,
@@ -122,6 +129,7 @@ void SkyCatalogImportWorkflowTests::parsesConstellationPayloads()
     LogCapture capture(QtInfoMsg);
     runAsync([&](QEventLoop& loop) {
         workflow.downloadConstellationLines(
+            newCancellation(),
             {"https://example.test/index.json"},
             this,
             [&statuses](const QString& status) { statuses.push_back(status); },
@@ -155,6 +163,7 @@ void SkyCatalogImportWorkflowTests::noConstellationCompletionAfterContextDestroy
     bool completionCalled = false;
     auto callbackContext = std::make_unique<QObject>();
     workflow.downloadConstellationLines(
+        newCancellation(),
         {"https://example.test/slow-index.json"},
         callbackContext.get(),
         {},
@@ -183,6 +192,7 @@ void SkyCatalogImportWorkflowTests::fallsBackForMalformedConstellationPayload()
     );
     runAsync([&](QEventLoop& loop) {
         workflow.downloadConstellationLines(
+            newCancellation(),
             {"https://example.test/bad-index.json"},
             this,
             {},
@@ -215,6 +225,7 @@ void SkyCatalogImportWorkflowTests::rejectsDeepSkyCatalogWithoutDsos()
     skygate::ui::internal::SkyCatalogSourceImportResult finalResult;
     runAsync([&](QEventLoop& loop) {
         workflow.downloadSource(
+            newCancellation(),
             source,
             skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly,
             this,
@@ -250,6 +261,7 @@ void SkyCatalogImportWorkflowTests::reportsDeepSkyObjectCount()
     skygate::ui::internal::SkyCatalogSourceImportResult finalResult;
     runAsync([&](QEventLoop& loop) {
         workflow.downloadSource(
+            newCancellation(),
             source,
             skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly,
             this,
@@ -288,6 +300,7 @@ void SkyCatalogImportWorkflowTests::unifiedDownloadSourceKeepsStarCatalogsUnfilt
     skygate::ui::internal::SkyCatalogSourceImportResult finalResult;
     runAsync([&](QEventLoop& loop) {
         workflow.downloadSource(
+            newCancellation(),
             source,
             skygate::ephemeris::CatalogCompositionPolicy::Merge,
             this,

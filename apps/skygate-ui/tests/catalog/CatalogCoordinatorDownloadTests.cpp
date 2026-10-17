@@ -1,5 +1,6 @@
 #include "BaseCelestialBody.hpp"
 #include "catalog/CatalogCoordinator.hpp"
+#include "catalog/CatalogDownloadCancellation.hpp"
 #include "catalog/CatalogParseOptions.hpp"
 #include "support/AsyncTestSupport.hpp"
 #include "support/CatalogTestPayloads.hpp"
@@ -13,6 +14,15 @@
 #include <utility>
 
 using namespace skygate::ui::tests;
+
+namespace {
+
+std::shared_ptr<CatalogDownloadCancellation> newCancellation()
+{
+    return std::make_shared<CatalogDownloadCancellation>();
+}
+
+}  // namespace
 
 class CatalogCoordinatorDownloadTests final : public QObject {
     Q_OBJECT
@@ -36,6 +46,7 @@ void CatalogCoordinatorDownloadTests::parsesSuccessfulDownloadedCatalog()
     QStringList statuses;
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
+            newCancellation(),
             {"https://example.test/catalog.csv"},
             CatalogParseOptions{},
             this,
@@ -78,6 +89,7 @@ void CatalogCoordinatorDownloadTests::reportsParseFailureWithSourceUrl()
     );
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
+            newCancellation(),
             {"https://example.test/bad.csv"},
             CatalogParseOptions{},
             this,
@@ -128,6 +140,7 @@ void CatalogCoordinatorDownloadTests::gzipUnknownInnerSchemaUsesFormatNeutralWor
     );
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
+            newCancellation(),
             {"https://example.test/missing-mag.csv.gz"},
             CatalogParseOptions{},
             this,
@@ -160,6 +173,7 @@ void CatalogCoordinatorDownloadTests::missingOpenNgcColumnsDoNotClaimHyg()
     );
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
+            newCancellation(),
             {"https://example.test/missing-dec.csv"},
             CatalogParseOptions{},
             this,
@@ -186,6 +200,7 @@ void CatalogCoordinatorDownloadTests::loadsArchiveMemberNamedByParseOptions()
     CatalogCoordinator::DownloadResult finalResult;
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
+            newCancellation(),
             {"https://example.test/catalogs.zip"},
             CatalogParseOptions{
                 .archiveMember = QStringLiteral("catalog/ngc.csv"),
@@ -227,6 +242,7 @@ void CatalogCoordinatorDownloadTests::reportsContradictorySchemaHintWithSourceUr
     );
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
+            newCancellation(),
             {"https://example.test/stars.csv"},
             CatalogParseOptions{.schemaHint = skygate::ephemeris::CatalogSourceType::OpenNgcCsv},
             this,

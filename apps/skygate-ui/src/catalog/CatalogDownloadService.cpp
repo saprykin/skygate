@@ -106,21 +106,26 @@ CatalogDownloadService::CatalogDownloadService(QNetworkAccessManager* networkAcc
 {
 }
 
-std::shared_ptr<CatalogDownloadCancellation> CatalogDownloadService::downloadFirstSuccessfulFromUrls(
+void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
+    const std::shared_ptr<CatalogDownloadCancellation>& cancellation,
     const QStringList& urlTexts,
     QObject* callbackContext,
     StatusHandler statusHandler,
     CompletionHandler completionHandler
 ) const
 {
-    const auto cancellation = std::make_shared<CatalogDownloadCancellation>();
+    Q_ASSERT(cancellation != nullptr);
+    if (cancellation == nullptr || cancellation->isCanceled()) {
+        return;
+    }
+
     const QStringList candidateUrls = normalizedCandidateUrls(urlTexts);
     if (candidateUrls.isEmpty()) {
         DownloadResult result;
         result.errorText = "Catalog: Invalid URL";
         qCWarning(skygateCatalogDownloadLog) << "Catalog download aborted: no valid source URLs";
         completionHandler(std::move(result));
-        return cancellation;
+        return;
     }
 
     if (m_networkAccessManager == nullptr) {
@@ -128,7 +133,7 @@ std::shared_ptr<CatalogDownloadCancellation> CatalogDownloadService::downloadFir
         result.errorText = "Catalog: Network unavailable";
         qCWarning(skygateCatalogDownloadLog) << "Catalog download aborted: network unavailable";
         completionHandler(std::move(result));
-        return cancellation;
+        return;
     }
 
     qCInfo(skygateCatalogDownloadLog).noquote() << "Catalog download started: sources" << candidateUrls.size();
@@ -169,6 +174,11 @@ std::shared_ptr<CatalogDownloadCancellation> CatalogDownloadService::downloadFir
 
         if (statusHandler) {
             statusHandler(QString("Catalog: Downloading %1...").arg(url.toString()));
+            // The status handler is user code; a synchronous cancellation
+            // must stop the candidate before its request is issued.
+            if (cancellation->isCanceled()) {
+                return;
+            }
         }
 
         QNetworkRequest request(url);
@@ -300,5 +310,4 @@ std::shared_ptr<CatalogDownloadCancellation> CatalogDownloadService::downloadFir
     };
 
     (*tryDownloadNextUrl)(0);
-    return cancellation;
 }
