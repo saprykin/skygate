@@ -771,6 +771,11 @@ QString SkyContextController::ephemerisLongRangeKernelStatusText() const
     return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->longRangeKernelStatusText() : QString();
 }
 
+QString SkyContextController::ephemerisKernelDisplayText() const
+{
+    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->kernelDisplayText() : QString();
+}
+
 QString SkyContextController::ephemerisEarthOrientationStatusText() const
 {
     return m_ephemerisUpdateWorkflow->earthOrientationStatusText();

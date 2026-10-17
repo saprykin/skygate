@@ -146,6 +146,11 @@ class SkyContextController final : public QObject {
         NOTIFY ephemerisDataStatusTextChanged
     )
     Q_PROPERTY(
+        QString ephemerisKernelDisplayText
+        READ ephemerisKernelDisplayText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
         QString ephemerisEarthOrientationStatusText
         READ ephemerisEarthOrientationStatusText
         NOTIFY ephemerisDataStatusTextChanged
@@ -335,6 +340,7 @@ public:
     [[nodiscard]] QString ephemerisEngineStatusText() const;
     [[nodiscard]] QString ephemerisShortRangeKernelStatusText() const;
     [[nodiscard]] QString ephemerisLongRangeKernelStatusText() const;
+    [[nodiscard]] QString ephemerisKernelDisplayText() const;
     [[nodiscard]] QString ephemerisEarthOrientationStatusText() const;
     [[nodiscard]] QString ephemerisLeapSecondStatusText() const;
     [[nodiscard]] QString ephemerisDeltaTStatusText() const;

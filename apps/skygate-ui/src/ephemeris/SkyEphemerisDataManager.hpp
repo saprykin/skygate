@@ -39,6 +39,7 @@ public:
     [[nodiscard]] QString datasetInfoText() const;
     [[nodiscard]] QString shortRangeKernelStatusText() const;
     [[nodiscard]] QString longRangeKernelStatusText() const;
+    [[nodiscard]] QString kernelDisplayText() const;
     [[nodiscard]] QString earthOrientationStatusText() const;
     [[nodiscard]] QString leapSecondStatusText() const;
     [[nodiscard]] QString deltaTStatusText() const;
