@@ -9,7 +9,6 @@ struct SkyTimelineState final {
     bool toolbarCollapsed = false;
     bool catchingUpToCurrentUtc = false;
     double speedMultiplier = 1.0;
-    double speedRemainderSeconds = 0.0;
     int stepSeconds = SkyTimelineViewDefaultsPolicy::kDefaultStepSeconds;
 };
 

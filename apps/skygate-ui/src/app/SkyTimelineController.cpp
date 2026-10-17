@@ -36,7 +36,6 @@ bool SkyTimelineController::setLive(const bool live) noexcept
     }
 
     m_state.live = live;
-    resetSpeedProgress();
     m_state.catchingUpToCurrentUtc = false;
     return true;
 }
@@ -58,7 +57,6 @@ bool SkyTimelineController::setSpeedMultiplier(const double speedMultiplier) noe
     }
 
     m_state.speedMultiplier = speedMultiplier;
-    resetSpeedProgress();
     return true;
 }
 
@@ -77,32 +75,10 @@ void SkyTimelineController::setCatchingUpToCurrentUtc(const bool catchingUpToCur
     m_state.catchingUpToCurrentUtc = catchingUpToCurrentUtc;
 }
 
-void SkyTimelineController::resetSpeedProgress() noexcept
-{
-    m_state.speedRemainderSeconds = 0.0;
-}
-
-void SkyTimelineController::addSpeedRemainderSeconds(const double seconds) noexcept
-{
-    m_state.speedRemainderSeconds += seconds;
-}
-
-int SkyTimelineController::takeWholeSpeedRemainderSeconds() noexcept
-{
-    const int wholeSeconds = static_cast<int>(std::floor(m_state.speedRemainderSeconds));
-    if (wholeSeconds <= 0) {
-        return 0;
-    }
-
-    m_state.speedRemainderSeconds -= wholeSeconds;
-    return wholeSeconds;
-}
-
 void SkyTimelineController::startLiveAtCurrentUtc() noexcept
 {
     m_state.live = true;
     m_state.catchingUpToCurrentUtc = false;
-    resetSpeedProgress();
 }
 
 }  // namespace skygate::ui::internal
