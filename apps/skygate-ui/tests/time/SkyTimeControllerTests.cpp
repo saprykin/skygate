@@ -44,7 +44,12 @@ private slots:
     void changingTimeZonePreservesUtcInstant();
     void formatsSeasonalDstLabels();
     void parsesSelectedZoneWallTimeToUtc();
+    void parsesWallTimeAcrossDstGapAndOverlap();
     void validatesBceInput();
+    void qtTimeCodecParsesCivilComponents();
+    void qtTimeCodecClassifiesInvalidInput();
+    void utcDateTextCodecReportsExactMessages();
+    void timeControllerReportsExactMessages();
     void formatsBceDateTimesWithSuffix();
     void dateTextCodecsAgreeOnValidDates();
     void invalidDateTimeKeepsZeroedDateText();
@@ -177,6 +182,134 @@ void SkyTimeControllerTests::validatesBceInput()
 
     QVERIFY(controller.setDateTimeText(QStringLiteral("0044-03-15 BC"), QStringLiteral("12:00:00")));
     QCOMPARE(controller.dateText(), QStringLiteral("0044-03-15 BCE"));
+}
+
+void SkyTimeControllerTests::parsesWallTimeAcrossDstGapAndOverlap()
+{
+    SkyTimeController controller;
+    QVERIFY(controller.setTimeZoneId(QStringLiteral("Europe/Zurich")));
+    connect(
+        &controller, &SkyTimeController::utcDateTimeChangeRequested, &controller, &SkyTimeController::setUtcDateTime
+    );
+
+    // 02:30 does not exist on the spring-forward day; Qt resolves it with the pre-transition offset.
+    QVERIFY(controller.setDateTimeText(QStringLiteral("2026-03-29"), QStringLiteral("02:30:00")));
+    QCOMPARE(controller.utcDateTime(), QDateTime(QDate(2026, 3, 29), QTime(1, 30, 0), QTimeZone::UTC));
+
+    // 02:30 happens twice on the fall-back day; Qt resolves it to the first occurrence.
+    QVERIFY(controller.setDateTimeText(QStringLiteral("2026-10-25"), QStringLiteral("02:30:00")));
+    QCOMPARE(controller.utcDateTime(), QDateTime(QDate(2026, 10, 25), QTime(0, 30, 0), QTimeZone::UTC));
+
+    QVERIFY(controller.setDateTimeText(QStringLiteral("2026-10-25"), QStringLiteral("03:00:00")));
+    QCOMPARE(controller.utcDateTime(), QDateTime(QDate(2026, 10, 25), QTime(2, 0, 0), QTimeZone::UTC));
+}
+
+void SkyTimeControllerTests::qtTimeCodecParsesCivilComponents()
+{
+    const auto ce = SkyQtTimeCodec::parseDateTime(QStringLiteral("2026-05-06"), QStringLiteral("09:30:30"));
+    QCOMPARE(ce.error, SkyQtTimeCodec::ParseError::None);
+    QCOMPARE(ce.year, 2026);
+    QCOMPARE(ce.month, 5);
+    QCOMPARE(ce.day, 6);
+    QCOMPARE(ce.hour, 9);
+    QCOMPARE(ce.minute, 30);
+    QCOMPARE(ce.second, 30);
+
+    const auto bce = SkyQtTimeCodec::parseDateTime(QStringLiteral("0044-03-15 bce"), QStringLiteral("12:00:00"));
+    QCOMPARE(bce.error, SkyQtTimeCodec::ParseError::None);
+    QCOMPARE(bce.year, -44);
+    QCOMPARE(bce.month, 3);
+    QCOMPARE(bce.day, 15);
+
+    const auto bc = SkyQtTimeCodec::parseDateTime(QStringLiteral("0044-03-15 BC"), QStringLiteral("12:00:00"));
+    QCOMPARE(bc.error, SkyQtTimeCodec::ParseError::None);
+    QCOMPARE(bc.year, -44);
+
+    const auto padded = SkyQtTimeCodec::parseDateTime(QStringLiteral("  2026-05-06  "), QStringLiteral(" 09:30:30 "));
+    QCOMPARE(padded.error, SkyQtTimeCodec::ParseError::None);
+    QCOMPARE(padded.year, 2026);
+    QCOMPARE(padded.hour, 9);
+}
+
+void SkyTimeControllerTests::qtTimeCodecClassifiesInvalidInput()
+{
+    QCOMPARE(
+        SkyQtTimeCodec::parseDateTime(QStringLiteral("2026-5-6"), QStringLiteral("09:30:30")).error,
+        SkyQtTimeCodec::ParseError::InvalidDateSyntax
+    );
+    QCOMPARE(
+        SkyQtTimeCodec::parseDateTime(QStringLiteral("0000-01-01"), QStringLiteral("00:00:00")).error,
+        SkyQtTimeCodec::ParseError::InvalidYearMagnitude
+    );
+    QCOMPARE(
+        SkyQtTimeCodec::parseDateTime(QStringLiteral("12345678901-01-01"), QStringLiteral("00:00:00")).error,
+        SkyQtTimeCodec::ParseError::InvalidYearMagnitude
+    );
+    QCOMPARE(
+        SkyQtTimeCodec::parseDateTime(QStringLiteral("2026-02-30"), QStringLiteral("09:30:30")).error,
+        SkyQtTimeCodec::ParseError::InvalidCalendarDate
+    );
+    QCOMPARE(
+        SkyQtTimeCodec::parseDateTime(QStringLiteral("2026-05-06"), QStringLiteral("09:30")).error,
+        SkyQtTimeCodec::ParseError::InvalidTimeSyntax
+    );
+    QCOMPARE(
+        SkyQtTimeCodec::parseDateTime(QStringLiteral("2026-05-06"), QStringLiteral("09:30:30.500")).error,
+        SkyQtTimeCodec::ParseError::InvalidTimeSyntax
+    );
+}
+
+void SkyTimeControllerTests::utcDateTextCodecReportsExactMessages()
+{
+    using skygate::ui::internal::SkyContextUtcDateTimeTextCodec;
+
+    QCOMPARE(
+        SkyContextUtcDateTimeTextCodec::parse(QStringLiteral("2026-5-6"), QStringLiteral("09:30:30")).errorText,
+        QStringLiteral("Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates.")
+    );
+    QCOMPARE(
+        SkyContextUtcDateTimeTextCodec::parse(QStringLiteral("0000-01-01"), QStringLiteral("00:00:00")).errorText,
+        QStringLiteral("Year 0000 is invalid. Use 0001 BCE for the year before 0001 CE.")
+    );
+    QCOMPARE(
+        SkyContextUtcDateTimeTextCodec::parse(QStringLiteral("2026-02-30"), QStringLiteral("09:30:30")).errorText,
+        QStringLiteral("Enter a valid UTC date.")
+    );
+    QCOMPARE(
+        SkyContextUtcDateTimeTextCodec::parse(QStringLiteral("2026-05-06"), QStringLiteral("09:30")).errorText,
+        QStringLiteral("Use HH:mm:ss for the UTC time.")
+    );
+
+    const auto parsed =
+        SkyContextUtcDateTimeTextCodec::parse(QStringLiteral(" 0044-03-15 bc "), QStringLiteral(" 12:00:00 "));
+    QVERIFY(parsed.isValid());
+    QCOMPARE(parsed.utcDateTime, QDateTime(QDate(-44, 3, 15), QTime(12, 0, 0), QTimeZone::UTC));
+}
+
+void SkyTimeControllerTests::timeControllerReportsExactMessages()
+{
+    SkyTimeController controller;
+    QVERIFY(controller.setTimeZoneId(QStringLiteral("Europe/Zurich")));
+
+    QCOMPARE(
+        controller.validateDateTimeText(QStringLiteral("2026-5-6"), QStringLiteral("09:30:30")),
+        QStringLiteral("Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates.")
+    );
+    QCOMPARE(
+        controller.validateDateTimeText(QStringLiteral("0000-01-01"), QStringLiteral("00:00:00")),
+        QStringLiteral("Year 0000 is invalid. Use 0001 BCE for the year before 0001 CE.")
+    );
+    QCOMPARE(
+        controller.validateDateTimeText(QStringLiteral("2026-02-30"), QStringLiteral("09:30:30")),
+        QStringLiteral("Enter a valid date.")
+    );
+    QCOMPARE(
+        controller.validateDateTimeText(QStringLiteral("2026-05-06"), QStringLiteral("09:30")),
+        QStringLiteral("Use HH:mm:ss for the time.")
+    );
+
+    QVERIFY(controller.validateDateTimeText(QStringLiteral(" 2026-05-06 "), QStringLiteral(" 09:30:30 ")).isEmpty());
+    QVERIFY(controller.validateDateTimeText(QStringLiteral("0044-03-15 BC"), QStringLiteral("12:00:00")).isEmpty());
 }
 
 void SkyTimeControllerTests::formatsBceDateTimesWithSuffix()
