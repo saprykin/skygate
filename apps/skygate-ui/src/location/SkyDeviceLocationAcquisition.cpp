@@ -198,7 +198,11 @@ void SkyDeviceLocationAcquisition::applyPositionInfo(const QGeoPositionInfo& pos
 void SkyDeviceLocationAcquisition::requestOneShotUpdate()
 {
 #if SKYGATE_HAS_POSITIONING
+    const quint64 sourceRevision = m_sourceRevision;
     emit statusTextChanged(QStringLiteral("Location: Locating"));
+    if (sourceRevision != m_sourceRevision) {
+        return;
+    }
 
     QGeoPositionInfoSource* const source = livePositionSource();
     if (source == nullptr) {
