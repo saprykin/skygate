@@ -123,17 +123,26 @@ QString installedDatasetInfoText(const EphemerisDataCacheSnapshot& snapshot)
     return parts.join(QStringLiteral(" | "));
 }
 
+QString installedKernelMetadataText(const EphemerisDataCacheSnapshot& snapshot)
+{
+    return QStringList{
+        snapshot.installedKernelAssetId,
+        snapshot.installedKernelProfileId,
+        snapshot.installedKernelVersion,
+    }
+        .join(QLatin1Char(' '))
+        .toLower();
+}
+
 bool installedKernelLooksLongRange(const EphemerisDataCacheSnapshot& snapshot)
 {
-    const QString haystack =
-        QStringList{
-            snapshot.installedKernelAssetId,
-            snapshot.installedKernelProfileId,
-            snapshot.installedKernelVersion,
-        }
-            .join(QLatin1Char(' '))
-            .toLower();
-    return haystack.contains(QStringLiteral("de441")) || haystack.contains(QStringLiteral("long"));
+    const QString metadataText = installedKernelMetadataText(snapshot);
+    return metadataText.contains(QStringLiteral("de441")) || metadataText.contains(QStringLiteral("long"));
+}
+
+bool installedKernelLooksShortRange(const EphemerisDataCacheSnapshot& snapshot)
+{
+    return installedKernelMetadataText(snapshot).contains(QStringLiteral("de440"));
 }
 
 StagedUpdateDownloadRequest
@@ -199,6 +208,20 @@ QString SkyEphemerisDataManager::longRangeKernelStatusText() const
         return QStringLiteral("Installed: %1").arg(version);
     }
     return QStringLiteral("Not installed");
+}
+
+QString SkyEphemerisDataManager::kernelDisplayText() const
+{
+    if (!usingInstalledData()) {
+        return QStringLiteral("Bundled");
+    }
+    if (installedKernelLooksLongRange(m_activeCacheSnapshot)) {
+        return QStringLiteral("DE441");
+    }
+    if (installedKernelLooksShortRange(m_activeCacheSnapshot)) {
+        return QStringLiteral("DE440s");
+    }
+    return QStringLiteral("Bundled");
 }
 
 QString SkyEphemerisDataManager::earthOrientationStatusText() const

@@ -261,6 +261,7 @@ void SkyContextControllerEphemerisDataTests::controllerOwnsManagerAndExposesSnap
     SkyContextController controller(nullptr, nullptr, options, nullptr);
 
     QCOMPARE(controller.ephemerisDataStatusText(), QString("Ephemeris data: Bundled fallback"));
+    QCOMPARE(controller.ephemerisKernelDisplayText(), QString("Bundled"));
     QVERIFY(controller.ephemerisDataRevision() > 0U);
     QVERIFY(controller.activeEphemerisDataSnapshot() != nullptr);
 }
@@ -299,6 +300,7 @@ void SkyContextControllerEphemerisDataTests::updateRefreshesRemoteManifestAndRep
     QVERIFY(statusSpy.count() > 0);
     QCOMPARE(controller.ephemerisDataUpdateProgress(), 1.0);
     QCOMPARE(controller.ephemerisShortRangeKernelStatusText(), QString("Installed: fresh"));
+    QCOMPARE(controller.ephemerisKernelDisplayText(), QString("DE440s"));
     QCOMPARE(controller.ephemerisDataLastUpdateResultText(), QString("Installed DE440sShortRange"));
 
     const auto snapshot = controller.activeEphemerisDataSnapshot();

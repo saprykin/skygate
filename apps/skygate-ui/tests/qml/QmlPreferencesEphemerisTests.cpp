@@ -367,7 +367,9 @@ void QmlPreferencesEphemerisTests::ephemerisDataControlsShowFallbackAndUpdateMod
     QVERIFY(kernelDownloadCombo != nullptr);
     QVERIFY(supportDownloadCombo != nullptr);
 
+    QCOMPARE(controller->ephemerisKernelDisplayText(), QString("Bundled"));
     QCOMPARE(modernStatus->property("text").toString(), QString("Bundled"));
+    QCOMPARE(modernStatus->property("text").toString(), controller->ephemerisKernelDisplayText());
     QCOMPARE(eopStatus->property("text").toString(), QString("Bundled"));
     QCOMPARE(leapSecondStatus->property("text").toString(), QString("Bundled"));
     QCOMPARE(deltaTStatus->property("text").toString(), QString("Bundled"));
@@ -378,10 +380,15 @@ void QmlPreferencesEphemerisTests::ephemerisDataControlsShowFallbackAndUpdateMod
 
     QVERIFY(QMetaObject::invokeMethod(kernelDownloadCombo, "activated", Q_ARG(int, 2)));
     QTRY_COMPARE(modernStatus->property("text").toString(), QString("DE441"));
+    QCOMPARE(modernStatus->property("text").toString(), controller->ephemerisKernelDisplayText());
     QTRY_COMPARE(eopStatus->property("text").toString(), QString("Bundled"));
     QTRY_COMPARE(leapSecondStatus->property("text").toString(), QString("Bundled"));
     QTRY_COMPARE(deltaTStatus->property("text").toString(), QString("Bundled"));
     QCOMPARE(controller->ephemerisDataStatusText(), QString("Ephemeris data: Installed data active"));
+
+    QVERIFY(QMetaObject::invokeMethod(kernelDownloadCombo, "activated", Q_ARG(int, 1)));
+    QTRY_COMPARE(modernStatus->property("text").toString(), QString("DE440s"));
+    QCOMPARE(modernStatus->property("text").toString(), controller->ephemerisKernelDisplayText());
 
     controller->setEphemerisDataOnlineUpdatesEnabled(false);
     QTRY_VERIFY(supportDownloadCombo->property("enabled").toBool());
@@ -464,6 +471,7 @@ void QmlPreferencesEphemerisTests::ephemerisControlsShowInstalledStateAndClearCa
     QVERIFY(supportClearButton != nullptr);
 
     QCOMPARE(modernStatus->property("text").toString(), QString("DE441"));
+    QCOMPARE(modernStatus->property("text").toString(), controller->ephemerisKernelDisplayText());
     QCOMPARE(kernelCacheSize->property("text").toString(), QString("2.0 MB"));
     QCOMPARE(supportCacheSize->property("text").toString(), QString("3.0 MB"));
     QCOMPARE(eopStatus->property("text").toString(), QString("2026-05-07"));
@@ -478,6 +486,7 @@ void QmlPreferencesEphemerisTests::ephemerisControlsShowInstalledStateAndClearCa
 
     QVERIFY(activateControl(kernelClearButton));
     QTRY_COMPARE(modernStatus->property("text").toString(), QString("Bundled"));
+    QCOMPARE(modernStatus->property("text").toString(), controller->ephemerisKernelDisplayText());
     QTRY_COMPARE(kernelCacheSize->property("text").toString(), QString("0 MB"));
     QCOMPARE(eopStatus->property("text").toString(), QString("2026-05-07 (available: 2026-06-01)"));
     QVERIFY(!QFileInfo::exists(kernelPath));

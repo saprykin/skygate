@@ -256,14 +256,7 @@ Item {
                 Label {
                     objectName: "ephemerisShortRangeKernelStatusLabel"
                     Layout.fillWidth: true
-                    readonly property string kernelStatusText: engineSection.controllerText("ephemerisLongRangeKernelStatusText", "Not installed") === "Not installed"
-                                                               ? engineSection.controllerText("ephemerisShortRangeKernelStatusText", "Bundled fallback")
-                                                               : engineSection.controllerText("ephemerisLongRangeKernelStatusText", "Not installed")
-                    text: kernelStatusText.indexOf("DE441") >= 0
-                          ? "DE441"
-                          : (kernelStatusText.indexOf("DE440") >= 0
-                             ? "DE440s"
-                             : "Bundled")
+                    text: engineSection.controllerText("ephemerisKernelDisplayText", "Bundled")
                     color: skyContext.theme.listItemPrimaryText
                     font.pixelSize: 11
                     font.family: "Avenir Next"

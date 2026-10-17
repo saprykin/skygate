@@ -94,6 +94,11 @@ private slots:
     void missingInstalledDataFallsBackToBundled();
     void unbundledProductionOmitsMissingFallbackFiles();
     void revisionSignalEmitsOnlyWhenActiveDataChanges();
+    void kernelDisplayTextForBundledData();
+    void kernelDisplayTextForMissingInstalledData();
+    void kernelDisplayTextForInstalledKernels();
+    void kernelDisplayTextForLegacyProfile();
+    void kernelDisplayTextForUnexpectedMetadata();
 
 private:
     SettingsTestFixture m_settings;
@@ -261,6 +266,97 @@ void SkyEphemerisDataStatusTests::unbundledProductionOmitsMissingFallbackFiles()
     QVERIFY(snapshot != nullptr);
     QVERIFY(!snapshot->solarSystemKernelAsset("de440s-kernel").has_value());
     QVERIFY(!snapshot->solarSystemKernelAsset("de441-kernel").has_value());
+}
+
+void SkyEphemerisDataStatusTests::kernelDisplayTextForBundledData()
+{
+    SkySettingsStore store;
+    SkyEphemerisDataManager manager(&store);
+
+    QVERIFY(!manager.usingInstalledData());
+    QCOMPARE(manager.kernelDisplayText(), QString("Bundled"));
+}
+
+void SkyEphemerisDataStatusTests::kernelDisplayTextForMissingInstalledData()
+{
+    SkySettingsStore store;
+    QVERIFY(store.saveEphemerisDataCache(
+        EphemerisDataCacheSnapshotFixture::installedSnapshot(
+            m_settings.filePath(QStringLiteral("display-missing-kernel.bsp")), QString()
+        )
+    ));
+
+    SkyEphemerisDataManager manager(&store);
+
+    QVERIFY(!manager.usingInstalledData());
+    QCOMPARE(manager.kernelDisplayText(), QString("Bundled"));
+}
+
+void SkyEphemerisDataStatusTests::kernelDisplayTextForInstalledKernels()
+{
+    const QString de440sPath = m_settings.filePath(QStringLiteral("display-de440s.bsp"));
+    QVERIFY(writeFile(de440sPath, QByteArrayLiteral("kernel")));
+    SkySettingsStore store;
+    QVERIFY(store.saveEphemerisDataCache(EphemerisDataCacheSnapshotFixture::installedSnapshot(de440sPath, QString())));
+    {
+        SkyEphemerisDataManager manager(&store);
+        QVERIFY(manager.usingInstalledData());
+        QCOMPARE(manager.kernelDisplayText(), QString("DE440s"));
+    }
+
+    SkyEphemerisDataCacheSnapshot de441Snapshot = EphemerisDataCacheSnapshotFixture::installedSnapshot(
+        m_settings.filePath(QStringLiteral("display-de441.bsp")), QString()
+    );
+    QVERIFY(writeFile(de441Snapshot.installedKernelPath, QByteArrayLiteral("kernel")));
+    de441Snapshot.installedKernelAssetId = QStringLiteral("de441-kernel");
+    de441Snapshot.installedKernelProfileId = QStringLiteral("de441-long-range");
+    de441Snapshot.installedKernelVersion = QStringLiteral("DE441-test");
+    QVERIFY(store.saveEphemerisDataCache(de441Snapshot));
+
+    SkyEphemerisDataManager manager(&store);
+
+    QVERIFY(manager.usingInstalledData());
+    QCOMPARE(manager.kernelDisplayText(), QString("DE441"));
+}
+
+void SkyEphemerisDataStatusTests::kernelDisplayTextForLegacyProfile()
+{
+    const QString kernelPath = m_settings.filePath(QStringLiteral("display-legacy-modern.bsp"));
+    QVERIFY(writeFile(kernelPath, QByteArrayLiteral("kernel")));
+    SkyEphemerisDataCacheSnapshot snapshot =
+        EphemerisDataCacheSnapshotFixture::installedSnapshot(kernelPath, QString());
+    snapshot.installedKernelProfileId = QStringLiteral("modern");
+    snapshot.installedKernelVersion = QStringLiteral("DE440s-2026a");
+
+    SkySettingsStore store;
+    QVERIFY(store.saveEphemerisDataCache(snapshot));
+
+    SkyEphemerisDataManager manager(&store);
+
+    QVERIFY(manager.usingInstalledData());
+    QCOMPARE(manager.activeCacheSnapshot().installedKernelProfileId, QString("de440s-short-range"));
+    QCOMPARE(manager.kernelDisplayText(), QString("DE440s"));
+}
+
+void SkyEphemerisDataStatusTests::kernelDisplayTextForUnexpectedMetadata()
+{
+    const QString kernelPath = m_settings.filePath(QStringLiteral("display-unexpected-kernel.bsp"));
+    QVERIFY(writeFile(kernelPath, QByteArrayLiteral("kernel")));
+    SkyEphemerisDataCacheSnapshot snapshot =
+        EphemerisDataCacheSnapshotFixture::installedSnapshot(kernelPath, QString());
+    snapshot.installedKernelAssetId = QStringLiteral("custom-kernel");
+    snapshot.installedKernelProfileId = QStringLiteral("custom-profile");
+    snapshot.installedKernelVersion = QStringLiteral("custom-version");
+
+    SkySettingsStore store;
+    QVERIFY(store.saveEphemerisDataCache(snapshot));
+
+    SkyEphemerisDataManager manager(&store);
+
+    QVERIFY(manager.usingInstalledData());
+    QCOMPARE(manager.shortRangeKernelStatusText(), QString("Installed: custom-version"));
+    QCOMPARE(manager.longRangeKernelStatusText(), QString("Not installed"));
+    QCOMPARE(manager.kernelDisplayText(), QString("Bundled"));
 }
 
 void SkyEphemerisDataStatusTests::revisionSignalEmitsOnlyWhenActiveDataChanges()
