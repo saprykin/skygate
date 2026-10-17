@@ -43,6 +43,8 @@ private slots:
     void cancelAbortsOnlyOwnTransfers();
     void cancelWhileParsingIgnoresQueuedCompletion();
     void cancelFromStartupNotificationLeavesNoRequest();
+    void cancelFromFirstRowNotificationLeavesNoRequest();
+    void retryAfterFirstRowNotificationCancelSucceeds();
     void failedLocalDownloadClearsBusyAndReportsStatus();
     void failedLoadPreservesPriorDataAndRetrySucceeds();
     void failedUpdateKeepsAcceptedFactsWhenPersisting();
@@ -405,6 +407,131 @@ void SkyCatalogManagerImportTests::cancelFromStartupNotificationLeavesNoRequest(
     QVERIFY(!entry->busy);
     QVERIFY(!entry->hasError);
     QCOMPARE(entry->statusText, QStringLiteral("Canceled"));
+}
+
+void SkyCatalogManagerImportTests::cancelFromFirstRowNotificationLeavesNoRequest()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/first-row-cancel.csv");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    // A request that started despite the cancellation would stay open, so the
+    // test observes a leak instead of racing an automatic completion.
+    networkAccessManager.enqueueResponse(
+        catalogUrl,
+        {.payload = skygate::ui::tests::sampleHygCsvPayload(
+             {.id = 909100, .hip = 909100, .properName = "First Row Cancel Star", .mag = "1.0"}
+         ),
+         .manualFinish = true}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+
+    const auto acceptedRevisionBefore = manager.catalogRevision();
+    const std::size_t acceptedBodiesBefore = manager.bodyCount();
+    const skygate::ephemeris::IStarCatalog* const acceptedCatalogBefore = manager.starCatalog();
+
+    bool canceledFromFirstRow = false;
+    bool downloadingWhenNotified = true;
+    QObject::connect(
+        &manager,
+        &SkyCatalogManager::sourcesChanged,
+        &manager,
+        [&manager, &canceledFromFirstRow, &downloadingWhenNotified]() {
+            if (canceledFromFirstRow) {
+                return;
+            }
+            canceledFromFirstRow = true;
+            // The busy row is published before the download starts, so the
+            // first notification arrives with no transfer running yet.
+            downloadingWhenNotified = manager.downloadingCatalog();
+            manager.cancelCatalogDownload();
+        }
+    );
+
+    const skygate::ui::internal::SkyCatalogSourceInstance source =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(catalogUrl);
+    const QString instanceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QVERIFY(canceledFromFirstRow);
+    QVERIFY(!downloadingWhenNotified);
+    QCoreApplication::processEvents();
+
+    QVERIFY(!manager.downloadingCatalog());
+    QVERIFY(!manager.catalogProcessing());
+    QVERIFY(networkAccessManager.issuedReplies().isEmpty());
+    QVERIFY(networkAccessManager.requestedUrls().isEmpty());
+    QCOMPARE(manager.catalogRevision(), acceptedRevisionBefore);
+    QCOMPARE(manager.bodyCount(), acceptedBodiesBefore);
+    QCOMPARE(manager.starCatalog(), acceptedCatalogBefore);
+    QCOMPARE(catalogSpy.count(), 0);
+    QCOMPARE(manager.statusText(), QStringLiteral("Catalog: Download canceled."));
+
+    const QVector<SkyCatalogManager::SourceViewEntry> view = manager.sourceViewEntries();
+    const auto entry =
+        std::find_if(view.begin(), view.end(), [&instanceId](const SkyCatalogManager::SourceViewEntry& viewEntry) {
+            return viewEntry.instanceId == instanceId;
+        });
+    QVERIFY(entry != view.end());
+    QVERIFY(!entry->busy);
+    QVERIFY(!entry->hasError);
+    QCOMPARE(entry->statusText, QStringLiteral("Canceled"));
+}
+
+void SkyCatalogManagerImportTests::retryAfterFirstRowNotificationCancelSucceeds()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/first-row-retry.csv");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        catalogUrl,
+        {.payload = skygate::ui::tests::sampleHygCsvPayload(
+             {.id = 909200, .hip = 909200, .properName = "First Row Retry Star", .mag = "1.0"}
+         )}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    bool canceledFromFirstRow = false;
+    QObject::connect(&manager, &SkyCatalogManager::sourcesChanged, &manager, [&manager, &canceledFromFirstRow]() {
+        if (canceledFromFirstRow) {
+            return;
+        }
+        canceledFromFirstRow = true;
+        manager.cancelCatalogDownload();
+    });
+
+    const skygate::ui::internal::SkyCatalogSourceInstance source =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(catalogUrl);
+    const QString instanceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QCoreApplication::processEvents();
+
+    QVERIFY(canceledFromFirstRow);
+    // The canceled startup issued no request, so the queued response is still
+    // available to the retry.
+    QVERIFY(networkAccessManager.requestedUrls().isEmpty());
+    QVERIFY(!manager.downloadingCatalog());
+    QVERIFY(!manager.catalogProcessing());
+
+    manager.retrySource(instanceId);
+    QVERIFY(manager.downloadingCatalog());
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QVERIFY(!manager.catalogProcessing());
+    QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("First Row Retry Star")));
+    QVERIFY(!manager.statusText().contains(QStringLiteral("canceled"), Qt::CaseInsensitive));
+
+    const QVector<SkyCatalogManager::SourceViewEntry> view = manager.sourceViewEntries();
+    const auto entry =
+        std::find_if(view.begin(), view.end(), [&instanceId](const SkyCatalogManager::SourceViewEntry& viewEntry) {
+            return viewEntry.instanceId == instanceId;
+        });
+    QVERIFY(entry != view.end());
+    QVERIFY(!entry->busy);
+    QVERIFY(!entry->hasError);
+    QCOMPARE(entry->statusText, QStringLiteral("Active"));
 }
 
 void SkyCatalogManagerImportTests::failedLocalDownloadClearsBusyAndReportsStatus()
