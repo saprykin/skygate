@@ -113,6 +113,8 @@ private slots:
     void setUtcDateTimeTextAcceptsBceInput();
     void bceAliasesResolveToTheSameInstant();
     void invalidUtcDateTimeInputLeavesTimelineUnchanged();
+    void utcValidationMessagesMatchEachRejection();
+    void utcInputParsingIgnoresDisplayZoneDst();
     void invalidYearZeroUtcDateTimeIsRejected();
     void manualUtcApplyPausesLivePlayback();
     void manualTimelineSteppingStillWorks();
@@ -192,6 +194,39 @@ void SkyContextControllerTimelineTests::invalidUtcDateTimeInputLeavesTimelineUnc
     QCOMPARE(controller->utcDateText(), QString("2026-01-02"));
     QCOMPARE(controller->utcTimeText(), QString("03:04:05"));
     QCOMPARE(controllerUtcTime(*controller).toSecsSinceEpoch(), beforeSeconds);
+}
+
+void SkyContextControllerTimelineTests::utcValidationMessagesMatchEachRejection()
+{
+    const auto controller = createController();
+    controller->setLive(false);
+
+    QCOMPARE(
+        controller->validateUtcDateTimeText("2026-5-6", "09:30:30"),
+        QString("Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates.")
+    );
+    QCOMPARE(
+        controller->validateUtcDateTimeText("0000-01-01", "00:00:00"),
+        QString("Year 0000 is invalid. Use 0001 BCE for the year before 0001 CE.")
+    );
+    QCOMPARE(controller->validateUtcDateTimeText("2026-02-30", "09:30:30"), QString("Enter a valid UTC date."));
+    QCOMPARE(controller->validateUtcDateTimeText("2026-05-06", "09:30"), QString("Use HH:mm:ss for the UTC time."));
+
+    QVERIFY(controller->validateUtcDateTimeText(" 2026-05-06 ", " 09:30:30 ").isEmpty());
+    QVERIFY(controller->validateUtcDateTimeText("0044-03-15 bc", "12:00:00").isEmpty());
+}
+
+void SkyContextControllerTimelineTests::utcInputParsingIgnoresDisplayZoneDst()
+{
+    const auto controller = createController();
+    controller->setLive(false);
+    QVERIFY(controller->timeController()->setTimeZoneId(QString("Europe/Zurich")));
+
+    QVERIFY(controller->setUtcDateTimeText("2026-03-29", "02:30:00"));
+
+    QCOMPARE(controller->utcDateText(), QString("2026-03-29"));
+    QCOMPARE(controller->utcTimeText(), QString("02:30:00"));
+    QCOMPARE(controller->timeController()->timeText(), QString("04:30:00"));
 }
 
 void SkyContextControllerTimelineTests::invalidYearZeroUtcDateTimeIsRejected()

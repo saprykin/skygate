@@ -2,6 +2,7 @@
 
 #include "UtcTimeCodec.hpp"
 
+#include <QTime>
 #include <QTimeZone>
 
 namespace {
@@ -63,4 +64,46 @@ QRegularExpression SkyQtTimeCodec::dateInputPattern()
         R"(^(\d{4,})-(\d{2})-(\d{2})(?:\s+(BCE|BC))?$)", QRegularExpression::CaseInsensitiveOption
     );
     return pattern;
+}
+
+SkyQtTimeCodec::ParseResult SkyQtTimeCodec::parseDateTime(const QString& dateText, const QString& timeText)
+{
+    const QRegularExpressionMatch dateMatch = dateInputPattern().match(dateText.trimmed());
+    if (!dateMatch.hasMatch()) {
+        return {.error = ParseError::InvalidDateSyntax};
+    }
+
+    bool isValidYear = false;
+    const int yearMagnitude = dateMatch.captured(1).toInt(&isValidYear);
+    if (!isValidYear || yearMagnitude == 0) {
+        return {.error = ParseError::InvalidYearMagnitude};
+    }
+
+    bool isValidMonth = false;
+    const int month = dateMatch.captured(2).toInt(&isValidMonth);
+    bool isValidDay = false;
+    const int day = dateMatch.captured(3).toInt(&isValidDay);
+    if (!isValidMonth || !isValidDay) {
+        return {.error = ParseError::InvalidCalendarDate};
+    }
+
+    const bool isBce = !dateMatch.captured(4).isEmpty();
+    const int year = isBce ? -yearMagnitude : yearMagnitude;
+    if (!QDate(year, month, day).isValid()) {
+        return {.error = ParseError::InvalidCalendarDate};
+    }
+
+    const QTime time = QTime::fromString(timeText.trimmed(), "HH:mm:ss");
+    if (!time.isValid()) {
+        return {.error = ParseError::InvalidTimeSyntax};
+    }
+
+    return {
+        .year = year,
+        .month = month,
+        .day = day,
+        .hour = time.hour(),
+        .minute = time.minute(),
+        .second = time.second(),
+    };
 }
