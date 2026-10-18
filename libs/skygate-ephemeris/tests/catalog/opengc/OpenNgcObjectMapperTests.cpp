@@ -37,6 +37,7 @@ private slots:
     void extractsSuffixedDesignationFromPrimaryName();
     void matchesCaseAndPaddingDesignationVariants();
     void ignoresUnrecognizedPrimaryNames();
+    void preservesNonDesignationLabels();
 };
 
 void OpenNgcObjectMapperTests::skipsUnsupportedObjectTypes()
@@ -89,7 +90,7 @@ void OpenNgcObjectMapperTests::extractsSuffixedDesignationFromPrimaryName()
 
     const auto ngcSuffixed =
         OpenNgcObjectMapper::mapObject(QStringLiteral("G"), QStringLiteral("NGC1234A"), {}, {}, {}, {}, {});
-    QCOMPARE(ngcSuffixed.id, std::string("ngc_1234A"));
+    QCOMPARE(ngcSuffixed.id, std::string("ngc_1234a"));
     QVERIFY(hasIdentifier(ngcSuffixed.externalIdentifiers, "ngc", "1234a"));
     QVERIFY(!hasIdentifier(ngcSuffixed.externalIdentifiers, "ngc", "1234"));
 
@@ -123,6 +124,35 @@ void OpenNgcObjectMapperTests::matchesCaseAndPaddingDesignationVariants()
             QString::fromStdString(lowered.externalIdentifiers[index].key())
         );
     }
+}
+
+void OpenNgcObjectMapperTests::preservesNonDesignationLabels()
+{
+    using namespace skygate::ephemeris;
+
+    // Only a prefix followed by a catalog number denotes a designation; a
+    // descriptive name that happens to start with an M keeps its text.
+    const auto commonName = OpenNgcObjectMapper::mapObject(
+        QStringLiteral("Neb"), QStringLiteral("NGC 1432"), {}, {}, {}, {}, QStringLiteral("Maia Nebula")
+    );
+    QVERIFY(hasAlias(commonName.aliases, "Maia Nebula"));
+    QVERIFY(!hasAlias(commonName.aliases, "M aia Nebula"));
+    QVERIFY(hasIdentifier(commonName.externalIdentifiers, "ngc", "1432"));
+
+    const auto compactName =
+        OpenNgcObjectMapper::mapObject(QStringLiteral("OCl"), QStringLiteral("Mel022"), {}, {}, {}, {}, {});
+    QCOMPARE(compactName.id, std::string("open_ngc_mel022"));
+    QCOMPARE(compactName.displayName, std::string("Mel022"));
+    QVERIFY(hasAlias(compactName.aliases, "Mel022"));
+    QVERIFY(compactName.externalIdentifiers.empty());
+
+    const auto identifiersField = OpenNgcObjectMapper::mapObject(
+        QStringLiteral("OCl"), QStringLiteral("NGC 1960"), {}, {}, {}, QStringLiteral("MWSC 0175"), {}
+    );
+    QVERIFY(hasAlias(identifiersField.aliases, "MWSC 0175"));
+    QVERIFY(!hasAlias(identifiersField.aliases, "M WSC 0175"));
+    QCOMPARE(identifiersField.externalIdentifiers.size(), std::size_t{1});
+    QVERIFY(hasIdentifier(identifiersField.externalIdentifiers, "ngc", "1960"));
 }
 
 void OpenNgcObjectMapperTests::ignoresUnrecognizedPrimaryNames()

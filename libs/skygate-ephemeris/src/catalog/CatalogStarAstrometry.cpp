@@ -1,4 +1,5 @@
 #include "CatalogStarAstrometry.hpp"
+#include "math/MathConstants.hpp"
 
 #include <cmath>
 
@@ -11,6 +12,16 @@ namespace {
 }
 
 }  // namespace
+
+double CatalogStarAstrometry::parallaxMasFromDistanceParsecs(const double distanceParsecs) noexcept
+{
+    return skygate::core::MathConstants::kMilliarcsecondsPerArcsecond / distanceParsecs;
+}
+
+double CatalogStarAstrometry::distanceParsecsFromParallaxMas(const double parallaxMas) noexcept
+{
+    return skygate::core::MathConstants::kMilliarcsecondsPerArcsecond / parallaxMas;
+}
 
 bool CatalogStarAstrometry::hasUsableProperMotionRightAscension() const noexcept
 {

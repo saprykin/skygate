@@ -7,29 +7,31 @@
 #include <QStringList>
 
 #include <optional>
+#include <string>
+#include <string_view>
 
 namespace skygate::ephemeris {
 namespace {
 
-// Recognizes a primary NGC or IC designation, including supported component
-// suffixes ("NGC0001", "ngc 1", "NGC1234A"). The raw captured digits and
-// suffix are passed through unchanged because CatalogIdentifier owns the
-// normalization of every identifier value.
+constexpr std::string_view kOpenNgcFallbackNamespace = "open_ngc";
+
+// The matcher shared with CatalogIdentifier decides whether an alias is a
+// designation at all: a prefix is one only when a catalog number follows it,
+// so labels such as "Maia Nebula" and "MWSC 3156" stay descriptive names.
 std::optional<CatalogIdentifier> recognizedDesignation(const QString& text)
 {
-    static const QRegularExpression designationPattern(
-        QStringLiteral("^(NGC|IC)\\s*(\\d+)([A-Za-z]*)$"), QRegularExpression::CaseInsensitiveOption
-    );
+    return CatalogIdentifier::designationFromText(CatalogParsingUtilities::toUtf8String(text.trimmed()));
+}
 
-    const QRegularExpressionMatch match = designationPattern.match(text);
-    if (!match.hasMatch()) {
-        return std::nullopt;
+QString designationAliasLabel(const std::string_view namespaceName)
+{
+    if (namespaceName == CatalogIdentifier::kMessierNamespace) {
+        return QStringLiteral("M");
     }
-
-    return CatalogIdentifier::make(
-        CatalogParsingUtilities::toUtf8String(match.captured(1)),
-        CatalogParsingUtilities::toUtf8String(match.captured(2) + match.captured(3))
-    );
+    if (namespaceName == CatalogIdentifier::kNgcNamespace) {
+        return QStringLiteral("NGC");
+    }
+    return QStringLiteral("IC");
 }
 
 QString normalizedCatalogAlias(QString text)
@@ -39,37 +41,30 @@ QString normalizedCatalogAlias(QString text)
         return {};
     }
 
-    const auto normalizePrefix = [&text](const QString& prefix) {
-        if (!text.startsWith(prefix, Qt::CaseInsensitive)) {
-            return;
-        }
+    const std::optional<CatalogIdentifier> designation =
+        CatalogIdentifier::designationFromText(CatalogParsingUtilities::toUtf8String(text));
+    if (!designation.has_value()) {
+        return text;
+    }
 
-        QString suffix = text.sliced(prefix.size()).trimmed();
-        suffix = OpenNgcObjectMapper::withoutLeadingZeros(suffix);
-        if (!suffix.isEmpty()) {
-            text = QString("%1 %2").arg(prefix, suffix);
-        }
-    };
-
-    normalizePrefix("NGC");
-    normalizePrefix("IC");
-    normalizePrefix("M");
-    return text;
+    qsizetype numberStart = 0;
+    while (numberStart < text.size() && !text.at(numberStart).isDigit()) {
+        ++numberStart;
+    }
+    const QString suffix = OpenNgcObjectMapper::withoutLeadingZeros(text.sliced(numberStart));
+    if (suffix.isEmpty()) {
+        return text;
+    }
+    return designationAliasLabel(designation->namespaceName) + QStringLiteral(" ") + suffix;
 }
 
 QString objectIdFromAlias(const QString& alias)
 {
     const QString normalized = normalizedCatalogAlias(alias);
-    if (normalized.startsWith("NGC ", Qt::CaseInsensitive)) {
-        return "ngc_" + normalized.sliced(4).trimmed();
-    }
-    if (normalized.startsWith("IC ", Qt::CaseInsensitive)) {
-        return "ic_" + normalized.sliced(3).trimmed();
-    }
-    if (normalized.startsWith("M ", Qt::CaseInsensitive)) {
-        return QString::fromStdString(
-            CatalogIdentifier::bodyId("messier", CatalogParsingUtilities::toUtf8String(normalized.sliced(2).trimmed()))
-        );
+    if (const std::optional<CatalogIdentifier> designation =
+            CatalogIdentifier::designationFromText(CatalogParsingUtilities::toUtf8String(normalized));
+        designation.has_value()) {
+        return QString::fromStdString(CatalogIdentifier::bodyId(designation->namespaceName, designation->value));
     }
 
     QString id = normalized.toLower();
@@ -80,7 +75,12 @@ QString objectIdFromAlias(const QString& alias)
     while (id.endsWith('_')) {
         id.chop(1);
     }
-    return id.isEmpty() ? QString{} : "open_ngc_" + id;
+    if (id.isEmpty()) {
+        return {};
+    }
+    return QString::fromStdString(
+        CatalogIdentifier::bodyId(kOpenNgcFallbackNamespace, CatalogParsingUtilities::toUtf8String(id))
+    );
 }
 
 void appendAlias(std::vector<std::string>& aliases, const QString& alias)
@@ -150,18 +150,22 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
     if (!messier.isEmpty()) {
         appendAlias(mapping.aliases, "M " + messier);
         mapping.externalIdentifiers.push_back(
-            CatalogIdentifier::make("messier", CatalogParsingUtilities::toUtf8String(messier))
+            CatalogIdentifier::make(
+                CatalogIdentifier::kMessierNamespace, CatalogParsingUtilities::toUtf8String(messier)
+            )
         );
     }
     if (!ngc.isEmpty()) {
         appendAlias(mapping.aliases, "NGC " + ngc);
         mapping.externalIdentifiers.push_back(
-            CatalogIdentifier::make("ngc", CatalogParsingUtilities::toUtf8String(ngc))
+            CatalogIdentifier::make(CatalogIdentifier::kNgcNamespace, CatalogParsingUtilities::toUtf8String(ngc))
         );
     }
     if (!ic.isEmpty()) {
         appendAlias(mapping.aliases, "IC " + ic);
-        mapping.externalIdentifiers.push_back(CatalogIdentifier::make("ic", CatalogParsingUtilities::toUtf8String(ic)));
+        mapping.externalIdentifiers.push_back(
+            CatalogIdentifier::make(CatalogIdentifier::kIcNamespace, CatalogParsingUtilities::toUtf8String(ic))
+        );
     }
     // The primary Name column is itself a designation column: a recognized
     // NGC/IC name is authoritative even when the optional cross-reference

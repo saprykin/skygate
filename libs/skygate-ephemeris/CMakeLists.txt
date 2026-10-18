@@ -278,6 +278,7 @@ add_library(skygate-ephemeris STATIC
     src/TextParsingUtilities.hpp
     src/PlanetIdentity.hpp
     src/catalog/CatalogStarAstrometry.hpp
+    src/catalog/CelestialBodyIds.hpp
     src/catalog/CatalogCoordinateModel.hpp
     src/catalog/normalize/CatalogBodyNormalization.hpp
     src/catalog/normalize/CatalogSnapshotValidator.hpp

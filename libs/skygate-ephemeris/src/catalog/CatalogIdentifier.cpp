@@ -3,6 +3,7 @@
 #include "StringUtilities.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -10,15 +11,46 @@
 namespace skygate::ephemeris {
 namespace {
 
-bool isNumericIdentifierNamespace(const std::string_view namespaceName)
+struct DesignationPrefix final {
+    std::string_view text;
+    std::string_view namespaceName;
+};
+
+constexpr DesignationPrefix kDesignationPrefixes[] = {
+    {.text = "NGC", .namespaceName = CatalogIdentifier::kNgcNamespace},
+    {.text = "IC", .namespaceName = CatalogIdentifier::kIcNamespace},
+    {.text = "M", .namespaceName = CatalogIdentifier::kMessierNamespace},
+};
+
+[[nodiscard]] bool isNumericIdentifierNamespace(const std::string_view namespaceName)
 {
-    return namespaceName == "hip" || namespaceName == "hyg"
+    return namespaceName == CatalogIdentifier::kHipNamespace || namespaceName == CatalogIdentifier::kHygNamespace
            || CatalogIdentifier::isDeepSkyDesignationNamespace(namespaceName);
+}
+
+[[nodiscard]] bool isAsciiDigit(const char character) noexcept
+{
+    return character >= '0' && character <= '9';
+}
+
+[[nodiscard]] bool isAsciiLetter(const char character) noexcept
+{
+    return (character >= 'A' && character <= 'Z') || (character >= 'a' && character <= 'z');
+}
+
+[[nodiscard]] std::string_view designationPrefixForNamespace(const std::string_view namespaceName) noexcept
+{
+    for (const DesignationPrefix& prefix : kDesignationPrefixes) {
+        if (StringUtilities::equalsIgnoreAsciiCase(namespaceName, prefix.namespaceName)) {
+            return prefix.text;
+        }
+    }
+    return {};
 }
 
 }  // namespace
 
-CatalogIdentifier CatalogIdentifier::make(std::string namespaceName, std::string value)
+CatalogIdentifier CatalogIdentifier::make(const std::string_view namespaceName, const std::string_view value)
 {
     std::string normalizedNamespace = StringUtilities::toLowerAscii(namespaceName);
     std::string normalizedValue = normalizeValue(normalizedNamespace, value);
@@ -40,26 +72,65 @@ std::string CatalogIdentifier::normalizeValue(const std::string_view namespaceNa
     // namespace before padding/stripping is applied.
     normalized = StringUtilities::toLowerAscii(normalized);
     normalized = stripLeadingZeros(std::move(normalized));
-    if (namespaceName == "messier" && normalized.size() < 3U) {
+    if (namespaceName == kMessierNamespace && normalized.size() < 3U) {
         normalized.insert(0U, 3U - normalized.size(), '0');
     }
     return normalized;
 }
 
-std::string CatalogIdentifier::bodyId(std::string namespaceName, std::string value)
+std::string CatalogIdentifier::bodyId(const std::string_view namespaceName, const std::string_view value)
 {
-    const CatalogIdentifier identifier = make(std::move(namespaceName), std::move(value));
+    const CatalogIdentifier identifier = make(namespaceName, value);
     if (identifier.empty()) {
         return {};
     }
     return identifier.namespaceName + "_" + identifier.value;
 }
 
+std::string CatalogIdentifier::hipBodyId(const std::uint64_t hipNumber)
+{
+    return bodyId(kHipNamespace, std::to_string(hipNumber));
+}
+
 bool CatalogIdentifier::isDeepSkyDesignationNamespace(const std::string_view namespaceName) noexcept
 {
-    return StringUtilities::equalsIgnoreAsciiCase(namespaceName, "ngc")
-           || StringUtilities::equalsIgnoreAsciiCase(namespaceName, "ic")
-           || StringUtilities::equalsIgnoreAsciiCase(namespaceName, "messier");
+    return StringUtilities::equalsIgnoreAsciiCase(namespaceName, kNgcNamespace)
+           || StringUtilities::equalsIgnoreAsciiCase(namespaceName, kIcNamespace)
+           || StringUtilities::equalsIgnoreAsciiCase(namespaceName, kMessierNamespace);
+}
+
+std::optional<CatalogIdentifier> CatalogIdentifier::designationFromText(const std::string_view text)
+{
+    const std::string_view trimmed = StringUtilities::trimAsciiWhitespace(text);
+    for (const DesignationPrefix& prefix : kDesignationPrefixes) {
+        if (trimmed.size() <= prefix.text.size()
+            || !StringUtilities::equalsIgnoreAsciiCase(trimmed.substr(0U, prefix.text.size()), prefix.text)) {
+            continue;
+        }
+
+        std::string_view remainder = trimmed.substr(prefix.text.size());
+        if (!remainder.empty() && remainder.front() == ' ') {
+            remainder.remove_prefix(1U);
+        }
+        if (remainder.empty() || !isAsciiDigit(remainder.front())) {
+            continue;
+        }
+
+        std::size_t index = 0U;
+        while (index < remainder.size() && isAsciiDigit(remainder[index])) {
+            ++index;
+        }
+        while (index < remainder.size() && isAsciiLetter(remainder[index])) {
+            ++index;
+        }
+        if (index != remainder.size()) {
+            continue;
+        }
+
+        return make(prefix.namespaceName, remainder);
+    }
+
+    return std::nullopt;
 }
 
 std::optional<CatalogIdentifier> CatalogIdentifier::designationFromCanonicalId(const std::string_view canonicalId)
@@ -72,10 +143,19 @@ std::optional<CatalogIdentifier> CatalogIdentifier::designationFromCanonicalId(c
 
     const std::string_view namespaceName = trimmed.substr(0U, separator);
     const std::string_view value = trimmed.substr(separator + 1U);
-    if (value.empty() || !isDeepSkyDesignationNamespace(namespaceName)) {
+    if (value.empty()) {
         return std::nullopt;
     }
-    return make(std::string(namespaceName), std::string(value));
+
+    const std::string_view prefix = designationPrefixForNamespace(namespaceName);
+    if (prefix.empty()) {
+        return std::nullopt;
+    }
+
+    std::string designationText(prefix);
+    designationText.push_back(' ');
+    designationText.append(value);
+    return designationFromText(designationText);
 }
 
 bool CatalogIdentifier::appendUnique(std::vector<CatalogIdentifier>& identifiers, CatalogIdentifier identifier)

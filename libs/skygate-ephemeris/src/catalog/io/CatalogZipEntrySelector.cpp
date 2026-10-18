@@ -77,7 +77,7 @@ CatalogZipEntrySelector::select(const std::string_view zipData, const std::optio
             selection.status = CatalogZipEntrySelection::Status::MissingMember;
             return selection;
         }
-        if (entry->isDirectory() || entry->isEncrypted()) {
+        if (!isUsableEntry(*entry)) {
             selection.status = CatalogZipEntrySelection::Status::UnusableMember;
             return selection;
         }
