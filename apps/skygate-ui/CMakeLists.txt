@@ -319,6 +319,7 @@ qt_add_qml_module(skygate-ui
         qml/controls/PreferencesComboBox.qml
         qml/controls/PreferencesCompactActionButton.qml
         qml/controls/PreferencesGroupTitle.qml
+        qml/controls/PreferencesSearchablePickerShell.qml
         qml/controls/PreferencesSectionButton.qml
         qml/controls/PreferencesTextField.qml
         qml/sky/SkyHoverLabel.qml

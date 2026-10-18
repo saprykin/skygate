@@ -77,6 +77,9 @@ private slots:
     void preferencesComboBoxActivatesAndShowsPopup();
     void preferencesComboBoxPopupRowsShowModelText();
     void preferencesCityPickerFiltersChoosesAndClears();
+    void preferencesCityPickerPlacesPopupBySpace_data();
+    void preferencesCityPickerPlacesPopupBySpace();
+    void preferencesCityPickerShowsEmptyState();
     void preferencesButtonCheckboxSectionControlsWork();
 
 private:
@@ -355,6 +358,118 @@ void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClears()
     QVERIFY(root->property("chosenLatitude").toDouble() > 40.0);
     QVERIFY(root->property("chosenLongitude").toDouble() > 0.0);
     QTRY_COMPARE(cityModel->property("filterText").toString(), QString());
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlPreferenceControlTests::preferencesCityPickerPlacesPopupBySpace_data()
+{
+    QTest::addColumn<int>("pickerY");
+    QTest::addColumn<bool>("expectAbove");
+
+    QTest::newRow("above") << 600 << true;
+    QTest::newRow("below") << 10 << false;
+}
+
+void QmlPreferenceControlTests::preferencesCityPickerPlacesPopupBySpace()
+{
+    QFETCH(int, pickerY);
+    QFETCH(bool, expectAbove);
+
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 900
+            height: 640
+            PreferencesCityPicker {
+                theme: skyContext.theme
+                x: 10
+                y: %1
+                width: 320
+                height: 32
+                catalogModel: skyContext.cityCatalogModel
+            }
+        }
+    )")
+            .arg(pickerY),
+        QStringLiteral("PreferencesCityPickerPlacementTest.qml")
+    );
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+
+    ExposedQuickWindow exposed(root);
+    auto* pickerMouse = firstQuickItemWithObjectName(root, QStringLiteral("cityPickerMouse"));
+    QVERIFY(pickerMouse != nullptr);
+    clickItemCenter(exposed.window(), pickerMouse);
+
+    auto* filterField = firstQuickItemWithObjectName(root, QStringLiteral("citySearchField"));
+    QVERIFY(filterField != nullptr);
+    QTRY_VERIFY(filterField->hasActiveFocus());
+    const qreal filterFieldY = filterField->mapToScene(QPointF()).y();
+    const qreal pickerYInScene = pickerMouse->mapToScene(QPointF()).y();
+    QCOMPARE(filterFieldY < pickerYInScene, expectAbove);
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlPreferenceControlTests::preferencesCityPickerShowsEmptyState()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    auto* cityModel = controller->cityCatalogModel();
+    QVERIFY(cityModel != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 900
+            height: 640
+            PreferencesCityPicker {
+                theme: skyContext.theme
+                x: 10
+                y: 10
+                width: 320
+                height: 32
+                catalogModel: skyContext.cityCatalogModel
+            }
+        }
+    )"),
+        QStringLiteral("PreferencesCityPickerEmptyStateTest.qml")
+    );
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+
+    ExposedQuickWindow exposed(root);
+    auto* pickerMouse = firstQuickItemWithObjectName(root, QStringLiteral("cityPickerMouse"));
+    QVERIFY(pickerMouse != nullptr);
+    clickItemCenter(exposed.window(), pickerMouse);
+
+    auto* filterField = firstQuickItemWithObjectName(root, QStringLiteral("citySearchField"));
+    QVERIFY(filterField != nullptr);
+    QTRY_VERIFY(filterField->hasActiveFocus());
+    replaceText(exposed.window(), filterField, QStringLiteral("no such city"));
+    QTRY_COMPARE(cityModel->property("filterText").toString(), QString("no such city"));
+
+    auto* emptyLabel = firstQuickItemWithObjectName(root, QStringLiteral("cityEmptyLabel"));
+    QVERIFY(emptyLabel != nullptr);
+    QTRY_VERIFY(emptyLabel->isVisible());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
