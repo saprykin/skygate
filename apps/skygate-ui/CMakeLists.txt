@@ -189,6 +189,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/app/SkyContextProjectionTypeCodec.hpp
     src/render/SkyRenderStylePolicy.cpp
     src/render/SkyRenderStylePolicy.hpp
+    src/settings/SkyCacheFiles.cpp
+    src/settings/SkyCacheFiles.hpp
     src/settings/SkySettingsKeyBuilder.cpp
     src/settings/SkySettingsKeyBuilder.hpp
     src/settings/SkyTimelineViewDefaultsPolicy.hpp

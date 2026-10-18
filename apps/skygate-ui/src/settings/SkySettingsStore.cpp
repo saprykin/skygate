@@ -1,16 +1,14 @@
 #include "SkySettingsStore.hpp"
+#include "SkyCacheFiles.hpp"
 #include "SkySettingsKeyBuilder.hpp"
 #include "SkySettingsSnapshotCodecs.hpp"
 #include "SkySettingsValueCodecs.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
 
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QLoggingCategory>
-#include <QSaveFile>
 #include <QSettings>
-#include <QStandardPaths>
 
 #include <optional>
 
@@ -34,34 +32,24 @@ constexpr const char* kDeepSkyCatalogCacheFileName = "deep-sky-catalog-cache-v1.
 constexpr const char* kCatalogBinaryCacheFileName = "catalog-cache-v3.bin";
 constexpr const char* kDeepSkyBinaryCatalogCacheFileName = "deep-sky-catalog-cache-v2.bin";
 
-QString appDataCachePath(const char* fileName)
-{
-    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (appDataPath.isEmpty()) {
-        return {};
-    }
-
-    return QDir(appDataPath).filePath(QString::fromUtf8(fileName));
-}
-
 QString defaultCatalogCachePath()
 {
-    return appDataCachePath(kCatalogCacheFileName);
+    return SkyCacheFiles::appDataFilePath(QString::fromUtf8(kCatalogCacheFileName));
 }
 
 QString defaultDeepSkyCatalogCachePath()
 {
-    return appDataCachePath(kDeepSkyCatalogCacheFileName);
+    return SkyCacheFiles::appDataFilePath(QString::fromUtf8(kDeepSkyCatalogCacheFileName));
 }
 
 QString defaultCatalogBinaryCachePath()
 {
-    return appDataCachePath(kCatalogBinaryCacheFileName);
+    return SkyCacheFiles::appDataFilePath(QString::fromUtf8(kCatalogBinaryCacheFileName));
 }
 
 QString defaultDeepSkyBinaryCatalogCachePath()
 {
-    return appDataCachePath(kDeepSkyBinaryCatalogCacheFileName);
+    return SkyCacheFiles::appDataFilePath(QString::fromUtf8(kDeepSkyBinaryCatalogCacheFileName));
 }
 
 QString appSettingsKey(const char* name)
@@ -89,25 +77,22 @@ int readWindowDimension(QSettings& settings, const QString& key, const int fallb
     return ok ? value : fallback;
 }
 
-void appendCachePath(QStringList& cachePaths, const QString& path)
+// A missing legacy cache file is first use, while a file that exists but cannot
+// be opened is a storage problem worth reporting.
+void loadCachePayload(const QString& path, const QString& logNoun, QByteArray& payload)
 {
-    if (!path.isEmpty() && !cachePaths.contains(path)) {
-        cachePaths.push_back(path);
+    if (path.isEmpty()) {
+        return;
     }
-}
 
-bool removeCacheFiles(const QStringList& cachePaths)
-{
-    bool removedAllCacheFiles = true;
-    for (const QString& cachePath : cachePaths) {
-        QFile cacheFile(cachePath);
-        if (cacheFile.exists() && !cacheFile.remove()) {
-            qCWarning(skygateCatalogCacheLog).noquote()
-                << "Failed to remove catalog cache file" << cachePath << cacheFile.errorString();
-            removedAllCacheFiles = false;
-        }
+    const SkyCacheFiles::ReadResult result = SkyCacheFiles::readFile(path);
+    if (result.state == SkyCacheFiles::ReadState::Ok) {
+        payload = result.payload;
+        return;
     }
-    return removedAllCacheFiles;
+    if (result.state == SkyCacheFiles::ReadState::Unreadable) {
+        qCWarning(skygateCatalogCacheLog).noquote() << "Failed to open" << logNoun << path << result.errorString;
+    }
 }
 
 }  // namespace
@@ -167,9 +152,9 @@ bool SkySettingsStore::clearCatalogCache() const
     const QString defaultPath = defaultCatalogCachePath();
 
     QStringList cachePaths;
-    appendCachePath(cachePaths, configuredPath);
-    appendCachePath(cachePaths, defaultPath);
-    appendCachePath(cachePaths, defaultCatalogBinaryCachePath());
+    SkyCacheFiles::appendUniquePath(cachePaths, configuredPath);
+    SkyCacheFiles::appendUniquePath(cachePaths, defaultPath);
+    SkyCacheFiles::appendUniquePath(cachePaths, defaultCatalogBinaryCachePath());
 
     if (!defaultPath.isEmpty()) {
         const QFileInfo defaultInfo(defaultPath);
@@ -177,11 +162,11 @@ bool SkySettingsStore::clearCatalogCache() const
         const QStringList matchingEntries =
             defaultDir.entryList(QStringList{"catalog-cache*"}, QDir::Files | QDir::Readable);
         for (const QString& entryName : matchingEntries) {
-            appendCachePath(cachePaths, defaultDir.filePath(entryName));
+            SkyCacheFiles::appendUniquePath(cachePaths, defaultDir.filePath(entryName));
         }
     }
 
-    const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
+    const bool removedAllCacheFiles = SkyCacheFiles::removeFiles(cachePaths, QStringLiteral("catalog cache"));
 
     settings.remove(SkySettingsKeyBuilder::key("catalogCachePath"));
     settings.remove(SkySettingsKeyBuilder::key("catalogBinaryCachePath"));
@@ -206,15 +191,15 @@ bool SkySettingsStore::clearDeepSkyCatalogCache() const
 {
     QSettings settings;
     QStringList cachePaths;
-    appendCachePath(
+    SkyCacheFiles::appendUniquePath(
         cachePaths,
         settings.value(SkySettingsKeyBuilder::key("deepSkyCatalogCachePath"), defaultDeepSkyCatalogCachePath())
             .toString()
     );
-    appendCachePath(cachePaths, defaultDeepSkyCatalogCachePath());
-    appendCachePath(cachePaths, defaultDeepSkyBinaryCatalogCachePath());
+    SkyCacheFiles::appendUniquePath(cachePaths, defaultDeepSkyCatalogCachePath());
+    SkyCacheFiles::appendUniquePath(cachePaths, defaultDeepSkyBinaryCatalogCachePath());
 
-    const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
+    const bool removedAllCacheFiles = SkyCacheFiles::removeFiles(cachePaths, QStringLiteral("catalog cache"));
     settings.remove(SkySettingsKeyBuilder::key("deepSkyCatalogCachePath"));
     settings.remove(SkySettingsKeyBuilder::key("deepSkyBinaryCatalogCachePath"));
     settings.remove(SkySettingsKeyBuilder::key("deepSkyCatalogSourceLabel"));
@@ -245,36 +230,7 @@ bool SkySettingsStore::saveCatalogCache(const SkyCatalogLegacyCacheSnapshot& sna
         if (path.isEmpty() || payload.isEmpty()) {
             return true;
         }
-
-        const QFileInfo targetInfo(path);
-        QDir targetDir(targetInfo.absolutePath());
-        if (!targetDir.mkpath(".")) {
-            qCWarning(skygateCatalogCacheLog).noquote()
-                << "Failed to create catalog cache directory" << targetDir.absolutePath();
-            return false;
-        }
-
-        QSaveFile cacheFile(path);
-        if (!cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            qCWarning(skygateCatalogCacheLog).noquote()
-                << "Failed to open catalog cache for writing" << path << cacheFile.errorString();
-            return false;
-        }
-
-        const qint64 writtenBytes = cacheFile.write(payload);
-        if (writtenBytes != payload.size()) {
-            qCWarning(skygateCatalogCacheLog).noquote() << "Failed to write complete catalog cache" << path << "written"
-                                                        << writtenBytes << "expected" << payload.size();
-            cacheFile.cancelWriting();
-            return false;
-        }
-
-        if (!cacheFile.commit()) {
-            qCWarning(skygateCatalogCacheLog).noquote()
-                << "Failed to commit catalog cache" << path << cacheFile.errorString();
-            return false;
-        }
-        return true;
+        return SkyCacheFiles::writeFileAtomically(path, payload, QStringLiteral("catalog cache"));
     };
 
     if (!writePayload(configuredPath, snapshot.catalogPayload)) {
@@ -342,44 +298,20 @@ std::optional<SkyCatalogLegacyCacheSnapshot> SkySettingsStore::loadCatalogCache(
         settings.value(SkySettingsKeyBuilder::key("catalogCachePath"), defaultCatalogCachePath()).toString();
 
     SkyCatalogLegacyCacheSnapshot snapshot;
-    QFile cacheFile(configuredPath);
-    if (!configuredPath.isEmpty() && cacheFile.exists() && cacheFile.open(QIODevice::ReadOnly)) {
-        snapshot.catalogPayload = cacheFile.readAll();
-    } else if (!configuredPath.isEmpty() && cacheFile.exists()) {
-        qCWarning(skygateCatalogCacheLog).noquote()
-            << "Failed to open star catalog cache" << configuredPath << cacheFile.errorString();
-    }
+    loadCachePayload(configuredPath, QStringLiteral("star catalog cache"), snapshot.catalogPayload);
 
     const QString configuredDeepSkyPath =
         settings.value(SkySettingsKeyBuilder::key("deepSkyCatalogCachePath"), defaultDeepSkyCatalogCachePath())
             .toString();
-    QFile deepSkyCacheFile(configuredDeepSkyPath);
-    if (!configuredDeepSkyPath.isEmpty() && deepSkyCacheFile.exists() && deepSkyCacheFile.open(QIODevice::ReadOnly)) {
-        snapshot.deepSkyCatalogPayload = deepSkyCacheFile.readAll();
-    } else if (!configuredDeepSkyPath.isEmpty() && deepSkyCacheFile.exists()) {
-        qCWarning(skygateCatalogCacheLog).noquote()
-            << "Failed to open deep-sky catalog cache" << configuredDeepSkyPath << deepSkyCacheFile.errorString();
-    }
+    loadCachePayload(configuredDeepSkyPath, QStringLiteral("deep-sky catalog cache"), snapshot.deepSkyCatalogPayload);
 
     const QString configuredBinaryPath = defaultCatalogBinaryCachePath();
-    QFile binaryCacheFile(configuredBinaryPath);
-    if (!configuredBinaryPath.isEmpty() && binaryCacheFile.exists() && binaryCacheFile.open(QIODevice::ReadOnly)) {
-        snapshot.catalogBinaryPayload = binaryCacheFile.readAll();
-    } else if (!configuredBinaryPath.isEmpty() && binaryCacheFile.exists()) {
-        qCWarning(skygateCatalogCacheLog).noquote()
-            << "Failed to open binary star catalog cache" << configuredBinaryPath << binaryCacheFile.errorString();
-    }
+    loadCachePayload(configuredBinaryPath, QStringLiteral("binary star catalog cache"), snapshot.catalogBinaryPayload);
 
     const QString configuredDeepSkyBinaryPath = defaultDeepSkyBinaryCatalogCachePath();
-    QFile deepSkyBinaryCacheFile(configuredDeepSkyBinaryPath);
-    if (!configuredDeepSkyBinaryPath.isEmpty() && deepSkyBinaryCacheFile.exists()
-        && deepSkyBinaryCacheFile.open(QIODevice::ReadOnly)) {
-        snapshot.deepSkyBinaryPayload = deepSkyBinaryCacheFile.readAll();
-    } else if (!configuredDeepSkyBinaryPath.isEmpty() && deepSkyBinaryCacheFile.exists()) {
-        qCWarning(skygateCatalogCacheLog).noquote()
-            << "Failed to open binary deep-sky catalog cache" << configuredDeepSkyBinaryPath
-            << deepSkyBinaryCacheFile.errorString();
-    }
+    loadCachePayload(
+        configuredDeepSkyBinaryPath, QStringLiteral("binary deep-sky catalog cache"), snapshot.deepSkyBinaryPayload
+    );
 
     if (snapshot.catalogPayload.isEmpty() && snapshot.deepSkyCatalogPayload.isEmpty()
         && snapshot.catalogBinaryPayload.isEmpty() && snapshot.deepSkyBinaryPayload.isEmpty()) {
