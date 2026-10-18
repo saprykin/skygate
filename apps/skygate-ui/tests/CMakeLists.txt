@@ -214,6 +214,7 @@ add_skygate_ui_qtest(
     TIMEOUT 60
 )
 add_skygate_ui_qtest(skygate-ui-time-controller-tests time/SkyTimeControllerTests.cpp)
+add_skygate_ui_qtest(skygate-ui-timeline-controller-tests app/SkyTimelineControllerTests.cpp)
 add_skygate_ui_qtest(
     skygate-ui-logging-tests
     diagnostics/SkyLoggingTests.cpp

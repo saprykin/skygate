@@ -1,6 +1,10 @@
 #pragma once
 
+#include "SkyTimelineCatchUpResult.hpp"
 #include "SkyTimelineState.hpp"
+#include "UtcTimePoint.hpp"
+
+#include <optional>
 
 namespace skygate::ui::internal {
 
@@ -11,6 +15,12 @@ public:
     [[nodiscard]] double speedMultiplier() const noexcept;
     [[nodiscard]] int stepSeconds() const noexcept;
     [[nodiscard]] bool catchingUpToCurrentUtc() const noexcept;
+
+    [[nodiscard]] std::optional<SkyTimelineCatchUpResult> computeCatchUpAdvancement(
+        const skygate::core::UtcTimePoint& timelineUtc,
+        const skygate::core::UtcTimePoint& clockUtc,
+        const skygate::core::UtcTimePoint& wallUtc
+    ) const noexcept;
 
     [[nodiscard]] bool setLive(bool live) noexcept;
     [[nodiscard]] bool setToolbarCollapsed(bool toolbarCollapsed) noexcept;
