@@ -4,10 +4,10 @@
 #include "EphemerisSnapshot.hpp"
 #include "ObservationContext.hpp"
 #include "PreparedProjection.hpp"
-#include "catalog/constellation/ConstellationData.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "scene/SkySceneLookupKey.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
 
 #include <QHash>
 #include <QString>
