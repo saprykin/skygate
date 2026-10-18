@@ -16,6 +16,7 @@
 #include "engine/EphemerisEngineDescriptorRegistry.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
 #include "ephemeris/SkyEphemerisDataManager.hpp"
+#include "ephemeris/SkyEphemerisSettingsPolicy.hpp"
 #include "ephemeris/SkyEphemerisUpdateWorkflow.hpp"
 #include "location/LocationCatalogModel.hpp"
 #include "location/SkyDeviceLocationAcquisition.hpp"
@@ -49,7 +50,6 @@ Q_LOGGING_CATEGORY(skygateEphemerisUpdateLog, "skygate.ephemeris.update")
 
 constexpr int kUtcTickIntervalMs = 1000;
 
-using skygate::ephemeris::EphemerisCorrectionFlags;
 using skygate::ephemeris::EphemerisEngineDescriptorRegistry;
 using skygate::ephemeris::EphemerisEngineKind;
 
@@ -107,74 +107,9 @@ using skygate::ephemeris::EphemerisEngineKind;
     return QStringLiteral("%1 MB").arg(static_cast<double>(bytes) / kBytesPerMegabyte, 0, 'f', 1);
 }
 
-[[nodiscard]] EphemerisCorrectionFlags correctionPresetFlags(const int index) noexcept
-{
-    switch (index) {
-    case 0:
-        return EphemerisCorrectionFlags::geometric();
-    case 1:
-        return EphemerisCorrectionFlags::astrometric();
-    case 2:
-        return EphemerisCorrectionFlags::apparent();
-    default:
-        return EphemerisCorrectionFlags::topocentric();
-    }
-}
-
-[[nodiscard]] QString correctionPresetId(const int index)
-{
-    switch (index) {
-    case 0:
-        return QStringLiteral("geometric");
-    case 1:
-        return QStringLiteral("astrometric");
-    case 2:
-        return QStringLiteral("apparent");
-    default:
-        return QStringLiteral("apparent-topocentric");
-    }
-}
-
-[[nodiscard]] int correctionPresetIndex(const EphemerisCorrectionFlags flags) noexcept
-{
-    const EphemerisCorrectionFlags baseFlags =
-        skygate::ephemeris::EphemerisCorrectionFlags::without(flags, EphemerisCorrectionFlags::atmosphericRefraction());
-    if (baseFlags == EphemerisCorrectionFlags::geometric() || baseFlags == EphemerisCorrectionFlags::noCorrections()) {
-        return 0;
-    }
-    if (baseFlags == EphemerisCorrectionFlags::astrometric()) {
-        return 1;
-    }
-    if (baseFlags == EphemerisCorrectionFlags::apparent()) {
-        return 2;
-    }
-    return 3;
-}
-
-[[nodiscard]] EphemerisCorrectionFlags
-correctionFlagsWithRefraction(const EphemerisCorrectionFlags baseFlags, const bool enabled) noexcept
-{
-    if (enabled) {
-        return baseFlags | EphemerisCorrectionFlags::atmosphericRefraction();
-    }
-    return skygate::ephemeris::EphemerisCorrectionFlags::without(
-        baseFlags, EphemerisCorrectionFlags::atmosphericRefraction()
-    );
-}
-
 [[nodiscard]] QString decimalText(const double value, const int precision)
 {
     return QString::number(value, 'f', precision);
-}
-
-[[nodiscard]] std::optional<double> boundedDouble(const QString& text, const double minimum, const double maximum)
-{
-    bool isValidNumber = false;
-    const double value = text.trimmed().toDouble(&isValidNumber);
-    if (!isValidNumber || value < minimum || value > maximum) {
-        return std::nullopt;
-    }
-    return value;
 }
 
 }  // namespace
@@ -259,15 +194,9 @@ SkyContextController::SkyContextController(
         &SkyContextController::applyCurrentLocation
     );
 #endif
-    m_ephemerisUserSettings.engineKind = m_ephemerisSession->engineKind();
-    m_ephemerisUserSettings.correctionFlags = m_ephemerisSession->engineOptions().correctionFlags();
-    m_ephemerisUserSettings.fallbackToSimpleEngine = m_ephemerisSession->engineOptions().fallbackToSimpleEngine();
-    m_ephemerisUserSettings.refractionEnabled = m_ephemerisSession->engineOptions().enableAtmosphericRefraction();
-    m_ephemerisUserSettings.atmosphericPressureHpa = m_ephemerisSession->engineOptions().atmosphericPressureHpa();
-    m_ephemerisUserSettings.atmosphericTemperatureC = m_ephemerisSession->engineOptions().atmosphericTemperatureC();
-    m_ephemerisUserSettings.relativeHumidity = m_ephemerisSession->engineOptions().relativeHumidity();
-    m_ephemerisUserSettings.observingWavelengthMicrometers =
-        m_ephemerisSession->engineOptions().observingWavelengthMicrometers();
+    m_ephemerisUserSettings = SkyEphemerisSettingsPolicy::userSettingsFromEngine(
+        m_ephemerisUserSettings, m_ephemerisSession->engineKind(), m_ephemerisSession->engineOptions()
+    );
     if (m_ephemerisDataManager != nullptr) {
         m_ephemerisDataManager->setBundledFallbackData(
             initializationOptions.ephemerisFactoryInputs.dataManifest,
@@ -620,7 +549,7 @@ int SkyContextController::ephemerisEngineDefaultCorrectionPresetIndex(const int 
     }
     const auto& defaults =
         EphemerisEngineDescriptorRegistry::descriptorAt(static_cast<std::size_t>(engineKindIndex)).defaultOptions;
-    return correctionPresetIndex(defaults.correctionFlags());
+    return SkyEphemerisSettingsPolicy::correctionPresetIndex(defaults.correctionFlags());
 }
 
 bool SkyContextController::ephemerisEngineDefaultRefractionEnabled(const int engineKindIndex) const noexcept
@@ -634,7 +563,7 @@ bool SkyContextController::ephemerisEngineDefaultRefractionEnabled(const int eng
 
 int SkyContextController::ephemerisCorrectionPresetIndex() const noexcept
 {
-    return correctionPresetIndex(m_ephemerisSession->engineOptions().correctionFlags());
+    return SkyEphemerisSettingsPolicy::correctionPresetIndex(m_ephemerisSession->engineOptions().correctionFlags());
 }
 
 bool SkyContextController::ephemerisRefractionEnabled() const noexcept
@@ -1121,15 +1050,8 @@ void SkyContextController::setLogFilePath(const QString& logFilePath)
 
 void SkyContextController::applyEphemerisUserSettings(const SkyEphemerisUserSettingsSnapshot& settings)
 {
-    skygate::ephemeris::EphemerisEngineOptions nextOptions = m_ephemerisSession->engineOptions();
-    nextOptions.setEngineKind(settings.engineKind);
-    nextOptions.setCorrectionFlags(settings.correctionFlags);
-    nextOptions.setFallbackToSimpleEngine(settings.fallbackToSimpleEngine);
-    nextOptions.setEnableAtmosphericRefraction(settings.refractionEnabled);
-    nextOptions.setAtmosphericPressureHpa(settings.atmosphericPressureHpa);
-    nextOptions.setAtmosphericTemperatureC(settings.atmosphericTemperatureC);
-    nextOptions.setRelativeHumidity(settings.relativeHumidity);
-    nextOptions.setObservingWavelengthMicrometers(settings.observingWavelengthMicrometers);
+    const skygate::ephemeris::EphemerisEngineOptions nextOptions =
+        SkyEphemerisSettingsPolicy::engineOptionsFromSettings(m_ephemerisSession->engineOptions(), settings);
 
     m_ephemerisUserSettings = settings;
     if (!m_ephemerisSession->applyOptions(settings.engineKind, nextOptions)) {
@@ -1151,30 +1073,26 @@ void SkyContextController::setEphemerisEngineKindIndex(const int engineKindIndex
 
     auto settings = m_ephemerisUserSettings;
     const EphemerisEngineKind::Type targetKind = engineKindFromIndex(engineKindIndex);
-    settings.engineKind = targetKind;
     if (targetKind != m_ephemerisSession->engineKind()) {
-        const auto* descriptor = EphemerisEngineDescriptorRegistry::findByKind(targetKind);
-        if (descriptor != nullptr) {
-            const auto& defaults = descriptor->defaultOptions;
-            settings.correctionFlags = defaults.correctionFlags();
-            settings.refractionEnabled = defaults.enableAtmosphericRefraction();
-            settings.correctionPresetId = correctionPresetId(correctionPresetIndex(defaults.correctionFlags()));
-        }
+        settings = SkyEphemerisSettingsPolicy::settingsForEngineSwitch(std::move(settings), targetKind);
+    } else {
+        settings.engineKind = targetKind;
     }
     applyEphemerisUserSettings(settings);
 }
 
 void SkyContextController::setEphemerisCorrectionPresetIndex(const int correctionPresetIndex)
 {
-    if (correctionPresetIndex < 0 || correctionPresetIndex > 3) {
+    if (correctionPresetIndex < 0 || correctionPresetIndex >= SkyEphemerisSettingsPolicy::kCorrectionPresetCount) {
         emit ephemerisSettingsChanged();
         return;
     }
 
     auto settings = m_ephemerisUserSettings;
-    settings.correctionPresetId = correctionPresetId(correctionPresetIndex);
-    settings.correctionFlags =
-        correctionFlagsWithRefraction(correctionPresetFlags(correctionPresetIndex), settings.refractionEnabled);
+    settings.correctionPresetId = SkyEphemerisSettingsPolicy::correctionPresetId(correctionPresetIndex);
+    settings.correctionFlags = SkyEphemerisSettingsPolicy::withRefraction(
+        SkyEphemerisSettingsPolicy::correctionFlagsForPreset(correctionPresetIndex), settings.refractionEnabled
+    );
     applyEphemerisUserSettings(settings);
 }
 
@@ -1182,14 +1100,15 @@ void SkyContextController::setEphemerisRefractionEnabled(const bool enabled)
 {
     auto settings = m_ephemerisUserSettings;
     settings.refractionEnabled = enabled;
-    settings.correctionFlags =
-        correctionFlagsWithRefraction(correctionPresetFlags(ephemerisCorrectionPresetIndex()), enabled);
+    settings.correctionFlags = SkyEphemerisSettingsPolicy::withRefraction(
+        SkyEphemerisSettingsPolicy::correctionFlagsForPreset(ephemerisCorrectionPresetIndex()), enabled
+    );
     applyEphemerisUserSettings(settings);
 }
 
 void SkyContextController::setEphemerisAtmosphericPressureText(const QString& pressureText)
 {
-    const std::optional<double> pressure = boundedDouble(pressureText, 0.0, 2000.0);
+    const std::optional<double> pressure = SkyEphemerisSettingsPolicy::atmosphericPressureHpaFromText(pressureText);
     if (!pressure.has_value()) {
         emit ephemerisSettingsChanged();
         return;
@@ -1202,7 +1121,8 @@ void SkyContextController::setEphemerisAtmosphericPressureText(const QString& pr
 
 void SkyContextController::setEphemerisAtmosphericTemperatureText(const QString& temperatureText)
 {
-    const std::optional<double> temperature = boundedDouble(temperatureText, -100.0, 80.0);
+    const std::optional<double> temperature =
+        SkyEphemerisSettingsPolicy::atmosphericTemperatureCFromText(temperatureText);
     if (!temperature.has_value()) {
         emit ephemerisSettingsChanged();
         return;
@@ -1215,20 +1135,21 @@ void SkyContextController::setEphemerisAtmosphericTemperatureText(const QString&
 
 void SkyContextController::setEphemerisRelativeHumidityText(const QString& humidityText)
 {
-    const std::optional<double> humidityPercent = boundedDouble(humidityText, 0.0, 100.0);
-    if (!humidityPercent.has_value()) {
+    const std::optional<double> humidity = SkyEphemerisSettingsPolicy::relativeHumidityFromText(humidityText);
+    if (!humidity.has_value()) {
         emit ephemerisSettingsChanged();
         return;
     }
 
     auto settings = m_ephemerisUserSettings;
-    settings.relativeHumidity = *humidityPercent / 100.0;
+    settings.relativeHumidity = *humidity;
     applyEphemerisUserSettings(settings);
 }
 
 void SkyContextController::setEphemerisWavelengthText(const QString& wavelengthText)
 {
-    const std::optional<double> wavelength = boundedDouble(wavelengthText, 0.1, 100.0);
+    const std::optional<double> wavelength =
+        SkyEphemerisSettingsPolicy::observingWavelengthMicrometersFromText(wavelengthText);
     if (!wavelength.has_value()) {
         emit ephemerisSettingsChanged();
         return;

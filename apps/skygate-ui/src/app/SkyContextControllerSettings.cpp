@@ -4,6 +4,7 @@
 #include "UtcTimeCodec.hpp"
 #include "catalog/SkyCatalogManager.hpp"
 #include "ephemeris/SkyEphemerisDataManager.hpp"
+#include "ephemeris/SkyEphemerisSettingsPolicy.hpp"
 #include "settings/SkySettingsStore.hpp"
 #include "theme/SkyOverlayLayerSettings.hpp"
 #include "time/SkyTimeController.hpp"
@@ -46,16 +47,9 @@ bool SkyContextController::saveSettings() const
     snapshot.logToTerminal = logToTerminal();
     snapshot.logToFile = logToFile();
     snapshot.logFilePath = logFilePath();
-    snapshot.ephemeris = m_ephemerisUserSettings;
-    snapshot.ephemeris.engineKind = m_ephemerisSession->engineKind();
-    snapshot.ephemeris.correctionFlags = m_ephemerisSession->engineOptions().correctionFlags();
-    snapshot.ephemeris.fallbackToSimpleEngine = m_ephemerisSession->engineOptions().fallbackToSimpleEngine();
-    snapshot.ephemeris.refractionEnabled = m_ephemerisSession->engineOptions().enableAtmosphericRefraction();
-    snapshot.ephemeris.atmosphericPressureHpa = m_ephemerisSession->engineOptions().atmosphericPressureHpa();
-    snapshot.ephemeris.atmosphericTemperatureC = m_ephemerisSession->engineOptions().atmosphericTemperatureC();
-    snapshot.ephemeris.relativeHumidity = m_ephemerisSession->engineOptions().relativeHumidity();
-    snapshot.ephemeris.observingWavelengthMicrometers =
-        m_ephemerisSession->engineOptions().observingWavelengthMicrometers();
+    snapshot.ephemeris = SkyEphemerisSettingsPolicy::userSettingsFromEngine(
+        m_ephemerisUserSettings, m_ephemerisSession->engineKind(), m_ephemerisSession->engineOptions()
+    );
     snapshot.ephemerisSettingsPresent = true;
     return m_settingsStore->saveState(snapshot);
 }
