@@ -2,6 +2,14 @@
 
 #include <algorithm>
 
+namespace {
+
+constexpr double kPointHitTargetRadiusMinPx = 10.0;
+constexpr double kPointHitTargetRadiusPaddingPx = 5.0;
+constexpr double kGlyphHitTargetRadiusMinPx = 12.0;
+
+}  // namespace
+
 void SkyHitTargetIndex::rebuild(const SkyRenderFrame& frame, const skygate::ephemeris::EphemerisSnapshot& snapshot)
 {
     m_targets.clear();
@@ -15,7 +23,10 @@ void SkyHitTargetIndex::rebuild(const SkyRenderFrame& frame, const skygate::ephe
 
         m_targets.push_back(
             skygate::core::CircleHitTarget{
-                .x = point.x, .y = point.y, .radius = std::max(10.0, point.sizePx + 5.0), .payloadId = point.bodyIndex
+                .x = point.x,
+                .y = point.y,
+                .radius = std::max(kPointHitTargetRadiusMinPx, point.sizePx + kPointHitTargetRadiusPaddingPx),
+                .payloadId = point.bodyIndex
             }
         );
     }
@@ -30,7 +41,7 @@ void SkyHitTargetIndex::rebuild(const SkyRenderFrame& frame, const skygate::ephe
             skygate::core::CircleHitTarget{
                 .x = glyph.x,
                 .y = glyph.y,
-                .radius = std::max({glyph.radiusXPx, glyph.radiusYPx, 12.0}),
+                .radius = std::max({glyph.radiusXPx, glyph.radiusYPx, kGlyphHitTargetRadiusMinPx}),
                 .payloadId = glyph.bodyIndex
             }
         );

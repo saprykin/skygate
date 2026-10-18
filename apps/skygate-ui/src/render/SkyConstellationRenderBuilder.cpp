@@ -11,6 +11,9 @@
 namespace {
 
 constexpr double kConstellationLineWidthPx = 1.8;
+// Constellation lines may span the whole sky, so they clip at a larger share of
+// the viewport than the rest of the overlay geometry.
+constexpr double kConstellationSegmentLengthViewportFraction = 0.90;
 
 }  // namespace
 
@@ -26,7 +29,8 @@ void SkyConstellationRenderBuilder::appendLines(
     const SkyThemeRenderPalette& renderTheme
 ) const
 {
-    const double maxSegmentLength = std::max(viewportWidth, viewportHeight) * 0.90;
+    const double maxSegmentLength =
+        std::max(viewportWidth, viewportHeight) * kConstellationSegmentLengthViewportFraction;
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
     const skygate::core::ProjectedPolylineBuilder lineBuilder;
     const QColor lineColor = SkyRenderStylePolicy::constellationLineColor(renderTheme);

@@ -19,6 +19,13 @@ constexpr int kGridAltitudeStepDeg = 15;
 constexpr int kGridAzimuthStepDeg = 30;
 constexpr int kGridAltitudeSampleCount = 96;
 constexpr int kGridAzimuthSampleCount = 64;
+// Azimuth lines stop short of the poles, where every azimuth projects to the
+// same point.
+constexpr double kGridMeridianAltitudeMinDeg = -85.0;
+constexpr double kGridMeridianAltitudeMaxDeg = 85.0;
+// Projected chords longer than this share of the larger viewport dimension are
+// dropped, which removes the screen-wide jumps where geometry wraps.
+constexpr double kOverlaySegmentLengthViewportFraction = 0.30;
 constexpr int kReferenceCircleSampleCount = 192;
 constexpr float kGridLineWidthPx = 1.0F;
 constexpr float kCardinalLineWidthPx = 1.8F;
@@ -246,7 +253,9 @@ void appendAltAzGridLines(
             kGridLineWidthPx,
             [azimuthDeg](const int index) {
                 const double altitudeDeg =
-                    -85.0 + (170.0 * static_cast<double>(index)) / static_cast<double>(kGridAzimuthSampleCount);
+                    kGridMeridianAltitudeMinDeg
+                    + ((kGridMeridianAltitudeMaxDeg - kGridMeridianAltitudeMinDeg) * static_cast<double>(index))
+                          / static_cast<double>(kGridAzimuthSampleCount);
                 return skygate::core::HorizontalCoordinate{
                     .altitudeDeg = altitudeDeg, .azimuthDeg = static_cast<double>(azimuthDeg)
                 };
@@ -272,7 +281,9 @@ void appendCardinalGridLines(
             kCardinalLineWidthPx,
             [cardinalAzimuthDeg](const int index) {
                 const double altitudeDeg =
-                    -85.0 + (170.0 * static_cast<double>(index)) / static_cast<double>(kGridAzimuthSampleCount);
+                    kGridMeridianAltitudeMinDeg
+                    + ((kGridMeridianAltitudeMaxDeg - kGridMeridianAltitudeMinDeg) * static_cast<double>(index))
+                          / static_cast<double>(kGridAzimuthSampleCount);
                 return skygate::core::HorizontalCoordinate{
                     .altitudeDeg = altitudeDeg, .azimuthDeg = static_cast<double>(cardinalAzimuthDeg)
                 };
@@ -394,7 +405,8 @@ namespace skygate::ui::internal {
 
 std::vector<SkyViewportLineSegment> SkyViewportGeometry::buildLineSegments(const SkyViewportGeometryInput& input)
 {
-    const double maxSegmentLength = std::max(input.viewportWidth, input.viewportHeight) * 0.30;
+    const double maxSegmentLength =
+        std::max(input.viewportWidth, input.viewportHeight) * kOverlaySegmentLengthViewportFraction;
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
 
     std::vector<SkyViewportLineSegment> lineSegments;
