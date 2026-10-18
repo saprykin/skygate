@@ -320,7 +320,7 @@ void SkySettingsStoreTests::malformedEphemerisUserSettingsFallBackToDefaults()
     settings.setValue("skyContext/ephemeris/updateManifestUrl", "  https://example.invalid/manifest.json  ");
 
     const SkySettingsStore store;
-    ignoreSkySettingsFallbackWarnings(8);
+    ignoreSkySettingsFallbackWarnings(11);
     const auto loadedSnapshot = store.loadState();
     QVERIFY(loadedSnapshot.has_value());
     const SkyEphemerisUserSettingsSnapshot defaults;

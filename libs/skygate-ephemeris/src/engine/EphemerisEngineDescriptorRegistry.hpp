@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <string>
 #include <string_view>
 
 namespace skygate::ephemeris {
@@ -17,6 +18,8 @@ public:
     [[nodiscard]] static std::size_t count() noexcept;
     [[nodiscard]] static std::optional<std::size_t> indexOf(EphemerisEngineKind::Type kind) noexcept;
     [[nodiscard]] static const EphemerisEngineDescriptor* findById(std::string_view id) noexcept;
+    [[nodiscard]] static const EphemerisEngineDescriptor* findByIdIgnoreAsciiCase(std::string_view id) noexcept;
+    [[nodiscard]] static std::string normalizedLookupKey(std::string_view id);
     [[nodiscard]] static const EphemerisEngineDescriptor* findByKind(EphemerisEngineKind::Type kind) noexcept;
 };
 

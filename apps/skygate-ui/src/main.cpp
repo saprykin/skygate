@@ -3,6 +3,8 @@
 #include "diagnostics/SkyLogging.hpp"
 #include "diagnostics/SkyLoggingConfiguration.hpp"
 #include "engine/EphemerisDataManifest.hpp"
+#include "ephemeris/SkyEphemerisManifestLoader.hpp"
+#include "ephemeris/SkyEphemerisSettingsPolicy.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "platform/MacDockIcon.hpp"
 #include "render/SkyViewportItem.hpp"
@@ -10,7 +12,6 @@
 #include "settings/SkySettingsStore.hpp"
 
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QFont>
 #include <QGuiApplication>
@@ -18,9 +19,7 @@
 #include <QLoggingCategory>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-#include <QSettings>
 #include <QSize>
-#include <QStandardPaths>
 #include <QSysInfo>
 #include <QVariantMap>
 #include <QWindow>
@@ -146,17 +145,11 @@ StartupLoggingConfiguration startupLoggingConfiguration(const QStringList& argum
 {
     StartupLoggingConfiguration startupConfiguration{.configuration = skygate::ui::SkyLogging::defaultConfiguration()};
 
-    QSettings settings;
-    startupConfiguration.configuration.logToTerminal =
-        settings
-            .value(QStringLiteral("skyContext/logging/logToTerminal"), startupConfiguration.configuration.logToTerminal)
-            .toBool();
-    startupConfiguration.configuration.logToFile =
-        settings.value(QStringLiteral("skyContext/logging/logToFile"), startupConfiguration.configuration.logToFile)
-            .toBool();
-    startupConfiguration.configuration.logFilePath =
-        settings.value(QStringLiteral("skyContext/logging/logFilePath"), startupConfiguration.configuration.logFilePath)
-            .toString();
+    const SkySettingsStore startupSettings;
+    const skygate::ui::internal::SkyLoggingSettingsSnapshot persistedLogging = startupSettings.loadLoggingSettings();
+    startupConfiguration.configuration.logToTerminal = persistedLogging.logToTerminal;
+    startupConfiguration.configuration.logToFile = persistedLogging.logToFile;
+    startupConfiguration.configuration.logFilePath = persistedLogging.logFilePath;
 
     startupConfiguration.overrideApplied =
         applyOutputText(startupConfiguration.configuration, qEnvironmentVariable("SKYGATE_LOG_OUTPUT"));
@@ -233,30 +226,25 @@ StartupEphemerisDataConfiguration startupEphemerisDataConfiguration()
     StartupEphemerisDataConfiguration configuration;
     for (const QString& root : ephemerisDataRootCandidates()) {
         const QString manifestPath = root + QStringLiteral("/manifest.json");
-        QFile manifestFile(manifestPath);
-        if (!manifestFile.exists()) {
+        skygate::ui::internal::SkyEphemerisManifestLoader::Result loadResult =
+            skygate::ui::internal::SkyEphemerisManifestLoader::load(manifestPath, std::nullopt);
+        if (loadResult.status == skygate::ui::internal::SkyEphemerisManifestLoader::Status::Missing) {
             continue;
         }
-        if (!manifestFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        if (loadResult.status == skygate::ui::internal::SkyEphemerisManifestLoader::Status::OpenFailed) {
             configuration.errorText = QStringLiteral("Unable to open ephemeris manifest: %1").arg(manifestPath);
             continue;
         }
-
-        const QByteArray payload = manifestFile.readAll();
-        skygate::ephemeris::EphemerisDataManifest::ParseResult parseResult =
-            skygate::ephemeris::EphemerisDataManifest::parse(
-                std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()))
-            );
-        if (!parseResult.isSuccess()) {
-            const QString diagnostic = parseResult.diagnostics.empty()
+        if (!loadResult.isSuccess()) {
+            const QString diagnostic = loadResult.diagnostics.empty()
                                            ? QStringLiteral("unknown parse error")
-                                           : QString::fromStdString(parseResult.diagnostics.front());
+                                           : QString::fromStdString(loadResult.diagnostics.front());
             configuration.errorText =
                 QStringLiteral("Unable to parse ephemeris manifest %1: %2").arg(manifestPath, diagnostic);
             continue;
         }
 
-        configuration.manifest = std::move(parseResult.manifest);
+        configuration.manifest = std::move(loadResult.manifest);
         configuration.resourceRoot = root;
         configuration.manifestPath = manifestPath;
         configuration.errorText.clear();
@@ -335,7 +323,7 @@ int main(int argc, char* argv[])
         controllerOptions.ephemerisFactoryInputs.dataManifest = &*ephemerisDataConfiguration.manifest;
         controllerOptions.ephemerisFactoryInputs.updateResourceRoot = ephemerisDataConfiguration.resourceRoot;
         controllerOptions.ephemerisFactoryInputs.writableCacheRoot =
-            QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/ephemeris-data");
+            skygate::ui::internal::SkyEphemerisSettingsPolicy::defaultWritableCacheRoot();
     }
     SkyContextController skyContextController(
         std::move(starCatalog), std::move(ephemerisEngine), controllerOptions, nullptr

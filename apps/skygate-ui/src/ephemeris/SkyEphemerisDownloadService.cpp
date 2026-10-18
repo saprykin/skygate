@@ -35,16 +35,6 @@ constexpr std::size_t kDownloadBufferBytes = 64U * 1024U;
 constexpr std::uint64_t kNetworkStagingSlackBytes = 1U << 20U;
 constexpr std::uint64_t kNetworkStagingFallbackByteCap = 4ULL << 30U;
 
-std::filesystem::path pathFromQString(const QString& path)
-{
-    return std::filesystem::path(path.toStdString());
-}
-
-QString stringToQString(const std::string& value)
-{
-    return QString::fromUtf8(value.data(), static_cast<qsizetype>(value.size()));
-}
-
 void addDiagnostic(StagedUpdateDownloadResult& result, QString diagnostic)
 {
     if (!diagnostic.trimmed().isEmpty()) {
@@ -78,7 +68,7 @@ void reportDownloadProgress(
     if (request.asset == nullptr || request.asset->sourceUrl.empty()) {
         return {};
     }
-    return stringToQString(request.asset->sourceUrl);
+    return EphemerisDataFileUtilities::stringToQString(request.asset->sourceUrl);
 }
 
 [[nodiscard]] bool prepareStagedFileDirectory(const QString& stagedPath, StagedUpdateDownloadResult& result)
@@ -240,7 +230,8 @@ void SkyEphemerisDownloadService::stageInternal(
     }
 
     if (!request.sourceResourceRoot.trimmed().isEmpty()) {
-        const std::filesystem::path sourcePath = pathFromQString(request.sourceResourceRoot) / relativePath;
+        const std::filesystem::path sourcePath =
+            EphemerisDataFileUtilities::pathFromQString(request.sourceResourceRoot) / relativePath;
         completionHandler(stageLocalFile(request, EphemerisDataFileUtilities::pathToQString(sourcePath)));
         return;
     }
@@ -294,8 +285,9 @@ SkyEphemerisDownloadService::stageLocalFile(const StagedUpdateDownloadRequest& r
     };
 
     const std::filesystem::path relativePath(request.asset->relativePath);
-    result.stagedPath =
-        EphemerisDataFileUtilities::pathToQString(pathFromQString(request.stagedResourceRoot) / relativePath);
+    result.stagedPath = EphemerisDataFileUtilities::pathToQString(
+        EphemerisDataFileUtilities::pathFromQString(request.stagedResourceRoot) / relativePath
+    );
 
     QFile sourceFile(sourcePath);
     if (!sourceFile.open(QIODevice::ReadOnly)) {
@@ -343,8 +335,9 @@ void SkyEphemerisDownloadService::stageNetworkUrl(
     state->completionHandler = std::move(completionHandler);
 
     const std::filesystem::path relativePath(request.asset->relativePath);
-    state->result.stagedPath =
-        EphemerisDataFileUtilities::pathToQString(pathFromQString(request.stagedResourceRoot) / relativePath);
+    state->result.stagedPath = EphemerisDataFileUtilities::pathToQString(
+        EphemerisDataFileUtilities::pathFromQString(request.stagedResourceRoot) / relativePath
+    );
 
     if (!prepareStagedFileDirectory(state->result.stagedPath, state->result)) {
         state->completionHandler(std::move(state->result));

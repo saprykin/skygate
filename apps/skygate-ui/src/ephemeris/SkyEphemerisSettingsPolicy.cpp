@@ -1,6 +1,7 @@
 #include "SkyEphemerisSettingsPolicy.hpp"
 #include "engine/EphemerisEngineDescriptorRegistry.hpp"
 
+#include <QStandardPaths>
 #include <QString>
 
 #include <optional>
@@ -19,6 +20,11 @@ constexpr double kMaximumWavelengthMicrometers = 100.0;
 }  // namespace
 
 namespace skygate::ui::internal {
+
+QString SkyEphemerisSettingsPolicy::defaultWritableCacheRoot()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/ephemeris-data");
+}
 
 skygate::ephemeris::EphemerisCorrectionFlags
 SkyEphemerisSettingsPolicy::correctionFlagsForPreset(const int presetIndex) noexcept

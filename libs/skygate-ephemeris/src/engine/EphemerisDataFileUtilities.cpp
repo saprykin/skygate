@@ -10,6 +10,16 @@ QString EphemerisDataFileUtilities::pathToQString(const std::filesystem::path& p
     return QString::fromStdString(path.generic_string());
 }
 
+std::filesystem::path EphemerisDataFileUtilities::pathFromQString(const QString& path)
+{
+    return std::filesystem::path(path.toStdString());
+}
+
+QString EphemerisDataFileUtilities::stringToQString(const std::string& value)
+{
+    return QString::fromUtf8(value.data(), static_cast<qsizetype>(value.size()));
+}
+
 bool EphemerisDataFileUtilities::hasUnsafePathComponent(const std::filesystem::path& path)
 {
     if (path.empty() || path.is_absolute()) {

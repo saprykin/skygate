@@ -118,8 +118,7 @@ SkySettingsValueCodecs::readNonBlankStringSetting(QSettings& settings, const QSt
 {
     const QString configuredValue = settings.value(key, fallback).toString().trimmed();
     if (configuredValue.isEmpty()) {
-        qCWarning(skygateSettingsLog).noquote()
-            << "Invalid blank log file path setting" << key << "- using fallback" << fallback;
+        qCWarning(skygateSettingsLog).noquote() << "Invalid blank setting" << key << "- using fallback" << fallback;
         return fallback;
     }
     return configuredValue;

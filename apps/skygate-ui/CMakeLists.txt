@@ -33,13 +33,20 @@ qt_add_library(skygate-ui-lib STATIC
     src/diagnostics/SkyLoggingConfiguration.hpp
     src/diagnostics/SkyPerformanceLogging.cpp
     src/diagnostics/SkyPerformanceLogging.hpp
+    src/ephemeris/SkyEphemerisAssetStatus.cpp
+    src/ephemeris/SkyEphemerisAssetStatus.hpp
     src/ephemeris/SkyEphemerisCacheController.cpp
     src/ephemeris/SkyEphemerisCacheController.hpp
+    src/ephemeris/SkyEphemerisDataCacheSnapshot.hpp
+    src/ephemeris/SkyEphemerisDataCacheSnapshotPolicy.cpp
+    src/ephemeris/SkyEphemerisDataCacheSnapshotPolicy.hpp
     src/ephemeris/SkyEphemerisDataManager.cpp
     src/ephemeris/SkyEphemerisDataManager.hpp
-    src/ephemeris/SkyEphemerisDataCacheSnapshot.hpp
+    src/ephemeris/SkyEphemerisDataProfileIds.hpp
     src/ephemeris/SkyEphemerisDownloadService.cpp
     src/ephemeris/SkyEphemerisDownloadService.hpp
+    src/ephemeris/SkyEphemerisManifestLoader.cpp
+    src/ephemeris/SkyEphemerisManifestLoader.hpp
     src/ephemeris/SkyEphemerisPathSegmentPolicy.cpp
     src/ephemeris/SkyEphemerisPathSegmentPolicy.hpp
     src/ephemeris/SkyEphemerisSession.cpp

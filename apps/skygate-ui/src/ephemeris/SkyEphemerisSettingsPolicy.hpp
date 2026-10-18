@@ -24,6 +24,7 @@ public:
 
     SkyEphemerisSettingsPolicy() = delete;
 
+    [[nodiscard]] static QString defaultWritableCacheRoot();
     [[nodiscard]] static skygate::ephemeris::EphemerisCorrectionFlags
     correctionFlagsForPreset(int presetIndex) noexcept;
     [[nodiscard]] static QString correctionPresetId(int presetIndex);

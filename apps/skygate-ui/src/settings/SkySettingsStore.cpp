@@ -110,11 +110,6 @@ bool removeCacheFiles(const QStringList& cachePaths)
     return removedAllCacheFiles;
 }
 
-QString readTrimmedStringSetting(QSettings& settings, const QString& key, const QString& fallback = {})
-{
-    return settings.value(key, fallback).toString().trimmed();
-}
-
 }  // namespace
 
 bool SkySettingsStore::saveState(const SkyPersistedStateSnapshot& snapshot) const
@@ -156,6 +151,12 @@ QSize SkySettingsStore::loadMainWindowSize() const
         readWindowDimension(settings, appSettingsKey("mainWindowWidth"), kDefaultMainWindowWidth),
         readWindowDimension(settings, appSettingsKey("mainWindowHeight"), kDefaultMainWindowHeight)
     ));
+}
+
+SkyLoggingSettingsSnapshot SkySettingsStore::loadLoggingSettings() const
+{
+    QSettings settings;
+    return SkySettingsSnapshotCodecs::loadLoggingSettings(settings);
 }
 
 bool SkySettingsStore::clearCatalogCache() const
@@ -488,16 +489,12 @@ SkyEphemerisDataCacheSnapshot SkySettingsStore::loadEphemerisDataCache() const
     snapshot.installedDeltaTDataPath = settings.value(ephemerisDataCacheKey("installedDeltaTDataPath")).toString();
     snapshot.installedDeltaTDataVersion =
         settings.value(ephemerisDataCacheKey("installedDeltaTDataVersion")).toString();
-    snapshot.dataRevisionToken =
-        readTrimmedStringSetting(settings, ephemerisDataCacheKey("dataRevisionToken"), snapshot.dataRevisionToken);
-    if (snapshot.dataRevisionToken.isEmpty()) {
-        snapshot.dataRevisionToken = SkyEphemerisDataCacheSnapshot{}.dataRevisionToken;
-    }
-    snapshot.lastUpdateResult =
-        readTrimmedStringSetting(settings, ephemerisDataCacheKey("lastUpdateResult"), snapshot.lastUpdateResult);
-    if (snapshot.lastUpdateResult.isEmpty()) {
-        snapshot.lastUpdateResult = SkyEphemerisDataCacheSnapshot{}.lastUpdateResult;
-    }
+    snapshot.dataRevisionToken = SkySettingsValueCodecs::readNonBlankStringSetting(
+        settings, ephemerisDataCacheKey("dataRevisionToken"), snapshot.dataRevisionToken
+    );
+    snapshot.lastUpdateResult = SkySettingsValueCodecs::readNonBlankStringSetting(
+        settings, ephemerisDataCacheKey("lastUpdateResult"), snapshot.lastUpdateResult
+    );
     return snapshot;
 }
 
