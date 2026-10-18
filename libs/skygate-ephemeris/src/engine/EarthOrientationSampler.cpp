@@ -1,4 +1,5 @@
 #include "EarthOrientationSampler.hpp"
+#include "EphemerisDataStaleness.hpp"
 #include "TableInterpolation.hpp"
 
 #include <algorithm>
@@ -34,12 +35,6 @@ constexpr double kEpochKeyEqualityToleranceDays = 1.0e-9;
 [[nodiscard]] bool sameEpochKey(const double lhs, const double rhs) noexcept
 {
     return std::abs(lhs - rhs) <= kEpochKeyEqualityToleranceDays;
-}
-
-[[nodiscard]] bool
-epochAfter(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::AstronomicalEpoch& boundary) noexcept
-{
-    return epoch.sortKey() > boundary.sortKey();
 }
 
 void addSampleWarning(
@@ -141,7 +136,7 @@ void applyDataWarnings(
 ) noexcept
 {
     if (info.status == IEarthOrientationProvider::DataStatus::Stale
-        || (info.expiresAt.has_value() && epochAfter(utcEpoch, *info.expiresAt))) {
+        || EphemerisDataStaleness::isStale(utcEpoch, info.expiresAt)) {
         addSampleWarning(sample, EarthOrientationSampler::Sample::WarningCode::StaleData);
     }
 

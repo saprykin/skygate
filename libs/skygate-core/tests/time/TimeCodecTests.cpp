@@ -10,8 +10,10 @@
 
 #include <QtTest/QtTest>
 
+#include <array>
 #include <cmath>
 #include <cstdint>
+#include <optional>
 
 namespace {
 
@@ -57,10 +59,15 @@ private slots:
     void epochCodecMapsJ2000UtcToJulianDate();
     void epochCodecRoundTripsUtcAndEpoch();
     void epochCodecDaysSinceJ2000FromEpoch();
+    void epochCodecRoundTripKeepsOriginalGrouping();
     void epochCodecMapsNtpTimestamps();
     void astronomicalEpochAddsSecondsAndNormalizes();
     void astronomicalEpochComparesEqual();
     void astronomicalTimeReportsJ2000SiderealTime();
+    void calendarTimeAndEpochCodecAgreeOnJulianDate();
+    void epochFromUtcTimeExactTracksApproximateEpoch();
+    void calendarTimeRecognizesUtcLeapSecondLabels();
+    void astronomicalEpochAddsDaysAcrossDayBoundary();
 };
 
 void TimeCodecTests::calendarTimeMapsJ2000CivilDateToJulianDate()
@@ -168,6 +175,17 @@ void TimeCodecTests::epochCodecDaysSinceJ2000FromEpoch()
     QCOMPARE(skygate::core::EpochCodec::daysSinceJ2000(offsetEpoch), 1.25);
 }
 
+void TimeCodecTests::epochCodecRoundTripKeepsOriginalGrouping()
+{
+    const skygate::core::UtcTimePoint utcTime = skygate::core::UtcTimeCodec::fromEpochMicros(1'700'000'000'654'321LL);
+    const skygate::core::AstronomicalEpoch epoch = skygate::core::EpochCodec::epochFromUtcTimeExact(utcTime);
+    const skygate::core::UtcTimePoint roundTrip = skygate::core::EpochCodec::utcTimeFromEpoch(epoch);
+
+    // Julian-date round trips quantize at the Julian-date magnitude, so the
+    // original grouping resolves this instant to 654304 microseconds.
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(roundTrip), 1'700'000'000'654'304LL);
+}
+
 void TimeCodecTests::epochCodecMapsNtpTimestamps()
 {
     const skygate::core::AstronomicalEpoch ntpEpoch = skygate::core::EpochCodec::epochFromNtpTimestamp(0U);
@@ -211,6 +229,153 @@ void TimeCodecTests::astronomicalTimeReportsJ2000SiderealTime()
 {
     QVERIFY(isNear(skygate::core::AstronomicalTime::meanObliquityDeg(0.0), 23.4393));
     QVERIFY(isNear(skygate::core::AstronomicalTime::greenwichMeanSiderealTimeDeg(j2000UtcTime()), 280.46061837));
+}
+
+void TimeCodecTests::calendarTimeAndEpochCodecAgreeOnJulianDate()
+{
+    const skygate::core::UtcTimePoint utcTime = skygate::core::UtcTimeCodec::fromEpochMicros(1'700'000'000'000'000LL);
+    const auto calendarEpoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
+            .astronomicalYear = 2023,
+            .month = 11,
+            .day = 14,
+            .hour = 22,
+            .minute = 13,
+            .second = 20,
+            .timeScale = skygate::core::TimeScale::Utc,
+        }
+    );
+    QVERIFY(calendarEpoch.has_value());
+
+    const double utcJulianDay = skygate::core::EpochCodec::julianDayFromUtc(utcTime);
+    QVERIFY(isNear(calendarEpoch->sortKey(), utcJulianDay, 1e-9));
+    QVERIFY(isNear(skygate::core::EpochCodec::julianDayFromEpoch(*calendarEpoch), utcJulianDay, 1e-9));
+
+    const double daysSinceUnix =
+        skygate::core::EpochCodec::daysSinceUnixEpoch(calendarEpoch->julianDatePart1, calendarEpoch->julianDatePart2);
+    QVERIFY(isNear(skygate::core::EpochCodec::julianDateFromDaysSinceUnixEpoch(daysSinceUnix), utcJulianDay, 1e-9));
+}
+
+void TimeCodecTests::epochFromUtcTimeExactTracksApproximateEpoch()
+{
+    constexpr std::array<std::int64_t, 4> kInstants{
+        0LL,
+        946'728'000'123'456LL,
+        1'700'000'000'654'321LL,
+        -1'500'000LL,
+    };
+
+    for (const std::int64_t instant : kInstants) {
+        const skygate::core::UtcTimePoint utcTime = skygate::core::UtcTimeCodec::fromEpochMicros(instant);
+        const skygate::core::AstronomicalEpoch exact = skygate::core::EpochCodec::epochFromUtcTimeExact(utcTime);
+        const skygate::core::AstronomicalEpoch approximate = skygate::core::EpochCodec::epochFromUtcTime(utcTime);
+
+        QVERIFY(isNear(exact.julianDatePart1, approximate.julianDatePart1, 0.0));
+        QCOMPARE(static_cast<std::uint8_t>(exact.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Utc));
+
+        const double part2DeltaMicroseconds = std::abs(exact.julianDatePart2 - approximate.julianDatePart2)
+                                              * skygate::core::TimeConstants::kMicrosecondsPerDay;
+        QVERIFY(part2DeltaMicroseconds < 50.0);
+    }
+
+    const auto expected = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
+            .astronomicalYear = 2023,
+            .month = 11,
+            .day = 14,
+            .hour = 22,
+            .minute = 13,
+            .second = 20,
+            .nanosecond = 654'321'000U,
+            .timeScale = skygate::core::TimeScale::Utc,
+        }
+    );
+    QVERIFY(expected.has_value());
+    QVERIFY(
+        skygate::core::EpochCodec::epochFromUtcTimeExact(
+            skygate::core::UtcTimeCodec::fromEpochMicros(1'700'000'000'654'321LL)
+        )
+        == *expected
+    );
+}
+
+void TimeCodecTests::calendarTimeRecognizesUtcLeapSecondLabels()
+{
+    const skygate::core::CivilDateTime leapSecond{
+        .astronomicalYear = 2024,
+        .month = 6,
+        .day = 30,
+        .hour = 23,
+        .minute = 59,
+        .second = 60,
+        .timeScale = skygate::core::TimeScale::Utc,
+    };
+    QVERIFY(skygate::core::CalendarTime::isValidCivilDateTime(leapSecond));
+    QVERIFY(skygate::core::CalendarTime::isUtcLeapSecondLabel(leapSecond));
+
+    const std::optional<skygate::core::CivilDateTime> predecessor =
+        skygate::core::CalendarTime::leapSecondPredecessor(leapSecond);
+    QVERIFY(predecessor.has_value());
+    QCOMPARE(predecessor->astronomicalYear, 2024);
+    QCOMPARE(predecessor->month, 6);
+    QCOMPARE(predecessor->day, 30);
+    QCOMPARE(predecessor->hour, 23);
+    QCOMPARE(predecessor->minute, 59);
+    QCOMPARE(predecessor->second, 59);
+    QVERIFY(skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*predecessor).has_value());
+
+    const skygate::core::CivilDateTime lastRegularSecond{
+        .astronomicalYear = 2024,
+        .month = 6,
+        .day = 30,
+        .hour = 23,
+        .minute = 59,
+        .second = 59,
+        .timeScale = skygate::core::TimeScale::Utc,
+    };
+    QVERIFY(!skygate::core::CalendarTime::isUtcLeapSecondLabel(lastRegularSecond));
+    QVERIFY(!skygate::core::CalendarTime::leapSecondPredecessor(lastRegularSecond).has_value());
+
+    const skygate::core::CivilDateTime nonUtcLabel{
+        .astronomicalYear = 2024,
+        .month = 6,
+        .day = 30,
+        .hour = 23,
+        .minute = 59,
+        .second = 60,
+        .timeScale = skygate::core::TimeScale::Tt,
+    };
+    QVERIFY(!skygate::core::CalendarTime::isValidCivilDateTime(nonUtcLabel));
+    QVERIFY(!skygate::core::CalendarTime::isUtcLeapSecondLabel(nonUtcLabel));
+    QVERIFY(!skygate::core::CalendarTime::leapSecondPredecessor(nonUtcLabel).has_value());
+}
+
+void TimeCodecTests::astronomicalEpochAddsDaysAcrossDayBoundary()
+{
+    const skygate::core::AstronomicalEpoch epoch = makeEpoch(2000, 1, 1, 23, 59, 30);
+
+    const skygate::core::AstronomicalEpoch nextDay = epoch.addDays(1.0);
+    QVERIFY(isNear(nextDay.julianDatePart1, epoch.julianDatePart1 + 1.0, 0.0));
+    QVERIFY(isNear(nextDay.julianDatePart2, epoch.julianDatePart2, 1e-12));
+    const auto nextDate = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(nextDay);
+    QVERIFY(nextDate.has_value());
+    QCOMPARE(nextDate->astronomicalYear, 2000);
+    QCOMPARE(nextDate->month, 1);
+    QCOMPARE(nextDate->day, 2);
+    QCOMPARE(nextDate->hour, 23);
+    QCOMPARE(nextDate->minute, 59);
+    QCOMPARE(nextDate->second, 30);
+
+    const auto previousDate = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch.addDays(-1.0));
+    QVERIFY(previousDate.has_value());
+    QCOMPARE(previousDate->astronomicalYear, 1999);
+    QCOMPARE(previousDate->month, 12);
+    QCOMPARE(previousDate->day, 31);
+    QCOMPARE(previousDate->hour, 23);
+    QCOMPARE(previousDate->minute, 59);
+    QCOMPARE(previousDate->second, 30);
+
+    QVERIFY(epoch.addDays(0.0) == epoch);
 }
 
 QTEST_APPLESS_MAIN(TimeCodecTests)

@@ -29,6 +29,9 @@ public:
     ) const override;
 
 private:
+    [[nodiscard]] static double
+    targetOffsetSeconds(skygate::core::TimeScale target, double taiMinusUtcSeconds) noexcept;
+
     LeapSecondOffsetResolver m_leapSecondOffsetResolver;
     Ut1OffsetResolver m_ut1OffsetResolver;
 };

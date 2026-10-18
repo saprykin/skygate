@@ -1,4 +1,5 @@
 #include "CalendarTime.hpp"
+#include "EpochCodec.hpp"
 #include "math/TimeConstants.hpp"
 
 #include <algorithm>
@@ -92,6 +93,23 @@ int CalendarTime::historicalYearFromAstronomicalYear(const int astronomicalYear)
     return astronomicalYear;
 }
 
+bool CalendarTime::isUtcLeapSecondLabel(const CivilDateTime& dateTime) noexcept
+{
+    return dateTime.timeScale == TimeScale::Utc && dateTime.hour == 23 && dateTime.minute == 59
+           && dateTime.second == 60;
+}
+
+std::optional<CivilDateTime> CalendarTime::leapSecondPredecessor(const CivilDateTime& dateTime) noexcept
+{
+    if (!isUtcLeapSecondLabel(dateTime)) {
+        return std::nullopt;
+    }
+
+    CivilDateTime precedingSecond = dateTime;
+    precedingSecond.second = 59;
+    return precedingSecond;
+}
+
 bool CalendarTime::isValidCivilDateTime(const CivilDateTime& dateTime) noexcept
 {
     if (dateTime.month < 1 || dateTime.month > 12) {
@@ -106,8 +124,7 @@ bool CalendarTime::isValidCivilDateTime(const CivilDateTime& dateTime) noexcept
     if (dateTime.second < 0 || dateTime.second > 60) {
         return false;
     }
-    if (dateTime.second == 60
-        && (dateTime.timeScale != TimeScale::Utc || dateTime.hour != 23 || dateTime.minute != 59)) {
+    if (dateTime.second == 60 && !isUtcLeapSecondLabel(dateTime)) {
         return false;
     }
 
@@ -134,7 +151,7 @@ AstronomicalEpochResult CalendarTime::astronomicalEpochFromCivilDateTime(const C
         static_cast<double>(nanosecondsSinceMidnight) / static_cast<double>(TimeConstants::kNanosecondsPerDay);
 
     return AstronomicalEpoch{
-        .julianDatePart1 = TimeConstants::kJulianDateUnixEpoch + static_cast<double>(daysSinceUnixEpoch),
+        .julianDatePart1 = EpochCodec::julianDateFromDaysSinceUnixEpoch(static_cast<double>(daysSinceUnixEpoch)),
         .julianDatePart2 = dayFraction,
         .timeScale = dateTime.timeScale,
     }
@@ -149,7 +166,7 @@ CivilDateTimeResult CalendarTime::civilDateTimeFromAstronomicalEpoch(const Astro
 
     const AstronomicalEpoch normalizedEpoch = epoch.normalized();
     const double daysSinceUnixEpochDouble =
-        (normalizedEpoch.julianDatePart1 - TimeConstants::kJulianDateUnixEpoch) + normalizedEpoch.julianDatePart2;
+        EpochCodec::daysSinceUnixEpoch(normalizedEpoch.julianDatePart1, normalizedEpoch.julianDatePart2);
     if (!std::isfinite(daysSinceUnixEpochDouble)
         || daysSinceUnixEpochDouble < static_cast<double>(std::numeric_limits<std::int64_t>::min())
         || daysSinceUnixEpochDouble > static_cast<double>(std::numeric_limits<std::int64_t>::max())) {

@@ -73,4 +73,17 @@ AstronomicalEpoch AstronomicalEpoch::addMinutes(const double offsetMinutes, cons
         .normalized();
 }
 
+AstronomicalEpoch AstronomicalEpoch::addDays(const double offsetDays) const noexcept
+{
+    return addDays(offsetDays, timeScale);
+}
+
+AstronomicalEpoch AstronomicalEpoch::addDays(const double offsetDays, const TimeScale resultScale) const noexcept
+{
+    return AstronomicalEpoch{
+        .julianDatePart1 = julianDatePart1, .julianDatePart2 = julianDatePart2 + offsetDays, .timeScale = resultScale
+    }
+        .normalized();
+}
+
 }  // namespace skygate::core
