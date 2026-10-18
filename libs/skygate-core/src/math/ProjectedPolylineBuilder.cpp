@@ -69,7 +69,7 @@ void appendAdaptiveProjectedSegment(
     const int subsegmentCount = adaptiveSubsegmentCount(projection.params(), angularDistance);
 
     ScreenPoint previousPoint = projection.project(startCoordinate);
-    bool hasPreviousPoint = previousPoint.isVisible && previousPoint.isFinite();
+    bool hasPreviousPoint = previousPoint.isVisible() && previousPoint.isFinite();
     for (int subsegmentIndex = 1; subsegmentIndex <= subsegmentCount; ++subsegmentIndex) {
         const double t = static_cast<double>(subsegmentIndex) / static_cast<double>(subsegmentCount);
         const HorizontalCoordinate coordinate =
@@ -78,7 +78,7 @@ void appendAdaptiveProjectedSegment(
                                                      interpolateUnitVector(startVector, endVector, angularDistance, t)
                                                  );
         const ScreenPoint point = projection.project(coordinate);
-        const bool hasPoint = point.isVisible && point.isFinite();
+        const bool hasPoint = point.isVisible() && point.isFinite();
         if (hasPreviousPoint && hasPoint) {
             appendProjectedSegment(segments, previousPoint, point, maxSegmentLengthSquared);
         }
@@ -89,6 +89,14 @@ void appendAdaptiveProjectedSegment(
 }
 
 }  // namespace
+
+double ProjectedPolylineBuilder::viewportSegmentLimitSquared(
+    const double viewportWidth, const double viewportHeight, const double viewportFraction
+) noexcept
+{
+    const double segmentLimit = std::max(viewportWidth, viewportHeight) * viewportFraction;
+    return segmentLimit * segmentLimit;
+}
 
 std::vector<LineSegment2d> ProjectedPolylineBuilder::build(
     const PreparedProjection& projection,

@@ -36,9 +36,11 @@ private slots:
     void projectedPolylineSplitsGapsAndDropsLongJumps();
     void projectedPolylineHandlesBoundaryAndDegenerate();
     void projectedPolylineSamplesOffscreenSegmentInterior();
+    void projectedPolylineViewportLimitUsesLargerSide();
     void dashedLineBuilderCreatesDashSegments();
     void dashedLineBuilderHandlesDegenerateAndDiagonals();
     void coordinateFiniteQueriesDoNotChangeValidity();
+    void screenPointVisibilityFollowsStatus();
 };
 
 void GeometryHelpersTests::rectIntersectionAndViewportFit()
@@ -187,8 +189,8 @@ void GeometryHelpersTests::projectedPolylineHandlesBoundaryAndDegenerate()
     };
     const auto firstPoint = projection->project(twoCoordinates.front());
     const auto secondPoint = projection->project(twoCoordinates.back());
-    QVERIFY(firstPoint.isVisible);
-    QVERIFY(secondPoint.isVisible);
+    QVERIFY(firstPoint.isVisible());
+    QVERIFY(secondPoint.isVisible());
 
     const double segmentLengthSquared =
         skygate::core::Geometry2d::squaredDistance2d(firstPoint.x, firstPoint.y, secondPoint.x, secondPoint.y);
@@ -222,8 +224,8 @@ void GeometryHelpersTests::projectedPolylineSamplesOffscreenSegmentInterior()
         {.altitudeDeg = 45.0, .azimuthDeg = 179.0},
         {.altitudeDeg = 45.0, .azimuthDeg = 181.0},
     };
-    QVERIFY(!projection->project(coordinates.front()).isVisible);
-    QVERIFY(!projection->project(coordinates.back()).isVisible);
+    QVERIFY(!projection->project(coordinates.front()).isVisible());
+    QVERIFY(!projection->project(coordinates.back()).isVisible());
 
     const skygate::core::ProjectedPolylineBuilder builder;
     const auto segments = builder.build(*projection, coordinates, 1'000'000.0);
@@ -233,6 +235,14 @@ void GeometryHelpersTests::projectedPolylineSamplesOffscreenSegmentInterior()
         return segment.x1 >= 0.0 && segment.x1 <= 1000.0 && segment.y1 >= 0.0 && segment.y1 <= 800.0
                && segment.x2 >= 0.0 && segment.x2 <= 1000.0 && segment.y2 >= 0.0 && segment.y2 <= 800.0;
     }));
+}
+
+void GeometryHelpersTests::projectedPolylineViewportLimitUsesLargerSide()
+{
+    QCOMPARE(skygate::core::ProjectedPolylineBuilder::viewportSegmentLimitSquared(600.0, 800.0, 0.5), 160000.0);
+    QCOMPARE(skygate::core::ProjectedPolylineBuilder::viewportSegmentLimitSquared(800.0, 600.0, 0.5), 160000.0);
+    QCOMPARE(skygate::core::ProjectedPolylineBuilder::viewportSegmentLimitSquared(800.0, 600.0, 1.0), 640000.0);
+    QCOMPARE(skygate::core::ProjectedPolylineBuilder::viewportSegmentLimitSquared(800.0, 600.0, 0.0), 0.0);
 }
 
 void GeometryHelpersTests::dashedLineBuilderCreatesDashSegments()
@@ -294,6 +304,22 @@ void GeometryHelpersTests::coordinateFiniteQueriesDoNotChangeValidity()
 
     QVERIFY((skygate::core::ScreenPoint{.x = 1.0, .y = 2.0}).isFinite());
     QVERIFY(!(skygate::core::ScreenPoint{.x = nan, .y = 2.0}).isFinite());
+}
+
+void GeometryHelpersTests::screenPointVisibilityFollowsStatus()
+{
+    const skygate::core::ScreenPoint visible{.x = 1.0, .y = 2.0, .status = skygate::core::ProjectionStatus::Visible};
+    QVERIFY(visible.isVisible());
+
+    const skygate::core::ScreenPoint culled{.x = 1.0, .y = 2.0, .status = skygate::core::ProjectionStatus::Culled};
+    QVERIFY(!culled.isVisible());
+
+    const skygate::core::ScreenPoint invalidCoordinate{
+        .x = 1.0, .y = 2.0, .status = skygate::core::ProjectionStatus::InvalidCoordinate
+    };
+    QVERIFY(!invalidCoordinate.isVisible());
+
+    QVERIFY(!(skygate::core::ScreenPoint{}).isVisible());
 }
 
 QTEST_APPLESS_MAIN(GeometryHelpersTests)

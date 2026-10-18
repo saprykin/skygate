@@ -3,13 +3,12 @@
 #include "ObservationEventCalculator.hpp"
 #include "SkyObjectInspectorFormatters.hpp"
 #include "SkySelectionOverlayInput.hpp"
+#include "SkySelectionTargetKind.hpp"
 #include "diagnostics/SkyPerformanceLogging.hpp"
+#include "diagnostics/SkyPerformanceStageTimer.hpp"
 #include "engine/EphemerisComputationPolicy.hpp"
 #include "scene/SkyInspectorField.hpp"
-#include "scene/SkySceneLookupKey.hpp"
 #include "scene/SkySelectedObjectInspector.hpp"
-
-#include <QElapsedTimer>
 
 #include <utility>
 #include <vector>
@@ -24,11 +23,6 @@ SkyInspectorField inspectorField(const QString& label, const QString& value)
 SkyInspectorField inspectorField(const QString& label, const QString& value, const QString& tooltip)
 {
     return SkyInspectorField{.label = label, .value = value, .tooltip = tooltip};
-}
-
-bool hasSelectionInputs(const SkySelectionOverlayInput& input)
-{
-    return input.snapshot != nullptr && input.preparedProjection != nullptr && input.stateIndexByBodyId != nullptr;
 }
 
 skygate::ephemeris::ObservationEventSummary observationEventsForInspector(
@@ -46,13 +40,12 @@ void appendObservationEventFields(
         return;
     }
 
-    QElapsedTimer timer;
-    skygate::ui::SkyPerformanceLogging::startTimer(timer);
+    skygate::ui::SkyPerformanceStageTimer timer;
 
     const auto events = observationEventsForInspector(input, body, bodyIndex);
     if (skygate::ui::SkyPerformanceLogging::enabled()) {
         qCInfo(skygate::ui::skygatePerfLog)
-            << "object inspector events elapsedMs=" << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer)
+            << "object inspector events elapsedMs=" << timer.elapsedMilliseconds()
             << "bodyId=" << QString::fromStdString(body.id) << "request=" << input.ephemerisRequest.has_value();
     }
     fields.push_back(inspectorField(
@@ -187,30 +180,28 @@ void appendEphemerisMetadataFields(
 
 SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOverlayInput& input) const
 {
-    QElapsedTimer timer;
-    skygate::ui::SkyPerformanceLogging::startTimer(timer);
+    skygate::ui::SkyPerformanceStageTimer timer;
 
-    if (!hasSelectionInputs(input)) {
+    if (!input.hasRequiredSnapshotInputs()) {
         return {};
     }
 
     const QString targetId =
         !input.selectedObjectTargetId.isEmpty()
             ? input.selectedObjectTargetId
-            : (skygate::ui::internal::SkySceneLookupKey::normalized(input.selectedSearchTargetKind) == "body"
+            : (skygate::ui::internal::SkySelectionTargetKind::isBody(input.selectedSearchTargetKind)
                    ? input.selectedSearchTargetId
                    : QString());
     if (targetId.trimmed().isEmpty()) {
         return {};
     }
 
-    const auto stateIndexIt =
-        input.stateIndexByBodyId->constFind(skygate::ui::internal::SkySceneLookupKey::normalized(targetId));
-    if (stateIndexIt == input.stateIndexByBodyId->cend()) {
+    const auto stateIndex = input.stateIndexForBodyId(targetId);
+    if (!stateIndex.has_value()) {
         return {};
     }
 
-    const auto& sceneState = input.snapshot->states.at(*stateIndexIt);
+    const auto& sceneState = input.snapshot->states.at(*stateIndex);
     const auto& body = input.snapshot->bodyAt(sceneState.bodyIndex);
     if (body.displayName.empty()) {
         return {};
@@ -224,7 +215,7 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
         }
 
         const auto projected = input.preparedProjection->project(sceneState.horizontal);
-        if (!projected.isVisible) {
+        if (!projected.isVisible()) {
             return {};
         }
 
@@ -232,9 +223,9 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
         inspectorY = projected.y + 18.0;
     }
 
-    const qint64 lookupNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+    const double lookupMs = timer.stageMilliseconds();
     const skygate::ephemeris::CelestialBodyState state = detailedInspectorState(input, sceneState);
-    const qint64 detailStateNs = skygate::ui::SkyPerformanceLogging::enabled() ? timer.nsecsElapsed() : lookupNs;
+    const double detailStateMs = timer.stageMilliseconds();
 
     std::vector<SkyInspectorField> fields;
     fields.push_back(
@@ -267,22 +258,21 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
             input.catalogSourceIds, input.catalogSourceContributors, input.catalogSourceTitles, sceneState.bodyIndex
         )
     ));
-    const qint64 fieldsNs = skygate::ui::SkyPerformanceLogging::enabled() ? timer.nsecsElapsed() : detailStateNs;
+    const double fieldsMs = timer.stageMilliseconds();
 
     if (skygate::ui::SkyPerformanceLogging::enabled()) {
-        qCInfo(skygate::ui::skygatePerfLog)
-            << "object inspector build elapsedMs=" << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer)
-            << "lookupMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(lookupNs)
-            << "detailStateMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(detailStateNs - lookupNs)
-            << "fieldsMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(fieldsNs - detailStateNs)
-            << "bodyId=" << QString::fromStdString(body.id);
+        qCInfo(skygate::ui::skygatePerfLog) << "object inspector build elapsedMs=" << timer.elapsedMilliseconds()
+                                            << "lookupMs=" << lookupMs << "detailStateMs=" << detailStateMs
+                                            << "fieldsMs=" << fieldsMs << "bodyId=" << QString::fromStdString(body.id);
     }
 
     return SkySelectedObjectInspector{
         .visible = true,
         .x = inspectorX,
         .y = inspectorY,
-        .targetKind = "body",
+        .targetKind = skygate::ui::internal::SkySelectionTargetKind::token(
+            skygate::ui::internal::SkySelectionTargetKind::Type::Body
+        ),
         .targetId = QString::fromStdString(body.id),
         .title = QString::fromStdString(body.displayName),
         .pinned = input.inspectorPinned,

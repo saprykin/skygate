@@ -12,10 +12,8 @@ bool SkySceneFramePipeline::SnapshotCacheKey::equals(const SnapshotCacheKey& oth
            && engineOptionsRevision == other.engineOptionsRevision
            && ephemerisDataRevision == other.ephemerisDataRevision
            && earthOrientationDataRevision == other.earthOrientationDataRevision
-           && leapSecondDataRevision == other.leapSecondDataRevision
-           && observer.latitudeDeg == other.observer.latitudeDeg && observer.longitudeDeg == other.observer.longitudeDeg
-           && observer.elevationMeters == other.observer.elevationMeters && utcTime == other.utcTime
-           && requestEpoch == other.requestEpoch && requestOptions == other.requestOptions;
+           && leapSecondDataRevision == other.leapSecondDataRevision && observer.equals(other.observer)
+           && utcTime == other.utcTime && requestEpoch == other.requestEpoch && requestOptions == other.requestOptions;
 }
 
 bool SkySceneFramePipeline::RenderFrameKey::equals(const RenderFrameKey& other) const noexcept

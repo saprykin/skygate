@@ -3,6 +3,7 @@
 #include "math/ViewportMath.hpp"
 #include "render/SkyRenderBuilders.hpp"
 #include "render/SkyRenderLabel.hpp"
+#include "render/SkyRenderStylePolicy.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
 
 #include <QtTest/QtTest>
@@ -162,6 +163,7 @@ private slots:
     void starDecimationStartsAtThirtyThousandStates();
     void starDecimationStartsAboveThirtyFiveDegFov();
     void deepSkyVisibilityAndGlyphPolicyFollowRules();
+    void deepSkyGlyphRadiiFollowPolicy();
     void deepSkyGlyphRendersJustOutsideViewport();
     void deepSkyLabelsPreferNamedAndRespectVisibility();
     void deepSkyAliasOnlyLabelsNeedNarrowField();
@@ -247,6 +249,43 @@ void SkyRenderBuildersTests::deepSkyVisibilityAndGlyphPolicyFollowRules()
     QVERIFY(frame.glyphs.empty());
 }
 
+void SkyRenderBuildersTests::deepSkyGlyphRadiiFollowPolicy()
+{
+    auto fixture = makeFixture(
+        {
+            makeDeepSkyBody("edge", "Edge DSO", 7.0),
+        },
+        40.0
+    );
+
+    const auto frame = buildFrame(fixture);
+    QCOMPARE(frame.glyphs.size(), 1U);
+
+    const skygate::ui::internal::SkyRenderStylePolicy::GlyphRadii radii =
+        skygate::ui::internal::SkyRenderStylePolicy::deepSkyGlyphRadiiPx(
+            fixture.snapshot.bodyAt(0U), fixture.projection->params()
+        );
+    QCOMPARE(radii.radiusXPx, 20.0);
+    QCOMPARE(radii.radiusYPx, 5.0);
+    QCOMPARE(frame.glyphs.front().radiusXPx, radii.radiusXPx);
+    QCOMPARE(frame.glyphs.front().radiusYPx, radii.radiusYPx);
+
+    auto nebulaFixture = makeFixture(
+        {
+            makeDeepSkyBody(
+                "nebula", "Planetary Nebula", 9.0, skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula
+            ),
+        },
+        40.0
+    );
+    const skygate::ui::internal::SkyRenderStylePolicy::GlyphRadii nebulaRadii =
+        skygate::ui::internal::SkyRenderStylePolicy::deepSkyGlyphRadiiPx(
+            nebulaFixture.snapshot.bodyAt(0U), nebulaFixture.projection->params()
+        );
+    QCOMPARE(nebulaRadii.radiusXPx, 12.0);
+    QCOMPARE(nebulaRadii.radiusYPx, 12.0);
+}
+
 void SkyRenderBuildersTests::deepSkyGlyphRendersJustOutsideViewport()
 {
     auto fixture = makeFixture(
@@ -257,7 +296,7 @@ void SkyRenderBuildersTests::deepSkyGlyphRendersJustOutsideViewport()
     );
     fixture.snapshot.states.front().horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.76};
 
-    QVERIFY(!fixture.projection->project(fixture.snapshot.states.front().horizontal).isVisible);
+    QVERIFY(!fixture.projection->project(fixture.snapshot.states.front().horizontal).isVisible());
 
     const auto frame = buildFrame(fixture);
 
@@ -373,8 +412,8 @@ void SkyRenderBuildersTests::constellationLineRendersWithEndpointsOutside()
         {"hip_a", "hip_b"},
     };
 
-    QVERIFY(!fixture.projection->project(fixture.snapshot.states[0].horizontal).isVisible);
-    QVERIFY(!fixture.projection->project(fixture.snapshot.states[1].horizontal).isVisible);
+    QVERIFY(!fixture.projection->project(fixture.snapshot.states[0].horizontal).isVisible());
+    QVERIFY(!fixture.projection->project(fixture.snapshot.states[1].horizontal).isVisible());
 
     const auto frame = buildFrame(fixture, {}, lineRefs);
 

@@ -486,7 +486,7 @@ void verifyConsumerMatrix(
     const auto projection = sceneModel.preparedProjection();
     QVERIFY(projection.has_value());
     const auto expectedTargetPoint = projection->project(engine.expectedTargetHorizontal(renderRequest));
-    QVERIFY(expectedTargetPoint.isVisible);
+    QVERIFY(expectedTargetPoint.isVisible());
     QVERIFY(nearlyEqual(targetPoint->x, expectedTargetPoint.x));
     QVERIFY(nearlyEqual(targetPoint->y, expectedTargetPoint.y));
     observations.targetRenderPoint = QPointF(targetPoint->x, targetPoint->y);

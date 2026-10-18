@@ -4,6 +4,7 @@
 
 #include <QColor>
 
+#include <algorithm>
 #include <cstdint>
 
 struct SkyRenderGlyph final {
@@ -16,4 +17,11 @@ struct SkyRenderGlyph final {
     std::uint32_t bodyIndex = 0;
     skygate::ephemeris::DeepSkyObjectInfo::Kind kind = skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown;
     QColor color;
+
+    // Largest axis radius, never below the caller's minimum. Label anchors and
+    // hit targets need different minima, so the minimum stays a parameter.
+    [[nodiscard]] double extentRadiusPx(double minimumRadiusPx) const noexcept
+    {
+        return std::max({radiusXPx, radiusYPx, minimumRadiusPx});
+    }
 };

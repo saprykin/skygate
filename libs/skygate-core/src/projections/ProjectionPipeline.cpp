@@ -104,7 +104,6 @@ ScreenPoint ProjectionPipeline::visiblePoint(const double screenX, const double 
     ScreenPoint point;
     point.x = screenX;
     point.y = screenY;
-    point.isVisible = true;
     point.status = ProjectionStatus::Visible;
     return point;
 }

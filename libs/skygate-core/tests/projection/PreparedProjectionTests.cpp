@@ -61,7 +61,7 @@ void PreparedProjectionTests::matchesDirectProjectionForAllProjectionTypes()
             const auto preparedPoint = preparedProjection->project(coordinate);
 
             QCOMPARE(preparedPoint.status, directPoint.status);
-            QCOMPARE(preparedPoint.isVisible, directPoint.isVisible);
+            QCOMPARE(preparedPoint.isVisible(), directPoint.isVisible());
             QVERIFY(isNear(preparedPoint.x, directPoint.x, 1e-6));
             QVERIFY(isNear(preparedPoint.y, directPoint.y, 1e-6));
         }
@@ -152,7 +152,7 @@ void PreparedProjectionTests::matchesDirectInvalidCoordinateStatus()
     const auto preparedPoint = preparedProjection->project(invalidCoordinate);
 
     QCOMPARE(preparedPoint.status, directPoint.status);
-    QCOMPARE(preparedPoint.isVisible, directPoint.isVisible);
+    QCOMPARE(preparedPoint.isVisible(), directPoint.isVisible());
 }
 
 QTEST_APPLESS_MAIN(PreparedProjectionTests)

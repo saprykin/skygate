@@ -21,13 +21,13 @@ namespace {
 void expectInvalidParameters(const skygate::core::ScreenPoint& point)
 {
     QCOMPARE(point.status, skygate::core::ProjectionStatus::InvalidParameters);
-    QVERIFY(!point.isVisible);
+    QVERIFY(!point.isVisible());
 }
 
 void expectCulled(const skygate::core::ScreenPoint& point)
 {
     QCOMPARE(point.status, skygate::core::ProjectionStatus::Culled);
-    QVERIFY(!point.isVisible);
+    QVERIFY(!point.isVisible());
 }
 
 }  // namespace
@@ -69,7 +69,7 @@ void ProjectionPipelineBoundaryTests::finishCircularCullsOutsideRadiusKeepsVisib
     const auto params = baseParams();
     const auto visible = ProjectionPipeline::finishCircular(0.5, -0.25, params, 1.0);
     QCOMPARE(visible.status, skygate::core::ProjectionStatus::Visible);
-    QVERIFY(visible.isVisible);
+    QVERIFY(visible.isVisible());
     QVERIFY(std::isfinite(visible.x));
     QVERIFY(std::isfinite(visible.y));
 
@@ -105,7 +105,7 @@ void ProjectionPipelineBoundaryTests::finishRectangularCullsOutsideBoundsKeepsVi
     const auto params = baseParams();
     const auto visible = ProjectionPipeline::finishRectangular(0.5, -0.5, params, 1.0, 1.0);
     QCOMPARE(visible.status, skygate::core::ProjectionStatus::Visible);
-    QVERIFY(visible.isVisible);
+    QVERIFY(visible.isVisible());
     QVERIFY(std::isfinite(visible.x));
     QVERIFY(std::isfinite(visible.y));
 

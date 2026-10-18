@@ -15,6 +15,7 @@ struct GeoLocation {
     double elevationMeters = 0.0;
 
     [[nodiscard]] bool isValid() const noexcept;
+    [[nodiscard]] bool equals(const GeoLocation& other) const noexcept;
 };
 
 }  // namespace skygate::core

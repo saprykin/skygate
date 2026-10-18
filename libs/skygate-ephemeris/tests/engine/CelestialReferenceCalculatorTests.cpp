@@ -45,6 +45,7 @@ class CelestialReferenceCalculatorTests final : public QObject {
 
 private slots:
     void computesFiniteEclipticAndEquatorialPoints();
+    void eclipticCircleMapsIndexToLongitude();
     void declinationCircleFallsBackForNonPositiveCounts();
     void circumpolarBoundaryDeclinationFollowsHemisphere();
     void constellationAnchorCentroidAveragesAnchorVectors();
@@ -79,6 +80,42 @@ void CelestialReferenceCalculatorTests::computesFiniteEclipticAndEquatorialPoint
     QVERIFY(equatorialPoint.altitudeDeg <= 90.0);
     QVERIFY(equatorialPoint.azimuthDeg >= 0.0);
     QVERIFY(equatorialPoint.azimuthDeg < 360.0);
+}
+
+void CelestialReferenceCalculatorTests::eclipticCircleMapsIndexToLongitude()
+{
+    skygate::core::GeoLocation observer;
+    observer.latitudeDeg = 47.3769;
+    observer.longitudeDeg = 8.5417;
+    observer.elevationMeters = 408.0;
+    const skygate::core::UtcTimePoint utcTime(std::chrono::seconds(1'717'276'800));
+    constexpr int kSampleCount = skygate::ephemeris::CelestialReferenceCalculator::kReferenceCircleSamples;
+
+    const auto atStart =
+        skygate::ephemeris::CelestialReferenceCalculator::eclipticCirclePoint(0, kSampleCount, observer, utcTime);
+    const auto atZeroLongitude =
+        skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(0.0, observer, utcTime);
+    QCOMPARE(atStart.altitudeDeg, atZeroLongitude.altitudeDeg);
+    QCOMPARE(atStart.azimuthDeg, atZeroLongitude.azimuthDeg);
+
+    const auto atQuarter = skygate::ephemeris::CelestialReferenceCalculator::eclipticCirclePoint(
+        kSampleCount / 4, kSampleCount, observer, utcTime
+    );
+    const auto atNinetyDegrees =
+        skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(90.0, observer, utcTime);
+    QCOMPARE(atQuarter.altitudeDeg, atNinetyDegrees.altitudeDeg);
+    QCOMPARE(atQuarter.azimuthDeg, atNinetyDegrees.azimuthDeg);
+
+    const auto fullTurn = skygate::ephemeris::CelestialReferenceCalculator::eclipticCirclePoint(
+        kSampleCount, kSampleCount, observer, utcTime
+    );
+    QCOMPARE(fullTurn.altitudeDeg, atZeroLongitude.altitudeDeg);
+    QCOMPARE(fullTurn.azimuthDeg, atZeroLongitude.azimuthDeg);
+
+    const auto fallback =
+        skygate::ephemeris::CelestialReferenceCalculator::eclipticCirclePoint(3, 0, observer, utcTime);
+    QCOMPARE(fallback.altitudeDeg, atZeroLongitude.altitudeDeg);
+    QCOMPARE(fallback.azimuthDeg, atZeroLongitude.azimuthDeg);
 }
 
 void CelestialReferenceCalculatorTests::declinationCircleFallsBackForNonPositiveCounts()

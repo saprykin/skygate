@@ -4,9 +4,10 @@
 #include "EphemerisSnapshot.hpp"
 #include "ObservationContext.hpp"
 #include "PreparedProjection.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "engine/IEphemerisGuidanceStrategy.hpp"
-#include "catalog/constellation/ConstellationData.hpp"
+#include "scene/SkySceneLookupKey.hpp"
 
 #include <QHash>
 #include <QString>
@@ -41,4 +42,26 @@ struct SkySelectionOverlayInput final {
     double inspectorPinnedY = 0.0;
     bool inspectorPinned = false;
     std::shared_ptr<skygate::ephemeris::IEphemerisGuidanceStrategy> guidanceStrategy;
+
+    [[nodiscard]] bool hasRequiredSnapshotInputs() const noexcept
+    {
+        return snapshot != nullptr && preparedProjection != nullptr && stateIndexByBodyId != nullptr;
+    }
+
+    // Body ids are matched the same way the scene index was built, so lookup
+    // ids can come from search text or settings without extra normalization.
+    [[nodiscard]] std::optional<std::size_t> stateIndexForBodyId(const QString& bodyId) const
+    {
+        if (stateIndexByBodyId == nullptr) {
+            return std::nullopt;
+        }
+
+        const auto stateIndexIt =
+            stateIndexByBodyId->constFind(skygate::ui::internal::SkySceneLookupKey::normalized(bodyId));
+        if (stateIndexIt == stateIndexByBodyId->cend()) {
+            return std::nullopt;
+        }
+
+        return *stateIndexIt;
+    }
 };

@@ -1,5 +1,6 @@
 #include "CelestialReferenceCalculator.hpp"
 #include "math/ViewportMath.hpp"
+#include "render/SkyCardinalDirectionPolicy.hpp"
 #include "render/SkyRenderLabel.hpp"
 #include "render/SkyRenderPoint.hpp"
 #include "scene/SkyOverlayItem.hpp"
@@ -11,6 +12,7 @@
 #include <QHash>
 #include <QtTest/QtTest>
 
+#include <algorithm>
 #include <chrono>
 #include <optional>
 
@@ -88,6 +90,7 @@ private slots:
     void selectionOnlyKeyChangePreservesFrameContent();
     void referenceOverlayLabelsUseResolvedRequestContext();
     void referenceOverlayLabelsPreferSnapshotContext();
+    void cardinalOverlayItemsFollowCardinalPolicy();
     void resetForcesNextCompositionToRebuild();
 };
 
@@ -271,6 +274,58 @@ void SkySceneCompositionTests::referenceOverlayLabelsPreferSnapshotContext()
 
     QVERIFY(result.changed);
     QVERIFY(overlayItemsContainText(sceneFrame.overlayItems, "Circumpolar"));
+}
+
+void SkySceneCompositionTests::cardinalOverlayItemsFollowCardinalPolicy()
+{
+    const auto projection = makeProjection(0.0, 180.0);
+    QVERIFY(projection.has_value());
+
+    SkySceneComposer composer;
+    SkySceneFrameData sceneFrame;
+    sceneFrame.preparedProjection = projection;
+
+    const skygate::ephemeris::EphemerisSnapshot snapshot;
+    const QHash<QString, std::size_t> stateIndexByBodyId;
+    const SkyRenderFrame frame;
+    SkySceneCompositionInput input = makeInput();
+    input.frameInput.overlayLayers.horizon = true;
+    input.frameInput.renderTheme.cardinalNorthLine = QColor("#111111");
+    input.frameInput.renderTheme.cardinalEastLine = QColor("#222222");
+    input.frameInput.renderTheme.cardinalSouthLine = QColor("#333333");
+    input.frameInput.renderTheme.cardinalWestLine = QColor("#444444");
+    input.frameInput.renderTheme.gridAzimuthLine = QColor("#555555");
+
+    const auto result = composer.rebuild(
+        sceneFrame, input, makeFrameResult(true, 9U, *projection, snapshot, frame, stateIndexByBodyId)
+    );
+    QVERIFY(result.changed);
+
+    int cardinalItemCount = 0;
+    for (const double azimuthDeg : skygate::ui::internal::SkyCardinalDirectionPolicy::kAzimuthsDeg) {
+        const auto projected =
+            projection->project(skygate::core::HorizontalCoordinate{.altitudeDeg = 0.0, .azimuthDeg = azimuthDeg});
+        if (!projected.isVisible()) {
+            continue;
+        }
+
+        const QString expectedLabel = skygate::ui::internal::SkyCardinalDirectionPolicy::label(azimuthDeg);
+        const QColor expectedColor =
+            skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(azimuthDeg, input.frameInput.renderTheme);
+        const auto cardinalItemIt = std::find_if(
+            sceneFrame.overlayItems.begin(),
+            sceneFrame.overlayItems.end(),
+            [&expectedLabel](const SkyOverlayItem& overlayItem) {
+                return overlayItem.kind == QString("cardinal") && overlayItem.text == expectedLabel;
+            }
+        );
+        QVERIFY2(cardinalItemIt != sceneFrame.overlayItems.end(), qPrintable(expectedLabel));
+        QCOMPARE(cardinalItemIt->x, projected.x);
+        QCOMPARE(cardinalItemIt->y, projected.y);
+        QCOMPARE(cardinalItemIt->color, expectedColor);
+        ++cardinalItemCount;
+    }
+    QVERIFY(cardinalItemCount > 0);
 }
 
 void SkySceneCompositionTests::resetForcesNextCompositionToRebuild()

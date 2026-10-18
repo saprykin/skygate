@@ -49,7 +49,7 @@ void StereographicProjectionTests::centerDirectionMapsToScreenCenter()
     const skygate::core::ProjectionParams params = makeDefaultStereographicParams();
     const auto projectedCenter = projection->project(params.center, params);
 
-    QVERIFY(projectedCenter.isVisible);
+    QVERIFY(projectedCenter.isVisible());
     QCOMPARE(projectedCenter.status, skygate::core::ProjectionStatus::Visible);
     QVERIFY(isNear(projectedCenter.x, params.viewportWidth * 0.5, 1e-6));
     QVERIFY(isNear(projectedCenter.y, params.viewportHeight * 0.5, 1e-6));
@@ -63,7 +63,7 @@ void StereographicProjectionTests::oppositeDirectionIsHidden()
     const skygate::core::ProjectionParams params = makeDefaultStereographicParams();
     const auto oppositePoint = projection->project({.altitudeDeg = -45.0, .azimuthDeg = 0.0}, params);
 
-    QVERIFY(!oppositePoint.isVisible);
+    QVERIFY(!oppositePoint.isVisible());
     QCOMPARE(oppositePoint.status, skygate::core::ProjectionStatus::Culled);
 }
 
@@ -76,31 +76,31 @@ void StereographicProjectionTests::invalidParamsAreRejected()
 
     params.fovDeg = 0.9;
     const auto tooSmallFov = projection->project(params.center, params);
-    QVERIFY(!tooSmallFov.isVisible);
+    QVERIFY(!tooSmallFov.isVisible());
     QCOMPARE(tooSmallFov.status, skygate::core::ProjectionStatus::InvalidParameters);
 
     params = makeDefaultStereographicParams();
     params.fovDeg = 150.1;
     const auto tooLargeFov = projection->project(params.center, params);
-    QVERIFY(!tooLargeFov.isVisible);
+    QVERIFY(!tooLargeFov.isVisible());
     QCOMPARE(tooLargeFov.status, skygate::core::ProjectionStatus::InvalidParameters);
 
     params = makeDefaultStereographicParams();
     params.viewportWidth = 0.0;
     const auto zeroWidth = projection->project(params.center, params);
-    QVERIFY(!zeroWidth.isVisible);
+    QVERIFY(!zeroWidth.isVisible());
     QCOMPARE(zeroWidth.status, skygate::core::ProjectionStatus::InvalidParameters);
 
     params = makeDefaultStereographicParams();
     params.viewportHeight = -1.0;
     const auto negativeHeight = projection->project(params.center, params);
-    QVERIFY(!negativeHeight.isVisible);
+    QVERIFY(!negativeHeight.isVisible());
     QCOMPARE(negativeHeight.status, skygate::core::ProjectionStatus::InvalidParameters);
 
     params = makeDefaultStereographicParams();
     params.rollDeg = std::numeric_limits<double>::quiet_NaN();
     const auto nanRoll = projection->project(params.center, params);
-    QVERIFY(!nanRoll.isVisible);
+    QVERIFY(!nanRoll.isVisible());
     QCOMPARE(nanRoll.status, skygate::core::ProjectionStatus::InvalidParameters);
 }
 
@@ -112,7 +112,7 @@ void StereographicProjectionTests::invalidCoordinateIsRejected()
     const skygate::core::ProjectionParams params = makeDefaultStereographicParams();
     const auto invalidCoordinatePoint = projection->project({.altitudeDeg = 95.0, .azimuthDeg = 0.0}, params);
 
-    QVERIFY(!invalidCoordinatePoint.isVisible);
+    QVERIFY(!invalidCoordinatePoint.isVisible());
     QCOMPARE(invalidCoordinatePoint.status, skygate::core::ProjectionStatus::InvalidCoordinate);
 }
 
@@ -125,12 +125,12 @@ void StereographicProjectionTests::legalFovBoundaryValuesAreAccepted()
 
     params.fovDeg = skygate::core::ProjectionParams::kFieldOfViewMinDeg;
     const auto minFovPoint = projection->project(params.center, params);
-    QVERIFY(minFovPoint.isVisible);
+    QVERIFY(minFovPoint.isVisible());
     QCOMPARE(minFovPoint.status, skygate::core::ProjectionStatus::Visible);
 
     params.fovDeg = skygate::core::ProjectionParams::kFieldOfViewMaxDeg;
     const auto maxFovPoint = projection->project(params.center, params);
-    QVERIFY(maxFovPoint.isVisible);
+    QVERIFY(maxFovPoint.isVisible());
     QCOMPARE(maxFovPoint.status, skygate::core::ProjectionStatus::Visible);
 }
 
@@ -148,11 +148,11 @@ void StereographicProjectionTests::directionAtCircularFovEdgeIsVisible()
     };
 
     const auto edgePoint = projection->project({.altitudeDeg = 0.0, .azimuthDeg = 30.0}, params);
-    QVERIFY(edgePoint.isVisible);
+    QVERIFY(edgePoint.isVisible());
     QCOMPARE(edgePoint.status, skygate::core::ProjectionStatus::Visible);
 
     const auto outsidePoint = projection->project({.altitudeDeg = 0.0, .azimuthDeg = 30.25}, params);
-    QVERIFY(!outsidePoint.isVisible);
+    QVERIFY(!outsidePoint.isVisible());
     QCOMPARE(outsidePoint.status, skygate::core::ProjectionStatus::Culled);
 }
 
@@ -170,7 +170,7 @@ void StereographicProjectionTests::directionOutsideFovIsHidden()
     };
 
     const auto outsideFovPoint = projection->project({.altitudeDeg = 0.0, .azimuthDeg = 50.0}, params);
-    QVERIFY(!outsideFovPoint.isVisible);
+    QVERIFY(!outsideFovPoint.isVisible());
     QCOMPARE(outsideFovPoint.status, skygate::core::ProjectionStatus::Culled);
 }
 
@@ -189,12 +189,12 @@ void StereographicProjectionTests::rollRotatesProjectedPoint()
     };
 
     const auto baselinePoint = projection->project(target, baseParams);
-    QVERIFY(baselinePoint.isVisible);
+    QVERIFY(baselinePoint.isVisible());
 
     skygate::core::ProjectionParams rollParams = baseParams;
     rollParams.rollDeg = 90.0;
     const auto rotatedPoint = projection->project(target, rollParams);
-    QVERIFY(rotatedPoint.isVisible);
+    QVERIFY(rotatedPoint.isVisible());
 
     const double centerX = rollParams.viewportWidth * 0.5;
     const double centerY = rollParams.viewportHeight * 0.5;
@@ -221,7 +221,7 @@ void StereographicProjectionTests::zenithCenterIsSupported()
     };
 
     const auto projectedCenter = projection->project(params.center, params);
-    QVERIFY(projectedCenter.isVisible);
+    QVERIFY(projectedCenter.isVisible());
     QCOMPARE(projectedCenter.status, skygate::core::ProjectionStatus::Visible);
     QVERIFY(isNear(projectedCenter.x, params.viewportWidth * 0.5, 1e-6));
     QVERIFY(isNear(projectedCenter.y, params.viewportHeight * 0.5, 1e-6));
@@ -251,8 +251,8 @@ void StereographicProjectionTests::zenithOrientationRemainsContinuous()
     const auto nearPolePoint = projection->project(target, nearPoleParams);
     const auto polePoint = projection->project(target, poleParams);
 
-    QVERIFY(nearPolePoint.isVisible);
-    QVERIFY(polePoint.isVisible);
+    QVERIFY(nearPolePoint.isVisible());
+    QVERIFY(polePoint.isVisible());
     QVERIFY(isNear(nearPolePoint.x, polePoint.x, 1.0));
     QVERIFY(isNear(nearPolePoint.y, polePoint.y, 1.0));
 }

@@ -11,4 +11,10 @@ bool GeoLocation::isValid() const noexcept
            && longitudeDeg <= kLongitudeMaxDeg;
 }
 
+bool GeoLocation::equals(const GeoLocation& other) const noexcept
+{
+    return latitudeDeg == other.latitudeDeg && longitudeDeg == other.longitudeDeg
+           && elevationMeters == other.elevationMeters;
+}
+
 }  // namespace skygate::core

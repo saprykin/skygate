@@ -5,7 +5,6 @@
 #include "math/ProjectedPolylineBuilder.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
 
-#include <algorithm>
 #include <array>
 
 namespace {
@@ -29,9 +28,9 @@ void SkyConstellationRenderBuilder::appendLines(
     const SkyThemeRenderPalette& renderTheme
 ) const
 {
-    const double maxSegmentLength =
-        std::max(viewportWidth, viewportHeight) * kConstellationSegmentLengthViewportFraction;
-    const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
+    const double maxSegmentLengthSquared = skygate::core::ProjectedPolylineBuilder::viewportSegmentLimitSquared(
+        viewportWidth, viewportHeight, kConstellationSegmentLengthViewportFraction
+    );
     const skygate::core::ProjectedPolylineBuilder lineBuilder;
     const QColor lineColor = SkyRenderStylePolicy::constellationLineColor(renderTheme);
 
@@ -90,7 +89,7 @@ void SkyConstellationRenderBuilder::appendLabels(
             }
 
             const auto projected = projection.project(*horizontal);
-            if (!projected.isVisible || !projected.isFinite()) {
+            if (!projected.isVisible() || !projected.isFinite()) {
                 continue;
             }
 
