@@ -6,6 +6,10 @@ class AngleMath final {
 public:
     [[nodiscard]] static double toRadians(double degrees) noexcept;
     [[nodiscard]] static double toDegrees(double radians) noexcept;
+    [[nodiscard]] static double hoursToRadians(double hours) noexcept;
+    [[nodiscard]] static double radiansToHours(double radians) noexcept;
+    [[nodiscard]] static double hoursToDegrees(double hours) noexcept;
+    [[nodiscard]] static double degreesToHours(double degrees) noexcept;
     [[nodiscard]] static double normalizeDegrees(double degrees) noexcept;
     [[nodiscard]] static double normalizeDegreesSigned(double degrees) noexcept;
     [[nodiscard]] static double normalizeHours(double hours) noexcept;

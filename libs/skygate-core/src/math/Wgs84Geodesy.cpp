@@ -1,5 +1,6 @@
 #include "Wgs84Geodesy.hpp"
 #include "AngleMath.hpp"
+#include "Matrix3x3.hpp"
 #include "PhysicalConstants.hpp"
 
 #include <cassert>
@@ -32,6 +33,25 @@ Vector3d Wgs84Geodesy::ecefMeters(const GeoLocation& location) noexcept
         .y = yMeters,
         .z = zMeters,
     };
+}
+
+Vector3d Wgs84Geodesy::eastNorthUpMeters(const GeoLocation& location, const Vector3d& ecefMeters) noexcept
+{
+    assert(location.isValid());
+
+    const double latitudeRad = AngleMath::toRadians(location.latitudeDeg);
+    const double longitudeRad = AngleMath::toRadians(location.longitudeDeg);
+    const double sinLatitude = std::sin(latitudeRad);
+    const double cosLatitude = std::cos(latitudeRad);
+    const double sinLongitude = std::sin(longitudeRad);
+    const double cosLongitude = std::cos(longitudeRad);
+
+    const Matrix3x3 localFrame{
+        {.x = -sinLongitude, .y = cosLongitude, .z = 0.0},
+        {.x = -sinLatitude * cosLongitude, .y = -sinLatitude * sinLongitude, .z = cosLatitude},
+        {.x = cosLatitude * cosLongitude, .y = cosLatitude * sinLongitude, .z = sinLatitude},
+    };
+    return localFrame.multiplied(ecefMeters);
 }
 
 }  // namespace skygate::core

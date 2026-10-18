@@ -1,6 +1,7 @@
 #include "MoonEquatorialCalculator.hpp"
 #include "EclipticToEquatorialCalculator.hpp"
 #include "math/AngleMath.hpp"
+#include "math/SphericalGeometry.hpp"
 #include "time/AstronomicalTime.hpp"
 #include "time/EpochCodec.hpp"
 
@@ -48,13 +49,15 @@ MoonEquatorialCalculator::compute(const skygate::core::UtcTimePoint& utcTime) co
                          + std::cos(ascendingNodeRad) * std::sin(longitudeArgumentRad) * std::cos(inclinationRad));
     const double zH = radius * std::sin(longitudeArgumentRad) * std::sin(inclinationRad);
 
-    const double eclipticLongitudeDeg =
-        skygate::core::AngleMath::normalizeDegrees(skygate::core::AngleMath::toDegrees(std::atan2(yH, xH)));
-    const double eclipticLatitudeDeg =
-        skygate::core::AngleMath::toDegrees(std::atan2(zH, std::sqrt(xH * xH + yH * yH)));
+    // The ecliptic frame shares its longitude and latitude convention with the
+    // equatorial one, so the equatorial accessors return the ecliptic angles.
+    const skygate::core::EquatorialCoordinate eclipticAngles =
+        skygate::core::SphericalGeometry::equatorialFromUnitVector({.x = xH, .y = yH, .z = zH});
 
     return EclipticToEquatorialCalculator::compute(
-        eclipticLongitudeDeg, eclipticLatitudeDeg, skygate::core::AstronomicalTime::meanObliquityDeg(daysSinceJ2000)
+        skygate::core::AngleMath::hoursToDegrees(eclipticAngles.rightAscensionHours),
+        eclipticAngles.declinationDeg,
+        skygate::core::AstronomicalTime::meanObliquityDeg(daysSinceJ2000)
     );
 }
 

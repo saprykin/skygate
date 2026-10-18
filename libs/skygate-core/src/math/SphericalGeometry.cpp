@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 
 namespace skygate::core {
 namespace {
@@ -10,7 +11,37 @@ namespace {
 // Direction used when a rotated or interpolated vector collapses to zero length.
 constexpr Vector3d kZenithFallbackDirection{.x = 0.0, .y = 0.0, .z = 1.0};
 
+// Reference directions that resolve a rotation axis for collinear inputs, tried
+// in this order.
+constexpr Vector3d kPolarReferenceDirection{.x = 0.0, .y = 0.0, .z = 1.0};
+constexpr Vector3d kEquinoxReferenceDirection{.x = 1.0, .y = 0.0, .z = 0.0};
+
+// For two unit vectors the cross-product length is the sine of the angle
+// between them. Below this value the rotation axis is unresolved and the
+// directions are treated as collinear.
+constexpr double kCollinearSinTolerance = 1e-9;
+
 }  // namespace
+
+Vector3d SphericalGeometry::equatorialToUnitVector(const EquatorialCoordinate& coordinate) noexcept
+{
+    const double rightAscensionRad = AngleMath::hoursToRadians(coordinate.rightAscensionHours);
+    const double declinationRad = AngleMath::toRadians(coordinate.declinationDeg);
+    const double cosDeclination = std::cos(declinationRad);
+    return {
+        .x = cosDeclination * std::cos(rightAscensionRad),
+        .y = cosDeclination * std::sin(rightAscensionRad),
+        .z = std::sin(declinationRad),
+    };
+}
+
+EquatorialCoordinate SphericalGeometry::equatorialFromUnitVector(const Vector3d& vector) noexcept
+{
+    return {
+        .rightAscensionHours = AngleMath::normalizeHours(AngleMath::radiansToHours(std::atan2(vector.y, vector.x))),
+        .declinationDeg = AngleMath::toDegrees(std::atan2(vector.z, std::hypot(vector.x, vector.y))),
+    };
+}
 
 Vector3d SphericalGeometry::horizontalToUnitVector(const HorizontalCoordinate& coordinate) noexcept
 {
@@ -45,13 +76,41 @@ SphericalGeometry::rotatedAroundAxis(const Vector3d& vector, const Vector3d& axi
     return rotated.normalized().value_or(kZenithFallbackDirection);
 }
 
+Vector3d SphericalGeometry::rotationAxisBetween(const Vector3d& from, const Vector3d& to) noexcept
+{
+    Vector3d axis = from.cross(to);
+    if (axis.length() <= kCollinearSinTolerance) {
+        axis = from.cross(kPolarReferenceDirection);
+        if (axis.length() <= kCollinearSinTolerance) {
+            axis = from.cross(kEquinoxReferenceDirection);
+        }
+    }
+    return axis.normalized().value_or(kZenithFallbackDirection);
+}
+
+double SphericalGeometry::rotationAngleBetween(const Vector3d& from, const Vector3d& to, const Vector3d& axis) noexcept
+{
+    const double cosAngle = from.dot(to);
+    const double sinAngle = from.cross(to).dot(axis);
+    if (std::abs(sinAngle) <= kCollinearSinTolerance) {
+        // Collinear directions leave the sine component unresolved, so the dot
+        // product alone decides between no turn and a half turn.
+        return cosAngle > 0.0 ? 0.0 : std::numbers::pi;
+    }
+    return std::atan2(sinAngle, cosAngle);
+}
+
+double SphericalGeometry::angularSeparationRad(const Vector3d& lhs, const Vector3d& rhs) noexcept
+{
+    return std::acos(std::clamp(lhs.dot(rhs), -1.0, 1.0));
+}
+
 double
 SphericalGeometry::angularSeparationDegrees(const HorizontalCoordinate& lhs, const HorizontalCoordinate& rhs) noexcept
 {
     const Vector3d lhsVector = horizontalToUnitVector(lhs.normalizedAzimuth());
     const Vector3d rhsVector = horizontalToUnitVector(rhs.normalizedAzimuth());
-    const double dot = std::clamp(lhsVector.dot(rhsVector), -1.0, 1.0);
-    return AngleMath::toDegrees(std::acos(dot));
+    return AngleMath::toDegrees(angularSeparationRad(lhsVector, rhsVector));
 }
 
 HorizontalCoordinate SphericalGeometry::interpolateHorizontalCoordinate(
@@ -82,7 +141,7 @@ bool SphericalGeometry::tryBuildProjectionBasis(
     const double sinAzimuth = std::sin(azimuthRad);
     const double cosAzimuth = std::cos(azimuthRad);
 
-    center = {.x = cosAltitude * sinAzimuth, .y = cosAltitude * cosAzimuth, .z = sinAltitude};
+    center = horizontalToUnitVector(normalizedCoordinate);
     right = {.x = -cosAzimuth, .y = sinAzimuth, .z = 0.0};
     up = {.x = -sinAltitude * sinAzimuth, .y = -sinAltitude * cosAzimuth, .z = cosAltitude};
     return true;
