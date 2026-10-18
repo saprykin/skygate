@@ -79,21 +79,28 @@ using skygate::ui::internal::SkyEphemerisUpdateOperation;
     return parts.isEmpty() ? fallback : parts.join(QStringLiteral("; "));
 }
 
-[[nodiscard]] QString
+struct SupportDataStatus {
+    QString text;
+    bool updateAvailable = false;
+};
+
+[[nodiscard]] SupportDataStatus
 supportDataStatusText(const QString& rawStatusText, const QString& availableVersion, const bool updateChecked)
 {
     const QString displayStatus = displayDataStatus(rawStatusText);
     if (!updateChecked) {
-        return displayStatus;
+        return {displayStatus, false};
     }
     if (displayStatus == QStringLiteral("Bundled")) {
-        return availableVersion.isEmpty() ? QStringLiteral("Bundled (latest)")
-                                          : QStringLiteral("Bundled (available: %1)").arg(availableVersion);
+        if (availableVersion.isEmpty()) {
+            return {QStringLiteral("Bundled (latest)"), false};
+        }
+        return {QStringLiteral("Bundled (available: %1)").arg(availableVersion), true};
     }
     if (!availableVersion.isEmpty() && availableVersion > displayStatus) {
-        return QStringLiteral("%1 (available: %2)").arg(displayStatus, availableVersion);
+        return {QStringLiteral("%1 (available: %2)").arg(displayStatus, availableVersion), true};
     }
-    return QStringLiteral("%1 (latest)").arg(displayStatus);
+    return {QStringLiteral("%1 (latest)").arg(displayStatus), false};
 }
 
 [[nodiscard]] QString
@@ -163,28 +170,31 @@ QString SkyEphemerisUpdateWorkflow::statusText() const
 QString SkyEphemerisUpdateWorkflow::earthOrientationStatusText() const
 {
     return supportDataStatusText(
-        m_dataManager != nullptr ? m_dataManager->earthOrientationStatusText() : QString(),
-        m_availableEarthOrientationVersion,
-        m_supportDataUpdateChecked
-    );
+               m_dataManager != nullptr ? m_dataManager->earthOrientationStatusText() : QString(),
+               m_availableEarthOrientationVersion,
+               m_supportDataUpdateChecked
+    )
+        .text;
 }
 
 QString SkyEphemerisUpdateWorkflow::leapSecondStatusText() const
 {
     return supportDataStatusText(
-        m_dataManager != nullptr ? m_dataManager->leapSecondStatusText() : QString(),
-        m_availableLeapSecondVersion,
-        m_supportDataUpdateChecked
-    );
+               m_dataManager != nullptr ? m_dataManager->leapSecondStatusText() : QString(),
+               m_availableLeapSecondVersion,
+               m_supportDataUpdateChecked
+    )
+        .text;
 }
 
 QString SkyEphemerisUpdateWorkflow::deltaTStatusText() const
 {
     return supportDataStatusText(
-        m_dataManager != nullptr ? m_dataManager->deltaTStatusText() : QString(),
-        m_availableDeltaTVersion,
-        m_supportDataUpdateChecked
-    );
+               m_dataManager != nullptr ? m_dataManager->deltaTStatusText() : QString(),
+               m_availableDeltaTVersion,
+               m_supportDataUpdateChecked
+    )
+        .text;
 }
 
 bool SkyEphemerisUpdateWorkflow::updateCancellationRequested() const noexcept
@@ -411,7 +421,28 @@ bool SkyEphemerisUpdateWorkflow::checkSupportDataUpdates(const QString& manifest
         m_availableLeapSecondVersion = supportDataVersion(*manifest, EphemerisDataManifest::AssetKind::LeapSecondTable);
         m_availableDeltaTVersion = supportDataVersion(*manifest, EphemerisDataManifest::AssetKind::DeltaTData);
         m_supportDataUpdateChecked = true;
-        setStatusText({});
+
+        const SupportDataStatus earthOrientationStatus = supportDataStatusText(
+            m_dataManager != nullptr ? m_dataManager->earthOrientationStatusText() : QString(),
+            m_availableEarthOrientationVersion,
+            m_supportDataUpdateChecked
+        );
+        const SupportDataStatus leapSecondStatus = supportDataStatusText(
+            m_dataManager != nullptr ? m_dataManager->leapSecondStatusText() : QString(),
+            m_availableLeapSecondVersion,
+            m_supportDataUpdateChecked
+        );
+        const SupportDataStatus deltaTStatus = supportDataStatusText(
+            m_dataManager != nullptr ? m_dataManager->deltaTStatusText() : QString(),
+            m_availableDeltaTVersion,
+            m_supportDataUpdateChecked
+        );
+        const bool updatesAvailable =
+            earthOrientationStatus.updateAvailable || leapSecondStatus.updateAvailable || deltaTStatus.updateAvailable;
+        setStatusText(
+            updatesAvailable ? QStringLiteral("Ephemeris data: Updates available for time and Earth data")
+                             : QStringLiteral("Ephemeris data: Time and Earth data is up to date")
+        );
         emit statusChanged();
     });
     return true;

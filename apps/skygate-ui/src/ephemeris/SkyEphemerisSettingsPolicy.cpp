@@ -139,6 +139,15 @@ SkyEphemerisUserSettingsSnapshot SkyEphemerisSettingsPolicy::userSettingsFromEng
     return settings;
 }
 
+SkyEphemerisUserSettingsSnapshot
+SkyEphemerisSettingsPolicy::normalizedUpdateManifestUrl(SkyEphemerisUserSettingsSnapshot settings)
+{
+    if (settings.updateManifestUrl.trimmed().isEmpty()) {
+        settings.updateManifestUrl = kDefaultUpdateManifestUrl.toString();
+    }
+    return settings;
+}
+
 skygate::ephemeris::EphemerisEngineOptions SkyEphemerisSettingsPolicy::engineOptionsFromSettings(
     const skygate::ephemeris::EphemerisEngineOptions& baseOptions, const SkyEphemerisUserSettingsSnapshot& settings
 )

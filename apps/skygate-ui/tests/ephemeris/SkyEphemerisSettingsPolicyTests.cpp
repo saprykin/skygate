@@ -43,6 +43,7 @@ private slots:
     void atmosphereTextEnforcesFieldBounds_data();
     void atmosphereTextEnforcesFieldBounds();
     void userSettingsFromEngineCopiesEngineFields();
+    void normalizedUpdateManifestUrlFillsDefaultWhenEmpty();
     void engineOptionsFromSettingsCopiesAllFields();
     void settingsForEngineSwitchAppliesDefaults();
 };
@@ -231,6 +232,28 @@ void SkyEphemerisSettingsPolicyTests::userSettingsFromEngineCopiesEngineFields()
     QVERIFY(!result.onlineUpdatesEnabled);
     QCOMPARE(result.updatePresetId, QStringLiteral("custom"));
     QCOMPARE(result.updateManifestUrl, QStringLiteral("https://example.test/ephemeris.json"));
+}
+
+void SkyEphemerisSettingsPolicyTests::normalizedUpdateManifestUrlFillsDefaultWhenEmpty()
+{
+    SkyEphemerisUserSettingsSnapshot emptySettings;
+    QVERIFY(emptySettings.updateManifestUrl.isEmpty());
+
+    const SkyEphemerisUserSettingsSnapshot normalized =
+        SkyEphemerisSettingsPolicy::normalizedUpdateManifestUrl(emptySettings);
+    QCOMPARE(normalized.updateManifestUrl, SkyEphemerisSettingsPolicy::kDefaultUpdateManifestUrl.toString());
+
+    SkyEphemerisUserSettingsSnapshot blankSettings;
+    blankSettings.updateManifestUrl = QStringLiteral("  \t ");
+    const SkyEphemerisUserSettingsSnapshot blankNormalized =
+        SkyEphemerisSettingsPolicy::normalizedUpdateManifestUrl(blankSettings);
+    QCOMPARE(blankNormalized.updateManifestUrl, SkyEphemerisSettingsPolicy::kDefaultUpdateManifestUrl.toString());
+
+    SkyEphemerisUserSettingsSnapshot customSettings;
+    customSettings.updateManifestUrl = QStringLiteral("https://example.test/ephemeris.json");
+    const SkyEphemerisUserSettingsSnapshot preserved =
+        SkyEphemerisSettingsPolicy::normalizedUpdateManifestUrl(customSettings);
+    QCOMPARE(preserved.updateManifestUrl, QStringLiteral("https://example.test/ephemeris.json"));
 }
 
 void SkyEphemerisSettingsPolicyTests::engineOptionsFromSettingsCopiesAllFields()

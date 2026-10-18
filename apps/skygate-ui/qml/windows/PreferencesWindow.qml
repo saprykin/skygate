@@ -43,6 +43,9 @@ Window {
                                            && skyContextController.ephemerisDataUpdateInProgress
     readonly property bool footerBusy: (selectedPage === engineSection && ephemerisBusy)
                                        || (selectedPage === catalogSection && catalogBusy)
+    readonly property bool footerEngineStatusVisible: selectedPage === engineSection
+        && skyContextController !== null
+        && skyContextController.ephemerisDataStatusText !== ""
     readonly property bool footerCancelable: (selectedPage === engineSection && ephemerisBusy)
                                              || (selectedPage === catalogSection
                                                  && skyContextController !== null
@@ -375,12 +378,14 @@ Window {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 3
-                        visible: preferencesWindow.footerBusy
+                        visible: preferencesWindow.footerBusy || preferencesWindow.footerEngineStatusVisible
 
                         Label {
                             Layout.fillWidth: true
+                            objectName: "preferencesFooterStatusLabel"
+                            visible: preferencesWindow.footerBusy || preferencesWindow.footerEngineStatusVisible
                             text: {
-                                const statusText = preferencesWindow.ephemerisBusy
+                                const statusText = preferencesWindow.selectedPage === preferencesWindow.engineSection
                                     ? (preferencesWindow.skyContextController.ephemerisDataStatusText || "")
                                     : (preferencesWindow.skyContextController.catalogStatusText || "")
                                 return statusText.startsWith("Catalog: ")
@@ -398,9 +403,11 @@ Window {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
+                            visible: preferencesWindow.footerBusy
 
                             ProgressBar {
                                 id: footerCatalogProgressBar
+                                objectName: "preferencesFooterProgressBar"
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 6
                                 Layout.alignment: Qt.AlignVCenter

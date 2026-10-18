@@ -1,10 +1,17 @@
 #include "engine/EphemerisDataManifest.hpp"
+#include "settings/SkyPersistedStateSnapshot.hpp"
+#include "settings/SkySettingsStore.hpp"
 #include "support/QmlPreferencesTestSupport.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <QDir>
 #include <QFileInfo>
+#include <QMetaObject>
+#include <QPointF>
+#include <QQuickItem>
 #include <QSettings>
+#include <QUrl>
+#include <QWindow>
 
 #include <string>
 #include <string_view>
@@ -182,12 +189,218 @@ bool writeStagedEphemerisAssets(const QString& root, const skygate::ephemeris::E
     return true;
 }
 
+QString manifestAssetVersion(const skygate::ephemeris::EphemerisDataManifest& manifest, const std::string& assetId)
+{
+    const skygate::ephemeris::EphemerisDataManifest::Asset* asset = manifest.asset(assetId);
+    return asset != nullptr ? QString::fromStdString(asset->version).trimmed() : QString();
+}
+
+QString preferencesUpdateManifestJson(
+    const QString& updateResourceRoot,
+    const QString& earthOrientationVersion,
+    const QString& leapSecondVersion,
+    const QString& deltaTVersion
+)
+{
+    const auto sourceUrl = [&updateResourceRoot](const QString& relativePath) {
+        return QUrl::fromLocalFile(updateResourceRoot + QLatin1Char('/') + relativePath).toString();
+    };
+    const QString emptySha256 = QString::fromLatin1(kEmptySha256.data(), static_cast<qsizetype>(kEmptySha256.size()));
+
+    return QStringLiteral(R"({
+  "schemaVersion": 1,
+  "id": "test-preferences-data",
+  "displayName": "Test preferences data",
+  "version": "2026a",
+  "provenance": "preferences test",
+  "dateRanges": [
+    {
+      "id": "test-range",
+      "displayName": "Test range",
+      "start": "1900-01-01",
+      "end": "2100-01-01"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "de440s-short-range",
+      "displayName": "DE440sShortRange",
+      "bundled": true,
+      "longRange": false,
+      "assetIds": ["de440s-kernel"]
+    },
+    {
+      "id": "de441-long-range",
+      "displayName": "DE441 long range",
+      "bundled": false,
+      "longRange": true,
+      "assetIds": ["de441-kernel"]
+    },
+    {
+      "id": "support-data",
+      "displayName": "Time and Earth data",
+      "bundled": false,
+      "longRange": false,
+      "assetIds": ["support-earth-orientation", "support-leap-seconds", "support-delta-t"]
+    }
+  ],
+  "assets": [
+    {
+      "id": "de440s-kernel",
+      "kind": "solar-system-kernel",
+      "profileId": "de440s-short-range",
+      "version": "DE440s-test",
+      "sourceUrl": "%1",
+      "relativePath": "de440s-short-range/kernels/de440s.bsp",
+      "checksum": { "algorithm": "sha256", "value": "%6" },
+      "compression": { "format": "none", "uncompressedSizeBytes": 0 },
+      "validityRange": {
+        "id": "kernel-range",
+        "displayName": "Kernel range",
+        "start": "1900-01-01",
+        "end": "2100-01-01"
+      }
+    },
+    {
+      "id": "de441-kernel",
+      "kind": "solar-system-kernel",
+      "profileId": "de441-long-range",
+      "version": "DE441-test",
+      "sourceUrl": "%2",
+      "relativePath": "de441/kernels/de441.bsp",
+      "checksum": { "algorithm": "sha256", "value": "%6" },
+      "compression": { "format": "none", "uncompressedSizeBytes": 0 },
+      "validityRange": {
+        "id": "kernel-range",
+        "displayName": "Kernel range",
+        "start": "1900-01-01",
+        "end": "2100-01-01"
+      }
+    },
+    {
+      "id": "support-earth-orientation",
+      "kind": "earth-orientation-data",
+      "profileId": "support-data",
+      "version": "%7",
+      "sourceUrl": "%3",
+      "relativePath": "time/eop.txt",
+      "checksum": { "algorithm": "sha256", "value": "%6" },
+      "compression": { "format": "none", "uncompressedSizeBytes": 0 },
+      "validityRange": {
+        "id": "eop-range",
+        "displayName": "Earth orientation range",
+        "start": "1900-01-01",
+        "end": "2100-01-01"
+      }
+    },
+    {
+      "id": "support-leap-seconds",
+      "kind": "leap-second-table",
+      "profileId": "support-data",
+      "version": "%8",
+      "sourceUrl": "%4",
+      "relativePath": "time/leap-seconds.list",
+      "checksum": { "algorithm": "sha256", "value": "%6" },
+      "compression": { "format": "none", "uncompressedSizeBytes": 0 },
+      "validityRange": {
+        "id": "leap-second-range",
+        "displayName": "Leap-second table range",
+        "start": "1972-01-01",
+        "end": "2027-06-28"
+      }
+    },
+    {
+      "id": "support-delta-t",
+      "kind": "delta-t-data",
+      "profileId": "support-data",
+      "version": "%9",
+      "sourceUrl": "%5",
+      "relativePath": "time/delta-t.data",
+      "checksum": { "algorithm": "sha256", "value": "%6" },
+      "compression": { "format": "none", "uncompressedSizeBytes": 0 },
+      "validityRange": {
+        "id": "delta-t-range",
+        "displayName": "Delta T range",
+        "start": "-13200-01-01",
+        "end": "13200-12-31"
+      }
+    }
+  ]
+})")
+        .arg(
+            sourceUrl(QStringLiteral("de440s-short-range/kernels/de440s.bsp")),
+            sourceUrl(QStringLiteral("de441/kernels/de441.bsp")),
+            sourceUrl(QStringLiteral("time/eop.txt")),
+            sourceUrl(QStringLiteral("time/leap-seconds.list")),
+            sourceUrl(QStringLiteral("time/delta-t.data")),
+            emptySha256,
+            earthOrientationVersion,
+            leapSecondVersion,
+            deltaTVersion
+        );
+}
+
+QQuickItem* comboPopupDelegate(QObject* combo, const int index)
+{
+    QObject* popup = qvariant_cast<QObject*>(combo->property("popup"));
+    if (popup == nullptr) {
+        return nullptr;
+    }
+    QObject* listView = qvariant_cast<QObject*>(popup->property("contentItem"));
+    if (listView == nullptr) {
+        return nullptr;
+    }
+    QQuickItem* delegate = nullptr;
+    if (!QMetaObject::invokeMethod(listView, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, delegate), Q_ARG(int, index))) {
+        return nullptr;
+    }
+    return delegate;
+}
+
+void clickComboPopupDelegate(QWindow* window, QObject* combo, const int index)
+{
+    QVERIFY(combo != nullptr);
+    QObject* popup = qvariant_cast<QObject*>(combo->property("popup"));
+    QVERIFY(popup != nullptr);
+    QVERIFY(QMetaObject::invokeMethod(popup, "open"));
+    QTRY_VERIFY(popup->property("opened").toBool());
+
+    QQuickItem* delegate = comboPopupDelegate(combo, index);
+    QVERIFY(delegate != nullptr);
+    const QPoint clickPoint =
+        delegate->mapToScene(QPointF(delegate->width() * 0.5, delegate->height() * 0.5)).toPoint();
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, clickPoint);
+    QCoreApplication::processEvents();
+}
+
 std::unique_ptr<SkyContextController> makeControllerWithManifest(
     const skygate::ephemeris::EphemerisDataManifest& manifest,
     const QString& updateResourceRoot,
     const QString& writableCacheRoot
 )
 {
+    const QString manifestPath = updateResourceRoot + QStringLiteral("/update-manifest.json");
+    if (!writeFile(
+            manifestPath,
+            preferencesUpdateManifestJson(
+                updateResourceRoot,
+                manifestAssetVersion(manifest, "support-earth-orientation"),
+                manifestAssetVersion(manifest, "support-leap-seconds"),
+                manifestAssetVersion(manifest, "support-delta-t")
+            )
+                .toUtf8()
+        )) {
+        return {};
+    }
+
+    SkyPersistedStateSnapshot savedSettings;
+    savedSettings.ephemerisSettingsPresent = true;
+    savedSettings.ephemeris.updateManifestUrl = QUrl::fromLocalFile(manifestPath).toString();
+    SkySettingsStore settingsStore;
+    if (!settingsStore.saveState(savedSettings)) {
+        return {};
+    }
+
     auto starCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     if (starCatalog == nullptr) {
         return {};
@@ -216,6 +429,7 @@ private slots:
     void ephemerisEngineControlsBindDraftAndVisibility();
     void ephemerisDataControlsShowFallbackAndUpdateMode();
     void ephemerisControlsShowInstalledStateAndClearCache();
+    void downloadComboPopupClicksInvokeControllerActions();
 
 private:
     QmlSettingsFixture m_settings;
@@ -496,6 +710,66 @@ void QmlPreferencesEphemerisTests::ephemerisControlsShowInstalledStateAndClearCa
     QTRY_COMPARE(modernStatus->property("text").toString(), QString("Bundled"));
     QTRY_COMPARE(supportCacheSize->property("text").toString(), QString("0 MB"));
     QCOMPARE(controller->ephemerisDataStatusText(), QString("Ephemeris data: Bundled fallback"));
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlPreferencesEphemerisTests::downloadComboPopupClicksInvokeControllerActions()
+{
+    const skygate::ephemeris::EphemerisDataManifest manifest = supportDataUpdateManifest();
+    const QString updateResourceRoot = m_settings.cachePath(QStringLiteral("ephemeris-source"));
+    QVERIFY(writeStagedEphemerisAssets(updateResourceRoot, manifest));
+    auto controller = makeControllerWithManifest(
+        manifest, updateResourceRoot, m_settings.cachePath(QStringLiteral("ephemeris-cache"))
+    );
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 900
+            height: 720
+            property alias draft: draft
+            PreferencesDraft {
+                id: draft
+                skyContextController: skyContext
+                Component.onCompleted: resetFromContext()
+            }
+            PreferencesEngineSection {
+                anchors.fill: parent
+                skyContextController: skyContext
+                preferencesDraft: draft
+            }
+        }
+    )"),
+        QStringLiteral("PreferencesEphemerisPopupActivationTest.qml")
+    );
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+
+    QObject* kernelDownloadCombo = firstObjectWithObjectName(root, QStringLiteral("ephemerisKernelDownloadCombo"));
+    QObject* supportDownloadCombo =
+        firstObjectWithObjectName(root, QStringLiteral("ephemerisSupportDataDownloadCombo"));
+    QVERIFY(kernelDownloadCombo != nullptr);
+    QVERIFY(supportDownloadCombo != nullptr);
+
+    ExposedQuickWindow exposed(root);
+    QWindow* window = exposed.window();
+
+    clickComboPopupDelegate(window, supportDownloadCombo, 2);
+    QTRY_COMPARE(
+        controller->ephemerisDataStatusText(), QString("Ephemeris data: Updates available for time and Earth data")
+    );
+
+    clickComboPopupDelegate(window, kernelDownloadCombo, 2);
+    QTRY_COMPARE(controller->ephemerisKernelDisplayText(), QString("DE441"));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 

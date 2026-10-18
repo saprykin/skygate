@@ -7,6 +7,7 @@ private slots:
     void initTestCase();
     void init();
     void preferencesWindowShellNavigatesAppliesAndCloses();
+    void engineFooterStatusVisibleWhenNotBusy();
 
 private:
     QmlSettingsFixture m_settings;
@@ -94,6 +95,48 @@ void QmlPreferencesWindowTests::preferencesWindowShellNavigatesAppliesAndCloses(
     QStringList unexpectedWarnings = warnings.messages();
     unexpectedWarnings.removeAll(QStringLiteral("This plugin does not support raise()"));
     QVERIFY2(unexpectedWarnings.isEmpty(), qPrintable(unexpectedWarnings.join('\n')));
+}
+
+void QmlPreferencesWindowTests::engineFooterStatusVisibleWhenNotBusy()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createFileComponent(
+        engine,
+        QStringLiteral("windows/PreferencesWindow.qml"),
+        {{QStringLiteral("skyContextController"), QVariant::fromValue<QObject*>(controller.get())}}
+    );
+    QVERIFY(object != nullptr);
+    auto* window = qobject_cast<QQuickWindow*>(object.get());
+    QVERIFY(window != nullptr);
+
+    auto* statusLabel = firstQuickItemWithObjectName(window, QStringLiteral("preferencesFooterStatusLabel"));
+    auto* progressBar = firstQuickItemWithObjectName(window, QStringLiteral("preferencesFooterProgressBar"));
+    auto* cancelButton = firstQuickItemWithObjectName(window, QStringLiteral("preferencesFooterCancelDownloadButton"));
+    QVERIFY(statusLabel != nullptr);
+    QVERIFY(progressBar != nullptr);
+    QVERIFY(cancelButton != nullptr);
+
+    // The status row is footer-busy-gated until the engine section is
+    // selected, even though the controller already reports a data status.
+    QVERIFY(!controller->ephemerisDataUpdateInProgress());
+    QVERIFY(!controller->ephemerisDataStatusText().isEmpty());
+    QTRY_VERIFY(!statusLabel->isVisible());
+
+    QObject* engineSection = firstObjectWithObjectName(window, QStringLiteral("preferencesEngineSectionButton"));
+    QVERIFY(engineSection != nullptr);
+    QVERIFY(activateControl(engineSection));
+    QTRY_COMPARE(window->property("selectedPage").toInt(), 2);
+
+    QTRY_VERIFY(statusLabel->isVisible());
+    QTRY_VERIFY(!progressBar->isVisible());
+    QTRY_VERIFY(!cancelButton->isVisible());
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
 SKYGATE_QML_TEST_MAIN(QmlPreferencesWindowTests)
