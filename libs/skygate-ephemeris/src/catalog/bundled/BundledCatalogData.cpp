@@ -1,5 +1,4 @@
 #include "catalog/bundled/BundledCatalogData.hpp"
-
 #include "catalog/CelestialBodyIds.hpp"
 
 #include <array>
