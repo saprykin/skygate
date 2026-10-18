@@ -1,4 +1,5 @@
 #include "HighPrecisionEphemerisEngine.hpp"
+#include "EphemerisCacheGateway.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "EphemerisResultBuilder.hpp"
@@ -6,7 +7,6 @@
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
 #include "IApparentPlaceCalculator.hpp"
-#include "IEphemerisComputationCache.hpp"
 #include "IEphemerisResultBuilder.hpp"
 #include "ISolarSystemStateCalculator.hpp"
 #include "IStarAstrometryCalculator.hpp"
@@ -221,7 +221,8 @@ public:
         : m_catalog(std::make_shared<CelestialBodyCatalog>(catalog)),
           m_catalogStarAstrometryArrays(m_catalog->bodies()), m_options(engineOptions),
           m_dependencies(std::move(dependencies)),
-          m_preparedRequestStateBuilder(makePreparedRequestStateBuilderDependencies(m_dependencies))
+          m_preparedRequestStateBuilder(makePreparedRequestStateBuilderDependencies(m_dependencies)),
+          m_cache(m_dependencies.computationCache, m_catalog.get(), m_dependencies.dataSetInfo)
     {
         m_options.setEngineKind(EphemerisEngineKind::Type::HighPrecision);
     }
@@ -285,23 +286,9 @@ public:
 
     [[nodiscard]] EphemerisSnapshot compute(const EphemerisRequest& request) const
     {
-        if (m_dependencies.computationCache != nullptr) {
-            if (std::optional<EphemerisSnapshot> cachedSnapshot = m_dependencies.computationCache->findSnapshot(
-                    request, catalogIdentity(), m_dependencies.dataSetInfo
-                );
-                cachedSnapshot.has_value()) {
-                return *cachedSnapshot;
-            }
-        }
-
-        const std::shared_ptr<const PreparedEphemerisRequestState> preparedState = preparedRequestState(request);
-        EphemerisSnapshot snapshot = computeUncached(request, preparedState);
-        if (m_dependencies.computationCache != nullptr) {
-            m_dependencies.computationCache->storeSnapshot(
-                request, catalogIdentity(), m_dependencies.dataSetInfo, snapshot
-            );
-        }
-        return snapshot;
+        return m_cache.snapshot(request, [this, &request] {
+            return computeUncached(request, preparedRequestState(request));
+        });
     }
 
     [[nodiscard]] std::optional<CelestialBodyState>
@@ -332,37 +319,17 @@ public:
     }
 
 private:
-    [[nodiscard]] const CelestialBodyCatalog* catalogIdentity() const noexcept
-    {
-        return m_catalog.get();
-    }
-
     [[nodiscard]] CelestialBodyState
     computeResolvedBodyState(const EphemerisRequest& request, const std::size_t bodyIndex) const
     {
-        if (m_dependencies.computationCache != nullptr) {
-            if (std::optional<CelestialBodyState> cachedSnapshotState =
-                    m_dependencies.computationCache->findSnapshotBodyState(
-                        request, catalogIdentity(), m_dependencies.dataSetInfo, bodyIndex
-                    );
-                cachedSnapshotState.has_value()) {
-                return *cachedSnapshotState;
-            }
-            if (std::optional<CelestialBodyState> cachedBodyState = m_dependencies.computationCache->findBodyState(
-                    request, catalogIdentity(), m_dependencies.dataSetInfo, bodyIndex
-                );
-                cachedBodyState.has_value()) {
-                return *cachedBodyState;
-            }
+        if (std::optional<CelestialBodyState> cachedSnapshotState = m_cache.findSnapshotBodyState(request, bodyIndex);
+            cachedSnapshotState.has_value()) {
+            return *cachedSnapshotState;
         }
 
-        CelestialBodyState state = computeStateForBody(request, bodyIndex, preparedRequestState(request));
-        if (m_dependencies.computationCache != nullptr) {
-            m_dependencies.computationCache->storeBodyState(
-                request, catalogIdentity(), m_dependencies.dataSetInfo, bodyIndex, state
-            );
-        }
-        return state;
+        return m_cache.bodyState(request, bodyIndex, [this, &request, bodyIndex] {
+            return computeStateForBody(request, bodyIndex, preparedRequestState(request));
+        });
     }
 
     [[nodiscard]] EphemerisSnapshot computeUncached(
@@ -426,24 +393,9 @@ private:
     [[nodiscard]] std::shared_ptr<const PreparedEphemerisRequestState>
     preparedRequestState(const EphemerisRequest& request) const
     {
-        if (m_dependencies.computationCache != nullptr) {
-            if (std::shared_ptr<const PreparedEphemerisRequestState> cachedState =
-                    m_dependencies.computationCache->findPreparedRequestState(
-                        request, catalogIdentity(), m_dependencies.dataSetInfo
-                    );
-                cachedState != nullptr) {
-                return cachedState;
-            }
-        }
-
-        std::shared_ptr<const PreparedEphemerisRequestState> preparedState =
-            m_preparedRequestStateBuilder.build(request);
-        if (m_dependencies.computationCache != nullptr) {
-            m_dependencies.computationCache->storePreparedRequestState(
-                request, catalogIdentity(), m_dependencies.dataSetInfo, preparedState
-            );
-        }
-        return preparedState;
+        return m_cache.preparedRequestState(request, [this, &request] {
+            return m_preparedRequestStateBuilder.build(request);
+        });
     }
 
     [[nodiscard]] CelestialBodyState computeStateForBody(
@@ -510,6 +462,7 @@ private:
     EphemerisEngineOptions m_options;
     HighPrecisionEphemerisEngine::Dependencies m_dependencies;
     PreparedRequestStateBuilder m_preparedRequestStateBuilder;
+    EphemerisCacheGateway m_cache;
 };
 
 // Public interface delegates
