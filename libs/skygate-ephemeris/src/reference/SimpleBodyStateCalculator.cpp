@@ -9,7 +9,7 @@ std::optional<skygate::core::EquatorialCoordinate> SimpleBodyStateCalculator::co
     const BaseCelestialBody& body, const skygate::core::UtcTimePoint& utcTime
 ) const noexcept
 {
-    if (body.fixedEquatorialValue().has_value()) {
+    if (body.hasFixedEquatorial()) {
         return body.fixedEquatorialValue();
     }
 

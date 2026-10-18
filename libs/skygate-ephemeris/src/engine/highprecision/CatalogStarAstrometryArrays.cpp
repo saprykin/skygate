@@ -9,7 +9,7 @@ namespace {
 
 [[nodiscard]] bool hasAstrometryArrayInput(const BaseCelestialBody& body) noexcept
 {
-    return body.isCatalogStar() && (body.starAstrometryValue().has_value() || body.fixedEquatorialValue().has_value());
+    return body.isCatalogStar() && (body.starAstrometryValue().has_value() || body.hasFixedEquatorial());
 }
 
 [[nodiscard]] double optionalOrQuietNaN(const std::optional<double> value) noexcept
@@ -74,14 +74,14 @@ void CatalogStarAstrometryArrays::appendBody(const std::size_t bodyIndex, const 
     m_referenceEpochJulianDatePart2.push_back(referenceEpoch.julianDatePart2);
     m_referenceEpochTimeScales.push_back(referenceEpoch.timeScale);
 
-    m_hasFixedEquatorialFallback.push_back(body.fixedEquatorialValue().has_value() ? 1U : 0U);
+    m_hasFixedEquatorialFallback.push_back(body.hasFixedEquatorial() ? 1U : 0U);
     m_fixedRightAscensionHours.push_back(
-        body.fixedEquatorialValue().has_value() ? body.fixedEquatorialValue()->rightAscensionHours
-                                                : std::numeric_limits<double>::quiet_NaN()
+        body.hasFixedEquatorial() ? body.fixedEquatorialValue()->rightAscensionHours
+                                  : std::numeric_limits<double>::quiet_NaN()
     );
     m_fixedDeclinationDegrees.push_back(
-        body.fixedEquatorialValue().has_value() ? body.fixedEquatorialValue()->declinationDeg
-                                                : std::numeric_limits<double>::quiet_NaN()
+        body.hasFixedEquatorial() ? body.fixedEquatorialValue()->declinationDeg
+                                  : std::numeric_limits<double>::quiet_NaN()
     );
 
     const std::optional<double> properMotionRightAscension =
