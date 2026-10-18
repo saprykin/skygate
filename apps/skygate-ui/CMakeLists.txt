@@ -262,6 +262,12 @@ qt_add_library(skygate-ui-lib STATIC
     src/settings/SkyPersistedStateSnapshot.hpp
     src/settings/SkySettingsValueCodecs.cpp
     src/settings/SkySettingsValueCodecs.hpp
+    src/settings/SkyEphemerisDataCacheSettings.cpp
+    src/settings/SkyEphemerisDataCacheSettings.hpp
+    src/settings/SkyLegacyCatalogCacheStore.cpp
+    src/settings/SkyLegacyCatalogCacheStore.hpp
+    src/settings/SkyWindowSizeSettings.cpp
+    src/settings/SkyWindowSizeSettings.hpp
     src/render/SkyViewportGeometry.cpp
     src/render/SkyViewportGeometry.hpp
     src/render/SkyViewportGeometryInput.hpp
