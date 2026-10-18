@@ -11,7 +11,6 @@
 #include "render/SkyRenderGlyph.hpp"
 #include "render/SkyRenderLine.hpp"
 #include "render/SkyRenderPoint.hpp"
-#include "time/CalendarTime.hpp"
 #include "time/SkyQtTimeCodec.hpp"
 #include "time/SkyTimeController.hpp"
 
@@ -23,25 +22,6 @@
 #include <optional>
 
 namespace {
-
-[[nodiscard]] QString formatEpochDate(const skygate::core::AstronomicalEpoch& epoch)
-{
-    const auto dateTime = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
-    if (!dateTime.has_value()) {
-        return QStringLiteral("--");
-    }
-
-    const int historicalYear =
-        skygate::core::CalendarTime::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
-    return SkyQtTimeCodec::formatDateText(QDate(historicalYear, dateTime->month, dateTime->day));
-}
-
-[[nodiscard]] QString rangeLabel(const skygate::ephemeris::EphemerisDateRange& range)
-{
-    const QString displayName = QString::fromStdString(range.displayName);
-    const QString dateText = QStringLiteral("%1 to %2").arg(formatEpochDate(range.start), formatEpochDate(range.end));
-    return displayName.isEmpty() ? dateText : QStringLiteral("%1: %2").arg(displayName, dateText);
-}
 
 void appendUniqueReason(QStringList& reasons, const QString& reason)
 {
@@ -68,7 +48,10 @@ void appendRangeWarning(
         return;
     }
 
-    appendUniqueReason(reasons, QStringLiteral("%1 out of range. Supported range: %2.").arg(label, rangeLabel(*range)));
+    appendUniqueReason(
+        reasons,
+        QStringLiteral("%1 out of range. Supported range: %2.").arg(label, SkyQtTimeCodec::formatDateRangeText(*range))
+    );
 }
 
 [[nodiscard]] QVariantList degradationReasonsForContext(
@@ -81,7 +64,8 @@ void appendRangeWarning(
             if (isKernelRange(range) && !range.contains(context.request.epoch)) {
                 appendUniqueReason(
                     reasons,
-                    QStringLiteral("Planetary kernel out of range. Supported range: %1.").arg(rangeLabel(range))
+                    QStringLiteral("Planetary kernel out of range. Supported range: %1.")
+                        .arg(SkyQtTimeCodec::formatDateRangeText(range))
                 );
             }
         }

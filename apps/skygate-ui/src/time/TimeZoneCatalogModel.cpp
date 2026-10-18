@@ -1,12 +1,12 @@
 #include "TimeZoneCatalogModel.hpp"
 #include "TimeZoneCatalogEntry.hpp"
 
+#include "SkyQtTimeCodec.hpp"
 #include "TimeZoneAliasCatalog.hpp"
 
 #include <QTimeZone>
 
 #include <algorithm>
-#include <cmath>
 
 namespace {
 
@@ -25,31 +25,6 @@ QString humanizedTimeZoneId(const QString& timeZoneId)
     text.replace(QLatin1Char('_'), QLatin1Char(' '));
     text.replace(QLatin1Char('-'), QLatin1Char(' '));
     return text.simplified();
-}
-
-QString formatUtcOffset(const int offsetSeconds)
-{
-    const QChar sign = offsetSeconds < 0 ? QLatin1Char('-') : QLatin1Char('+');
-    const int absoluteSeconds = std::abs(offsetSeconds);
-    return QString("UTC%1%2:%3")
-        .arg(sign)
-        .arg(absoluteSeconds / 3600, 2, 10, QLatin1Char('0'))
-        .arg((absoluteSeconds % 3600) / 60, 2, 10, QLatin1Char('0'));
-}
-
-QString timeZoneLabel(const QTimeZone& timeZone, const QDateTime& utcDateTime)
-{
-    const QDateTime zonedDateTime = utcDateTime.toTimeZone(timeZone);
-    QString label = timeZone.abbreviation(zonedDateTime).trimmed();
-    if (label.isEmpty()) {
-        label = timeZone.displayName(zonedDateTime, QTimeZone::ShortName).trimmed();
-    }
-    const QString offsetText = formatUtcOffset(timeZone.offsetFromUtc(zonedDateTime));
-    if (label.isEmpty() || label.startsWith(QLatin1String("GMT")) || label.startsWith(QLatin1Char('+'))
-        || label.startsWith(QLatin1Char('-'))) {
-        return offsetText;
-    }
-    return label;
 }
 
 QString rawTimeZoneLabel(const QTimeZone& timeZone, const QDateTime& utcDateTime)
@@ -216,9 +191,9 @@ QString TimeZoneCatalogModel::detailText(const TimeZoneCatalogEntry& entry) cons
     const QDateTime utc =
         m_referenceUtcDateTime.isValid() ? m_referenceUtcDateTime.toUTC() : QDateTime::currentDateTimeUtc();
     const QDateTime zonedDateTime = utc.toTimeZone(timeZone);
-    const QString label = timeZoneLabel(timeZone, utc);
-    const QString offsetText = formatUtcOffset(timeZone.offsetFromUtc(zonedDateTime));
-    return label == offsetText ? offsetText : QString("%1 · %2").arg(label, offsetText);
+    const QString label = SkyQtTimeCodec::timeZoneLabel(zonedDateTime);
+    const QString offsetLabel = SkyQtTimeCodec::formatUtcOffsetLabel(timeZone.offsetFromUtc(zonedDateTime));
+    return label == offsetLabel ? offsetLabel : QString("%1 · %2").arg(label, offsetLabel);
 }
 
 bool TimeZoneCatalogModel::matchesFilter(const TimeZoneCatalogEntry& entry) const

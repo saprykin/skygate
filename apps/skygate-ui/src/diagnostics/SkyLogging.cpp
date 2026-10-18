@@ -1,5 +1,6 @@
 #include "SkyLogging.hpp"
 #include "SkyLoggingConfiguration.hpp"
+#include "time/SkyQtTimeCodec.hpp"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -12,7 +13,6 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <cstdlib>
 #include <memory>
 
 namespace skygate::ui {
@@ -89,16 +89,10 @@ QString categoryFromContext(const QMessageLogContext& context)
 QString timestampText()
 {
     const QDateTime now = QDateTime::currentDateTime();
-    const int offsetSeconds = now.offsetFromUtc();
-    const QChar sign = offsetSeconds < 0 ? QLatin1Char('-') : QLatin1Char('+');
-    const int absoluteOffsetSeconds = std::abs(offsetSeconds);
-    return QStringLiteral("%1%2%3:%4")
-        .arg(
-            now.toString(QStringLiteral("yyyy-MM-dd'T'HH:mm:ss.zzz")),
-            QString(sign),
-            QStringLiteral("%1").arg(absoluteOffsetSeconds / 3600, 2, 10, QLatin1Char('0')),
-            QStringLiteral("%1").arg((absoluteOffsetSeconds % 3600) / 60, 2, 10, QLatin1Char('0'))
-        );
+    return QStringLiteral("%1%2").arg(
+        now.toString(QStringLiteral("yyyy-MM-dd'T'HH:mm:ss.zzz")),
+        SkyQtTimeCodec::formatUtcOffsetText(now.offsetFromUtc())
+    );
 }
 
 QString formatLine(const QtMsgType type, const QMessageLogContext& context, const QString& message)
