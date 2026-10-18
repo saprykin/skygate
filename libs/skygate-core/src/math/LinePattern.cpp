@@ -1,4 +1,5 @@
 #include "LinePattern.hpp"
+#include "MathConstants.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,7 +13,8 @@ DashedLineBuilder::build(const LineSegment2d& segment, const double dashLength, 
     const double deltaX = segment.x2 - segment.x1;
     const double deltaY = segment.y2 - segment.y1;
     const double length = std::hypot(deltaX, deltaY);
-    if (length <= 1e-9 || !std::isfinite(length) || dashLength <= 0.0 || gapLength < 0.0) {
+    if (length <= MathConstants::kMinSegmentLengthPx || !std::isfinite(length) || dashLength <= 0.0
+        || gapLength < 0.0) {
         return segments;
     }
 

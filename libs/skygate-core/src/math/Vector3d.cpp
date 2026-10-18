@@ -18,6 +18,8 @@ double Vector3d::length() const noexcept
 std::optional<Vector3d> Vector3d::normalized() const noexcept
 {
     const double vectorLength = length();
+    // The smallest normal double is deliberate: below it a vector has no
+    // usable direction, and kEpsilon is a different kind of threshold.
     if (!std::isfinite(vectorLength) || vectorLength <= std::numeric_limits<double>::min()) {
         return std::nullopt;
     }

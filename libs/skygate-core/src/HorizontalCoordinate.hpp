@@ -1,10 +1,12 @@
 #pragma once
 
+#include "math/MathConstants.hpp"
+
 namespace skygate::core {
 
 struct HorizontalCoordinate {
-    static constexpr double kAltitudeMinDeg = -90.0;
-    static constexpr double kAltitudeMaxDeg = 90.0;
+    static constexpr double kAltitudeMinDeg = -MathConstants::kPolarAngleDeg;
+    static constexpr double kAltitudeMaxDeg = MathConstants::kPolarAngleDeg;
 
     double altitudeDeg = 0.0;
     double azimuthDeg = 0.0;

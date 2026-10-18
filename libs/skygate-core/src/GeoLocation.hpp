@@ -1,10 +1,12 @@
 #pragma once
 
+#include "math/MathConstants.hpp"
+
 namespace skygate::core {
 
 struct GeoLocation {
-    static constexpr double kLatitudeMinDeg = -90.0;
-    static constexpr double kLatitudeMaxDeg = 90.0;
+    static constexpr double kLatitudeMinDeg = -MathConstants::kPolarAngleDeg;
+    static constexpr double kLatitudeMaxDeg = MathConstants::kPolarAngleDeg;
     static constexpr double kLongitudeMinDeg = -180.0;
     static constexpr double kLongitudeMaxDeg = 180.0;
 
