@@ -7,17 +7,18 @@
 
 namespace skygate::ephemeris {
 
-namespace {
-
 using skygate::core::TimeConstants;
 
-[[nodiscard]] bool isUtcLeapSecondLabel(const skygate::core::CivilDateTime& dateTime) noexcept
+double LeapSecondTimeScaleService::targetOffsetSeconds(
+    const skygate::core::TimeScale target, const double taiMinusUtcSeconds
+) noexcept
 {
-    return dateTime.timeScale == skygate::core::TimeScale::Utc && dateTime.hour == 23 && dateTime.minute == 59
-           && dateTime.second == 60;
+    // TT and TDB conversions add the fixed TT-TAI offset; TAI conversion does not.
+    if (target == skygate::core::TimeScale::Tai) {
+        return taiMinusUtcSeconds;
+    }
+    return taiMinusUtcSeconds + TimeConstants::kTtMinusTaiSeconds;
 }
-
-}  // namespace
 
 LeapSecondTimeScaleService::LeapSecondTimeScaleService(
     std::shared_ptr<const ILeapSecondProvider> leapSecondProvider,
@@ -96,8 +97,7 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convert(
         }
 
         const double taiOffset = static_cast<double>(*lookup.offsetSeconds);
-        const double targetOffset =
-            targetScale == skygate::core::TimeScale::Tt ? taiOffset + TimeConstants::kTtMinusTaiSeconds : taiOffset;
+        const double targetOffset = targetOffsetSeconds(targetScale, taiOffset);
         TimeScaleConversionResult result = TimeScaleConversionResult::success(
             epoch.addSeconds(targetOffset, targetScale), lookup.status, lookup.warningCodeMask
         );
@@ -227,16 +227,18 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convertCivilDateTime(
     }
 
     std::optional<skygate::core::AstronomicalEpoch> epoch;
-    if (!isUtcLeapSecondLabel(dateTime)) {
-        epoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
-    } else {
-        skygate::core::CivilDateTime precedingSecond = dateTime;
-        precedingSecond.second = 59;
-        const std::optional<skygate::core::AstronomicalEpoch> precedingEpoch =
-            skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(precedingSecond);
+    std::optional<skygate::core::AstronomicalEpoch> precedingEpoch;
+    const std::optional<skygate::core::CivilDateTime> precedingSecond =
+        skygate::core::CalendarTime::isUtcLeapSecondLabel(dateTime)
+            ? skygate::core::CalendarTime::leapSecondPredecessor(dateTime)
+            : std::nullopt;
+    if (precedingSecond.has_value()) {
+        precedingEpoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*precedingSecond);
         if (precedingEpoch.has_value()) {
             epoch = precedingEpoch->addSeconds(1.0, skygate::core::TimeScale::Utc);
         }
+    } else {
+        epoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
     }
 
     if (!epoch.has_value()) {
@@ -249,14 +251,10 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convertCivilDateTime(
         return result;
     }
 
-    if (!isUtcLeapSecondLabel(dateTime)) {
+    if (!precedingSecond.has_value()) {
         return convert(*epoch, targetScale);
     }
 
-    skygate::core::CivilDateTime precedingSecond = dateTime;
-    precedingSecond.second = 59;
-    const std::optional<skygate::core::AstronomicalEpoch> precedingEpoch =
-        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(precedingSecond);
     if (!precedingEpoch.has_value()) {
         TimeScaleConversionResult result =
             TimeScaleConversionResult::failure(*epoch, targetScale, "Leap-second civil date/time input is invalid.");
@@ -290,8 +288,7 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convertCivilDateTime(
     }
 
     const double taiOffset = static_cast<double>(*precedingLookup.offsetSeconds);
-    const double targetOffset =
-        targetScale == skygate::core::TimeScale::Tai ? taiOffset : taiOffset + TimeConstants::kTtMinusTaiSeconds;
+    const double targetOffset = targetOffsetSeconds(targetScale, taiOffset);
     TimeScaleConversionResult result = TimeScaleConversionResult::success(epoch->addSeconds(
         targetOffset, targetScale == skygate::core::TimeScale::Tdb ? skygate::core::TimeScale::Tt : targetScale
     ));

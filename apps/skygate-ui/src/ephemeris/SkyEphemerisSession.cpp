@@ -1,5 +1,4 @@
 #include "SkyEphemerisSession.hpp"
-#include "UtcTimeCodec.hpp"
 #include "composition/EphemerisBackendResourceCache.hpp"
 #include "composition/EphemerisGuidanceComposition.hpp"
 #include "engine/EphemerisDataManifest.hpp"
@@ -9,10 +8,7 @@
 #include "factory/EphemerisEngineFactory.hpp"
 #include "factory/EphemerisEngineFactoryRequest.hpp"
 #include "factory/EphemerisEngineReplacementPolicy.hpp"
-#include "time/CalendarTime.hpp"
-#include "time/SkyQtTimeCodec.hpp"
-
-#include <QDateTime>
+#include "time/EpochCodec.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -22,43 +18,6 @@
 #include <utility>
 
 namespace {
-
-[[nodiscard]] qint64 floorMod(const qint64 numerator, const qint64 denominator) noexcept
-{
-    qint64 remainder = numerator % denominator;
-    if (remainder < 0) {
-        remainder += denominator;
-    }
-    return remainder;
-}
-
-[[nodiscard]] std::optional<skygate::core::AstronomicalEpoch>
-astronomicalEpochFromUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcept
-{
-    const QDateTime normalizedUtcDateTime = SkyQtTimeCodec::toQDateTimeUtc(utcTime);
-    const QDate date = normalizedUtcDateTime.date();
-    const QTime time = normalizedUtcDateTime.time();
-    const auto astronomicalYear = skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(date.year());
-    if (!astronomicalYear.has_value()) {
-        return std::nullopt;
-    }
-
-    return skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::core::CivilDateTime{
-            .astronomicalYear = *astronomicalYear,
-            .month = date.month(),
-            .day = date.day(),
-            .hour = time.hour(),
-            .minute = time.minute(),
-            .second = time.second(),
-            .nanosecond = static_cast<std::uint32_t>(floorMod(
-                              static_cast<qint64>(skygate::core::UtcTimeCodec::toEpochMicros(utcTime)), 1'000'000
-                          ))
-                          * 1000U,
-            .timeScale = skygate::core::TimeScale::Utc,
-        }
-    );
-}
 
 void appendRevisionComponent(std::uint64_t& revision, const std::string_view value) noexcept
 {
@@ -252,9 +211,7 @@ SkyEphemerisSession::RequestContext SkyEphemerisSession::requestContext(const Re
         inputs.installedDeltaTDataVersion
     );
 
-    if (const auto epoch = astronomicalEpochFromUtcTime(inputs.observationContext.utcTime); epoch.has_value()) {
-        context.request.epoch = *epoch;
-    }
+    context.request.epoch = skygate::core::EpochCodec::epochFromUtcTimeExact(inputs.observationContext.utcTime);
 
     return context;
 }

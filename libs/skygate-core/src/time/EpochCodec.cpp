@@ -1,7 +1,10 @@
 #include "EpochCodec.hpp"
+#include "CalendarTime.hpp"
 #include "UtcTimeCodec.hpp"
 #include "math/TimeConstants.hpp"
 
+#include <cassert>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 
@@ -11,14 +14,37 @@ using skygate::core::TimeConstants;
 
 AstronomicalEpoch EpochCodec::epochFromUtcTime(const UtcTimePoint& utcTime) noexcept
 {
-    const double julianDay = UtcTimeCodec::secondsSinceEpochDouble(utcTime) / TimeConstants::kSecondsPerDay
-                             + TimeConstants::kJulianDateUnixEpoch;
+    const double julianDay = julianDayFromUtc(utcTime);
     const double julianDatePart1 = std::floor(julianDay);
     return AstronomicalEpoch{
         .julianDatePart1 = julianDatePart1,
         .julianDatePart2 = julianDay - julianDatePart1,
         .timeScale = TimeScale::Utc,
     };
+}
+
+AstronomicalEpoch EpochCodec::epochFromUtcTimeExact(const UtcTimePoint& utcTime) noexcept
+{
+    const std::int64_t epochSeconds = UtcTimeCodec::toEpochSecondsFloor(utcTime);
+    const std::int64_t remainingMicroseconds = UtcTimeCodec::toEpochMicros(utcTime) - epochSeconds * 1'000'000;
+    const std::int64_t secondsPerDay = static_cast<std::int64_t>(TimeConstants::kSecondsPerDay);
+    const std::int64_t daysSinceUnix =
+        std::chrono::floor<std::chrono::days>(std::chrono::seconds(epochSeconds)).count();
+    const std::int64_t secondsOfDay = epochSeconds - daysSinceUnix * secondsPerDay;
+
+    CivilDateTime dateTime = CalendarTime::civilDateFromDays(daysSinceUnix);
+    dateTime.hour = static_cast<int>(secondsOfDay / static_cast<std::int64_t>(TimeConstants::kSecondsPerHour));
+    dateTime.minute = static_cast<int>(
+        secondsOfDay % static_cast<std::int64_t>(TimeConstants::kSecondsPerHour)
+        / static_cast<std::int64_t>(TimeConstants::kSecondsPerMinute)
+    );
+    dateTime.second = static_cast<int>(secondsOfDay % static_cast<std::int64_t>(TimeConstants::kSecondsPerMinute));
+    dateTime.nanosecond = static_cast<std::uint32_t>(remainingMicroseconds * 1'000);
+    dateTime.timeScale = TimeScale::Utc;
+
+    const AstronomicalEpochResult epoch = CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
+    assert(epoch.has_value());
+    return epoch.value_or(AstronomicalEpoch{.timeScale = TimeScale::Utc});
 }
 
 UtcTimePoint EpochCodec::utcTimeFromEpoch(const AstronomicalEpoch& epoch) noexcept
@@ -42,8 +68,24 @@ AstronomicalEpoch EpochCodec::epochFromNtpTimestamp(const std::uint64_t ntpTimes
 
 double EpochCodec::julianDayFromUtc(const UtcTimePoint& utcTime) noexcept
 {
-    return UtcTimeCodec::secondsSinceEpochDouble(utcTime) / TimeConstants::kSecondsPerDay
-           + TimeConstants::kJulianDateUnixEpoch;
+    return julianDateFromDaysSinceUnixEpoch(
+        UtcTimeCodec::secondsSinceEpochDouble(utcTime) / TimeConstants::kSecondsPerDay
+    );
+}
+
+double EpochCodec::julianDayFromEpoch(const AstronomicalEpoch& epoch) noexcept
+{
+    return epoch.sortKey();
+}
+
+double EpochCodec::julianDateFromDaysSinceUnixEpoch(const double daysSinceUnix) noexcept
+{
+    return TimeConstants::kJulianDateUnixEpoch + daysSinceUnix;
+}
+
+double EpochCodec::daysSinceUnixEpoch(const double julianPart1, const double julianPart2) noexcept
+{
+    return (julianPart1 - TimeConstants::kJulianDateUnixEpoch) + julianPart2;
 }
 
 double EpochCodec::daysSinceJ2000(const UtcTimePoint& utcTime) noexcept
