@@ -1,6 +1,7 @@
 #include "SkyRenderLabelBuilder.hpp"
 #include "SkyRenderGlyph.hpp"
 #include "SkyRenderLabel.hpp"
+#include "math/NumericTolerance.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
 
 #include <algorithm>
@@ -344,7 +345,7 @@ void SkyRenderLabelBuilder::appendDeepSkyLabels(
         candidates.begin(),
         candidates.end(),
         [&frame, &snapshot](const DeepSkyLabelCandidate& lhs, const DeepSkyLabelCandidate& rhs) {
-            if (std::abs(lhs.score - rhs.score) > 1e-9) {
+            if (std::abs(lhs.score - rhs.score) > skygate::core::NumericTolerance::kDisplayChange) {
                 return lhs.score > rhs.score;
             }
 

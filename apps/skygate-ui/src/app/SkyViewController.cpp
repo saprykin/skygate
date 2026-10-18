@@ -1,5 +1,6 @@
 #include "SkyViewController.hpp"
 #include "SkyViewState.hpp"
+#include "math/NumericTolerance.hpp"
 #include "math/ViewportMath.hpp"
 #include "projections/ProjectionTypeCodec.hpp"
 
@@ -37,7 +38,7 @@ bool SkyViewController::setMagnitudeCutoff(const double magnitudeCutoff) noexcep
 {
     const double clamped =
         std::clamp(magnitudeCutoff, SkyViewState::kMagnitudeCutoffMin, SkyViewState::kMagnitudeCutoffMax);
-    if (std::abs(m_state.magnitudeCutoff - clamped) < 1e-9) {
+    if (std::abs(m_state.magnitudeCutoff - clamped) < skygate::core::NumericTolerance::kDisplayChange) {
         return false;
     }
 
@@ -49,8 +50,8 @@ bool SkyViewController::setCenter(const double altitudeDeg, const double azimuth
 {
     const double nextAltitudeDeg = skygate::core::ViewportMath::clampAltitudeDeg(altitudeDeg);
     const double nextAzimuthDeg = skygate::core::ViewportMath::normalizeAzimuthDeg(azimuthDeg);
-    if (std::abs(m_state.centerAltitudeDeg - nextAltitudeDeg) < 1e-9
-        && std::abs(m_state.centerAzimuthDeg - nextAzimuthDeg) < 1e-9) {
+    if (std::abs(m_state.centerAltitudeDeg - nextAltitudeDeg) < skygate::core::NumericTolerance::kDisplayChange
+        && std::abs(m_state.centerAzimuthDeg - nextAzimuthDeg) < skygate::core::NumericTolerance::kDisplayChange) {
         return false;
     }
 
@@ -62,7 +63,7 @@ bool SkyViewController::setCenter(const double altitudeDeg, const double azimuth
 bool SkyViewController::setFieldOfViewDeg(const double fieldOfViewDeg) noexcept
 {
     const double nextFieldOfViewDeg = skygate::core::ViewportMath::clampFieldOfViewDeg(fieldOfViewDeg);
-    if (std::abs(m_state.fieldOfViewDeg - nextFieldOfViewDeg) < 1e-9) {
+    if (std::abs(m_state.fieldOfViewDeg - nextFieldOfViewDeg) < skygate::core::NumericTolerance::kDisplayChange) {
         return false;
     }
 

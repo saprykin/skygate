@@ -30,6 +30,7 @@ add_library(skygate-core STATIC
     src/math/LinePattern.hpp
     src/math/Matrix3x3.hpp
     src/math/MathConstants.hpp
+    src/math/NumericTolerance.hpp
     src/math/TimeConstants.hpp
     src/math/PhysicalConstants.hpp
     src/math/ProjectedPolylineBuilder.hpp

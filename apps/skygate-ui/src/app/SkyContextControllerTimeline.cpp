@@ -3,6 +3,7 @@
 #include "SkyContextTimeCodec.hpp"
 #include "SkyContextUtcDateTimeTextCodec.hpp"
 #include "engine/EphemerisComputationPolicy.hpp"
+#include "math/NumericTolerance.hpp"
 #include "math/ViewportMath.hpp"
 #include "time/SkyTimeController.hpp"
 
@@ -183,7 +184,8 @@ void SkyContextController::zoomViewByWheelDelta(const int wheelDeltaY)
 
 void SkyContextController::zoomViewByScaleDelta(const double scaleDelta)
 {
-    if (!std::isfinite(scaleDelta) || scaleDelta <= 0.0 || std::abs(scaleDelta - 1.0) < 1e-9) {
+    if (!std::isfinite(scaleDelta) || scaleDelta <= 0.0
+        || std::abs(scaleDelta - 1.0) < skygate::core::NumericTolerance::kDisplayChange) {
         return;
     }
 
