@@ -2,6 +2,7 @@
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
 #include "math/TimeConstants.hpp"
+#include "time/EpochCodec.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,8 +13,7 @@ namespace {
 
 [[nodiscard]] double normalizedLunarCycleFraction(const skygate::core::AstronomicalEpoch& epoch) noexcept
 {
-    const skygate::core::AstronomicalEpoch normalizedEpoch = epoch.normalized();
-    const double julianDay = normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
+    const double julianDay = skygate::core::EpochCodec::julianDayFromEpoch(epoch);
     const double daysSinceKnownNewMoon = julianDay - skygate::core::TimeConstants::kJulianDateKnownNewMoon;
     double fraction = std::fmod(daysSinceKnownNewMoon / skygate::core::PhysicalConstants::kSynodicMonthDays, 1.0);
     if (fraction < 0.0) {

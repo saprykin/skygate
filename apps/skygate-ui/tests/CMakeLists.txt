@@ -401,6 +401,10 @@ add_skygate_ui_qtest(
     ephemeris/SkyEphemerisSettingsPolicyTests.cpp
 )
 add_skygate_ui_qtest(
+    skygate-ui-sky-ephemeris-session-tests
+    ephemeris/SkyEphemerisSessionTests.cpp
+)
+add_skygate_ui_qtest(
     skygate-ui-sky-ephemeris-update-workflow-tests
     ephemeris/SkyEphemerisUpdateWorkflowTests.cpp
 )
