@@ -1,16 +1,15 @@
 #include "SkyObjectTrailBuilder.hpp"
 #include "SkyObjectTrailInput.hpp"
 #include "diagnostics/SkyPerformanceLogging.hpp"
+#include "diagnostics/SkyPerformanceStageTimer.hpp"
 #include "math/LinePattern.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
 #include "render/SkyRenderLabelBuilder.hpp"
 #include "render/SkyRenderLine.hpp"
 
 #include <QColor>
-#include <QElapsedTimer>
 #include <QString>
 
-#include <algorithm>
 #include <array>
 
 namespace {
@@ -21,6 +20,9 @@ constexpr double kObjectTrailPastDashLengthPx = 8.0;
 constexpr double kObjectTrailPastDashGapPx = 7.0;
 constexpr int kObjectTrailFutureTickStepHours = 6;
 constexpr double kObjectTrailFutureTickRadiusPx = 5.0;
+// Trail chords share the overlay wrap clamp, expressed as a fraction of the
+// larger viewport dimension.
+constexpr double kObjectTrailSegmentLengthViewportFraction = 0.35;
 
 QColor colorWithAlpha(const QColor& color, const int alpha)
 {
@@ -94,8 +96,7 @@ void appendFutureTrailTick(
 
 void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTrailInput& input) const
 {
-    QElapsedTimer timer;
-    skygate::ui::SkyPerformanceLogging::startTimer(timer);
+    skygate::ui::SkyPerformanceStageTimer timer;
 
     const skygate::core::ObservationContext& context =
         input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
@@ -103,8 +104,9 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
         return;
     }
 
-    const double maxSegmentLength = std::max(input.viewportWidth, input.viewportHeight) * 0.35;
-    const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
+    const double maxSegmentLengthSquared = skygate::core::ProjectedPolylineBuilder::viewportSegmentLimitSquared(
+        input.viewportWidth, input.viewportHeight, kObjectTrailSegmentLengthViewportFraction
+    );
     const QColor pastColor = colorWithAlpha(input.renderTheme.selectionMarkerBorder, 105);
     const QColor futureColor = colorWithAlpha(input.renderTheme.selectionMarkerBorder, 175);
     const skygate::core::ProjectedPolylineBuilder polylineBuilder;
@@ -124,7 +126,7 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
     };
     const bool sampleCacheHit = m_trailSampler.hasCachedSamples(samplingInput);
     const auto& samples = m_trailSampler.samples(samplingInput);
-    const qint64 sampleNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+    const double sampleMs = timer.stageMilliseconds();
 
     int lineCountBefore = 0;
     int labelCountBefore = 0;
@@ -159,7 +161,7 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
         }
 
         const auto projected = input.preparedProjection->project(*sample.horizontal);
-        if (projected.isVisible && projected.isFinite() && sample.offsetMinutes > 0
+        if (projected.isVisible() && projected.isFinite() && sample.offsetMinutes > 0
             && sample.offsetMinutes % (kObjectTrailFutureTickStepHours * 60) == 0) {
             appendFutureTrailTick(frame, projected, sample.offsetMinutes, futureColor);
         }
@@ -171,10 +173,9 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
 
     if (skygate::ui::SkyPerformanceLogging::enabled()) {
         qCInfo(skygate::ui::skygatePerfLog)
-            << "trail append elapsedMs=" << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer)
-            << "sampleMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(sampleNs)
-            << "renderMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(timer.nsecsElapsed() - sampleNs)
-            << "samples=" << static_cast<qsizetype>(samples.size()) << "cacheHit=" << sampleCacheHit
+            << "trail append elapsedMs=" << timer.elapsedMilliseconds() << "sampleMs=" << sampleMs
+            << "renderMs=" << timer.stageMilliseconds() << "samples=" << static_cast<qsizetype>(samples.size())
+            << "cacheHit=" << sampleCacheHit
             << "highPrecision=" << SkyObjectTrailSampler::usesAdaptiveTrailSampling(samplingInput)
             << "guidance=" << SkyObjectTrailSampler::shouldUseGuidanceTrail(samplingInput)
             << "fixedEquatorial=" << SkyObjectTrailSampler::isFixedEquatorialTrailTarget(samplingInput)

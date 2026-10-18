@@ -35,6 +35,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/diagnostics/SkyPerformanceLogging.hpp
     src/ephemeris/SkyEphemerisAssetStatus.cpp
     src/ephemeris/SkyEphemerisAssetStatus.hpp
+    src/diagnostics/SkyPerformanceStageTimer.cpp
+    src/diagnostics/SkyPerformanceStageTimer.hpp
     src/ephemeris/SkyEphemerisCacheController.cpp
     src/ephemeris/SkyEphemerisCacheController.hpp
     src/ephemeris/SkyEphemerisDataCacheSnapshot.hpp
@@ -95,6 +97,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/selection/SkySelectionOverlayBuilder.cpp
     src/selection/SkySelectionOverlayBuilder.hpp
     src/selection/SkySelectionOverlayInput.hpp
+    src/selection/SkySelectionTargetKind.cpp
+    src/selection/SkySelectionTargetKind.hpp
     src/selection/SkySelectionMarkerBuilder.cpp
     src/selection/SkySelectionMarkerBuilder.hpp
     src/theme/SkyThemeOptionsAdapter.hpp
@@ -187,6 +191,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/app/SkyContextLocationSourceCodec.hpp
     src/app/SkyContextProjectionTypeCodec.cpp
     src/app/SkyContextProjectionTypeCodec.hpp
+    src/render/SkyCardinalDirectionPolicy.cpp
+    src/render/SkyCardinalDirectionPolicy.hpp
     src/render/SkyRenderStylePolicy.cpp
     src/render/SkyRenderStylePolicy.hpp
     src/settings/SkySettingsKeyBuilder.cpp

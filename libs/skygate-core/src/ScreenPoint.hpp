@@ -7,9 +7,9 @@ namespace skygate::core {
 struct ScreenPoint {
     double x = 0.0;
     double y = 0.0;
-    bool isVisible = false;
     ProjectionStatus status = ProjectionStatus::Culled;
 
+    [[nodiscard]] bool isVisible() const noexcept;
     [[nodiscard]] bool isFinite() const noexcept;
 };
 

@@ -41,7 +41,7 @@ void SkyHitTargetIndex::rebuild(const SkyRenderFrame& frame, const skygate::ephe
             skygate::core::CircleHitTarget{
                 .x = glyph.x,
                 .y = glyph.y,
-                .radius = std::max({glyph.radiusXPx, glyph.radiusYPx, kGlyphHitTargetRadiusMinPx}),
+                .radius = glyph.extentRadiusPx(kGlyphHitTargetRadiusMinPx),
                 .payloadId = glyph.bodyIndex
             }
         );

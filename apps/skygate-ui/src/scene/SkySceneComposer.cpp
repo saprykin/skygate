@@ -6,43 +6,29 @@
 #include "SkySceneFrameData.hpp"
 #include "SkySceneFramePipelineResult.hpp"
 #include "diagnostics/SkyPerformanceLogging.hpp"
+#include "diagnostics/SkyPerformanceStageTimer.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "math/Geometry2d.hpp"
+#include "render/SkyCardinalDirectionPolicy.hpp"
 #include "render/SkyRenderLabel.hpp"
 #include "selection/SkyObjectTrailInput.hpp"
 #include "selection/SkySelectionOverlayInput.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
 
 #include <QColor>
-#include <QElapsedTimer>
 #include <QPointF>
 
-#include <array>
 #include <limits>
 
 namespace {
 
-constexpr int kReferenceLabelSampleCount = 96;
+constexpr int kReferenceLabelSampleCount = skygate::ephemeris::CelestialReferenceCalculator::kReferenceCircleSamples;
 constexpr double kReferenceLabelEdgeMarginPx = 36.0;
 
 SkyOverlayItem
 overlayEntry(const QString& kind, const double x, const double y, const QString& text, const QColor& color)
 {
     return SkyOverlayItem{.kind = kind, .x = x, .y = y, .text = text, .color = color};
-}
-
-QColor cardinalColor(const double azimuthDeg, const skygate::ui::internal::SkyThemeRenderPalette& renderTheme)
-{
-    if (azimuthDeg == 0.0) {
-        return renderTheme.cardinalNorthLine;
-    }
-    if (azimuthDeg == 90.0) {
-        return renderTheme.cardinalEastLine;
-    }
-    if (azimuthDeg == 180.0) {
-        return renderTheme.cardinalSouthLine;
-    }
-    return renderTheme.cardinalWestLine;
 }
 
 struct TrailTargetPointers final {
@@ -95,7 +81,7 @@ void appendReferenceLayerLabel(
 
     for (int index = 0; index < kReferenceLabelSampleCount; ++index) {
         const auto projected = preparedProjection.project(coordinateAt(index));
-        if (!projected.isVisible) {
+        if (!projected.isVisible()) {
             continue;
         }
 
@@ -173,13 +159,12 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
     SkySceneFrameData& sceneFrame, const SkySceneCompositionInput& input, const SkySceneFramePipelineResult& frameResult
 )
 {
-    QElapsedTimer timer;
-    skygate::ui::SkyPerformanceLogging::startTimer(timer);
+    skygate::ui::SkyPerformanceStageTimer timer;
 
     const SkySelectionOverlayInput selectionInput = buildSelectionInput(input, frameResult);
-    const qint64 selectionInputNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+    const double selectionInputMs = timer.stageMilliseconds();
     const auto trailTargetBodyIndex = m_selectionOverlayBuilder.activeTrailTargetBodyIndex(selectionInput);
-    const qint64 trailResolveNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+    const double trailResolveMs = timer.stageMilliseconds();
     const CompositionKey compositionKey{
         .renderFrameGeneration = frameResult.renderFrameGeneration,
         .trailTargetBodyIndex = trailTargetBodyIndex,
@@ -194,8 +179,8 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
     };
     if (!frameResult.updated && m_compositionKey.has_value() && m_compositionKey.value().equals(compositionKey)) {
         if (skygate::ui::SkyPerformanceLogging::enabled()) {
-            qCInfo(skygate::ui::skygatePerfLog) << "scene composition skipped elapsedMs="
-                                                << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer);
+            qCInfo(skygate::ui::skygatePerfLog)
+                << "scene composition skipped elapsedMs=" << timer.elapsedMilliseconds();
         }
         return {};
     }
@@ -203,12 +188,12 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
     const bool frameContentChanged = frameResult.updated || !m_compositionKey.has_value()
                                      || m_compositionKey->renderFrameGeneration != compositionKey.renderFrameGeneration
                                      || m_compositionKey->trailTargetBodyIndex != compositionKey.trailTargetBodyIndex;
-    qint64 frameCopyNs = trailResolveNs;
-    qint64 trailNs = trailResolveNs;
-    qint64 overlayNs = trailResolveNs;
+    double frameCopyMs = 0.0;
+    double trailMs = 0.0;
+    double overlayMs = 0.0;
     if (frameContentChanged) {
         sceneFrame.frame = *frameResult.frame;
-        frameCopyNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+        frameCopyMs = timer.stageMilliseconds();
         if (trailTargetBodyIndex.has_value()) {
             const TrailTargetPointers trailTarget = trailTargetPointers(frameResult.snapshot, *trailTargetBodyIndex);
             m_objectTrailBuilder.appendTrail(
@@ -232,27 +217,22 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
                 }
             );
         }
-        trailNs = skygate::ui::SkyPerformanceLogging::enabled() ? timer.nsecsElapsed() : frameCopyNs;
+        trailMs = timer.stageMilliseconds();
 
         sceneFrame.overlayItems = buildOverlayItems(sceneFrame, input, frameResult);
-        overlayNs = skygate::ui::SkyPerformanceLogging::enabled() ? timer.nsecsElapsed() : trailNs;
+        overlayMs = timer.stageMilliseconds();
     }
 
     sceneFrame.selectionMarker = m_selectionOverlayBuilder.buildSelectionMarkerData(selectionInput);
-    const qint64 markerNs = skygate::ui::SkyPerformanceLogging::enabled() ? timer.nsecsElapsed() : overlayNs;
+    const double markerMs = timer.stageMilliseconds();
     sceneFrame.selectedObjectInspector = m_selectionOverlayBuilder.buildSelectedObjectInspectorData(selectionInput);
-    const qint64 inspectorNs = skygate::ui::SkyPerformanceLogging::enabled() ? timer.nsecsElapsed() : markerNs;
+    const double inspectorMs = timer.stageMilliseconds();
     m_compositionKey = compositionKey;
     if (skygate::ui::SkyPerformanceLogging::enabled()) {
         qCInfo(skygate::ui::skygatePerfLog)
-            << "scene composition elapsedMs=" << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer)
-            << "selectionInputMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(selectionInputNs)
-            << "trailResolveMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(trailResolveNs - selectionInputNs)
-            << "frameCopyMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(frameCopyNs - trailResolveNs)
-            << "trailMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(trailNs - frameCopyNs)
-            << "overlayMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(overlayNs - trailNs)
-            << "markerMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(markerNs - overlayNs)
-            << "inspectorMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(inspectorNs - markerNs)
+            << "scene composition elapsedMs=" << timer.elapsedMilliseconds() << "selectionInputMs=" << selectionInputMs
+            << "trailResolveMs=" << trailResolveMs << "frameCopyMs=" << frameCopyMs << "trailMs=" << trailMs
+            << "overlayMs=" << overlayMs << "markerMs=" << markerMs << "inspectorMs=" << inspectorMs
             << "frameContentChanged=" << frameContentChanged << "hasTrail=" << trailTargetBodyIndex.has_value();
     }
     return SkySceneCompositionResult{
@@ -284,10 +264,8 @@ std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
             "Ecliptic",
             renderTheme.eclipticLine,
             [&skyContext](const int index) {
-                const double eclipticLongitudeDeg =
-                    360.0 * static_cast<double>(index) / static_cast<double>(kReferenceLabelSampleCount);
-                return skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(
-                    eclipticLongitudeDeg, skyContext.observer, skyContext.utcTime
+                return skygate::ephemeris::CelestialReferenceCalculator::eclipticCirclePoint(
+                    index, kReferenceLabelSampleCount, skyContext.observer, skyContext.utcTime
                 );
             }
         );
@@ -327,13 +305,11 @@ std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
         return overlayItems;
     }
 
-    constexpr std::array<const char*, 4> kCardinalLabels{"N", "E", "S", "W"};
-    constexpr std::array<double, 4> kCardinalAzimuths{0.0, 90.0, 180.0, 270.0};
-    for (std::size_t index = 0; index < kCardinalLabels.size(); ++index) {
+    for (const double cardinalAzimuthDeg : skygate::ui::internal::SkyCardinalDirectionPolicy::kAzimuthsDeg) {
         const auto projected = sceneFrame.preparedProjection->project(
-            skygate::core::HorizontalCoordinate{.altitudeDeg = 0.0, .azimuthDeg = kCardinalAzimuths[index]}
+            skygate::core::HorizontalCoordinate{.altitudeDeg = 0.0, .azimuthDeg = cardinalAzimuthDeg}
         );
-        if (!projected.isVisible) {
+        if (!projected.isVisible()) {
             continue;
         }
 
@@ -341,8 +317,8 @@ std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
             "cardinal",
             projected.x,
             projected.y,
-            QString::fromUtf8(kCardinalLabels[index]),
-            cardinalColor(kCardinalAzimuths[index], renderTheme)
+            skygate::ui::internal::SkyCardinalDirectionPolicy::label(cardinalAzimuthDeg),
+            skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(cardinalAzimuthDeg, renderTheme)
         ));
     }
 

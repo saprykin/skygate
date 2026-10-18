@@ -43,6 +43,9 @@ constexpr double kLabelScaleReferenceWidthPx = 1100.0;
 constexpr double kLabelScaleReferenceHeightPx = 760.0;
 constexpr double kLabelViewportScaleMin = 0.70;
 constexpr double kLabelViewportScaleMax = 1.35;
+// Label anchors sit at least this far above the glyph centre, even for the
+// smallest deep-sky markers.
+constexpr double kDeepSkyLabelAnchorMinRadiusPx = 8.0;
 
 constexpr double kMessierLabelScore = 1000.0;
 constexpr double kCommonNameLabelScore = 700.0;
@@ -184,9 +187,9 @@ deepSkyLabelBudget(const double fovDeg, const double viewportWidth, const double
     return score - (normalizedDistanceSquared * kCenterDistanceScoreWeight);
 }
 
-[[nodiscard]] double deepSkyHitRadius(const SkyRenderGlyph& glyph)
+[[nodiscard]] double deepSkyLabelAnchorRadiusPx(const SkyRenderGlyph& glyph)
 {
-    return std::max({glyph.radiusXPx, glyph.radiusYPx, 8.0});
+    return glyph.extentRadiusPx(kDeepSkyLabelAnchorMinRadiusPx);
 }
 
 }  // namespace
@@ -322,7 +325,7 @@ void SkyRenderLabelBuilder::appendDeepSkyLabels(
             continue;
         }
 
-        const double anchorY = glyph.y - deepSkyHitRadius(glyph);
+        const double anchorY = glyph.y - deepSkyLabelAnchorRadiusPx(glyph);
         const skygate::core::Rect2d labelBounds = bounds(glyph.x, anchorY, body.displayName);
         if (!fitsViewport(labelBounds, viewportWidth, viewportHeight, edgeMarginPx)) {
             continue;
@@ -371,7 +374,7 @@ void SkyRenderLabelBuilder::appendDeepSkyLabels(
         append(
             frame.labels,
             glyph.x,
-            glyph.y - deepSkyHitRadius(glyph),
+            glyph.y - deepSkyLabelAnchorRadiusPx(glyph),
             body.displayName,
             colorForBodyType(body.kind, renderTheme)
         );

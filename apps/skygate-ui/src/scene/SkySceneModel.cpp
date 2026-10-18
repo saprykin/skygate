@@ -6,6 +6,7 @@
 #include "SkySceneFramePipelineInput.hpp"
 #include "app/SkyContextController.hpp"
 #include "diagnostics/SkyPerformanceLogging.hpp"
+#include "diagnostics/SkyPerformanceStageTimer.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "render/SkyRenderGlyph.hpp"
@@ -14,7 +15,6 @@
 #include "time/SkyQtTimeCodec.hpp"
 #include "time/SkyTimeController.hpp"
 
-#include <QElapsedTimer>
 #include <QStringList>
 
 #include <cmath>
@@ -470,31 +470,30 @@ std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
 
 void SkySceneModel::rebuildSceneFrame()
 {
-    QElapsedTimer timer;
-    skygate::ui::SkyPerformanceLogging::startTimer(timer);
+    skygate::ui::SkyPerformanceStageTimer timer;
 
     const auto input = buildSceneInput();
-    const qint64 inputNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+    const double inputMs = timer.stageMilliseconds();
     if (!input.has_value()) {
         if (clearSceneFrame()) {
             emit sceneFrameChanged();
         }
         if (skygate::ui::SkyPerformanceLogging::enabled()) {
-            qCInfo(skygate::ui::skygatePerfLog) << "scene rebuild skipped no-input elapsedMs="
-                                                << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer);
+            qCInfo(skygate::ui::skygatePerfLog)
+                << "scene rebuild skipped no-input elapsedMs=" << timer.elapsedMilliseconds();
         }
         return;
     }
 
     const auto frameResult = m_framePipeline.rebuild(input->frameInput, m_viewportWidth, m_viewportHeight);
-    const qint64 pipelineNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+    const double pipelineMs = timer.stageMilliseconds();
     if (!frameResult.has_value()) {
         if (clearSceneFrame()) {
             emit sceneFrameChanged();
         }
         if (skygate::ui::SkyPerformanceLogging::enabled()) {
-            qCInfo(skygate::ui::skygatePerfLog) << "scene rebuild skipped no-frame elapsedMs="
-                                                << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer);
+            qCInfo(skygate::ui::skygatePerfLog)
+                << "scene rebuild skipped no-frame elapsedMs=" << timer.elapsedMilliseconds();
         }
         return;
     }
@@ -506,7 +505,7 @@ void SkySceneModel::rebuildSceneFrame()
         degradationReasonsForContext(requestContext, input->frameInput.ephemerisEngine);
 
     const SkySceneCompositionResult compositionResult = m_sceneComposer.rebuild(m_sceneFrame, *input, *frameResult);
-    const qint64 compositionNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+    const double compositionMs = timer.stageMilliseconds();
     if (!compositionResult.changed) {
         if (m_ephemerisDegradationReasons != ephemerisDegradationReasons) {
             m_ephemerisDegradationReasons = ephemerisDegradationReasons;
@@ -518,24 +517,20 @@ void SkySceneModel::rebuildSceneFrame()
     if (compositionResult.frameContentChanged) {
         m_hitTargetIndex.rebuild(m_sceneFrame.frame, *frameResult->snapshot);
     }
-    const qint64 hitIndexNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+    const double hitIndexMs = timer.stageMilliseconds();
     m_overlayItems = m_sceneOverlayAdapter.overlayItems(m_sceneFrame.overlayItems);
     m_ephemerisDegradationReasons = ephemerisDegradationReasons;
     m_selectionMarker = m_sceneOverlayAdapter.selectionMarker(m_sceneFrame.selectionMarker);
     m_selectedObjectInspector = m_sceneOverlayAdapter.selectedObjectInspector(m_sceneFrame.selectedObjectInspector);
-    const qint64 adapterNs = skygate::ui::SkyPerformanceLogging::elapsedNanoseconds(timer);
+    const double adapterMs = timer.stageMilliseconds();
     publishViewportSnapshot(frameResult->renderFrameGeneration, compositionResult.trailTargetBodyIndex);
     emit sceneFrameChanged();
 
     if (skygate::ui::SkyPerformanceLogging::enabled()) {
         qCInfo(skygate::ui::skygatePerfLog)
-            << "scene rebuild elapsedMs=" << skygate::ui::SkyPerformanceLogging::elapsedMilliseconds(timer)
-            << "inputMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(inputNs)
-            << "pipelineMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(pipelineNs - inputNs)
-            << "compositionMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(compositionNs - pipelineNs)
-            << "hitIndexMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(hitIndexNs - compositionNs)
-            << "adapterMs=" << skygate::ui::SkyPerformanceLogging::milliseconds(adapterNs - hitIndexNs)
-            << "pipelineUpdated=" << frameResult->updated
+            << "scene rebuild elapsedMs=" << timer.elapsedMilliseconds() << "inputMs=" << inputMs
+            << "pipelineMs=" << pipelineMs << "compositionMs=" << compositionMs << "hitIndexMs=" << hitIndexMs
+            << "adapterMs=" << adapterMs << "pipelineUpdated=" << frameResult->updated
             << "frameContentChanged=" << compositionResult.frameContentChanged
             << "points=" << static_cast<qsizetype>(m_sceneFrame.frame.points.size())
             << "lines=" << static_cast<qsizetype>(m_sceneFrame.frame.lines.size())

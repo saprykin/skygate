@@ -225,7 +225,7 @@ void SkyObjectTrailGeometryTests::highPrecisionFixedTrailAlignsPresentToMarker()
     builder.appendTrail(frame, input);
 
     const skygate::core::ScreenPoint selectedPoint = projection->project(state.horizontal);
-    QVERIFY(selectedPoint.isVisible);
+    QVERIFY(selectedPoint.isVisible());
     QVERIFY(std::any_of(frame.lines.begin(), frame.lines.end(), [&](const SkyRenderLine& line) {
         return line.widthPx == 2.0 && line.color.alpha() == 175
                && TrailRenderQuery::lineTouchesPoint(line, selectedPoint.x, selectedPoint.y, 1.0);

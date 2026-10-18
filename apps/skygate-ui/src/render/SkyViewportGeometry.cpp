@@ -1,5 +1,6 @@
 #include "SkyViewportGeometry.hpp"
 #include "CelestialReferenceCalculator.hpp"
+#include "SkyCardinalDirectionPolicy.hpp"
 #include "SkyRenderGlyph.hpp"
 #include "SkyRenderLine.hpp"
 #include "SkyViewportGeometryInput.hpp"
@@ -8,7 +9,6 @@
 #include "math/ProjectedPolylineBuilder.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
 
-#include <algorithm>
 #include <array>
 #include <utility>
 
@@ -26,28 +26,21 @@ constexpr double kGridMeridianAltitudeMaxDeg = 85.0;
 // Projected chords longer than this share of the larger viewport dimension are
 // dropped, which removes the screen-wide jumps where geometry wraps.
 constexpr double kOverlaySegmentLengthViewportFraction = 0.30;
-constexpr int kReferenceCircleSampleCount = 192;
+constexpr int kReferenceCircleSampleCount = skygate::ephemeris::CelestialReferenceCalculator::kReferenceCircleSamples;
 constexpr float kGridLineWidthPx = 1.0F;
 constexpr float kCardinalLineWidthPx = 1.8F;
 constexpr float kHorizonLineWidthPx = 2.2F;
 constexpr float kReferenceLineWidthPx = 1.4F;
 constexpr int kGlyphEllipseSampleCount = 32;
 
-[[nodiscard]] QColor
-cardinalAzimuthLineColor(const int azimuthDeg, const skygate::ui::internal::SkyThemeRenderPalette& renderTheme)
+[[nodiscard]] skygate::core::HorizontalCoordinate
+meridianPoint(const double azimuthDeg, const int sampleIndex, const int sampleCount)
 {
-    switch (azimuthDeg) {
-    case 0:
-        return renderTheme.cardinalNorthLine;
-    case 90:
-        return renderTheme.cardinalEastLine;
-    case 180:
-        return renderTheme.cardinalSouthLine;
-    case 270:
-        return renderTheme.cardinalWestLine;
-    default:
-        return renderTheme.gridAzimuthLine;
-    }
+    const double altitudeDeg =
+        kGridMeridianAltitudeMinDeg
+        + ((kGridMeridianAltitudeMaxDeg - kGridMeridianAltitudeMinDeg) * static_cast<double>(sampleIndex))
+              / static_cast<double>(sampleCount);
+    return skygate::core::HorizontalCoordinate{.altitudeDeg = altitudeDeg, .azimuthDeg = azimuthDeg};
 }
 
 void appendLineSegment(
@@ -252,13 +245,7 @@ void appendAltAzGridLines(
             input.renderTheme.gridAzimuthLine,
             kGridLineWidthPx,
             [azimuthDeg](const int index) {
-                const double altitudeDeg =
-                    kGridMeridianAltitudeMinDeg
-                    + ((kGridMeridianAltitudeMaxDeg - kGridMeridianAltitudeMinDeg) * static_cast<double>(index))
-                          / static_cast<double>(kGridAzimuthSampleCount);
-                return skygate::core::HorizontalCoordinate{
-                    .altitudeDeg = altitudeDeg, .azimuthDeg = static_cast<double>(azimuthDeg)
-                };
+                return meridianPoint(static_cast<double>(azimuthDeg), index, kGridAzimuthSampleCount);
             }
         );
     }
@@ -270,23 +257,16 @@ void appendCardinalGridLines(
     const double maxSegmentLengthSquared
 )
 {
-    constexpr std::array<int, 4> kCardinalAzimuths{0, 90, 180, 270};
-    for (const int cardinalAzimuthDeg : kCardinalAzimuths) {
+    for (const double cardinalAzimuthDeg : skygate::ui::internal::SkyCardinalDirectionPolicy::kAzimuthsDeg) {
         appendProjectedPolyline(
             lineSegments,
             input.projection,
             kGridAzimuthSampleCount,
             maxSegmentLengthSquared,
-            cardinalAzimuthLineColor(cardinalAzimuthDeg, input.renderTheme),
+            skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(cardinalAzimuthDeg, input.renderTheme),
             kCardinalLineWidthPx,
             [cardinalAzimuthDeg](const int index) {
-                const double altitudeDeg =
-                    kGridMeridianAltitudeMinDeg
-                    + ((kGridMeridianAltitudeMaxDeg - kGridMeridianAltitudeMinDeg) * static_cast<double>(index))
-                          / static_cast<double>(kGridAzimuthSampleCount);
-                return skygate::core::HorizontalCoordinate{
-                    .altitudeDeg = altitudeDeg, .azimuthDeg = static_cast<double>(cardinalAzimuthDeg)
-                };
+                return meridianPoint(cardinalAzimuthDeg, index, kGridAzimuthSampleCount);
             }
         );
     }
@@ -327,10 +307,8 @@ void appendReferenceLines(
             input.renderTheme.eclipticLine,
             kReferenceLineWidthPx,
             [&input](const int index) {
-                const double eclipticLongitudeDeg =
-                    360.0 * static_cast<double>(index) / static_cast<double>(kReferenceCircleSampleCount);
-                return skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(
-                    eclipticLongitudeDeg, input.observer, input.utcTime
+                return skygate::ephemeris::CelestialReferenceCalculator::eclipticCirclePoint(
+                    index, kReferenceCircleSampleCount, input.observer, input.utcTime
                 );
             }
         );
@@ -405,9 +383,9 @@ namespace skygate::ui::internal {
 
 std::vector<SkyViewportLineSegment> SkyViewportGeometry::buildLineSegments(const SkyViewportGeometryInput& input)
 {
-    const double maxSegmentLength =
-        std::max(input.viewportWidth, input.viewportHeight) * kOverlaySegmentLengthViewportFraction;
-    const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
+    const double maxSegmentLengthSquared = skygate::core::ProjectedPolylineBuilder::viewportSegmentLimitSquared(
+        input.viewportWidth, input.viewportHeight, kOverlaySegmentLengthViewportFraction
+    );
 
     std::vector<SkyViewportLineSegment> lineSegments;
     lineSegments.reserve(4096U);

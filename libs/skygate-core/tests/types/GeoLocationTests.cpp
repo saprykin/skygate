@@ -13,6 +13,7 @@ private slots:
     void outOfRangeLatitudeIsInvalid();
     void outOfRangeLongitudeIsInvalid();
     void nonFiniteValuesAreInvalid();
+    void equalsComparesEveryField();
 };
 
 void GeoLocationTests::originIsValid()
@@ -70,6 +71,29 @@ void GeoLocationTests::nonFiniteValuesAreInvalid()
     location = {};
     location.elevationMeters = std::numeric_limits<double>::quiet_NaN();
     QVERIFY(!location.isValid());
+}
+
+void GeoLocationTests::equalsComparesEveryField()
+{
+    const skygate::core::GeoLocation location{
+        .latitudeDeg = 47.3769,
+        .longitudeDeg = 8.5417,
+        .elevationMeters = 408.0,
+    };
+    QVERIFY(location.equals(location));
+    QVERIFY(location.equals({.latitudeDeg = 47.3769, .longitudeDeg = 8.5417, .elevationMeters = 408.0}));
+
+    skygate::core::GeoLocation other = location;
+    other.latitudeDeg += 1e-12;
+    QVERIFY(!location.equals(other));
+
+    other = location;
+    other.longitudeDeg -= 1e-12;
+    QVERIFY(!location.equals(other));
+
+    other = location;
+    other.elevationMeters += 1.0;
+    QVERIFY(!location.equals(other));
 }
 
 QTEST_APPLESS_MAIN(GeoLocationTests)

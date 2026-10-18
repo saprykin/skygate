@@ -54,12 +54,6 @@ makeSingleBodyCatalog(const skygate::ephemeris::BaseCelestialBody& body)
     return skygate::ephemeris::CelestialBodyCatalog({std::move(ownGalaxyBody)});
 }
 
-[[nodiscard]] bool
-equatorialEqual(const skygate::core::EquatorialCoordinate& lhs, const skygate::core::EquatorialCoordinate& rhs) noexcept
-{
-    return lhs.rightAscensionHours == rhs.rightAscensionHours && lhs.declinationDeg == rhs.declinationDeg;
-}
-
 [[nodiscard]] bool optionalEquatorialsEqual(
     const std::optional<skygate::core::EquatorialCoordinate>& lhs,
     const std::optional<skygate::core::EquatorialCoordinate>& rhs
@@ -69,13 +63,19 @@ equatorialEqual(const skygate::core::EquatorialCoordinate& lhs, const skygate::c
         return false;
     }
 
-    return !lhs.has_value() || equatorialEqual(*lhs, *rhs);
+    return !lhs.has_value() || lhs->equals(*rhs);
 }
 
-[[nodiscard]] bool observersEqual(const skygate::core::GeoLocation& lhs, const skygate::core::GeoLocation& rhs) noexcept
+struct TrailOffsetWindow final {
+    int startOffsetMinutes = 0;
+    int endOffsetMinutes = 0;
+};
+
+[[nodiscard]] TrailOffsetWindow trailOffsetsMinutes(const skygate::ephemeris::BodyTrailOptions& renderOptions) noexcept
 {
-    return lhs.latitudeDeg == rhs.latitudeDeg && lhs.longitudeDeg == rhs.longitudeDeg
-           && lhs.elevationMeters == rhs.elevationMeters;
+    return TrailOffsetWindow{
+        .startOffsetMinutes = -renderOptions.pastHours * 60, .endOffsetMinutes = renderOptions.futureHours * 60
+    };
 }
 
 [[nodiscard]] std::optional<skygate::core::HorizontalCoordinate> interpolateSampleAtOffset(
@@ -121,15 +121,17 @@ equatorialEqual(const skygate::core::EquatorialCoordinate& lhs, const skygate::c
     const skygate::ephemeris::BodyTrailOptions& renderOptions
 )
 {
+    const TrailOffsetWindow offsetWindow = trailOffsetsMinutes(renderOptions);
     std::vector<skygate::ephemeris::BodyTrailSample> samples;
-    const int startOffsetMinutes = -renderOptions.pastHours * 60;
-    const int endOffsetMinutes = renderOptions.futureHours * 60;
     samples.reserve(
-        static_cast<std::size_t>((endOffsetMinutes - startOffsetMinutes) / renderOptions.sampleStepMinutes) + 1U
+        static_cast<std::size_t>(
+            (offsetWindow.endOffsetMinutes - offsetWindow.startOffsetMinutes) / renderOptions.sampleStepMinutes
+        )
+        + 1U
     );
 
     std::size_t nextAnchorIndex = 0U;
-    for (int offsetMinutes = startOffsetMinutes; offsetMinutes <= endOffsetMinutes;
+    for (int offsetMinutes = offsetWindow.startOffsetMinutes; offsetMinutes <= offsetWindow.endOffsetMinutes;
          offsetMinutes += renderOptions.sampleStepMinutes) {
         samples.push_back(
             skygate::ephemeris::BodyTrailSample{
@@ -310,15 +312,17 @@ void appendAdaptiveTrailAnchors(
     const SkyObjectTrailSamplingInput& input, const skygate::ephemeris::BodyTrailOptions& renderOptions
 )
 {
-    const int startOffsetMinutes = -renderOptions.pastHours * 60;
-    const int endOffsetMinutes = renderOptions.futureHours * 60;
+    const TrailOffsetWindow offsetWindow = trailOffsetsMinutes(renderOptions);
 
     std::vector<skygate::ephemeris::BodyTrailSample> samples;
     samples.reserve(
-        static_cast<std::size_t>((endOffsetMinutes - startOffsetMinutes) / renderOptions.sampleStepMinutes) + 1U
+        static_cast<std::size_t>(
+            (offsetWindow.endOffsetMinutes - offsetWindow.startOffsetMinutes) / renderOptions.sampleStepMinutes
+        )
+        + 1U
     );
 
-    for (int offsetMinutes = startOffsetMinutes; offsetMinutes <= endOffsetMinutes;
+    for (int offsetMinutes = offsetWindow.startOffsetMinutes; offsetMinutes <= offsetWindow.endOffsetMinutes;
          offsetMinutes += renderOptions.sampleStepMinutes) {
         samples.push_back(sampleEngineTrailAtOffset(input, offsetMinutes));
     }
@@ -419,7 +423,7 @@ bool SkyObjectTrailSampler::sampleCacheKeysEqual(
 {
     return lhs.ephemerisEngine == rhs.ephemerisEngine && lhs.guidanceStrategy == rhs.guidanceStrategy
            && lhs.targetBodyIndex == rhs.targetBodyIndex && lhs.context.utcTime == rhs.context.utcTime
-           && observersEqual(lhs.context.observer, rhs.context.observer) && lhs.requestEpoch == rhs.requestEpoch
+           && lhs.context.observer.equals(rhs.context.observer) && lhs.requestEpoch == rhs.requestEpoch
            && lhs.requestOptions == rhs.requestOptions
            && optionalEquatorialsEqual(lhs.targetEquatorial, rhs.targetEquatorial);
 }

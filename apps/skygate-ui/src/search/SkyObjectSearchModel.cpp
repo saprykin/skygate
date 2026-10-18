@@ -1,5 +1,6 @@
 #include "SkyObjectSearchModel.hpp"
 #include "StringUtilities.hpp"
+#include "selection/SkySelectionTargetKind.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -209,7 +210,9 @@ void SkyObjectSearchModel::setCatalogData(
             SourceEntry{
                 .displayText = QString::fromStdString(body.displayName),
                 .detailText = bodyDetailText(body),
-                .targetKind = "body",
+                .targetKind = skygate::ui::internal::SkySelectionTargetKind::token(
+                    skygate::ui::internal::SkySelectionTargetKind::Type::Body
+                ),
                 .targetId = targetId,
                 .brightnessMagnitude = body.visualMagnitude,
                 .selectable = true,
@@ -226,7 +229,9 @@ void SkyObjectSearchModel::setCatalogData(
                 SourceEntry{
                     .displayText = QString::fromStdString(alias),
                     .detailText = bodyDetailText(body),
-                    .targetKind = "body",
+                    .targetKind = skygate::ui::internal::SkySelectionTargetKind::token(
+                        skygate::ui::internal::SkySelectionTargetKind::Type::Body
+                    ),
                     .targetId = targetId,
                     .brightnessMagnitude = body.visualMagnitude,
                     .selectable = true,
@@ -251,7 +256,9 @@ void SkyObjectSearchModel::setCatalogData(
                 SourceEntry{
                     .displayText = QString::fromStdString(alias),
                     .detailText = bodyDetailText(body),
-                    .targetKind = "body",
+                    .targetKind = skygate::ui::internal::SkySelectionTargetKind::token(
+                        skygate::ui::internal::SkySelectionTargetKind::Type::Body
+                    ),
                     .targetId = targetId,
                     .brightnessMagnitude = body.visualMagnitude,
                     .selectable = true,
@@ -281,7 +288,9 @@ void SkyObjectSearchModel::setCatalogData(
             SourceEntry{
                 .displayText = QString::fromStdString(anchorGroup.first),
                 .detailText = "Constellation",
-                .targetKind = "constellationLabel",
+                .targetKind = skygate::ui::internal::SkySelectionTargetKind::token(
+                    skygate::ui::internal::SkySelectionTargetKind::Type::ConstellationLabel
+                ),
                 .targetId = QString::fromStdString(anchorGroup.first),
                 .brightnessMagnitude = 99.0,
                 .selectable = true,

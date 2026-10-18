@@ -51,7 +51,7 @@ constexpr std::array<skygate::core::ProjectionType, 3> kProjectionTypes{
 void verifyEquivalentPoints(const skygate::core::ScreenPoint& actual, const skygate::core::ScreenPoint& expected)
 {
     QCOMPARE(actual.status, expected.status);
-    QCOMPARE(actual.isVisible, expected.isVisible);
+    QCOMPARE(actual.isVisible(), expected.isVisible());
     if (actual.status == skygate::core::ProjectionStatus::Visible) {
         QVERIFY(actual.isFinite());
         QVERIFY(expected.isFinite());
@@ -109,14 +109,14 @@ void ProjectionPropertyTests::generatedVisiblePointsAreFiniteAndWithinViewport()
             const auto point = projection->project(coordinate, params);
 
             if (point.status == skygate::core::ProjectionStatus::Visible) {
-                QVERIFY(point.isVisible);
+                QVERIFY(point.isVisible());
                 QVERIFY(point.isFinite());
                 QVERIFY(point.x >= -1e-6);
                 QVERIFY(point.x <= params.viewportWidth + 1e-6);
                 QVERIFY(point.y >= -1e-6);
                 QVERIFY(point.y <= params.viewportHeight + 1e-6);
             } else {
-                QVERIFY(!point.isVisible);
+                QVERIFY(!point.isVisible());
             }
         }
     }
@@ -163,7 +163,7 @@ void ProjectionPropertyTests::invalidGeneratedCoordinatesNeverBecomeVisible()
             const auto point = projection->project(invalidCoordinate, params);
 
             QCOMPARE(point.status, skygate::core::ProjectionStatus::InvalidCoordinate);
-            QVERIFY(!point.isVisible);
+            QVERIFY(!point.isVisible());
         }
     }
 }
