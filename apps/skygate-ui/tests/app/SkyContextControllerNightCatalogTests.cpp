@@ -1,5 +1,6 @@
 #include "UtcTimeCodec.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
+#include "settings/SkySettingsStore.hpp"
 #include "support/SkyContextControllerTestSupport.hpp"
 
 #include <cmath>
