@@ -269,6 +269,11 @@ add_skygate_ephemeris_qtest(
     LABELS "unit;validation;time-eop"
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-earth-orientation-sampler-tests
+    engine/EarthOrientationSamplerTests.cpp
+    LABELS "unit;validation;time-eop"
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-leap-second-provider-tests
     engine/data/LeapSecondProviderTests.cpp
     LABELS "unit;validation;time-eop"
