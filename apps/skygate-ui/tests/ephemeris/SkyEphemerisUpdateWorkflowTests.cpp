@@ -162,6 +162,94 @@ skygate::ephemeris::EphemerisDataManifest twoAssetUpdateManifest(const bool incl
     return manifest;
 }
 
+QString supportDataManifestJson(
+    const QString& leapSecondVersion, const QString& earthOrientationVersion, const QString& deltaTVersion
+)
+{
+    return QStringLiteral(R"({
+  "schemaVersion": 1,
+  "id": "test-support-data",
+  "displayName": "Test support data",
+  "version": "2026a",
+  "provenance": "workflow support-data test",
+  "dateRanges": [
+    {
+      "id": "support-range",
+      "displayName": "Support range",
+      "start": "1900-01-01",
+      "end": "2100-01-01"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "support-data",
+      "displayName": "Time and Earth data",
+      "bundled": false,
+      "longRange": false,
+      "assetIds": ["support-leap-seconds", "support-earth-orientation", "support-delta-t"]
+    }
+  ],
+  "assets": [
+    {
+      "id": "support-leap-seconds",
+      "kind": "leap-second-table",
+      "profileId": "support-data",
+      "version": "%1",
+      "sourceUrl": "%4",
+      "relativePath": "time/leap-seconds.list",
+      "live": true,
+      "compression": { "format": "none" },
+      "validityRange": {
+        "id": "leap-second-range",
+        "displayName": "Leap-second table range",
+        "start": "1972-01-01",
+        "end": "2027-06-28"
+      }
+    },
+    {
+      "id": "support-earth-orientation",
+      "kind": "earth-orientation-data",
+      "profileId": "support-data",
+      "version": "%2",
+      "sourceUrl": "%5",
+      "relativePath": "time/eop.txt",
+      "live": true,
+      "compression": { "format": "none" },
+      "validityRange": {
+        "id": "eop-range",
+        "displayName": "Earth orientation range",
+        "start": "1900-01-01",
+        "end": "2100-01-01"
+      }
+    },
+    {
+      "id": "support-delta-t",
+      "kind": "delta-t-data",
+      "profileId": "support-data",
+      "version": "%3",
+      "sourceUrl": "%6",
+      "relativePath": "time/delta-t.data",
+      "live": true,
+      "compression": { "format": "none" },
+      "validityRange": {
+        "id": "delta-t-range",
+        "displayName": "Delta T range",
+        "start": "-13200-01-01",
+        "end": "13200-12-31"
+      }
+    }
+  ]
+})")
+        .arg(
+            leapSecondVersion,
+            earthOrientationVersion,
+            deltaTVersion,
+            QStringLiteral("https://example.test/time/leap-seconds.list"),
+            QStringLiteral("https://example.test/time/eop.txt"),
+            QStringLiteral("https://example.test/time/delta-t.data")
+        );
+}
+
 FakeNetworkResponse manualPayloadResponse()
 {
     return FakeNetworkResponse{.payload = stagedPayload(), .manualFinish = true};
@@ -258,6 +346,9 @@ private slots:
     void spellPathSegmentCollapsesRepeatedDots();
     void spellPathSegmentFallsBackWhenEmpty();
     void spellPathSegmentFallsBackForSingleDot();
+    void supportDataCheckReportsUpdatesAvailable();
+    void supportDataCheckReportsUpToDate();
+    void supportDataCheckAllowsEmptyManifestUrl();
 
 private:
     SettingsTestFixture m_settings;
@@ -647,6 +738,95 @@ void SkyEphemerisUpdateWorkflowTests::spellPathSegmentFallsBackForSingleDot()
     QCOMPARE(
         SkyEphemerisPathSegmentPolicy::spellPathSegment(QStringLiteral("..."), QStringLiteral("update")),
         QStringLiteral("update")
+    );
+}
+
+void SkyEphemerisUpdateWorkflowTests::supportDataCheckReportsUpdatesAvailable()
+{
+    const QString kernelPath = m_settings.filePath(QStringLiteral("support-info-kernel.bsp"));
+    QVERIFY(writeFile(kernelPath, QByteArrayLiteral("kernel")));
+
+    SkySettingsStore store;
+    QVERIFY(store.saveEphemerisDataCache(EphemerisDataCacheSnapshotFixture::installedSnapshot(kernelPath, QString())));
+
+    const QString manifestPath = m_settings.filePath(QStringLiteral("support-info-updates.json"));
+    QVERIFY(writeFile(
+        manifestPath,
+        supportDataManifestJson(QStringLiteral("LS-test-2"), QStringLiteral("EOP-test-2"), QStringLiteral("DT-test-2"))
+            .toUtf8()
+    ));
+
+    SkyEphemerisDataManager manager(&store);
+    QVERIFY(manager.usingInstalledData());
+
+    skygate::ephemeris::EphemerisDataManifest fallbackManifest = twoAssetUpdateManifest();
+    SkyEphemerisUpdateWorkflow workflow(
+        &manager,
+        &fallbackManifest,
+        m_settings.path(),
+        m_settings.path() + QStringLiteral("/support-info-cache"),
+        nullptr
+    );
+
+    QVERIFY(workflow.checkSupportDataUpdates(QUrl::fromLocalFile(manifestPath).toString()));
+    QCOMPARE(workflow.isUpdateInProgress(), false);
+    QCOMPARE(workflow.statusText(), QString("Ephemeris data: Updates available for time and Earth data"));
+    QVERIFY(workflow.earthOrientationStatusText().contains(QStringLiteral("(available: ")));
+}
+
+void SkyEphemerisUpdateWorkflowTests::supportDataCheckReportsUpToDate()
+{
+    const QString kernelPath = m_settings.filePath(QStringLiteral("support-info-kernel.bsp"));
+    QVERIFY(writeFile(kernelPath, QByteArrayLiteral("kernel")));
+
+    SkySettingsStore store;
+    QVERIFY(store.saveEphemerisDataCache(EphemerisDataCacheSnapshotFixture::installedSnapshot(kernelPath, QString())));
+
+    const QString manifestPath = m_settings.filePath(QStringLiteral("support-info-current.json"));
+    QVERIFY(writeFile(
+        manifestPath,
+        supportDataManifestJson(QStringLiteral("LS-test"), QStringLiteral("EOP-test"), QStringLiteral("DT-test"))
+            .toUtf8()
+    ));
+
+    SkyEphemerisDataManager manager(&store);
+    QVERIFY(manager.usingInstalledData());
+
+    skygate::ephemeris::EphemerisDataManifest fallbackManifest = twoAssetUpdateManifest();
+    SkyEphemerisUpdateWorkflow workflow(
+        &manager,
+        &fallbackManifest,
+        m_settings.path(),
+        m_settings.path() + QStringLiteral("/support-info-cache"),
+        nullptr
+    );
+
+    QVERIFY(workflow.checkSupportDataUpdates(QUrl::fromLocalFile(manifestPath).toString()));
+    QCOMPARE(workflow.isUpdateInProgress(), false);
+    QCOMPARE(workflow.statusText(), QString("Ephemeris data: Time and Earth data is up to date"));
+    QVERIFY(!workflow.earthOrientationStatusText().contains(QStringLiteral("(available: ")));
+}
+
+void SkyEphemerisUpdateWorkflowTests::supportDataCheckAllowsEmptyManifestUrl()
+{
+    SkySettingsStore store;
+    SkyEphemerisDataManager manager(&store);
+
+    skygate::ephemeris::EphemerisDataManifest fallbackManifest = twoAssetUpdateManifest();
+    SkyEphemerisUpdateWorkflow workflow(
+        &manager,
+        &fallbackManifest,
+        m_settings.path(),
+        m_settings.path() + QStringLiteral("/support-empty-cache"),
+        nullptr
+    );
+
+    QVERIFY(workflow.checkSupportDataUpdates(QString()));
+    QCOMPARE(workflow.isUpdateInProgress(), false);
+    const QString statusText = workflow.statusText();
+    QVERIFY(
+        statusText == QStringLiteral("Ephemeris data: Updates available for time and Earth data")
+        || statusText == QStringLiteral("Ephemeris data: Time and Earth data is up to date")
     );
 }
 

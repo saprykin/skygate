@@ -1,5 +1,6 @@
 #include "StaticCalcephKernelProvider.hpp"
 #include "TestCalcephKernel.hpp"
+#include "ephemeris/SkyEphemerisSettingsPolicy.hpp"
 #include "settings/SkySettingsStore.hpp"
 #include "support/SkyContextControllerTestSupport.hpp"
 #include "time/CalendarTime.hpp"
@@ -975,6 +976,8 @@ void SkyContextControllerEphemerisSettingsTests::savedSnapshotMirrorsAppliedEngi
     expectedSettings.atmosphericTemperatureC = -6.0;
     expectedSettings.relativeHumidity = 0.42;
     expectedSettings.observingWavelengthMicrometers = 0.68;
+    expectedSettings.updateManifestUrl =
+        skygate::ui::internal::SkyEphemerisSettingsPolicy::kDefaultUpdateManifestUrl.toString();
     verifyEphemerisUserSettings(savedSnapshot->ephemeris, expectedSettings);
 }
 

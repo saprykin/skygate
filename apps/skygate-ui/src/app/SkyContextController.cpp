@@ -194,8 +194,10 @@ SkyContextController::SkyContextController(
         &SkyContextController::applyCurrentLocation
     );
 #endif
-    m_ephemerisUserSettings = SkyEphemerisSettingsPolicy::userSettingsFromEngine(
-        m_ephemerisUserSettings, m_ephemerisSession->engineKind(), m_ephemerisSession->engineOptions()
+    m_ephemerisUserSettings = SkyEphemerisSettingsPolicy::normalizedUpdateManifestUrl(
+        SkyEphemerisSettingsPolicy::userSettingsFromEngine(
+            m_ephemerisUserSettings, m_ephemerisSession->engineKind(), m_ephemerisSession->engineOptions()
+        )
     );
     if (m_ephemerisDataManager != nullptr) {
         m_ephemerisDataManager->setBundledFallbackData(
@@ -1053,7 +1055,7 @@ void SkyContextController::applyEphemerisUserSettings(const SkyEphemerisUserSett
     const skygate::ephemeris::EphemerisEngineOptions nextOptions =
         SkyEphemerisSettingsPolicy::engineOptionsFromSettings(m_ephemerisSession->engineOptions(), settings);
 
-    m_ephemerisUserSettings = settings;
+    m_ephemerisUserSettings = SkyEphemerisSettingsPolicy::normalizedUpdateManifestUrl(settings);
     if (!m_ephemerisSession->applyOptions(settings.engineKind, nextOptions)) {
         return;
     }

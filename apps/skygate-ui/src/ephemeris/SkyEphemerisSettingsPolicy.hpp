@@ -6,6 +6,7 @@
 #include "settings/SkyEphemerisUserSettingsSnapshot.hpp"
 
 #include <QString>
+#include <QStringView>
 
 #include <optional>
 
@@ -17,6 +18,9 @@ namespace skygate::ui::internal {
 class SkyEphemerisSettingsPolicy final {
 public:
     static constexpr int kCorrectionPresetCount = 4;
+    static constexpr QStringView kDefaultUpdateManifestUrl =
+        u"https://raw.githubusercontent.com/saprykin/skygate/"
+        u"high-precision-ephemeris/apps/skygate-ui/resources/ephemeris/manifest.json";
 
     SkyEphemerisSettingsPolicy() = delete;
 
@@ -40,6 +44,8 @@ public:
         skygate::ephemeris::EphemerisEngineKind::Type engineKind,
         const skygate::ephemeris::EphemerisEngineOptions& engineOptions
     );
+    [[nodiscard]] static SkyEphemerisUserSettingsSnapshot
+    normalizedUpdateManifestUrl(SkyEphemerisUserSettingsSnapshot settings);
     [[nodiscard]] static skygate::ephemeris::EphemerisEngineOptions engineOptionsFromSettings(
         const skygate::ephemeris::EphemerisEngineOptions& baseOptions, const SkyEphemerisUserSettingsSnapshot& settings
     );
