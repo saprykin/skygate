@@ -5,6 +5,19 @@
 
 #include <optional>
 
+namespace {
+
+constexpr double kMinimumPressureHpa = 0.0;
+constexpr double kMaximumPressureHpa = 2000.0;
+constexpr double kMinimumTemperatureC = -100.0;
+constexpr double kMaximumTemperatureC = 80.0;
+constexpr double kMinimumRelativeHumidityPercent = 0.0;
+constexpr double kMaximumRelativeHumidityPercent = 100.0;
+constexpr double kMinimumWavelengthMicrometers = 0.1;
+constexpr double kMaximumWavelengthMicrometers = 100.0;
+
+}  // namespace
+
 skygate::ephemeris::EphemerisCorrectionFlags
 SkyEphemerisSettingsPolicy::correctionFlagsForPreset(const int presetIndex) noexcept
 {
@@ -67,17 +80,18 @@ skygate::ephemeris::EphemerisCorrectionFlags SkyEphemerisSettingsPolicy::withRef
 
 std::optional<double> SkyEphemerisSettingsPolicy::atmosphericPressureHpaFromText(const QString& text)
 {
-    return boundedDouble(text, 0.0, 2000.0);
+    return boundedDouble(text, kMinimumPressureHpa, kMaximumPressureHpa);
 }
 
 std::optional<double> SkyEphemerisSettingsPolicy::atmosphericTemperatureCFromText(const QString& text)
 {
-    return boundedDouble(text, -100.0, 80.0);
+    return boundedDouble(text, kMinimumTemperatureC, kMaximumTemperatureC);
 }
 
 std::optional<double> SkyEphemerisSettingsPolicy::relativeHumidityFromText(const QString& text)
 {
-    const std::optional<double> humidityPercent = boundedDouble(text, 0.0, 100.0);
+    const std::optional<double> humidityPercent =
+        boundedDouble(text, kMinimumRelativeHumidityPercent, kMaximumRelativeHumidityPercent);
     if (!humidityPercent.has_value()) {
         return std::nullopt;
     }
@@ -86,7 +100,7 @@ std::optional<double> SkyEphemerisSettingsPolicy::relativeHumidityFromText(const
 
 std::optional<double> SkyEphemerisSettingsPolicy::observingWavelengthMicrometersFromText(const QString& text)
 {
-    return boundedDouble(text, 0.1, 100.0);
+    return boundedDouble(text, kMinimumWavelengthMicrometers, kMaximumWavelengthMicrometers);
 }
 
 SkyEphemerisUserSettingsSnapshot SkyEphemerisSettingsPolicy::settingsForEngineSwitch(
