@@ -1,6 +1,7 @@
 #include "CatalogParsingUtilities.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "NumericParsingUtilities.hpp"
+#include "catalog/normalize/CatalogSnapshotValidator.hpp"
 #include "math/MathConstants.hpp"
 
 #include <QByteArray>
@@ -80,8 +81,8 @@ std::optional<double> CatalogParsingUtilities::parseFiniteDouble(const QString& 
 
 std::optional<double> CatalogParsingUtilities::parsePositiveDouble(const QStringView text)
 {
-    const auto value = parseFiniteDouble(text);
-    if (!value.has_value() || *value <= 0.0) {
+    const std::optional<double> value = parseFiniteDouble(text);
+    if (!value.has_value() || !CatalogSnapshotValidator::isKnownPositiveOptionalValue(value)) {
         return std::nullopt;
     }
     return value;
@@ -94,8 +95,8 @@ std::optional<double> CatalogParsingUtilities::parsePositiveDouble(const QString
 
 std::optional<double> CatalogParsingUtilities::parseNonNegativeDouble(const QStringView text)
 {
-    const auto value = parseFiniteDouble(text);
-    if (!value.has_value() || *value < 0.0) {
+    const std::optional<double> value = parseFiniteDouble(text);
+    if (!value.has_value() || !CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(value)) {
         return std::nullopt;
     }
     return value;

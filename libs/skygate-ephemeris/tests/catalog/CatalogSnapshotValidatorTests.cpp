@@ -107,6 +107,7 @@ private slots:
     void validatorRejectsOutOfRangeAndUnknownOrderEntries();
     void validatorRejectsEmptyCanonicalIds();
     void validatorRejectsInvalidNumericDomains();
+    void validatorScreensOptionalNumericDomains();
     void validatorRejectsMixedFixedPositionAndAstrometry();
     void validatorAllowsAbsentOptionalMetadata();
     void cacheDecodingRejectsInvalidNumericAndIdentity();
@@ -260,6 +261,38 @@ void CatalogSnapshotValidatorTests::validatorRejectsInvalidNumericDomains()
     negativeExtent.deepSkyObject->majorAxisArcmin = -5.0;
     const CatalogSnapshotValidator::Report extentReport = validateVectors({}, {std::move(negativeExtent)});
     QVERIFY(!extentReport.ok);
+
+    DistantCelestialBody negativePositionAngle = makeDeepSkyObject("ngc_negative_angle");
+    negativePositionAngle.deepSkyObject->positionAngleDeg = -1.0;
+    const CatalogSnapshotValidator::Report positionAngleReport =
+        validateVectors({}, {std::move(negativePositionAngle)});
+    QVERIFY(!positionAngleReport.ok);
+}
+
+void CatalogSnapshotValidatorTests::validatorScreensOptionalNumericDomains()
+{
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+
+    QVERIFY(CatalogSnapshotValidator::isKnownOptionalValue(std::nullopt));
+    QVERIFY(CatalogSnapshotValidator::isKnownPositiveOptionalValue(std::nullopt));
+    QVERIFY(CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(std::nullopt));
+
+    QVERIFY(CatalogSnapshotValidator::isKnownOptionalValue(-3.0));
+    QVERIFY(CatalogSnapshotValidator::isKnownOptionalValue(0.0));
+    QVERIFY(!CatalogSnapshotValidator::isKnownOptionalValue(nan));
+    QVERIFY(!CatalogSnapshotValidator::isKnownOptionalValue(infinity));
+    QVERIFY(!CatalogSnapshotValidator::isKnownOptionalValue(-infinity));
+
+    QVERIFY(CatalogSnapshotValidator::isKnownPositiveOptionalValue(0.5));
+    QVERIFY(!CatalogSnapshotValidator::isKnownPositiveOptionalValue(0.0));
+    QVERIFY(!CatalogSnapshotValidator::isKnownPositiveOptionalValue(-1.0));
+    QVERIFY(!CatalogSnapshotValidator::isKnownPositiveOptionalValue(nan));
+
+    QVERIFY(CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(0.0));
+    QVERIFY(CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(2.0));
+    QVERIFY(!CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(-0.5));
+    QVERIFY(!CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(infinity));
 }
 
 void CatalogSnapshotValidatorTests::validatorRejectsMixedFixedPositionAndAstrometry()

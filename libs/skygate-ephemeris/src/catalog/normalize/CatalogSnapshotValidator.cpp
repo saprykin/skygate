@@ -28,27 +28,24 @@ namespace {
     return epoch.isFinite() && skygate::core::TimeScaleCodec::isKnown(epoch.timeScale);
 }
 
-[[nodiscard]] bool isValidOptionalFiniteDouble(const std::optional<double> value) noexcept
+[[nodiscard]] bool isKnownFiniteValue(const std::optional<double> value) noexcept
 {
-    return !value.has_value() || std::isfinite(*value);
+    return value.has_value() && std::isfinite(*value);
 }
 
-[[nodiscard]] bool isValidOptionalPositiveDouble(const std::optional<double> value) noexcept
+// Drops blank entries and trims the rest, keeping the source order of the
+// values that survive.
+[[nodiscard]] std::vector<std::string> trimNonEmpty(const std::vector<std::string>& values)
 {
-    return !value.has_value() || (std::isfinite(*value) && *value > 0.0);
-}
-
-void normalizeAliases(std::vector<std::string>& aliases)
-{
-    std::vector<std::string> normalized;
-    normalized.reserve(aliases.size());
-    for (const std::string& alias : aliases) {
-        const std::string_view trimmed = StringUtilities::trimAsciiWhitespace(alias);
-        if (!trimmed.empty()) {
-            normalized.emplace_back(trimmed);
+    std::vector<std::string> trimmed;
+    trimmed.reserve(values.size());
+    for (const std::string& value : values) {
+        const std::string_view text = StringUtilities::trimAsciiWhitespace(value);
+        if (!text.empty()) {
+            trimmed.emplace_back(text);
         }
     }
-    aliases = std::move(normalized);
+    return trimmed;
 }
 
 void normalizeIdentity(CatalogObjectIdentity& identity)
@@ -62,17 +59,8 @@ void normalizeIdentity(CatalogObjectIdentity& identity)
         }
     }
     identity.externalIdentifiers = std::move(identifiers);
-    normalizeAliases(identity.aliases);
-
-    std::vector<std::string> retainedCanonicalIds;
-    retainedCanonicalIds.reserve(identity.retainedCanonicalIds.size());
-    for (const std::string& retainedId : identity.retainedCanonicalIds) {
-        const std::string_view trimmed = StringUtilities::trimAsciiWhitespace(retainedId);
-        if (!trimmed.empty()) {
-            retainedCanonicalIds.emplace_back(trimmed);
-        }
-    }
-    identity.retainedCanonicalIds = std::move(retainedCanonicalIds);
+    identity.aliases = trimNonEmpty(identity.aliases);
+    identity.retainedCanonicalIds = trimNonEmpty(identity.retainedCanonicalIds);
 }
 
 void normalizeOwnGalaxyBody(OwnGalaxyCelestialBody& body)
@@ -141,13 +129,13 @@ void normalizeDistantBody(DistantCelestialBody& body)
                           + "' mixes a fixed position with an unrelated astrometry reference position.";
             return false;
         }
-        if (!isValidOptionalFiniteDouble(astrometry->properMotionRightAscensionMasPerYear)
-            || !isValidOptionalFiniteDouble(astrometry->properMotionDeclinationMasPerYear)
-            || !isValidOptionalFiniteDouble(astrometry->radialVelocityKmPerSecond)) {
+        if (!CatalogSnapshotValidator::isKnownOptionalValue(astrometry->properMotionRightAscensionMasPerYear)
+            || !CatalogSnapshotValidator::isKnownOptionalValue(astrometry->properMotionDeclinationMasPerYear)
+            || !CatalogSnapshotValidator::isKnownOptionalValue(astrometry->radialVelocityKmPerSecond)) {
             errorDetail = "catalog body '" + body.id + "' has a non-finite astrometry value.";
             return false;
         }
-        if (!isValidOptionalPositiveDouble(astrometry->stellarParallaxMas)) {
+        if (!CatalogSnapshotValidator::isKnownPositiveOptionalValue(astrometry->stellarParallaxMas)) {
             errorDetail = "catalog body '" + body.id + "' has a non-positive stellar parallax.";
             return false;
         }
@@ -163,13 +151,13 @@ void normalizeDistantBody(DistantCelestialBody& body)
             errorDetail = "catalog body '" + body.id + "' has an unknown deep-sky object kind.";
             return false;
         }
-        if (!isValidOptionalPositiveDouble(info->majorAxisArcmin)
-            || !isValidOptionalPositiveDouble(info->minorAxisArcmin)) {
+        if (!CatalogSnapshotValidator::isKnownPositiveOptionalValue(info->majorAxisArcmin)
+            || !CatalogSnapshotValidator::isKnownPositiveOptionalValue(info->minorAxisArcmin)) {
             errorDetail = "catalog body '" + body.id + "' has a non-positive deep-sky object extent.";
             return false;
         }
-        if (!isValidOptionalFiniteDouble(info->positionAngleDeg)) {
-            errorDetail = "catalog body '" + body.id + "' has a non-finite deep-sky object position angle.";
+        if (!CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(info->positionAngleDeg)) {
+            errorDetail = "catalog body '" + body.id + "' has an invalid deep-sky object position angle.";
             return false;
         }
     }
@@ -252,6 +240,21 @@ bool CatalogSnapshotValidator::isOrderEntryValid(
         return bodyIndex < distantBodyCount;
     }
     return false;
+}
+
+bool CatalogSnapshotValidator::isKnownOptionalValue(const std::optional<double> value) noexcept
+{
+    return !value.has_value() || isKnownFiniteValue(value);
+}
+
+bool CatalogSnapshotValidator::isKnownPositiveOptionalValue(const std::optional<double> value) noexcept
+{
+    return !value.has_value() || (isKnownFiniteValue(value) && *value > 0.0);
+}
+
+bool CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(const std::optional<double> value) noexcept
+{
+    return !value.has_value() || (isKnownFiniteValue(value) && *value >= 0.0);
 }
 
 CatalogSnapshotValidator::Report CatalogSnapshotValidator::validate(std::vector<OwnGalaxyCelestialBody>& bodies)

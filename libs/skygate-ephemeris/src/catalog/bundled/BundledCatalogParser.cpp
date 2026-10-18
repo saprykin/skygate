@@ -2,6 +2,7 @@
 #include "StringUtilities.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CelestialBodyIds.hpp"
+#include "catalog/normalize/CatalogSnapshotValidator.hpp"
 
 #include <QObject>
 
@@ -1141,12 +1142,26 @@ constexpr std::array<BundledDeepSkyObjectEntry, 110> kBundledMessierEntries{{
      "M110|NGC 205"},
 }};
 
-std::optional<double> positiveOptional(const double value)
+// Zero is a sentinel in the bundled table: a zero extent means the size was
+// never measured, while a zero position angle means the major axis runs
+// north-south. Both screens use the snapshot validator's numeric domains so
+// the parser cannot admit a value the model would reject.
+[[nodiscard]] std::optional<double> extentFromTableValue(const double value) noexcept
 {
-    if (value <= 0.0) {
+    const std::optional<double> extent = value;
+    if (!CatalogSnapshotValidator::isKnownPositiveOptionalValue(extent)) {
         return std::nullopt;
     }
-    return value;
+    return extent;
+}
+
+[[nodiscard]] std::optional<double> positionAngleFromTableValue(const double value) noexcept
+{
+    const std::optional<double> positionAngle = value;
+    if (!CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(positionAngle)) {
+        return std::nullopt;
+    }
+    return positionAngle;
 }
 
 std::vector<CatalogIdentifier> bundledMessierExternalIdentifiers(const std::string_view aliases)
@@ -1206,9 +1221,9 @@ BundledCatalogParser::parse(const std::string_view data, const CatalogParseProgr
         body.deepSkyObject = DeepSkyObjectInfo{
             .kind = entry.kind,
             .aliases = std::move(aliases),
-            .majorAxisArcmin = positiveOptional(entry.majorAxisArcmin),
-            .minorAxisArcmin = positiveOptional(entry.minorAxisArcmin),
-            .positionAngleDeg = positiveOptional(entry.positionAngleDeg),
+            .majorAxisArcmin = extentFromTableValue(entry.majorAxisArcmin),
+            .minorAxisArcmin = extentFromTableValue(entry.minorAxisArcmin),
+            .positionAngleDeg = positionAngleFromTableValue(entry.positionAngleDeg),
         };
         result.orderedBodyIndexes.push_back(
             CelestialBodyCatalog::OrderEntry{
@@ -1219,8 +1234,9 @@ BundledCatalogParser::parse(const std::string_view data, const CatalogParseProgr
         result.distantBodies.push_back(std::move(body));
     }
 
-    result.diagnostics.processedRowCount = result.bodies.size();
-    result.diagnostics.parsedBodyCount = result.bodies.size();
+    const std::size_t bodyCount = result.bodies.size() + result.distantBodies.size();
+    result.diagnostics.processedRowCount = bodyCount;
+    result.diagnostics.parsedBodyCount = bodyCount;
     return result;
 }
 

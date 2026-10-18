@@ -5,6 +5,7 @@
 #include "DeepSkyObjectInfo.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -49,6 +50,13 @@ public:
         std::size_t ownGalaxyBodyCount,
         std::size_t distantBodyCount
     ) noexcept;
+
+    // Numeric-domain predicates for optional double metadata, shared with the
+    // catalog parsers so producers and this boundary agree on which values are
+    // real. An absent value is always known; a present one must be finite.
+    [[nodiscard]] static bool isKnownOptionalValue(std::optional<double> value) noexcept;
+    [[nodiscard]] static bool isKnownPositiveOptionalValue(std::optional<double> value) noexcept;
+    [[nodiscard]] static bool isKnownNonNegativeOptionalValue(std::optional<double> value) noexcept;
 
     // Normalizes bodies in place and validates the single-domain snapshot
     // inputs used by the vector factory.

@@ -1,17 +1,8 @@
 #include "CatalogStarAstrometry.hpp"
+#include "catalog/normalize/CatalogSnapshotValidator.hpp"
 #include "math/MathConstants.hpp"
 
-#include <cmath>
-
 namespace skygate::ephemeris {
-namespace {
-
-[[nodiscard]] bool hasFiniteValue(const std::optional<double>& value) noexcept
-{
-    return value.has_value() && std::isfinite(*value);
-}
-
-}  // namespace
 
 double CatalogStarAstrometry::parallaxMasFromDistanceParsecs(const double distanceParsecs) noexcept
 {
@@ -25,22 +16,25 @@ double CatalogStarAstrometry::distanceParsecsFromParallaxMas(const double parall
 
 bool CatalogStarAstrometry::hasUsableProperMotionRightAscension() const noexcept
 {
-    return hasFiniteValue(properMotionRightAscensionMasPerYear);
+    return properMotionRightAscensionMasPerYear.has_value()
+           && CatalogSnapshotValidator::isKnownOptionalValue(properMotionRightAscensionMasPerYear);
 }
 
 bool CatalogStarAstrometry::hasUsableProperMotionDeclination() const noexcept
 {
-    return hasFiniteValue(properMotionDeclinationMasPerYear);
+    return properMotionDeclinationMasPerYear.has_value()
+           && CatalogSnapshotValidator::isKnownOptionalValue(properMotionDeclinationMasPerYear);
 }
 
 bool CatalogStarAstrometry::hasUsableParallax() const noexcept
 {
-    return hasFiniteValue(stellarParallaxMas) && *stellarParallaxMas > 0.0;
+    return stellarParallaxMas.has_value() && CatalogSnapshotValidator::isKnownPositiveOptionalValue(stellarParallaxMas);
 }
 
 bool CatalogStarAstrometry::hasUsableRadialVelocity() const noexcept
 {
-    return hasFiniteValue(radialVelocityKmPerSecond);
+    return radialVelocityKmPerSecond.has_value()
+           && CatalogSnapshotValidator::isKnownOptionalValue(radialVelocityKmPerSecond);
 }
 
 }  // namespace skygate::ephemeris

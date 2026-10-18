@@ -505,6 +505,10 @@ add_skygate_ephemeris_qtest(
     catalog/opengc/OpenNgcParserEdgeTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-bundled-catalog-parser-tests
+    catalog/bundled/BundledCatalogParserTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-hyg-catalog-tests
     catalog/hyg/HygCatalogParserTests.cpp
 )
