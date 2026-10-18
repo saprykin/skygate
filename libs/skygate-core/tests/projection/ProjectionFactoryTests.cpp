@@ -1,50 +1,41 @@
-#include "ProjectionFactory.hpp"
+#include "ProjectionType.hpp"
+#include "projections/ProjectionTypeCodec.hpp"
 
 #include <QtTest/QtTest>
+
+#include <cstddef>
+#include <vector>
 
 class ProjectionFactoryTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void supportedProjectionsAreCreated();
-    void azimuthalProjectionIsCreated();
-    void createdProjectionReportsItsType();
+    void everyConcreteTypeIsKnown();
+    void everyCodecValueIsKnown();
+    void valuesOutsideTheEnumAreRejected();
 };
 
-void ProjectionFactoryTests::supportedProjectionsAreCreated()
+void ProjectionFactoryTests::everyConcreteTypeIsKnown()
 {
-    const auto stereographicProjection = skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
-    QVERIFY(stereographicProjection != nullptr);
-
-    const auto perspectiveProjection = skygate::core::createProjection(skygate::core::ProjectionType::Perspective);
-    QVERIFY(perspectiveProjection != nullptr);
-
-    const auto azimuthalProjection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
-    QVERIFY(azimuthalProjection != nullptr);
+    QVERIFY(skygate::core::ProjectionTypeCodec::isKnown(skygate::core::ProjectionType::Stereographic));
+    QVERIFY(skygate::core::ProjectionTypeCodec::isKnown(skygate::core::ProjectionType::AzimuthalEquidistant));
+    QVERIFY(skygate::core::ProjectionTypeCodec::isKnown(skygate::core::ProjectionType::Perspective));
 }
 
-void ProjectionFactoryTests::azimuthalProjectionIsCreated()
+void ProjectionFactoryTests::everyCodecValueIsKnown()
 {
-    const auto azimuthalProjection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
-    QVERIFY(azimuthalProjection != nullptr);
+    const std::vector<skygate::core::ProjectionType> values = skygate::core::ProjectionTypeCodec::orderedValues();
+    QCOMPARE(values.size(), std::size_t{3});
+    for (const skygate::core::ProjectionType value : values) {
+        QVERIFY(skygate::core::ProjectionTypeCodec::isKnown(value));
+    }
 }
 
-void ProjectionFactoryTests::createdProjectionReportsItsType()
+void ProjectionFactoryTests::valuesOutsideTheEnumAreRejected()
 {
-    const auto stereographicProjection = skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
-    QVERIFY(stereographicProjection != nullptr);
-    QCOMPARE(stereographicProjection->type(), skygate::core::ProjectionType::Stereographic);
-
-    const auto perspectiveProjection = skygate::core::createProjection(skygate::core::ProjectionType::Perspective);
-    QVERIFY(perspectiveProjection != nullptr);
-    QCOMPARE(perspectiveProjection->type(), skygate::core::ProjectionType::Perspective);
-
-    const auto azimuthalProjection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
-    QVERIFY(azimuthalProjection != nullptr);
-    QCOMPARE(azimuthalProjection->type(), skygate::core::ProjectionType::AzimuthalEquidistant);
+    QVERIFY(!skygate::core::ProjectionTypeCodec::isKnown(static_cast<skygate::core::ProjectionType>(3)));
+    QVERIFY(!skygate::core::ProjectionTypeCodec::isKnown(static_cast<skygate::core::ProjectionType>(200)));
+    QVERIFY(!skygate::core::ProjectionTypeCodec::isKnown(static_cast<skygate::core::ProjectionType>(255)));
 }
 
 QTEST_APPLESS_MAIN(ProjectionFactoryTests)

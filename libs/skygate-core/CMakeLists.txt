@@ -1,8 +1,6 @@
 add_library(skygate-core STATIC
-    src/IProjection.hpp
     src/PreparedProjection.hpp
     src/ITimeSource.hpp
-    src/ProjectionFactory.hpp
     src/EquatorialCoordinate.hpp
     src/GeoLocation.hpp
     src/HorizontalCoordinate.hpp
@@ -42,10 +40,7 @@ add_library(skygate-core STATIC
     src/math/Vector3d.hpp
     src/math/ViewportMath.hpp
     src/math/Wgs84Geodesy.hpp
-    src/projections/AzimuthalEquidistantProjection.hpp
-    src/projections/PerspectiveProjection.hpp
     src/projections/ProjectionTypeCodec.hpp
-    src/projections/StereographicProjection.hpp
     src/EquatorialCoordinate.cpp
     src/GeoLocation.cpp
     src/HorizontalCoordinate.cpp
@@ -71,15 +66,11 @@ add_library(skygate-core STATIC
     src/math/Vector3d.cpp
     src/math/ViewportMath.cpp
     src/math/Wgs84Geodesy.cpp
-    src/ProjectionFactory.cpp
     src/projections/ProjectionAlgorithms.cpp
     src/projections/ProjectionAlgorithms.hpp
     src/projections/ProjectionFrame.hpp
-    src/projections/AzimuthalEquidistantProjection.cpp
-    src/projections/PerspectiveProjection.cpp
     src/projections/ProjectionPipeline.cpp
     src/projections/ProjectionTypeCodec.cpp
-    src/projections/StereographicProjection.cpp
 )
 
 target_include_directories(skygate-core

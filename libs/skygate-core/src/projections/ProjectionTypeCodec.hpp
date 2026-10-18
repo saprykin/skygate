@@ -13,6 +13,10 @@ namespace skygate::core {
 // and the accepted spellings live in one place.
 class ProjectionTypeCodec final {
 public:
+    // True when the value names a projection this build can rasterize, so
+    // persisted and UI supplied values are checked before they reach the
+    // projection pipeline.
+    [[nodiscard]] static bool isKnown(ProjectionType projectionType) noexcept;
     [[nodiscard]] static std::vector<ProjectionType> orderedValues();
     [[nodiscard]] static std::string_view text(ProjectionType projectionType) noexcept;
     [[nodiscard]] static std::optional<ProjectionType> fromText(std::string_view text) noexcept;

@@ -1,5 +1,5 @@
 #include "PreparedProjection.hpp"
-#include "ProjectionFactory.hpp"
+#include "projections/ProjectionAlgorithms.hpp"
 
 #include <QtTest/QtTest>
 
@@ -50,14 +50,11 @@ void PreparedProjectionTests::matchesDirectProjectionForAllProjectionTypes()
     };
 
     for (const auto projectionType : projectionTypes) {
-        const auto projection = skygate::core::createProjection(projectionType);
-        QVERIFY(projection != nullptr);
-
         const auto preparedProjection = skygate::core::PreparedProjection::create(projectionType, params);
         QVERIFY(preparedProjection.has_value());
 
         for (const auto& coordinate : sampleCoordinates) {
-            const auto directPoint = projection->project(coordinate, params);
+            const auto directPoint = skygate::core::ProjectionAlgorithms::project(projectionType, coordinate, params);
             const auto preparedPoint = preparedProjection->project(coordinate);
 
             QCOMPARE(preparedPoint.status, directPoint.status);
@@ -133,9 +130,6 @@ void PreparedProjectionTests::reportsTypeAndStoredParams()
 
 void PreparedProjectionTests::matchesDirectInvalidCoordinateStatus()
 {
-    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
-    QVERIFY(projection != nullptr);
-
     const skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
         .fovDeg = 100.0,
@@ -148,7 +142,9 @@ void PreparedProjectionTests::matchesDirectInvalidCoordinateStatus()
     QVERIFY(preparedProjection.has_value());
 
     const skygate::core::HorizontalCoordinate invalidCoordinate{.altitudeDeg = -95.0, .azimuthDeg = 180.0};
-    const auto directPoint = projection->project(invalidCoordinate, params);
+    const auto directPoint = skygate::core::ProjectionAlgorithms::project(
+        skygate::core::ProjectionType::AzimuthalEquidistant, invalidCoordinate, params
+    );
     const auto preparedPoint = preparedProjection->project(invalidCoordinate);
 
     QCOMPARE(preparedPoint.status, directPoint.status);

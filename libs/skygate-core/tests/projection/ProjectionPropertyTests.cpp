@@ -1,5 +1,5 @@
 #include "PreparedProjection.hpp"
-#include "ProjectionFactory.hpp"
+#include "projections/ProjectionAlgorithms.hpp"
 #include "skygate/testsupport/DeterministicFuzz.hpp"
 
 #include <QtTest/QtTest>
@@ -77,9 +77,6 @@ void ProjectionPropertyTests::preparedProjectionsMatchDirectProjection()
     skygate::testsupport::DeterministicRng rng(0x9a700001U);
 
     for (const auto projectionType : kProjectionTypes) {
-        const auto projection = skygate::core::createProjection(projectionType);
-        QVERIFY(projection != nullptr);
-
         for (int sample = 0; sample < 180; ++sample) {
             const auto params = generatedParams(rng);
             const auto preparedProjection = skygate::core::PreparedProjection::create(projectionType, params);
@@ -88,7 +85,8 @@ void ProjectionPropertyTests::preparedProjectionsMatchDirectProjection()
             for (int coordinateIndex = 0; coordinateIndex < 6; ++coordinateIndex) {
                 const auto coordinate = generatedCoordinateNear(rng, params.center, params.fovDeg);
                 verifyEquivalentPoints(
-                    preparedProjection->project(coordinate), projection->project(coordinate, params)
+                    preparedProjection->project(coordinate),
+                    skygate::core::ProjectionAlgorithms::project(projectionType, coordinate, params)
                 );
             }
         }
@@ -100,13 +98,10 @@ void ProjectionPropertyTests::generatedVisiblePointsAreFiniteAndWithinViewport()
     skygate::testsupport::DeterministicRng rng(0x9a700002U);
 
     for (const auto projectionType : kProjectionTypes) {
-        const auto projection = skygate::core::createProjection(projectionType);
-        QVERIFY(projection != nullptr);
-
         for (int sample = 0; sample < 240; ++sample) {
             const auto params = generatedParams(rng);
             const auto coordinate = generatedCoordinateNear(rng, params.center, params.fovDeg * 0.45);
-            const auto point = projection->project(coordinate, params);
+            const auto point = skygate::core::ProjectionAlgorithms::project(projectionType, coordinate, params);
 
             if (point.status == skygate::core::ProjectionStatus::Visible) {
                 QVERIFY(point.isVisible());
@@ -127,9 +122,6 @@ void ProjectionPropertyTests::addingFullAzimuthTurnsDoesNotChangeProjection()
     skygate::testsupport::DeterministicRng rng(0x9a700003U);
 
     for (const auto projectionType : kProjectionTypes) {
-        const auto projection = skygate::core::createProjection(projectionType);
-        QVERIFY(projection != nullptr);
-
         for (int sample = 0; sample < 180; ++sample) {
             auto params = generatedParams(rng);
             auto shiftedParams = params;
@@ -140,7 +132,8 @@ void ProjectionPropertyTests::addingFullAzimuthTurnsDoesNotChangeProjection()
             shiftedCoordinate.azimuthDeg += 360.0 * static_cast<double>(rng.intInRange(-4, 4));
 
             verifyEquivalentPoints(
-                projection->project(shiftedCoordinate, shiftedParams), projection->project(coordinate, params)
+                skygate::core::ProjectionAlgorithms::project(projectionType, shiftedCoordinate, shiftedParams),
+                skygate::core::ProjectionAlgorithms::project(projectionType, coordinate, params)
             );
         }
     }
@@ -151,16 +144,13 @@ void ProjectionPropertyTests::invalidGeneratedCoordinatesNeverBecomeVisible()
     skygate::testsupport::DeterministicRng rng(0x9a700004U);
 
     for (const auto projectionType : kProjectionTypes) {
-        const auto projection = skygate::core::createProjection(projectionType);
-        QVERIFY(projection != nullptr);
-
         for (int sample = 0; sample < 96; ++sample) {
             const auto params = generatedParams(rng);
             const skygate::core::HorizontalCoordinate invalidCoordinate{
                 .altitudeDeg = rng.chance(1U, 2U) ? rng.realInRange(90.01, 720.0) : rng.realInRange(-720.0, -90.01),
                 .azimuthDeg = rng.realInRange(-720.0, 720.0),
             };
-            const auto point = projection->project(invalidCoordinate, params);
+            const auto point = skygate::core::ProjectionAlgorithms::project(projectionType, invalidCoordinate, params);
 
             QCOMPARE(point.status, skygate::core::ProjectionStatus::InvalidCoordinate);
             QVERIFY(!point.isVisible());
