@@ -103,6 +103,7 @@ private slots:
     void isolatesCachedSnapshotsByMicrosecondUtc();
     void isolatesCachedSnapshotsByDateRangeContents();
     void isolatesCachedSnapshotsByCatalogContents();
+    void doesNotReuseCachedSnapshotsForSignedZero();
     void findSnapshotBodyStateWithoutFullCopy();
 };
 
@@ -457,6 +458,61 @@ void HighPrecisionEngineCacheTests::isolatesCachedSnapshotsByCatalogContents()
         computationCache.findSnapshot(request, &newCatalog, dataSet);
 
     QVERIFY(!cachedSnapshot.has_value());
+}
+
+void HighPrecisionEngineCacheTests::doesNotReuseCachedSnapshotsForSignedZero()
+{
+    EphemerisComputationCache computationCache;
+    const std::vector<OwnGalaxyCelestialBody> bodies{HighPrecisionEngineFixture::sunBody()};
+    const CelestialBodyCatalog catalog(bodies);
+    const EphemerisDatasetInfo dataSet;
+
+    EphemerisRequest positiveZeroRequest = HighPrecisionEngineFixture::request();
+    positiveZeroRequest.epoch.julianDatePart2 = 0.0;
+    positiveZeroRequest.context.observer.elevationMeters = 0.0;
+    positiveZeroRequest.options.setAtmosphericTemperatureC(0.0);
+
+    EphemerisRequest negativeZeroRequest = positiveZeroRequest;
+    negativeZeroRequest.epoch.julianDatePart2 = -0.0;
+    negativeZeroRequest.context.observer.elevationMeters = -0.0;
+    negativeZeroRequest.options.setAtmosphericTemperatureC(-0.0);
+
+    EphemerisSnapshot positiveZeroSnapshot;
+    positiveZeroSnapshot.states.push_back(
+        CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        }
+    );
+    EphemerisSnapshot negativeZeroSnapshot;
+    negativeZeroSnapshot.states.push_back(
+        CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 3.0, .declinationDeg = 4.0},
+        }
+    );
+
+    computationCache.storeSnapshot(positiveZeroRequest, &catalog, dataSet, positiveZeroSnapshot);
+
+    const std::optional<EphemerisSnapshot> cachedPositiveZero =
+        computationCache.findSnapshot(positiveZeroRequest, &catalog, dataSet);
+
+    QVERIFY(cachedPositiveZero.has_value());
+    QCOMPARE(cachedPositiveZero->states[0].equatorial.rightAscensionHours, 1.0);
+    QVERIFY(!computationCache.findSnapshot(negativeZeroRequest, &catalog, dataSet).has_value());
+    QVERIFY(!computationCache.findSnapshotBodyState(negativeZeroRequest, &catalog, dataSet, 0U).has_value());
+
+    computationCache.storeSnapshot(negativeZeroRequest, &catalog, dataSet, negativeZeroSnapshot);
+
+    const std::optional<EphemerisSnapshot> cachedPositiveZeroAgain =
+        computationCache.findSnapshot(positiveZeroRequest, &catalog, dataSet);
+    const std::optional<EphemerisSnapshot> cachedNegativeZero =
+        computationCache.findSnapshot(negativeZeroRequest, &catalog, dataSet);
+
+    QVERIFY(cachedPositiveZeroAgain.has_value());
+    QVERIFY(cachedNegativeZero.has_value());
+    QCOMPARE(cachedPositiveZeroAgain->states[0].equatorial.rightAscensionHours, 1.0);
+    QCOMPARE(cachedNegativeZero->states[0].equatorial.rightAscensionHours, 3.0);
 }
 
 void HighPrecisionEngineCacheTests::findSnapshotBodyStateWithoutFullCopy()

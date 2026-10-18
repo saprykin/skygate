@@ -14,6 +14,7 @@ private slots:
     void outOfRangeLongitudeIsInvalid();
     void nonFiniteValuesAreInvalid();
     void equalsComparesEveryField();
+    void isIdenticalToDistinguishesSignedZero();
 };
 
 void GeoLocationTests::originIsValid()
@@ -94,6 +95,27 @@ void GeoLocationTests::equalsComparesEveryField()
     other = location;
     other.elevationMeters += 1.0;
     QVERIFY(!location.equals(other));
+}
+
+void GeoLocationTests::isIdenticalToDistinguishesSignedZero()
+{
+    const skygate::core::GeoLocation positiveZeroLocation{
+        .latitudeDeg = 47.3769,
+        .longitudeDeg = 0.0,
+        .elevationMeters = 408.0,
+    };
+    const skygate::core::GeoLocation negativeZeroLocation{
+        .latitudeDeg = 47.3769,
+        .longitudeDeg = -0.0,
+        .elevationMeters = 408.0,
+    };
+
+    QVERIFY(positiveZeroLocation.equals(negativeZeroLocation));
+    QVERIFY(!positiveZeroLocation.isIdenticalTo(negativeZeroLocation));
+    QVERIFY(!negativeZeroLocation.isIdenticalTo(positiveZeroLocation));
+    QVERIFY(
+        positiveZeroLocation.isIdenticalTo({.latitudeDeg = 47.3769, .longitudeDeg = 0.0, .elevationMeters = 408.0})
+    );
 }
 
 QTEST_APPLESS_MAIN(GeoLocationTests)

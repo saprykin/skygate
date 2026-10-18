@@ -1,7 +1,9 @@
 #include "AstronomicalEpoch.hpp"
 #include "math/TimeConstants.hpp"
 
+#include <bit>
 #include <cmath>
+#include <cstdint>
 
 namespace skygate::core {
 
@@ -41,6 +43,13 @@ double AstronomicalEpoch::sortKey() const noexcept
 {
     const AstronomicalEpoch normalizedEpoch = normalized();
     return normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
+}
+
+bool AstronomicalEpoch::isIdenticalTo(const AstronomicalEpoch& other) const noexcept
+{
+    return std::bit_cast<std::uint64_t>(julianDatePart1) == std::bit_cast<std::uint64_t>(other.julianDatePart1)
+           && std::bit_cast<std::uint64_t>(julianDatePart2) == std::bit_cast<std::uint64_t>(other.julianDatePart2)
+           && timeScale == other.timeScale;
 }
 
 AstronomicalEpoch AstronomicalEpoch::addSeconds(const double offsetSeconds) const noexcept

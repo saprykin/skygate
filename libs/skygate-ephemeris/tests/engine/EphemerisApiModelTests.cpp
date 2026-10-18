@@ -57,6 +57,7 @@ private slots:
     void simpleEngineExposesMetadataDefaults();
     void distinguishesGeometricFromNoCorrections();
     void rejectsNonFiniteAtmosphericNumericOptions();
+    void isIdenticalToDistinguishesSignedZeroOptions();
     void unavailableCorrectionDegradesValidResult();
 };
 
@@ -805,6 +806,23 @@ void EphemerisApiModelTests::rejectsNonFiniteAtmosphericNumericOptions()
     options.setAtmosphericPressureHpa(875.0);
     QCOMPARE(options.atmosphericPressureHpa(), 875.0);
     QVERIFY(options.isOptionSet(skygate::ephemeris::EphemerisEngineOptions::Key::AtmosphericPressureHpa));
+}
+
+void EphemerisApiModelTests::isIdenticalToDistinguishesSignedZeroOptions()
+{
+    skygate::ephemeris::EphemerisEngineOptions positiveZeroOptions;
+    positiveZeroOptions.setAtmosphericTemperatureC(0.0);
+    skygate::ephemeris::EphemerisEngineOptions negativeZeroOptions = positiveZeroOptions;
+    negativeZeroOptions.setAtmosphericTemperatureC(-0.0);
+
+    QVERIFY(positiveZeroOptions == negativeZeroOptions);
+    QVERIFY(!positiveZeroOptions.isIdenticalTo(negativeZeroOptions));
+    QVERIFY(!negativeZeroOptions.isIdenticalTo(positiveZeroOptions));
+    QVERIFY(positiveZeroOptions.isIdenticalTo(positiveZeroOptions));
+
+    skygate::ephemeris::EphemerisEngineOptions warmerOptions = positiveZeroOptions;
+    warmerOptions.setAtmosphericTemperatureC(0.5);
+    QVERIFY(!positiveZeroOptions.isIdenticalTo(warmerOptions));
 }
 
 void EphemerisApiModelTests::unavailableCorrectionDegradesValidResult()

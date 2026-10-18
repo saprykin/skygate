@@ -102,50 +102,6 @@ void appendKeyPart(std::string& key, const std::string_view label, const std::ui
     key.append(buffer.data(), result.ptr);
 }
 
-[[nodiscard]] bool sameDoubleIdentity(const double lhs, const double rhs) noexcept
-{
-    return std::bit_cast<std::uint64_t>(lhs) == std::bit_cast<std::uint64_t>(rhs);
-}
-
-[[nodiscard]] bool
-sameEpoch(const skygate::core::AstronomicalEpoch& lhs, const skygate::core::AstronomicalEpoch& rhs) noexcept
-{
-    return sameDoubleIdentity(lhs.julianDatePart1, rhs.julianDatePart1)
-           && sameDoubleIdentity(lhs.julianDatePart2, rhs.julianDatePart2) && lhs.timeScale == rhs.timeScale;
-}
-
-[[nodiscard]] bool sameObserver(const skygate::core::GeoLocation& lhs, const skygate::core::GeoLocation& rhs) noexcept
-{
-    return sameDoubleIdentity(lhs.latitudeDeg, rhs.latitudeDeg)
-           && sameDoubleIdentity(lhs.longitudeDeg, rhs.longitudeDeg)
-           && sameDoubleIdentity(lhs.elevationMeters, rhs.elevationMeters);
-}
-
-[[nodiscard]] bool sameOptions(const EphemerisEngineOptions& lhs, const EphemerisEngineOptions& rhs) noexcept
-{
-    return lhs.engineKind() == rhs.engineKind() && lhs.correctionFlags() == rhs.correctionFlags()
-           && lhs.fallbackToSimpleEngine() == rhs.fallbackToSimpleEngine()
-           && lhs.enableAtmosphericRefraction() == rhs.enableAtmosphericRefraction()
-           && sameDoubleIdentity(lhs.atmosphericPressureHpa(), rhs.atmosphericPressureHpa())
-           && sameDoubleIdentity(lhs.atmosphericTemperatureC(), rhs.atmosphericTemperatureC())
-           && sameDoubleIdentity(lhs.relativeHumidity(), rhs.relativeHumidity())
-           && sameDoubleIdentity(lhs.observingWavelengthMicrometers(), rhs.observingWavelengthMicrometers());
-}
-
-[[nodiscard]] bool sameRequest(const EphemerisRequest& lhs, const EphemerisRequest& rhs) noexcept
-{
-    return sameEpoch(lhs.epoch, rhs.epoch)
-           && skygate::core::UtcTimeCodec::toEpochMicros(lhs.context.utcTime)
-                  == skygate::core::UtcTimeCodec::toEpochMicros(rhs.context.utcTime)
-           && sameObserver(lhs.context.observer, rhs.context.observer) && sameOptions(lhs.options, rhs.options);
-}
-
-[[nodiscard]] bool sameDateRange(const EphemerisDateRange& lhs, const EphemerisDateRange& rhs) noexcept
-{
-    return lhs.id == rhs.id && lhs.displayName == rhs.displayName && sameEpoch(lhs.start, rhs.start)
-           && sameEpoch(lhs.end, rhs.end);
-}
-
 [[nodiscard]] bool sameDataSetInfo(const EphemerisDatasetInfo& lhs, const EphemerisDatasetInfo& rhs)
 {
     if (lhs.id != rhs.id || lhs.displayName != rhs.displayName || lhs.version != rhs.version
@@ -153,7 +109,10 @@ sameEpoch(const skygate::core::AstronomicalEpoch& lhs, const skygate::core::Astr
         return false;
     }
     for (std::size_t rangeIndex = 0U; rangeIndex < lhs.dateRanges.size(); ++rangeIndex) {
-        if (!sameDateRange(lhs.dateRanges[rangeIndex], rhs.dateRanges[rangeIndex])) {
+        const EphemerisDateRange& leftRange = lhs.dateRanges[rangeIndex];
+        const EphemerisDateRange& rightRange = rhs.dateRanges[rangeIndex];
+        if (leftRange.id != rightRange.id || leftRange.displayName != rightRange.displayName
+            || !leftRange.start.isIdenticalTo(rightRange.start) || !leftRange.end.isIdenticalTo(rightRange.end)) {
             return false;
         }
     }
@@ -187,7 +146,12 @@ bool EphemerisComputationCache::matchesIdentity(
     const EphemerisDatasetInfo& dataSetInfo
 )
 {
-    return sameRequest(identity.request, request) && identity.catalogIdentity == catalogIdentity
+    const EphemerisRequest& cachedRequest = identity.request;
+    return identity.catalogIdentity == catalogIdentity && cachedRequest.epoch.isIdenticalTo(request.epoch)
+           && skygate::core::UtcTimeCodec::toEpochMicros(cachedRequest.context.utcTime)
+                  == skygate::core::UtcTimeCodec::toEpochMicros(request.context.utcTime)
+           && cachedRequest.context.observer.isIdenticalTo(request.context.observer)
+           && cachedRequest.options.isIdenticalTo(request.options)
            && sameDataSetInfo(identity.dataSetInfo, dataSetInfo);
 }
 
