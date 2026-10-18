@@ -1,6 +1,6 @@
 #include "CatalogStarAstrometry.hpp"
-#include "catalog/normalize/CatalogSnapshotValidator.hpp"
 #include "math/MathConstants.hpp"
+#include "catalog/normalize/CatalogSnapshotValidator.hpp"
 
 namespace skygate::ephemeris {
 
