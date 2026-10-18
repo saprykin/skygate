@@ -1,5 +1,6 @@
 #include "BodyTrailCalculator.hpp"
 #include "CelestialBodyState.hpp"
+#include "EphemerisRequestFactory.hpp"
 #include "math/TimeConstants.hpp"
 
 #include <chrono>
@@ -80,9 +81,8 @@ std::vector<BodyTrailSample> BodyTrailCalculator::sample(
 ) const
 {
     return collectSamples(options, [&engine, &request, bodyIndex](const int offsetMinutes) {
-        EphemerisRequest sampleRequest = request;
-        sampleRequest.context.utcTime += std::chrono::minutes(offsetMinutes);
-        sampleRequest.epoch = request.epoch.addMinutes(offsetMinutes);
+        const skygate::core::UtcTimePoint sampleUtcTime = request.context.utcTime + std::chrono::minutes(offsetMinutes);
+        const EphemerisRequest sampleRequest = EphemerisRequestFactory::atUtcTime(request, sampleUtcTime);
 
         const std::optional<CelestialBodyState> bodyState =
             engine.computeBodyState(sampleRequest, static_cast<std::size_t>(bodyIndex));

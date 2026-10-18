@@ -433,7 +433,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestRequiresDatasetInf
     QCOMPARE(
         static_cast<std::uint8_t>(result.diagnostics.front().code),
         static_cast<std::uint8_t>(
-            skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable
+            skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable
         )
     );
 }
@@ -466,7 +466,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestHandlesNullKernelP
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.diagnostics.front().code),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::EngineCreationFailed)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::EngineCreationFailed)
     );
 }
 
@@ -668,13 +668,15 @@ void EphemerisEngineFactoryBehaviorTests::defaultProviderReportsUnavailableBuild
     QCOMPARE(
         static_cast<std::uint8_t>(result.diagnostics.front().code),
         static_cast<std::uint8_t>(
-            skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable
+            skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable
         )
     );
 #else
     QCOMPARE(
         static_cast<std::uint8_t>(result.diagnostics.front().code),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable)
+        static_cast<std::uint8_t>(
+            skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::HighPrecisionUnavailable
+        )
     );
 #endif
 }

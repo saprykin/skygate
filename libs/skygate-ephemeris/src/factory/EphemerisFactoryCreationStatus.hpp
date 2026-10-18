@@ -17,6 +17,13 @@ public:
 
     EphemerisFactoryCreationStatus() = delete;
 
+    // A creation status is a success whenever the factory produced an engine,
+    // whether it is the requested one or the simple-engine fallback.
+    [[nodiscard]] static constexpr bool isSuccess(const Type status) noexcept
+    {
+        return status == Type::CreatedRequestedEngine || status == Type::CreatedSimpleFallback;
+    }
+
     [[nodiscard]] static constexpr std::string_view displayName(const Type status) noexcept
     {
         switch (status) {

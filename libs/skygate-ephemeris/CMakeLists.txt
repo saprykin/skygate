@@ -220,7 +220,6 @@ add_library(skygate-ephemeris STATIC
     src/engine/EphemerisDataManifest.hpp
     src/engine/IDeltaTProvider.hpp
     src/factory/EphemerisEngineFactory.hpp
-    src/factory/EphemerisFactoryCreationDiagnosticCode.hpp
     src/factory/EphemerisFactoryCreationDiagnosticSeverity.hpp
     src/factory/EphemerisFactoryCreationStatus.hpp
     src/factory/EphemerisFactoryFallbackPolicy.hpp

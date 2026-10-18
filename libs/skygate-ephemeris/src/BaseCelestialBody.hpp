@@ -55,6 +55,10 @@ public:
 
     [[nodiscard]] bool isCatalogStar() const noexcept;
 
+    // Copies the fields every catalog domain object shares. Optional metadata
+    // specific to a storage domain stays with the owning body type.
+    void copySharedFieldsTo(BaseCelestialBody& target) const;
+
     // Canonical domain object identity. Never derived from displayName or sky
     // position; planet IDs such as "mercury" remain their domain identity.
     std::string id;

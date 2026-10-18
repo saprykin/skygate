@@ -113,6 +113,23 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
     return EphemerisDataFileUtilities::checksumsMatch(actualHexDigest, expectedHexDigest);
 }
 
+[[nodiscard]] std::string_view
+activatedPayloadVerificationDiagnostic(const EphemerisDataFileUtilities::PayloadVerification verification) noexcept
+{
+    switch (verification) {
+    case EphemerisDataFileUtilities::PayloadVerification::Verified:
+        break;
+    case EphemerisDataFileUtilities::PayloadVerification::EmptyLivePayload:
+        return "Activated live ephemeris data asset payload is empty.";
+    case EphemerisDataFileUtilities::PayloadVerification::UncompressedSizeMismatch:
+        return "Activated ephemeris data asset size does not match manifest metadata.";
+    case EphemerisDataFileUtilities::PayloadVerification::ChecksumMismatch:
+        return "Activated ephemeris data asset checksum does not match manifest metadata.";
+    }
+
+    return {};
+}
+
 [[nodiscard]] bool existingTargetIsCurrent(
     const EphemerisDataManifest::Asset& asset, const QString& targetPath, EphemerisDataActivationResult& result
 )
@@ -300,23 +317,11 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         return result;
     }
 
-    if (request.asset->live && payload.outputBytes == 0U) {
+    const EphemerisDataFileUtilities::PayloadVerification payloadVerification =
+        EphemerisDataFileUtilities::verifyDecodedPayload(*request.asset, payload.outputBytes, payload.checksum);
+    if (payloadVerification != EphemerisDataFileUtilities::PayloadVerification::Verified) {
         result.status = EphemerisDataActivationStatus::ChecksumMismatch;
-        addDiagnostic(result, "Activated live ephemeris data asset payload is empty.");
-        targetFile.cancelWriting();
-        return result;
-    }
-    if (!request.asset->live && request.asset->compression.uncompressedSizeBytes.has_value()
-        && payload.outputBytes != *request.asset->compression.uncompressedSizeBytes) {
-        result.status = EphemerisDataActivationStatus::ChecksumMismatch;
-        addDiagnostic(result, "Activated ephemeris data asset size does not match manifest metadata.");
-        targetFile.cancelWriting();
-        return result;
-    }
-    if (!request.asset->live
-        && !EphemerisDataFileUtilities::checksumsMatch(payload.checksum, request.asset->checksum.value)) {
-        result.status = EphemerisDataActivationStatus::ChecksumMismatch;
-        addDiagnostic(result, "Activated ephemeris data asset checksum does not match manifest metadata.");
+        addDiagnostic(result, activatedPayloadVerificationDiagnostic(payloadVerification));
         targetFile.cancelWriting();
         return result;
     }

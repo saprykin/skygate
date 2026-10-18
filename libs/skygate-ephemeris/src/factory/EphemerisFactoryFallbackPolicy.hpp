@@ -14,6 +14,11 @@ public:
 
     EphemerisFactoryFallbackPolicy() = delete;
 
+    [[nodiscard]] static constexpr bool allowsSimpleEngineFallback(const Type policy) noexcept
+    {
+        return policy == Type::AllowSimpleEngineFallback;
+    }
+
     [[nodiscard]] static constexpr std::string_view displayName(const Type policy) noexcept
     {
         switch (policy) {

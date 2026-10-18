@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <functional>
 #include <optional>
+#include <string>
 
 class EphemerisDataFileUtilitiesTests final : public QObject {
     Q_OBJECT
@@ -24,6 +25,7 @@ private slots:
     void reportsCancellationRequests();
     void mapsPayloadStatusToActivationStatus();
     void mapsPayloadStatusToVerificationStatus();
+    void verifiesDecodedPayloadAgainstMetadata();
 };
 
 void EphemerisDataFileUtilitiesTests::rejectsUnsafePathComponents()
@@ -180,6 +182,53 @@ void EphemerisDataFileUtilitiesTests::mapsPayloadStatusToVerificationStatus()
             EphemerisDataPayloadReader::Status::Read
         ),
         EphemerisStagedUpdateVerificationStatus::IoError
+    );
+}
+
+void EphemerisDataFileUtilitiesTests::verifiesDecodedPayloadAgainstMetadata()
+{
+    using skygate::ephemeris::EphemerisDataFileUtilities;
+    using skygate::ephemeris::EphemerisDataManifest;
+    using PayloadVerification = skygate::ephemeris::EphemerisDataFileUtilities::PayloadVerification;
+
+    EphemerisDataManifest::Asset asset;
+    asset.checksum.algorithm = std::string{EphemerisDataFileUtilities::kSha256Algorithm};
+    asset.checksum.value = "0123abcd";
+    asset.compression.uncompressedSizeBytes = 4U;
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(EphemerisDataFileUtilities::verifyDecodedPayload(asset, 4U, "0123ABCD")),
+        static_cast<std::uint8_t>(PayloadVerification::Verified)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(EphemerisDataFileUtilities::verifyDecodedPayload(asset, 4U, "0123abce")),
+        static_cast<std::uint8_t>(PayloadVerification::ChecksumMismatch)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(EphemerisDataFileUtilities::verifyDecodedPayload(asset, 5U, "0123abcd")),
+        static_cast<std::uint8_t>(PayloadVerification::UncompressedSizeMismatch)
+    );
+
+    EphemerisDataManifest::Asset unpinnedSizeAsset = asset;
+    unpinnedSizeAsset.compression.uncompressedSizeBytes.reset();
+    QCOMPARE(
+        static_cast<std::uint8_t>(EphemerisDataFileUtilities::verifyDecodedPayload(unpinnedSizeAsset, 5U, "0123abcd")),
+        static_cast<std::uint8_t>(PayloadVerification::Verified)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(EphemerisDataFileUtilities::verifyDecodedPayload(unpinnedSizeAsset, 5U, "ffffffff")),
+        static_cast<std::uint8_t>(PayloadVerification::ChecksumMismatch)
+    );
+
+    EphemerisDataManifest::Asset liveAsset = asset;
+    liveAsset.live = true;
+    QCOMPARE(
+        static_cast<std::uint8_t>(EphemerisDataFileUtilities::verifyDecodedPayload(liveAsset, 4U, "ffffffff")),
+        static_cast<std::uint8_t>(PayloadVerification::Verified)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(EphemerisDataFileUtilities::verifyDecodedPayload(liveAsset, 0U, "0123abcd")),
+        static_cast<std::uint8_t>(PayloadVerification::EmptyLivePayload)
     );
 }
 

@@ -62,6 +62,7 @@ private slots:
     void skyContextCompatibilityAppliesEngineDefaults();
     void requestBasedStateLookupByInsensitiveIdAndIndex();
     void requestBasedMissingIdAndIndexReturnNullopt();
+    void reportsSimpleEngineProvenanceKind();
 };
 
 void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
@@ -636,6 +637,53 @@ void EphemerisEngineBaselineTests::requestBasedMissingIdAndIndexReturnNullopt()
     QVERIFY(!engine->computeBodyState(request, "missing").has_value());
     QVERIFY(!engine->computeBodyState(request, "").has_value());
     QVERIFY(!engine->computeBodyState(request, std::size_t{1}).has_value());
+}
+
+void EphemerisEngineBaselineTests::reportsSimpleEngineProvenanceKind()
+{
+    const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
+    QVERIFY(catalog != nullptr);
+
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
+    QVERIFY(engine != nullptr);
+
+    skygate::core::ObservationContext context;
+    context.observer.latitudeDeg = 37.7749;
+    context.observer.longitudeDeg = -122.4194;
+    context.observer.elevationMeters = 16.0;
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'710'000'000));
+
+    const auto computedSnapshot = engine->compute(context);
+    QCOMPARE(computedSnapshot.states.size(), catalog->bodies().size());
+    for (const auto& state : computedSnapshot.states) {
+        QCOMPARE(
+            static_cast<std::uint8_t>(state.metadata.dataSourceProvenanceKind),
+            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataSourceProvenance::Type::SimpleEngine)
+        );
+    }
+
+    skygate::ephemeris::EphemerisRequest unsupportedRequest;
+    unsupportedRequest.context = context;
+    unsupportedRequest.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'460'310.0, .julianDatePart2 = 0.5, .timeScale = skygate::core::TimeScale::Tt
+    };
+    unsupportedRequest.options = engine->options();
+
+    const auto unsupportedSnapshot = engine->compute(unsupportedRequest);
+    QCOMPARE(unsupportedSnapshot.states.size(), catalog->bodies().size());
+    for (const auto& state : unsupportedSnapshot.states) {
+        QCOMPARE(
+            static_cast<std::uint8_t>(state.metadata.status),
+            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported)
+        );
+        QCOMPARE(
+            static_cast<std::uint8_t>(state.metadata.dataSourceProvenanceKind),
+            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataSourceProvenance::Type::SimpleEngine)
+        );
+        QCOMPARE(state.metadata.dataSourceProvenance, std::string{"Simple ephemeris engine"});
+    }
 }
 
 QTEST_APPLESS_MAIN(EphemerisEngineBaselineTests)

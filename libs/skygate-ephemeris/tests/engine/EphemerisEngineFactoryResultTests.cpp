@@ -113,7 +113,31 @@ void EphemerisEngineFactoryResultTests::constructsFactoryResultAndCreationDiagno
             skygate::ephemeris::EphemerisEngineFactory::displayName(status),
             skygate::ephemeris::EphemerisFactoryCreationStatus::displayName(status)
         );
+        QCOMPARE(
+            skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(status),
+            skygate::ephemeris::EphemerisEngineFactory::isCreationSuccess(status)
+        );
     }
+
+    QVERIFY(
+        skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(
+            skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(
+            skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback
+        )
+    );
+    QVERIFY(!skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedStrictHighPrecisionUnavailable
+    ));
+    QVERIFY(!skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedInvalidRequest
+    ));
+    QVERIFY(!skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(
+        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedCreationError
+    ));
 
     QVERIFY(
         skygate::ephemeris::EphemerisEngineFactory::isCreationSuccess(
@@ -130,31 +154,31 @@ void EphemerisEngineFactoryResultTests::constructsFactoryResultAndCreationDiagno
     ));
 
     const std::array diagnosticCodes{
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable,
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable,
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::RequiredTimeScaleServiceUnavailable,
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::RequiredEarthOrientationProviderUnavailable,
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::InvalidRequest,
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::EngineCreationFailed,
+        skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::HighPrecisionUnavailable,
+        skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable,
+        skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::RequiredTimeScaleServiceUnavailable,
+        skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::RequiredEarthOrientationProviderUnavailable,
+        skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::InvalidRequest,
+        skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::EngineCreationFailed,
     };
 
-    for (const skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode code : diagnosticCodes) {
-        QVERIFY(!skygate::ephemeris::EphemerisEngineFactory::diagnosticText(code).empty());
-        QCOMPARE(
-            skygate::ephemeris::EphemerisEngineFactory::diagnosticText(code),
-            skygate::ephemeris::EphemerisFactoryCreationDiagnostic::text(code)
-        );
+    for (const skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code code : diagnosticCodes) {
+        const skygate::ephemeris::EphemerisFactoryCreationDiagnostic diagnostic{
+            code, skygate::ephemeris::EphemerisFactoryCreationDiagnosticSeverity::Error
+        };
+        QVERIFY(!diagnostic.displayText().empty());
+        QCOMPARE(diagnostic.displayText(), skygate::ephemeris::EphemerisFactoryCreationDiagnostic::text(code));
     }
 
     skygate::ephemeris::EphemerisFactoryCreationDiagnostic fallbackDiagnostic{
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable,
+        skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::HighPrecisionUnavailable,
         skygate::ephemeris::EphemerisFactoryCreationDiagnosticSeverity::Warning,
     };
     QVERIFY(!fallbackDiagnostic.isError());
     QVERIFY(!fallbackDiagnostic.displayText().empty());
 
     skygate::ephemeris::EphemerisFactoryCreationDiagnostic strictFailureDiagnostic{
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable,
+        skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::HighPrecisionUnavailable,
         skygate::ephemeris::EphemerisFactoryCreationDiagnosticSeverity::Error,
         "strict high precision requested but unavailable",
     };
@@ -227,11 +251,11 @@ void EphemerisEngineFactoryResultTests::constructsFactoryResultAndCreationDiagno
 void EphemerisEngineFactoryResultTests::resultHelpersDistinguishOutcomesAndDiagnostics()
 {
     skygate::ephemeris::EphemerisFactoryCreationDiagnostic warning{
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable,
+        skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::HighPrecisionUnavailable,
         skygate::ephemeris::EphemerisFactoryCreationDiagnosticSeverity::Warning,
     };
     skygate::ephemeris::EphemerisFactoryCreationDiagnostic error{
-        skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::InvalidRequest,
+        skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::InvalidRequest,
         skygate::ephemeris::EphemerisFactoryCreationDiagnosticSeverity::Error,
         "invalid engine kind",
     };
