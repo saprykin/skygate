@@ -1,12 +1,8 @@
 #pragma once
 
-#include "BaseCelestialBody.hpp"
-#include "CelestialBodyState.hpp"
-#include "DistantCelestialBody.hpp"
 #include "EphemerisSnapshot.hpp"
 #include "GeoLocation.hpp"
 #include "ObservationContext.hpp"
-#include "OwnGalaxyCelestialBody.hpp"
 #include "ProjectionType.hpp"
 #include "SkyContextLocationSource.hpp"
 #include "SkyLocationController.hpp"
@@ -20,11 +16,9 @@
 #include "engine/IEphemerisEngine.hpp"
 #include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "ephemeris/SkyEphemerisSession.hpp"
-#include "settings/SkySettingsStore.hpp"
+#include "settings/SkyEphemerisUserSettingsSnapshot.hpp"
 #include "theme/SkyOverlayLayerVisibility.hpp"
-#include "theme/SkyThemePalette.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
-#include "theme/SkyThemeRepository.hpp"
 #include "time/SkyLiveClock.hpp"
 #include "time/SkyTimeController.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
@@ -44,6 +38,7 @@
 #include <vector>
 
 namespace skygate::ephemeris {
+class BaseCelestialBody;
 class IEarthOrientationProvider;
 class IEphemerisDataSnapshot;
 class IEphemerisDiagnosticsSink;
@@ -57,6 +52,8 @@ namespace skygate::ui::internal {
 class SkyCatalogSourceCollectionModel;
 class SkyCatalogSourcePresetModel;
 class SkyDeviceLocationAcquisition;
+class SkyThemePalette;
+class SkyThemeRepository;
 }  // namespace skygate::ui::internal
 
 class QDateTime;
@@ -68,6 +65,7 @@ class SkyEphemerisDataManager;
 class SkyEphemerisUpdateWorkflow;
 class SkyObjectSearchModel;
 class SkyOverlayLayerSettings;
+class SkySettingsStore;
 
 class SkyContextController final : public QObject {
     Q_OBJECT

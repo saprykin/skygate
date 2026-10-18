@@ -1,3 +1,4 @@
+#include "settings/SkySettingsStore.hpp"
 #include "support/SkyContextControllerTestSupport.hpp"
 
 namespace {

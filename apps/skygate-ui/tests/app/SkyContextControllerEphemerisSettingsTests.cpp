@@ -1,5 +1,6 @@
 #include "StaticCalcephKernelProvider.hpp"
 #include "TestCalcephKernel.hpp"
+#include "settings/SkySettingsStore.hpp"
 #include "support/SkyContextControllerTestSupport.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"

@@ -10,7 +10,6 @@
 #include "SkyConstellationLineImportResult.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/IStarCatalog.hpp"
-#include "settings/SkySettingsStore.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QHash>
@@ -26,6 +25,7 @@
 #include <vector>
 
 class QNetworkAccessManager;
+class SkySettingsStore;
 
 namespace skygate::ui::internal {
 class SkyCatalogCacheController;
