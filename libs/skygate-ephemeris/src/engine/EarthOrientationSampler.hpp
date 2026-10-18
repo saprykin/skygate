@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BitFlagSetOperations.hpp"
+#include "BitFlagSet.hpp"
 #include "EphemerisEngineWarning.hpp"
 #include "IEarthOrientationProvider.hpp"
 
@@ -52,6 +52,8 @@ public:
             EstimatedData
         };
 
+        using WarningMask = BitFlagSet<WarningCode>;
+
         skygate::core::AstronomicalEpoch requestedUtcEpoch;
         double ut1MinusUtcSeconds = 0.0;
         double polarMotionXArcseconds = 0.0;
@@ -62,7 +64,7 @@ public:
         // Meaningful for successful samples; failed samples never used table
         // values.
         Origin origin = Origin::ZeroFallback;
-        std::uint32_t warningCodeMask = 0U;
+        WarningMask warningCodeMask;
         std::string diagnosticText;
 
         [[nodiscard]] bool isSuccess() const noexcept
@@ -72,12 +74,12 @@ public:
 
         void addWarning(const WarningCode code) noexcept
         {
-            warningCodeMask |= BitFlagSetOperations::bit(code);
+            warningCodeMask.add(WarningMask::bit(code));
         }
 
         [[nodiscard]] bool hasWarning(const WarningCode code) const noexcept
         {
-            return (warningCodeMask & BitFlagSetOperations::bit(code)) != 0U;
+            return warningCodeMask.has(WarningMask::bit(code));
         }
 
         // Sentence that describes how the values were obtained. Row origins

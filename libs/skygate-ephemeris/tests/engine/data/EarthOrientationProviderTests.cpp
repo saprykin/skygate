@@ -679,7 +679,7 @@ void EarthOrientationProviderTests::preservesExpirationBoundaries()
     QVERIFY(!atExpiry.hasWarning(skygate::ephemeris::EarthOrientationSampler::Sample::WarningCode::StaleData));
     const auto afterExpiry =
         skygate::ephemeris::EarthOrientationSampler::sample(result.provider, epochForDate(2026, 4, 3));
-    QCOMPARE(afterExpiry.warningCodeMask, std::uint32_t{1});
+    QCOMPARE(afterExpiry.warningCodeMask.bits(), std::uint32_t{1});
     QCOMPARE(afterExpiry.diagnosticText, std::string{"Earth-orientation sample resolved with degraded metadata."});
     options.referenceEpoch = epochForDate(2026, 4, 3);
     const auto stale = skygate::ephemeris::EarthOrientationDataLoader::loadFromTextAsset(asset, options);
@@ -703,7 +703,7 @@ void EarthOrientationProviderTests::preservesPredictionAndEstimatedWarnings()
     for (const int day : {2, 3}) {
         const auto sample =
             skygate::ephemeris::EarthOrientationSampler::sample(result.provider, epochForDate(2026, 4, day));
-        QCOMPARE(sample.warningCodeMask, std::uint32_t{2});
+        QCOMPARE(sample.warningCodeMask.bits(), std::uint32_t{2});
         QCOMPARE(sample.status, skygate::ephemeris::EarthOrientationSampler::Sample::Status::Degraded);
         QCOMPARE(sample.diagnosticText, std::string{"Earth-orientation sample interpolated with degraded metadata."});
     }
@@ -718,7 +718,7 @@ void EarthOrientationProviderTests::preservesPredictionAndEstimatedWarnings()
         )
     );
     const auto combined = skygate::ephemeris::EarthOrientationSampler::sample(&provider, epochForDate(2026, 4, 2));
-    QCOMPARE(combined.warningCodeMask, std::uint32_t{35});
+    QCOMPARE(combined.warningCodeMask.bits(), std::uint32_t{35});
     QVERIFY(combined.estimated);
     QVERIFY(combined.predicted);
 }
@@ -731,12 +731,12 @@ void EarthOrientationProviderTests::rejectsInvalidEpochsBeforeFallback()
     epoch.timeScale = skygate::core::TimeScale::Tt;
     const auto nonUtc = skygate::ephemeris::EarthOrientationSampler::sample(nullptr, epoch, options);
     QCOMPARE(nonUtc.status, skygate::ephemeris::EarthOrientationSampler::Sample::Status::Failed);
-    QCOMPARE(nonUtc.warningCodeMask, std::uint32_t{16});
+    QCOMPARE(nonUtc.warningCodeMask.bits(), std::uint32_t{16});
     QCOMPARE(nonUtc.diagnosticText, std::string{"Earth-orientation sampling requires a finite UTC epoch."});
     epoch.timeScale = skygate::core::TimeScale::Utc;
     epoch.julianDatePart2 = std::numeric_limits<double>::quiet_NaN();
     const auto nonFinite = skygate::ephemeris::EarthOrientationSampler::sample(nullptr, epoch, options);
-    QCOMPARE(nonFinite.warningCodeMask, nonUtc.warningCodeMask);
+    QCOMPARE(nonFinite.warningCodeMask.bits(), nonUtc.warningCodeMask.bits());
     QCOMPARE(nonFinite.diagnosticText, nonUtc.diagnosticText);
 }
 
@@ -753,14 +753,14 @@ void EarthOrientationProviderTests::handlesUnusableAndEmptyProviders()
         );
         const auto failed = skygate::ephemeris::EarthOrientationSampler::sample(provider, epochForDate(2026, 4, 1));
         QVERIFY(!failed.isSuccess());
-        QCOMPARE(failed.warningCodeMask, std::uint32_t{4});
+        QCOMPARE(failed.warningCodeMask.bits(), std::uint32_t{4});
         QCOMPARE(failed.diagnosticText, std::string{"Earth-orientation data is unavailable for the requested epoch."});
         skygate::ephemeris::EarthOrientationSampler::Options options;
         options.allowMissingDataZeroFallback = true;
         const auto fallback =
             skygate::ephemeris::EarthOrientationSampler::sample(provider, epochForDate(2026, 4, 1), options);
         QVERIFY(fallback.isSuccess());
-        QCOMPARE(fallback.warningCodeMask, failed.warningCodeMask);
+        QCOMPARE(fallback.warningCodeMask.bits(), failed.warningCodeMask.bits());
         QCOMPARE(fallback.diagnosticText, std::string{"Earth-orientation data used a degraded zero-value fallback."});
     }
 }
@@ -775,7 +775,7 @@ void EarthOrientationProviderTests::preservesBothOutOfRangePolicies()
         const auto fallback =
             skygate::ephemeris::EarthOrientationSampler::sample(result.provider, epochForDate(2026, 4, day));
         QCOMPARE(fallback.status, skygate::ephemeris::EarthOrientationSampler::Sample::Status::Degraded);
-        QCOMPARE(fallback.warningCodeMask, std::uint32_t{8});
+        QCOMPARE(fallback.warningCodeMask.bits(), std::uint32_t{8});
         QCOMPARE(fallback.ut1MinusUtcSeconds, day == 1 ? 0.1 : 0.4);
         QCOMPARE(
             fallback.diagnosticText,
@@ -787,7 +787,7 @@ void EarthOrientationProviderTests::preservesBothOutOfRangePolicies()
         const auto failed =
             skygate::ephemeris::EarthOrientationSampler::sample(result.provider, epochForDate(2026, 4, day), options);
         QVERIFY(!failed.isSuccess());
-        QCOMPARE(failed.warningCodeMask, fallback.warningCodeMask);
+        QCOMPARE(failed.warningCodeMask.bits(), fallback.warningCodeMask.bits());
         QCOMPARE(
             failed.diagnosticText,
             day == 1 ? std::string{"Requested epoch is before the first Earth-orientation row."}

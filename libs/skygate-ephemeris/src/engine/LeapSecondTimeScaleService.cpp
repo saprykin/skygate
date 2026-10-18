@@ -4,6 +4,8 @@
 #include "time/CalendarTime.hpp"
 
 #include <optional>
+#include <string>
+#include <utility>
 
 namespace skygate::ephemeris {
 
@@ -51,33 +53,20 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convert(
         if (targetScale == skygate::core::TimeScale::Ut1) {
             const Ut1OffsetResolver::Result lookup = m_ut1OffsetResolver.lookupUtcToUt1Offset(epoch);
             if (!lookup.ut1MinusUtcSeconds.has_value()) {
-                TimeScaleConversionResult result =
-                    TimeScaleConversionResult::failure(epoch, targetScale, lookup.diagnosticText);
-                result.warningCodeMask = lookup.warningCodeMask;
-                return result;
+                return TimeScaleConversionResult::failureFromLookup(
+                    epoch, targetScale, lookup.warningCodeMask, lookup.diagnosticText
+                );
             }
 
             TimeScaleConversionResult result = TimeScaleConversionResult::success(
                 epoch.addSeconds(*lookup.ut1MinusUtcSeconds, skygate::core::TimeScale::Ut1)
             );
-            Ut1OffsetResolver::mergeWarnings(result, lookup);
-            if (!lookup.diagnosticText.empty()) {
-                result.diagnosticText = lookup.diagnosticText;
-            }
+            applyLookup(result, lookup);
             return result;
         }
 
         if (targetScale == skygate::core::TimeScale::Tdb) {
-            const TimeScaleConversionResult tt = convert(epoch, skygate::core::TimeScale::Tt);
-            if (!tt.isSuccess()) {
-                TimeScaleConversionResult result = tt;
-                result.epoch.timeScale = targetScale;
-                return result;
-            }
-
-            TimeScaleConversionResult tdb = convert(tt.epoch, skygate::core::TimeScale::Tdb);
-            TimeScaleConversionResult::mergeWarnings(tdb, tt.status, tt.warningCodeMask);
-            return tdb;
+            return convertVia(skygate::core::TimeScale::Tt, epoch, targetScale);
         }
 
         if (targetScale != skygate::core::TimeScale::Tai && targetScale != skygate::core::TimeScale::Tt) {
@@ -90,34 +79,20 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convert(
 
         const LeapSecondOffsetResolver::Result lookup = m_leapSecondOffsetResolver.lookupUtcOffset(epoch);
         if (!lookup.offsetSeconds.has_value()) {
-            TimeScaleConversionResult result =
-                TimeScaleConversionResult::failure(epoch, targetScale, lookup.diagnosticText);
-            result.warningCodeMask = lookup.warningCodeMask;
-            return result;
+            return TimeScaleConversionResult::failureFromLookup(
+                epoch, targetScale, lookup.warningCodeMask, lookup.diagnosticText
+            );
         }
 
-        const double taiOffset = static_cast<double>(*lookup.offsetSeconds);
-        const double targetOffset = targetOffsetSeconds(targetScale, taiOffset);
         TimeScaleConversionResult result = TimeScaleConversionResult::success(
-            epoch.addSeconds(targetOffset, targetScale), lookup.status, lookup.warningCodeMask
+            epoch.addSeconds(targetOffsetSeconds(targetScale, static_cast<double>(*lookup.offsetSeconds)), targetScale)
         );
-        if (!lookup.diagnosticText.empty()) {
-            result.diagnosticText = lookup.diagnosticText;
-        }
+        applyLookup(result, lookup);
         return result;
     }
     case skygate::core::TimeScale::Tai:
         if (targetScale == skygate::core::TimeScale::Tdb) {
-            TimeScaleConversionResult tt = convert(epoch, skygate::core::TimeScale::Tt);
-            if (!tt.isSuccess()) {
-                TimeScaleConversionResult result = tt;
-                result.epoch.timeScale = targetScale;
-                return result;
-            }
-
-            TimeScaleConversionResult tdb = convert(tt.epoch, skygate::core::TimeScale::Tdb);
-            TimeScaleConversionResult::mergeWarnings(tdb, tt.status, tt.warningCodeMask);
-            return tdb;
+            return convertVia(skygate::core::TimeScale::Tt, epoch, targetScale);
         }
         if (targetScale == skygate::core::TimeScale::Tt) {
             return TimeScaleConversionResult::success(
@@ -127,44 +102,24 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convert(
         if (targetScale == skygate::core::TimeScale::Utc) {
             const LeapSecondOffsetResolver::Result lookup = m_leapSecondOffsetResolver.lookupTaiOffset(epoch);
             if (!lookup.offsetSeconds.has_value()) {
-                TimeScaleConversionResult result =
-                    TimeScaleConversionResult::failure(epoch, targetScale, lookup.diagnosticText);
-                result.warningCodeMask = lookup.warningCodeMask;
-                return result;
+                return TimeScaleConversionResult::failureFromLookup(
+                    epoch, targetScale, lookup.warningCodeMask, lookup.diagnosticText
+                );
             }
 
             TimeScaleConversionResult result = TimeScaleConversionResult::success(
                 epoch.addSeconds(-static_cast<double>(*lookup.offsetSeconds), skygate::core::TimeScale::Utc)
             );
-            LeapSecondOffsetResolver::mergeWarnings(result, lookup);
-            if (!lookup.diagnosticText.empty()) {
-                result.diagnosticText = lookup.diagnosticText;
-            }
+            applyLookup(result, lookup);
             return result;
         }
         if (targetScale == skygate::core::TimeScale::Ut1) {
-            TimeScaleConversionResult utc = convert(epoch, skygate::core::TimeScale::Utc);
-            if (!utc.isSuccess()) {
-                utc.epoch.timeScale = targetScale;
-                return utc;
-            }
-
-            TimeScaleConversionResult ut1 = convert(utc.epoch, skygate::core::TimeScale::Ut1);
-            TimeScaleConversionResult::mergeWarnings(ut1, utc.status, utc.warningCodeMask);
-            return ut1;
+            return convertVia(skygate::core::TimeScale::Utc, epoch, targetScale);
         }
         break;
     case skygate::core::TimeScale::Tt:
         if (targetScale == skygate::core::TimeScale::Ut1) {
-            TimeScaleConversionResult utc = convert(epoch, skygate::core::TimeScale::Utc);
-            if (!utc.isSuccess()) {
-                utc.epoch.timeScale = targetScale;
-                return utc;
-            }
-
-            TimeScaleConversionResult ut1 = convert(utc.epoch, skygate::core::TimeScale::Ut1);
-            TimeScaleConversionResult::mergeWarnings(ut1, utc.status, utc.warningCodeMask);
-            return ut1;
+            return convertVia(skygate::core::TimeScale::Utc, epoch, targetScale);
         }
         if (targetScale == skygate::core::TimeScale::Tdb) {
             return TdbTtConverter::ttToTdb(epoch);
@@ -181,30 +136,16 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convert(
             );
         }
         break;
-    case skygate::core::TimeScale::Tdb: {
-        TimeScaleConversionResult result = TdbTtConverter::tdbToTt(epoch);
+    case skygate::core::TimeScale::Tdb:
         if (targetScale == skygate::core::TimeScale::Tt) {
-            return result;
+            return TdbTtConverter::tdbToTt(epoch);
         }
-
-        TimeScaleConversionResult converted = convert(result.epoch, targetScale);
-        TimeScaleConversionResult::mergeWarnings(converted, result.status, result.warningCodeMask);
-        return converted;
-    }
-    case skygate::core::TimeScale::Ut1: {
-        TimeScaleConversionResult utc = m_ut1OffsetResolver.lookupUtcFromUt1(epoch);
+        return convertVia(skygate::core::TimeScale::Tt, epoch, targetScale);
+    case skygate::core::TimeScale::Ut1:
         if (targetScale == skygate::core::TimeScale::Utc) {
-            return utc;
+            return m_ut1OffsetResolver.lookupUtcFromUt1(epoch);
         }
-        if (!utc.isSuccess()) {
-            utc.epoch.timeScale = targetScale;
-            return utc;
-        }
-
-        TimeScaleConversionResult converted = convert(utc.epoch, targetScale);
-        TimeScaleConversionResult::mergeWarnings(converted, utc.status, utc.warningCodeMask);
-        return converted;
-    }
+        return convertVia(skygate::core::TimeScale::Utc, epoch, targetScale);
     }
 
     TimeScaleConversionResult result =
@@ -267,10 +208,10 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convertCivilDateTime(
     const LeapSecondOffsetResolver::Result nextLookup = m_leapSecondOffsetResolver.lookupUtcOffset(*epoch);
     if (!precedingLookup.offsetSeconds.has_value() || !nextLookup.offsetSeconds.has_value()
         || *nextLookup.offsetSeconds != *precedingLookup.offsetSeconds + 1) {
-        TimeScaleConversionResult result = TimeScaleConversionResult::failure(
-            *epoch, targetScale, "Civil date/time does not identify a configured positive leap second."
+        TimeScaleConversionResult result = TimeScaleConversionResult::failureFromLookup(
+            *epoch, targetScale, precedingLookup.warningCodeMask, precedingLookup.diagnosticText
         );
-        result.warningCodeMask = precedingLookup.warningCodeMask | nextLookup.warningCodeMask;
+        result.warningCodeMask.merge(nextLookup.warningCodeMask);
         result.addWarning(TimeScaleConversionWarningCode::Type::InvalidInput);
         return result;
     }
@@ -292,13 +233,30 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convertCivilDateTime(
     TimeScaleConversionResult result = TimeScaleConversionResult::success(epoch->addSeconds(
         targetOffset, targetScale == skygate::core::TimeScale::Tdb ? skygate::core::TimeScale::Tt : targetScale
     ));
-    LeapSecondOffsetResolver::mergeWarnings(result, precedingLookup);
-    LeapSecondOffsetResolver::mergeWarnings(result, nextLookup);
+    TimeScaleConversionResult::mergeWarnings(result, precedingLookup.status, precedingLookup.warningCodeMask);
+    TimeScaleConversionResult::mergeWarnings(result, nextLookup.status, nextLookup.warningCodeMask);
     if (targetScale == skygate::core::TimeScale::Tdb) {
         TimeScaleConversionResult tdb = convert(result.epoch, skygate::core::TimeScale::Tdb);
         TimeScaleConversionResult::mergeWarnings(tdb, result.status, result.warningCodeMask);
         return tdb;
     }
+    return result;
+}
+
+TimeScaleConversionResult LeapSecondTimeScaleService::convertVia(
+    const skygate::core::TimeScale intermediateScale,
+    const skygate::core::AstronomicalEpoch& epoch,
+    const skygate::core::TimeScale targetScale
+) const
+{
+    TimeScaleConversionResult intermediate = convert(epoch, intermediateScale);
+    if (!intermediate.isSuccess()) {
+        intermediate.epoch.timeScale = targetScale;
+        return intermediate;
+    }
+
+    TimeScaleConversionResult result = convert(intermediate.epoch, targetScale);
+    TimeScaleConversionResult::mergeWarnings(result, intermediate.status, intermediate.warningCodeMask);
     return result;
 }
 

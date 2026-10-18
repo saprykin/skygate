@@ -1,10 +1,7 @@
 #include "EphemerisTimeScaleMetadataMerger.hpp"
 #include "EphemerisMetadataMerger.hpp"
-#include "engine/BitFlagSetOperations.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
 #include "engine/TimeScaleConversionResult.hpp"
-
-#include <cstdint>
 
 namespace skygate::ephemeris::highprecision {
 
@@ -12,10 +9,9 @@ void EphemerisTimeScaleMetadataMerger::mergeKernelEpochTimeScaleMetadata(
     EphemerisEngineQueryResult& metadata, const TimeScaleConversionResult& conversion
 ) noexcept
 {
-    constexpr std::uint32_t kTdbApproximationWarning =
-        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::Type::TdbApproximationApplied);
-    if (conversion.status == TimeScaleConversionStatus::Type::Degraded
-        && (conversion.warningCodeMask & ~kTdbApproximationWarning) == 0U) {
+    const bool onlyTdbApproximation =
+        !conversion.warningCodeMask.without(TimeScaleConversionWarningCode::Type::TdbApproximationApplied).hasAny();
+    if (conversion.status == TimeScaleConversionStatus::Type::Degraded && onlyTdbApproximation) {
         return;
     }
 

@@ -235,8 +235,10 @@ add_library(skygate-ephemeris STATIC
     src/factory/IEphemerisDiagnosticsSink.hpp
     src/engine/EphemerisEngineQueries.hpp
     src/engine/EphemerisPrecisionPolicy.hpp
-    src/engine/BitFlagSetOperations.hpp
+    src/engine/BitFlagSet.hpp
     src/engine/EphemerisCapabilities.hpp
+    src/engine/EphemerisCapability.hpp
+    src/engine/EphemerisCorrectionFlag.hpp
     src/engine/EphemerisCorrectionFlags.hpp
     src/engine/EphemerisDataSourceProvenance.hpp
     src/time/EphemerisDateRange.hpp

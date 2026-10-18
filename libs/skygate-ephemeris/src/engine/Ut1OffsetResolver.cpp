@@ -1,5 +1,4 @@
 #include "Ut1OffsetResolver.hpp"
-#include "BitFlagSetOperations.hpp"
 #include "EarthOrientationSampler.hpp"
 #include "TimeScaleConversionWarningCode.hpp"
 #include "math/TimeConstants.hpp"
@@ -113,7 +112,7 @@ void mergeEarthOrientationSampleWarnings(
     const LeapSecondOffsetResolver::Result utcOffset = leapSecondResolver.lookupUtcOffset(utcEpoch);
     if (!utcOffset.offsetSeconds.has_value()) {
         result.status = TimeScaleConversionStatus::Type::Failed;
-        result.warningCodeMask |= utcOffset.warningCodeMask;
+        result.warningCodeMask.merge(utcOffset.warningCodeMask);
         result.diagnosticText = utcOffset.diagnosticText;
         return result;
     }
@@ -121,7 +120,7 @@ void mergeEarthOrientationSampleWarnings(
     result.ut1MinusUtcSeconds = static_cast<double>(*utcOffset.offsetSeconds)
                                 + skygate::core::TimeConstants::kTtMinusTaiSeconds - *estimate.deltaTSeconds;
     result.status = TimeScaleConversionStatus::Type::Degraded;
-    result.warningCodeMask |= utcOffset.warningCodeMask;
+    result.warningCodeMask.merge(utcOffset.warningCodeMask);
     result.addWarning(TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied);
     if (estimate.status == IDeltaTProvider::EstimateStatus::Degraded) {
         result.addWarning(TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied);
@@ -173,7 +172,8 @@ void mergeEarthOrientationSampleWarnings(
     if (!taiOffset.offsetSeconds.has_value()) {
         TimeScaleConversionResult result =
             TimeScaleConversionResult::failure(taiEpoch, skygate::core::TimeScale::Utc, taiOffset.diagnosticText);
-        result.warningCodeMask = sourceFailure.warningCodeMask | taiOffset.warningCodeMask;
+        result.warningCodeMask = sourceFailure.warningCodeMask;
+        result.warningCodeMask.merge(taiOffset.warningCodeMask);
         return result;
     }
 
@@ -191,7 +191,7 @@ void mergeEarthOrientationSampleWarnings(
 
 void Ut1OffsetResolver::Result::addWarning(const TimeScaleConversionWarningCode::Type code) noexcept
 {
-    warningCodeMask |= BitFlagSetOperations::bit(code);
+    warningCodeMask.add(TimeScaleConversionResult::WarningMask::bit(code));
 }
 
 Ut1OffsetResolver::Ut1OffsetResolver(

@@ -32,6 +32,24 @@ private:
     [[nodiscard]] static double
     targetOffsetSeconds(skygate::core::TimeScale target, double taiMinusUtcSeconds) noexcept;
 
+    // Takes the warning report of a resolved lookup into a completed result.
+    // The lookup status and mask merge in, and its diagnostic text replaces
+    // the generic text when the lookup has one.
+    template <typename Lookup>
+    static void applyLookup(TimeScaleConversionResult& result, const Lookup& lookup) noexcept
+    {
+        TimeScaleConversionResult::mergeWarnings(result, lookup.status, lookup.warningCodeMask);
+        if (!lookup.diagnosticText.empty()) {
+            result.diagnosticText = lookup.diagnosticText;
+        }
+    }
+
+    [[nodiscard]] TimeScaleConversionResult convertVia(
+        skygate::core::TimeScale intermediateScale,
+        const skygate::core::AstronomicalEpoch& epoch,
+        skygate::core::TimeScale targetScale
+    ) const;
+
     LeapSecondOffsetResolver m_leapSecondOffsetResolver;
     Ut1OffsetResolver m_ut1OffsetResolver;
 };

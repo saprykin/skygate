@@ -164,6 +164,9 @@ private slots:
     void reportsOutOfRangeWithoutFallback();
     void reportsReverseOutOfRangeWithoutFallback();
     void usesDegradedFallbackForMissingTableWhenAllowed();
+    void adoptsDegradedFallbackTextForTaiToUtc();
+    void keepsChainWarningsThroughDegradedUt1ToTai();
+    void mergesChainWarningsIntoDegradedTdbResult();
     void convertsTtToTdbWithDocumentedApproximation();
     void roundTripsTtAndTdbPreservingPrecision();
     void convertsUtcToTdbThroughTt();
@@ -378,6 +381,85 @@ void LeapSecondTimeScaleServiceTests::usesDegradedFallbackForMissingTableWhenAll
     QVERIFY(result.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::Type::LeapSecondTableMissing));
     QVERIFY(result.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied));
     compareSecondsBetween(result.epoch, utc, 42.0);
+}
+
+void LeapSecondTimeScaleServiceTests::adoptsDegradedFallbackTextForTaiToUtc()
+{
+    using WarningCode = skygate::ephemeris::TimeScaleConversionWarningCode::Type;
+    using WarningMask = skygate::ephemeris::TimeScaleConversionResult::WarningMask;
+
+    skygate::ephemeris::TimeScaleServiceOptions options;
+    options.allowDegradedLeapSecondFallback = true;
+    options.fallbackTaiMinusUtcSeconds = 42;
+    const skygate::ephemeris::LeapSecondTimeScaleService service(nullptr, options);
+
+    skygate::core::AstronomicalEpoch tai = makeUtcEpoch(2026, 1, 1);
+    tai.timeScale = skygate::core::TimeScale::Tai;
+    const skygate::ephemeris::TimeScaleConversionResult result = service.convert(tai, skygate::core::TimeScale::Utc);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Type::Degraded)
+    );
+    QCOMPARE(
+        result.warningCodeMask,
+        WarningMask::fromBits(
+            WarningMask::bit(WarningCode::LeapSecondTableMissing)
+            | WarningMask::bit(WarningCode::LeapSecondFallbackApplied)
+        )
+    );
+    QCOMPARE(result.diagnosticText, std::string("Time-scale conversion used a degraded leap-second fallback."));
+    compareSecondsBetween(result.epoch, tai, -42.0);
+}
+
+void LeapSecondTimeScaleServiceTests::keepsChainWarningsThroughDegradedUt1ToTai()
+{
+    skygate::ephemeris::TimeScaleServiceOptions options;
+    options.allowDegradedLeapSecondFallback = true;
+    options.fallbackTaiMinusUtcSeconds = 42;
+    const skygate::ephemeris::LeapSecondTimeScaleService service(nullptr, options, makeEarthOrientationProvider());
+
+    const skygate::core::AstronomicalEpoch utc = makeUtcEpoch(2026, 4, 1);
+    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::core::TimeScale::Ut1);
+    QVERIFY(ut1.isSuccess());
+
+    const skygate::ephemeris::TimeScaleConversionResult result =
+        service.convert(ut1.epoch, skygate::core::TimeScale::Tai);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Type::Degraded)
+    );
+    QVERIFY(result.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::Type::LeapSecondTableMissing));
+    QVERIFY(result.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied));
+    QCOMPARE(result.diagnosticText, std::string("Time-scale conversion used a degraded leap-second fallback."));
+    compareSecondsBetween(result.epoch, ut1.epoch, 41.9);
+}
+
+void LeapSecondTimeScaleServiceTests::mergesChainWarningsIntoDegradedTdbResult()
+{
+    skygate::ephemeris::TimeScaleServiceOptions options;
+    options.allowDegradedLeapSecondFallback = true;
+    options.fallbackTaiMinusUtcSeconds = 42;
+    const skygate::ephemeris::LeapSecondTimeScaleService service(nullptr, options);
+
+    const skygate::ephemeris::TimeScaleConversionResult result =
+        service.convert(makeUtcEpoch(2026, 1, 1), skygate::core::TimeScale::Tdb);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Type::Degraded)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.epoch.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tdb)
+    );
+    QVERIFY(result.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::Type::LeapSecondTableMissing));
+    QVERIFY(result.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied));
+    QVERIFY(result.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::Type::TdbApproximationApplied));
+    QVERIFY(!result.diagnosticText.empty());
 }
 
 void LeapSecondTimeScaleServiceTests::convertsTtToTdbWithDocumentedApproximation()

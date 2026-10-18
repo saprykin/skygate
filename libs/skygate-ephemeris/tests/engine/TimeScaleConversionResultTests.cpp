@@ -1,5 +1,6 @@
-#include "engine/BitFlagSetOperations.hpp"
+#include "engine/BitFlagSet.hpp"
 #include "engine/TimeScaleConversionResult.hpp"
+#include "engine/TimeScaleConversionWarningCode.hpp"
 #include "time/AstronomicalEpoch.hpp"
 
 #include <QtTest/QtTest>
@@ -9,6 +10,9 @@
 
 namespace {
 
+using skygate::ephemeris::TimeScaleConversionResult;
+using skygate::ephemeris::TimeScaleConversionWarningCode;
+
 [[nodiscard]] skygate::core::AstronomicalEpoch makeEpoch()
 {
     return {
@@ -16,6 +20,12 @@ namespace {
         .julianDatePart2 = 1.25,
         .timeScale = skygate::core::TimeScale::Tt,
     };
+}
+
+[[nodiscard]] TimeScaleConversionResult::WarningMask
+warningMaskFor(const TimeScaleConversionWarningCode::Type code) noexcept
+{
+    return TimeScaleConversionResult::WarningMask::fromBits(TimeScaleConversionResult::WarningMask::bit(code));
 }
 
 }  // namespace
@@ -27,6 +37,7 @@ private slots:
     void successAppliesDefaultsAndNormalizesEpoch();
     void successKeepsExplicitStatusAndDiagnostic();
     void failureRetargetsEpochTimeScale();
+    void failureFromLookupCarriesLookupReport();
     void mergeCombinesMasksAndPromotesDegraded();
     void mergeKeepsFailedResult();
     void diagnosticsNameMatchesStatusCompanion();
@@ -38,7 +49,7 @@ void TimeScaleConversionResultTests::successAppliesDefaultsAndNormalizesEpoch()
 
     const TimeScaleConversionResult result = TimeScaleConversionResult::success(makeEpoch());
     QCOMPARE(result.status, TimeScaleConversionStatus::Type::Valid);
-    QCOMPARE(result.warningCodeMask, 0U);
+    QVERIFY(!result.warningCodeMask.hasAny());
     QCOMPARE(result.diagnosticText, std::string("Time-scale conversion succeeded."));
     QCOMPARE(result.epoch.julianDatePart1, 2460001.0);
     QCOMPARE(result.epoch.julianDatePart2, 0.75);
@@ -53,13 +64,11 @@ void TimeScaleConversionResultTests::successKeepsExplicitStatusAndDiagnostic()
     const TimeScaleConversionResult result = TimeScaleConversionResult::success(
         makeEpoch(),
         TimeScaleConversionStatus::Type::Degraded,
-        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied),
+        warningMaskFor(TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied),
         "custom diagnostic"
     );
     QCOMPARE(result.status, TimeScaleConversionStatus::Type::Degraded);
-    QCOMPARE(
-        result.warningCodeMask, BitFlagSetOperations::bit(TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied)
-    );
+    QCOMPARE(result.warningCodeMask, warningMaskFor(TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied));
     QCOMPARE(result.diagnosticText, std::string("custom diagnostic"));
 }
 
@@ -73,8 +82,26 @@ void TimeScaleConversionResultTests::failureRetargetsEpochTimeScale()
     QCOMPARE(result.epoch.timeScale, skygate::core::TimeScale::Utc);
     QCOMPARE(result.epoch.julianDatePart1, 2460000.5);
     QCOMPARE(result.epoch.julianDatePart2, 1.25);
-    QCOMPARE(result.warningCodeMask, 0U);
+    QVERIFY(!result.warningCodeMask.hasAny());
     QCOMPARE(result.diagnosticText, std::string("failed"));
+    QVERIFY(!result.isSuccess());
+}
+
+void TimeScaleConversionResultTests::failureFromLookupCarriesLookupReport()
+{
+    using namespace skygate::ephemeris;
+
+    const TimeScaleConversionResult result = TimeScaleConversionResult::failureFromLookup(
+        makeEpoch(),
+        skygate::core::TimeScale::Utc,
+        warningMaskFor(TimeScaleConversionWarningCode::Type::LeapSecondTableMissing),
+        "lookup failed"
+    );
+    QCOMPARE(result.status, TimeScaleConversionStatus::Type::Failed);
+    QCOMPARE(result.epoch.timeScale, skygate::core::TimeScale::Utc);
+    QCOMPARE(result.warningCodeMask, warningMaskFor(TimeScaleConversionWarningCode::Type::LeapSecondTableMissing));
+    QVERIFY(result.hasWarning(TimeScaleConversionWarningCode::Type::LeapSecondTableMissing));
+    QCOMPARE(result.diagnosticText, std::string("lookup failed"));
     QVERIFY(!result.isSuccess());
 }
 
@@ -86,13 +113,10 @@ void TimeScaleConversionResultTests::mergeCombinesMasksAndPromotesDegraded()
     TimeScaleConversionResult::mergeWarnings(
         result,
         TimeScaleConversionStatus::Type::Degraded,
-        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied)
+        warningMaskFor(TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied)
     );
     QCOMPARE(result.status, TimeScaleConversionStatus::Type::Degraded);
-    QCOMPARE(
-        result.warningCodeMask,
-        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied)
-    );
+    QCOMPARE(result.warningCodeMask, warningMaskFor(TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied));
 }
 
 void TimeScaleConversionResultTests::mergeKeepsFailedResult()
@@ -104,10 +128,10 @@ void TimeScaleConversionResultTests::mergeKeepsFailedResult()
     TimeScaleConversionResult::mergeWarnings(
         result,
         TimeScaleConversionStatus::Type::Degraded,
-        BitFlagSetOperations::bit(TimeScaleConversionWarningCode::Type::InvalidInput)
+        warningMaskFor(TimeScaleConversionWarningCode::Type::InvalidInput)
     );
     QCOMPARE(result.status, TimeScaleConversionStatus::Type::Failed);
-    QCOMPARE(result.warningCodeMask, BitFlagSetOperations::bit(TimeScaleConversionWarningCode::Type::InvalidInput));
+    QCOMPARE(result.warningCodeMask, warningMaskFor(TimeScaleConversionWarningCode::Type::InvalidInput));
 }
 
 void TimeScaleConversionResultTests::diagnosticsNameMatchesStatusCompanion()

@@ -4,7 +4,7 @@ namespace skygate::ephemeris {
 
 bool EphemerisEngineOptions::isOptionSet(const Key key) const noexcept
 {
-    return (m_specifiedMask & BitFlagSetOperations::bit(key)) != 0U;
+    return (m_specifiedMask & BitFlagSet<Key>::bit(key)) != 0U;
 }
 
 bool EphemerisEngineOptions::operator==(const EphemerisEngineOptions& other) const noexcept

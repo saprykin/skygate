@@ -324,6 +324,10 @@ add_skygate_ephemeris_qtest(
     engine/TimeScaleConversionResultTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-bit-flag-set-tests
+    engine/BitFlagSetTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-backend-resource-cache-tests
     engine/EphemerisBackendResourceCacheTests.cpp
 )
