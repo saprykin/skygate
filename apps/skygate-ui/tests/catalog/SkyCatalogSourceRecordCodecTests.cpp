@@ -1,7 +1,7 @@
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/CatalogSourceType.hpp"
-#include "catalog/SkyCatalogSourceCacheRecord.hpp"
 #include "catalog/SkyCatalogSourceCachePaths.hpp"
+#include "catalog/SkyCatalogSourceCacheRecord.hpp"
 #include "catalog/SkyCatalogSourceRecordCodec.hpp"
 #include "support/LogCapture.hpp"
 #include "support/SettingsTestFixture.hpp"
