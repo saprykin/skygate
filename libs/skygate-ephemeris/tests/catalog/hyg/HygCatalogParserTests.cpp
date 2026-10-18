@@ -1,5 +1,6 @@
 #include "TestHelpers.hpp"
 #include "catalog/CatalogLoader.hpp"
+#include "catalog/CatalogStarAstrometry.hpp"
 
 #include <QtTest/QtTest>
 
@@ -16,6 +17,7 @@ private slots:
     void supportsFallbackIdsAndQuotedFields();
     void keepsWholeCatalogByDefault();
     void rejectsMalformedInput();
+    void skipsNonNumericHipValues();
 };
 
 void HygCatalogParserTests::parsesBasicRows()
@@ -59,6 +61,9 @@ void HygCatalogParserTests::parsesAstrometryColumns()
     QCOMPARE(astrometry.radialVelocityKmPerSecond.value_or(0.0), -5.5);
     QVERIFY(astrometry.stellarParallaxMas.has_value());
     QVERIFY(std::abs(*astrometry.stellarParallaxMas - 379.219) < 0.001);
+    QCOMPARE(
+        skygate::ephemeris::CatalogStarAstrometry::distanceParsecsFromParallaxMas(*astrometry.stellarParallaxMas), 2.637
+    );
 }
 
 void HygCatalogParserTests::treatsMissingDistanceSentinelAsAbsentParallax()
@@ -186,6 +191,24 @@ void HygCatalogParserTests::rejectsMalformedInput()
         "1,NoCoordinates\n"
     );
     QVERIFY(!malformedResult.isSuccess());
+}
+
+void HygCatalogParserTests::skipsNonNumericHipValues()
+{
+    QTest::ignoreMessage(QtWarningMsg, "HYG CSV skipped 1 rows with invalid numeric values; samples: row 3 hip='abc'");
+    auto result = skygate::ephemeris::CatalogLoader::load(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
+        "hip,id,proper,ra,dec,mag\n"
+        "77,,Kept,1.0,2.0,3.0\n"
+        "abc,9,Skipped,3.0,4.0,5.0\n"
+    );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
+    QVERIFY(catalog != nullptr);
+
+    const auto bodies = catalog->bodies();
+    QVERIFY(bodies.size() == 1U);
+    QVERIFY(bodies[0]->id == "hip_77");
 }
 
 QTEST_APPLESS_MAIN(HygCatalogParserTests)

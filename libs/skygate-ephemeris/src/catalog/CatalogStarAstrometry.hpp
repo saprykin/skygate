@@ -18,6 +18,11 @@ struct CatalogStarAstrometry {
     std::optional<double> radialVelocityKmPerSecond;
     std::optional<EphemerisDateRange> validityRange;
 
+    // Parallax in milliarcseconds of a star at `distanceParsecs`, and the
+    // inverse conversion. Callers pass a positive distance or parallax.
+    [[nodiscard]] static double parallaxMasFromDistanceParsecs(double distanceParsecs) noexcept;
+    [[nodiscard]] static double distanceParsecsFromParallaxMas(double parallaxMas) noexcept;
+
     [[nodiscard]] bool hasUsableProperMotionRightAscension() const noexcept;
     [[nodiscard]] bool hasUsableProperMotionDeclination() const noexcept;
     [[nodiscard]] bool hasUsableParallax() const noexcept;

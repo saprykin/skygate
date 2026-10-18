@@ -34,7 +34,7 @@ std::optional<CatalogIdentifier> parseHipReference(const std::string_view refere
         return std::nullopt;
     }
 
-    return CatalogIdentifier::make("hip", std::to_string(*hipNumber));
+    return CatalogIdentifier::make(CatalogIdentifier::kHipNamespace, std::to_string(*hipNumber));
 }
 
 struct ResolutionSummary final {

@@ -68,6 +68,7 @@ private slots:
     void mergesExplicitCrossIdentifications();
     void primaryDesignationSurvivesBinaryRoundTrip();
     void classifiesUppercaseCanonicalDesignations();
+    void parsesDesignationsFromSourceText();
 };
 
 void CatalogIdentityMatchTests::deduplicatesDuplicateHipStars()
@@ -578,7 +579,7 @@ void CatalogIdentityMatchTests::keepsSuffixDesignationsDistinct()
 
     QTest::ignoreMessage(
         QtWarningMsg,
-        "Catalog composition kept ngc_1A distinct from ngc_1 because their shared alias is ambiguous across "
+        "Catalog composition kept ngc_1a distinct from ngc_1 because their shared alias is ambiguous across "
         "authoritative identifiers."
     );
     const auto result = CatalogMergeTestSupport::composePrimary(*parsed.catalog);
@@ -586,9 +587,9 @@ void CatalogIdentityMatchTests::keepsSuffixDesignationsDistinct()
     QVERIFY(result.isSuccess());
     QCOMPARE(result.deepSkyObjectCount, std::size_t{2});
     QCOMPARE(CatalogMergeTestSupport::countBodiesById(result.catalog->bodies(), "ngc_1"), std::size_t{1});
-    QCOMPARE(CatalogMergeTestSupport::countBodiesById(result.catalog->bodies(), "ngc_1A"), std::size_t{1});
+    QCOMPARE(CatalogMergeTestSupport::countBodiesById(result.catalog->bodies(), "ngc_1a"), std::size_t{1});
 
-    const BaseCelestialBody* component = CatalogMergeTestSupport::findBodyById(result.catalog->bodies(), "ngc_1A");
+    const BaseCelestialBody* component = CatalogMergeTestSupport::findBodyById(result.catalog->bodies(), "ngc_1a");
     QVERIFY(component != nullptr);
     QVERIFY(CatalogMergeTestSupport::hasIdentifier(*component, "ngc", "1a"));
 }
@@ -689,6 +690,31 @@ void CatalogIdentityMatchTests::classifiesUppercaseCanonicalDesignations()
     QCOMPARE(result.deepSkyObjectCount, std::size_t{2});
     QCOMPARE(CatalogMergeTestSupport::countBodiesById(result.catalog->bodies(), "NGC_224"), std::size_t{1});
     QCOMPARE(CatalogMergeTestSupport::countBodiesById(result.catalog->bodies(), "ngc_598"), std::size_t{1});
+}
+
+void CatalogIdentityMatchTests::parsesDesignationsFromSourceText()
+{
+    using skygate::ephemeris::CatalogIdentifier;
+
+    const auto spacedMessier = CatalogIdentifier::designationFromText("M 31");
+    QVERIFY(spacedMessier.has_value());
+    QCOMPARE(spacedMessier->key(), std::string{"messier:031"});
+
+    const auto compactMessier = CatalogIdentifier::designationFromText("m31");
+    QVERIFY(compactMessier.has_value());
+    QCOMPARE(compactMessier->key(), std::string{"messier:031"});
+
+    const auto ngc = CatalogIdentifier::designationFromText("NGC0001");
+    QVERIFY(ngc.has_value());
+    QCOMPARE(ngc->key(), std::string{"ngc:1"});
+
+    const auto icComponent = CatalogIdentifier::designationFromText("IC 4715b");
+    QVERIFY(icComponent.has_value());
+    QCOMPARE(icComponent->key(), std::string{"ic:4715b"});
+
+    QVERIFY(!CatalogIdentifier::designationFromText("Maia Nebula").has_value());
+    QVERIFY(!CatalogIdentifier::designationFromText("MWSC 0175").has_value());
+    QVERIFY(!CatalogIdentifier::designationFromText("M").has_value());
 }
 
 QTEST_APPLESS_MAIN(CatalogIdentityMatchTests)
