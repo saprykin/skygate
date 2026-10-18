@@ -1,8 +1,7 @@
 #include "ErfaFrameTransformer.hpp"
 #include "EphemerisMetadataMerger.hpp"
-#include "ErfaAstrometry.hpp"
-#include "engine/ITimeScaleService.hpp"
-#include "math/MathConstants.hpp"
+#include "FrameTransformMatrixCache.hpp"
+#include "FrameTransformStageCatalog.hpp"
 #include "math/Matrix3x3.hpp"
 
 #include <cstdint>
@@ -13,8 +12,6 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-using skygate::core::MathConstants;
-
 constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A celestial and terrestrial frame transform";
 
 class FrameTransformSession final {
@@ -22,12 +19,12 @@ public:
     FrameTransformSession(
         const CelestialReferenceFrame::Type sourceFrame,
         const CelestialReferenceFrame::Type targetFrame,
-        skygate::core::AstronomicalEpoch epoch,
+        const skygate::core::AstronomicalEpoch epoch,
         const skygate::ephemeris::ITimeScaleService* timeScaleService,
         const skygate::ephemeris::IEarthOrientationProvider* earthOrientationProvider
     )
-        : m_sourceFrame(sourceFrame), m_targetFrame(targetFrame), m_epoch(epoch), m_timeScaleService(timeScaleService),
-          m_earthOrientationProvider(earthOrientationProvider)
+        : m_sourceFrame(sourceFrame), m_targetFrame(targetFrame),
+          m_matrixCache(epoch, timeScaleService, earthOrientationProvider)
     {
     }
 
@@ -50,11 +47,6 @@ public:
             );
         }
 
-        CelestialFrameTransformResult result;
-        result.metadata.status = EphemerisEngineQueryStatus::Type::Valid;
-        result.metadata.appliedCorrections = EphemerisCorrectionFlags::noCorrections();
-        result.metadata.dataSourceProvenance = kFrameTransformProvenance;
-
         if (std::optional<CelestialFrameTransformResult> apparentResult = tryTransformApparentEquatorAndEquinox(vector);
             apparentResult.has_value()) {
             return *apparentResult;
@@ -71,32 +63,19 @@ public:
             );
         }
 
-        skygate::core::Vector3d transformed = vector;
-        const std::vector<StagePlan> stagePlan = buildTransformStagePlan(sourceRank, targetRank);
-        for (const StagePlan& plannedStage : stagePlan) {
-            CelestialFrameTransformResult::Stage stage = makeStage(plannedStage.sourceFrame, plannedStage.targetFrame);
-            const std::optional<skygate::core::Matrix3x3> matrix = stageMatrix(plannedStage.lowerRank, stage.metadata);
-            if (!matrix.has_value()) {
-                markStageUnavailable(stage, plannedStage.correction);
-                appendStage(result, std::move(stage));
-                return result;
-            }
-
-            transformed =
-                plannedStage.forward ? matrix->multiplied(transformed) : matrix->transposeMultiplied(transformed);
-            stage.applied = true;
-            EphemerisMetadataMerger::markCorrectionApplied(stage.metadata, plannedStage.correction);
-            appendStage(result, std::move(stage));
-        }
-
-        result.vector = transformed;
+        CelestialFrameTransformResult result = makeValidResult();
+        applyCatalogStages(vector, sourceRank, targetRank, result);
         return result;
     }
 
 private:
-    [[nodiscard]] static constexpr EphemerisMetadataMergeOptions cachedMetadataMergeOptions() noexcept
+    [[nodiscard]] static CelestialFrameTransformResult makeValidResult()
     {
-        return EphemerisMetadataMergeOptions::statusAndWarningsOnly();
+        CelestialFrameTransformResult result;
+        result.metadata.status = EphemerisEngineQueryStatus::Type::Valid;
+        result.metadata.appliedCorrections = EphemerisCorrectionFlags::noCorrections();
+        result.metadata.dataSourceProvenance = kFrameTransformProvenance;
+        return result;
     }
 
     [[nodiscard]] static constexpr EphemerisMetadataMergeOptions stageMetadataMergeOptions() noexcept
@@ -105,48 +84,6 @@ private:
         options.mergeCorrections = true;
         return options;
     }
-
-    [[nodiscard]] static constexpr EphemerisCorrectionFlags
-    correctionForLowerRank(const std::uint8_t lowerRank) noexcept
-    {
-        switch (lowerRank) {
-        case 0U:
-            return EphemerisCorrectionFlags::precessionNutation();
-        case 1U:
-            return EphemerisCorrectionFlags::earthOrientation();
-        case 2U:
-            return EphemerisCorrectionFlags::earthOrientation();
-        default:
-            return EphemerisCorrectionFlags::noCorrections();
-        }
-    }
-
-    struct MatrixCacheEntry {
-        std::optional<skygate::core::Matrix3x3> matrix;
-        EphemerisEngineQueryResult metadata;
-
-        void recordMatrix(std::optional<skygate::core::Matrix3x3> value) noexcept
-        {
-            matrix = std::move(value);
-            if (!matrix.has_value()) {
-                metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-                metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
-            }
-        }
-
-        void mergeMetadataInto(EphemerisEngineQueryResult& target) const noexcept
-        {
-            EphemerisMetadataMerger::merge(target, metadata, FrameTransformSession::cachedMetadataMergeOptions());
-        }
-    };
-
-    struct StagePlan {
-        CelestialReferenceFrame::Type sourceFrame = CelestialReferenceFrame::Type::Gcrs;
-        CelestialReferenceFrame::Type targetFrame = CelestialReferenceFrame::Type::Cirs;
-        std::uint8_t lowerRank = 0U;
-        EphemerisCorrectionFlags correction = EphemerisCorrectionFlags::noCorrections();
-        bool forward = true;
-    };
 
     [[nodiscard]] static CelestialFrameTransformResult::Stage
     makeStage(const CelestialReferenceFrame::Type sourceFrame, const CelestialReferenceFrame::Type targetFrame)
@@ -172,213 +109,42 @@ private:
         EphemerisMetadataMerger::markCorrectionUnavailable(stage.metadata, unavailableCorrection);
     }
 
-    [[nodiscard]] std::optional<skygate::core::AstronomicalEpoch>
-    epochInScale(skygate::core::TimeScale targetScale, EphemerisEngineQueryResult& metadata)
+    void applyCatalogStages(
+        const skygate::core::Vector3d& vector,
+        const std::uint8_t sourceRank,
+        const std::uint8_t targetRank,
+        CelestialFrameTransformResult& result
+    )
     {
-        if (!m_epoch.isFinite()) {
-            metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-            metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
-            return std::nullopt;
-        }
-
-        if (m_epoch.timeScale == targetScale) {
-            return m_epoch.normalized();
-        }
-
-        if (m_timeScaleService == nullptr) {
-            metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-            metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
-            return std::nullopt;
-        }
-
-        std::optional<TimeScaleConversionResult>* cachedConversion = conversionCacheFor(targetScale);
-        if (cachedConversion == nullptr) {
-            metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-            metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
-            return std::nullopt;
-        }
-        if (!cachedConversion->has_value()) {
-            *cachedConversion = m_timeScaleService->convert(m_epoch, targetScale);
-        }
-
-        const TimeScaleConversionResult& conversion = **cachedConversion;
-        EphemerisMetadataMerger::mergeTimeScale(metadata, conversion, EphemerisMetadataFailurePolicy::MarkFailed);
-        if (!conversion.isSuccess()) {
-            return std::nullopt;
-        }
-
-        return conversion.epoch;
-    }
-
-    [[nodiscard]] std::optional<EarthOrientationSampler::Sample> earthOrientation(EphemerisEngineQueryResult& metadata)
-    {
-        return EphemerisMetadataMerger::prepareEarthOrientation(
-            m_epoch,
-            m_timeScaleService,
-            m_earthOrientationProvider,
-            metadata,
-            EphemerisMetadataFailurePolicy::MarkFailed,
-            EarthOrientationSampler::Options::tolerantFallback(),
-            &m_earthOrientationCache
-        );
-    }
-
-    [[nodiscard]] std::optional<skygate::core::AstronomicalEpoch> ut1Epoch(EphemerisEngineQueryResult& metadata)
-    {
-        if (!m_epoch.isFinite()) {
-            metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-            metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
-            return std::nullopt;
-        }
-
-        if (m_epoch.timeScale == skygate::core::TimeScale::Ut1 || m_earthOrientationProvider == nullptr) {
-            return epochInScale(skygate::core::TimeScale::Ut1, metadata);
-        }
-
-        const std::optional<EarthOrientationSampler::Sample> sample = earthOrientation(metadata);
-        if (!sample.has_value()) {
-            return std::nullopt;
-        }
-
-        return sample->requestedUtcEpoch.addSeconds(sample->ut1MinusUtcSeconds, skygate::core::TimeScale::Ut1);
-    }
-
-    [[nodiscard]] std::optional<skygate::core::Matrix3x3>
-    celestialIntermediateMatrix(EphemerisEngineQueryResult& metadata)
-    {
-        if (!m_celestialIntermediateMatrix.has_value()) {
-            MatrixCacheEntry cacheEntry;
-            const std::optional<skygate::core::AstronomicalEpoch> ttEpoch =
-                epochInScale(skygate::core::TimeScale::Tt, cacheEntry.metadata);
-            if (ttEpoch.has_value()) {
-                cacheEntry.recordMatrix(ErfaAstrometry::celestialToIntermediateMatrix06A(*ttEpoch));
-            }
-            m_celestialIntermediateMatrix = cacheEntry;
-        }
-
-        m_celestialIntermediateMatrix->mergeMetadataInto(metadata);
-        return m_celestialIntermediateMatrix->matrix;
-    }
-
-    [[nodiscard]] std::optional<skygate::core::Matrix3x3>
-    intermediateToTerrestrialIntermediateMatrix(EphemerisEngineQueryResult& metadata)
-    {
-        if (!m_earthRotationMatrix.has_value()) {
-            MatrixCacheEntry cacheEntry;
-            const std::optional<skygate::core::AstronomicalEpoch> universalTime1 = ut1Epoch(cacheEntry.metadata);
-            if (universalTime1.has_value()) {
-                cacheEntry.recordMatrix(ErfaAstrometry::earthRotationMatrix00(*universalTime1));
-            }
-            m_earthRotationMatrix = cacheEntry;
-        }
-
-        m_earthRotationMatrix->mergeMetadataInto(metadata);
-        return m_earthRotationMatrix->matrix;
-    }
-
-    [[nodiscard]] std::optional<skygate::core::Matrix3x3>
-    terrestrialIntermediateToTerrestrialMatrix(EphemerisEngineQueryResult& metadata)
-    {
-        if (!m_polarMotionMatrix.has_value()) {
-            MatrixCacheEntry cacheEntry;
-            const std::optional<skygate::core::AstronomicalEpoch> ttEpoch =
-                epochInScale(skygate::core::TimeScale::Tt, cacheEntry.metadata);
-            const std::optional<EarthOrientationSampler::Sample> earthOrientationSample =
-                earthOrientation(cacheEntry.metadata);
-            if (ttEpoch.has_value() && earthOrientationSample.has_value()) {
-                const std::optional<double> tioLocator = ErfaAstrometry::tioLocatorS00(*ttEpoch);
-                if (tioLocator.has_value()) {
-                    cacheEntry.recordMatrix(
-                        ErfaAstrometry::polarMotionMatrix00(
-                            earthOrientationSample->polarMotionXArcseconds * MathConstants::kArcsecondsToRadians,
-                            earthOrientationSample->polarMotionYArcseconds * MathConstants::kArcsecondsToRadians,
-                            *tioLocator
-                        )
-                    );
-                } else {
-                    cacheEntry.recordMatrix(std::nullopt);
-                }
-            }
-            m_polarMotionMatrix = cacheEntry;
-        }
-
-        m_polarMotionMatrix->mergeMetadataInto(metadata);
-        return m_polarMotionMatrix->matrix;
-    }
-
-    [[nodiscard]] std::optional<skygate::core::Matrix3x3>
-    apparentEquatorAndEquinoxMatrix(EphemerisEngineQueryResult& metadata)
-    {
-        if (!m_apparentEquatorAndEquinoxMatrix.has_value()) {
-            MatrixCacheEntry cacheEntry;
-            const std::optional<skygate::core::AstronomicalEpoch> ttEpoch =
-                epochInScale(skygate::core::TimeScale::Tt, cacheEntry.metadata);
-            if (ttEpoch.has_value()) {
-                cacheEntry.recordMatrix(ErfaAstrometry::precessionNutationMatrix06A(*ttEpoch));
-            }
-            m_apparentEquatorAndEquinoxMatrix = cacheEntry;
-        }
-
-        m_apparentEquatorAndEquinoxMatrix->mergeMetadataInto(metadata);
-        return m_apparentEquatorAndEquinoxMatrix->matrix;
-    }
-
-    [[nodiscard]] std::optional<skygate::core::Matrix3x3>
-    stageMatrix(const std::uint8_t lowerRank, EphemerisEngineQueryResult& metadata)
-    {
-        switch (lowerRank) {
-        case 0U:
-            return celestialIntermediateMatrix(metadata);
-        case 1U:
-            return intermediateToTerrestrialIntermediateMatrix(metadata);
-        case 2U:
-            return terrestrialIntermediateToTerrestrialMatrix(metadata);
-        default:
-            metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-            metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
-            return std::nullopt;
-        }
-    }
-
-    [[nodiscard]] std::vector<StagePlan>
-    buildTransformStagePlan(const std::uint8_t sourceRank, const std::uint8_t targetRank) const
-    {
-        std::vector<StagePlan> stages;
-        if (sourceRank < targetRank) {
-            stages.reserve(targetRank - sourceRank);
-            for (std::uint8_t lowerRank = sourceRank; lowerRank < targetRank; ++lowerRank) {
-                const std::uint8_t upperRank = static_cast<std::uint8_t>(lowerRank + 1U);
-                stages.push_back(
-                    StagePlan{
-                        .sourceFrame =
-                            lowerRank == sourceRank ? m_sourceFrame : CelestialReferenceFrame::typeFromRank(lowerRank),
-                        .targetFrame =
-                            upperRank == targetRank ? m_targetFrame : CelestialReferenceFrame::typeFromRank(upperRank),
-                        .lowerRank = lowerRank,
-                        .correction = correctionForLowerRank(lowerRank),
-                        .forward = true,
-                    }
-                );
-            }
-            return stages;
-        }
-
-        stages.reserve(sourceRank - targetRank);
-        for (std::uint8_t lowerRank = sourceRank; lowerRank > targetRank; --lowerRank) {
-            const std::uint8_t stageLowerRank = static_cast<std::uint8_t>(lowerRank - 1U);
-            stages.push_back(
-                StagePlan{
-                    .sourceFrame =
-                        lowerRank == sourceRank ? m_sourceFrame : CelestialReferenceFrame::typeFromRank(lowerRank),
-                    .targetFrame = stageLowerRank == targetRank ? m_targetFrame
-                                                                : CelestialReferenceFrame::typeFromRank(stageLowerRank),
-                    .lowerRank = stageLowerRank,
-                    .correction = correctionForLowerRank(stageLowerRank),
-                    .forward = false,
-                }
+        const bool forward = sourceRank < targetRank;
+        const std::uint8_t stageCount = forward ? static_cast<std::uint8_t>(targetRank - sourceRank)
+                                                : static_cast<std::uint8_t>(sourceRank - targetRank);
+        skygate::core::Vector3d transformed = vector;
+        for (std::uint8_t index = 0U; index < stageCount; ++index) {
+            const std::uint8_t lowerRank = forward ? static_cast<std::uint8_t>(sourceRank + index)
+                                                   : static_cast<std::uint8_t>(sourceRank - 1U - index);
+            const FrameTransformStageCatalog::Row& row = FrameTransformStageCatalog::rowForLowerRank(lowerRank);
+            const bool firstStage = index == 0U;
+            const bool lastStage = static_cast<std::uint8_t>(index + 1U) == stageCount;
+            CelestialFrameTransformResult::Stage stage = makeStage(
+                firstStage ? m_sourceFrame : (forward ? row.sourceFrame : row.targetFrame),
+                lastStage ? m_targetFrame : (forward ? row.targetFrame : row.sourceFrame)
             );
+
+            const std::optional<skygate::core::Matrix3x3> matrix = m_matrixCache.matrix(row.matrixKind, stage.metadata);
+            if (!matrix.has_value()) {
+                markStageUnavailable(stage, row.correction);
+                appendStage(result, std::move(stage));
+                return;
+            }
+
+            transformed = forward ? matrix->multiplied(transformed) : matrix->transposeMultiplied(transformed);
+            stage.applied = true;
+            EphemerisMetadataMerger::markCorrectionApplied(stage.metadata, row.correction);
+            appendStage(result, std::move(stage));
         }
-        return stages;
+
+        result.vector = transformed;
     }
 
     [[nodiscard]] std::optional<CelestialFrameTransformResult>
@@ -392,56 +158,26 @@ private:
             return std::nullopt;
         }
 
-        CelestialFrameTransformResult result;
-        result.metadata.status = EphemerisEngineQueryStatus::Type::Valid;
-        result.metadata.appliedCorrections = EphemerisCorrectionFlags::noCorrections();
-        result.metadata.dataSourceProvenance = kFrameTransformProvenance;
-
+        const FrameTransformStageCatalog::Row& row = FrameTransformStageCatalog::apparentEquatorAndEquinoxRow();
+        CelestialFrameTransformResult result = makeValidResult();
         CelestialFrameTransformResult::Stage stage = makeStage(m_sourceFrame, m_targetFrame);
-        const std::optional<skygate::core::Matrix3x3> matrix = apparentEquatorAndEquinoxMatrix(stage.metadata);
+        const std::optional<skygate::core::Matrix3x3> matrix = m_matrixCache.matrix(row.matrixKind, stage.metadata);
         if (!matrix.has_value()) {
-            markStageUnavailable(stage, EphemerisCorrectionFlags::precessionNutation());
+            markStageUnavailable(stage, row.correction);
             appendStage(result, std::move(stage));
             return result;
         }
 
         result.vector = forward ? matrix->multiplied(vector) : matrix->transposeMultiplied(vector);
         stage.applied = true;
-        EphemerisMetadataMerger::markCorrectionApplied(stage.metadata, EphemerisCorrectionFlags::precessionNutation());
+        EphemerisMetadataMerger::markCorrectionApplied(stage.metadata, row.correction);
         appendStage(result, std::move(stage));
         return result;
     }
 
-    [[nodiscard]] std::optional<TimeScaleConversionResult>*
-    conversionCacheFor(const skygate::core::TimeScale targetScale)
-    {
-        switch (targetScale) {
-        case skygate::core::TimeScale::Tt:
-            return &m_ttConversion;
-        case skygate::core::TimeScale::Utc:
-            return &m_earthOrientationCache.utcConversion;
-        case skygate::core::TimeScale::Ut1:
-            return &m_ut1Conversion;
-        case skygate::core::TimeScale::Tai:
-        case skygate::core::TimeScale::Tdb:
-            return nullptr;
-        }
-
-        return nullptr;
-    }
-
     const CelestialReferenceFrame::Type m_sourceFrame = CelestialReferenceFrame::Type::Gcrs;
     const CelestialReferenceFrame::Type m_targetFrame = CelestialReferenceFrame::Type::Cirs;
-    const skygate::core::AstronomicalEpoch m_epoch;
-    const skygate::ephemeris::ITimeScaleService* const m_timeScaleService = nullptr;
-    const skygate::ephemeris::IEarthOrientationProvider* const m_earthOrientationProvider = nullptr;
-    std::optional<TimeScaleConversionResult> m_ttConversion;
-    EphemerisMetadataMerger::EarthOrientationCache m_earthOrientationCache;
-    std::optional<TimeScaleConversionResult> m_ut1Conversion;
-    std::optional<MatrixCacheEntry> m_celestialIntermediateMatrix;
-    std::optional<MatrixCacheEntry> m_earthRotationMatrix;
-    std::optional<MatrixCacheEntry> m_polarMotionMatrix;
-    std::optional<MatrixCacheEntry> m_apparentEquatorAndEquinoxMatrix;
+    FrameTransformMatrixCache m_matrixCache;
 };
 
 }  // namespace
