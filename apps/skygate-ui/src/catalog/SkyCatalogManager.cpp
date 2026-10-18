@@ -468,6 +468,26 @@ void SkyCatalogManager::cancelCatalogDownload()
     emit sourcesChanged();
 }
 
+bool SkyCatalogManager::clearSourceCachesForPolicy(const skygate::ephemeris::CatalogCompositionPolicy policy)
+{
+    if (m_cacheController == nullptr) {
+        return true;
+    }
+
+    bool cacheCleared = true;
+    for (const SkyCatalogSourceRecord& source : m_runtime->sources()) {
+        if (source.policy != policy) {
+            continue;
+        }
+        const bool sourceCleared = m_cacheController->clearSourceCache(source.instanceId);
+        if (sourceCleared) {
+            markSourcePayloadEvicted(source.instanceId);
+        }
+        cacheCleared = sourceCleared && cacheCleared;
+    }
+    return cacheCleared;
+}
+
 bool SkyCatalogManager::clearCatalogCache()
 {
     if (m_downloadingCatalog || m_catalogProcessing) {
@@ -476,18 +496,8 @@ bool SkyCatalogManager::clearCatalogCache()
         return false;
     }
 
-    bool cacheCleared = true;
+    bool cacheCleared = clearSourceCachesForPolicy(skygate::ephemeris::CatalogCompositionPolicy::Merge);
     if (m_cacheController != nullptr) {
-        for (const SkyCatalogSourceRecord& source : m_runtime->sources()) {
-            if (source.policy != skygate::ephemeris::CatalogCompositionPolicy::Merge) {
-                continue;
-            }
-            const bool sourceCleared = m_cacheController->clearSourceCache(source.instanceId);
-            if (sourceCleared) {
-                markSourcePayloadEvicted(source.instanceId);
-            }
-            cacheCleared = sourceCleared && cacheCleared;
-        }
         cacheCleared = m_cacheController->clearCatalogCache() && cacheCleared;
     }
     m_statusText = SkyCatalogText::starCacheClearResult(cacheCleared);
@@ -503,18 +513,8 @@ bool SkyCatalogManager::clearDeepSkyCatalogCache()
         return false;
     }
 
-    bool cacheCleared = true;
+    bool cacheCleared = clearSourceCachesForPolicy(skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
     if (m_cacheController != nullptr) {
-        for (const SkyCatalogSourceRecord& source : m_runtime->sources()) {
-            if (source.policy != skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly) {
-                continue;
-            }
-            const bool sourceCleared = m_cacheController->clearSourceCache(source.instanceId);
-            if (sourceCleared) {
-                markSourcePayloadEvicted(source.instanceId);
-            }
-            cacheCleared = sourceCleared && cacheCleared;
-        }
         cacheCleared = m_cacheController->clearDeepSkyCatalogCache() && cacheCleared;
     }
     m_statusText = SkyCatalogText::deepSkyCacheClearResult(cacheCleared);
