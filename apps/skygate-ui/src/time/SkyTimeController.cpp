@@ -7,24 +7,11 @@
 #include "SystemTimeSource.hpp"
 #include "UtcTimeCodec.hpp"
 
-#include <QDate>
-#include <QTime>
 #include <QTimeZone>
 
-#include <cmath>
 #include <chrono>
 
 namespace {
-
-QString formatUtcOffset(const int offsetSeconds)
-{
-    const QChar sign = offsetSeconds < 0 ? QLatin1Char('-') : QLatin1Char('+');
-    const int absoluteSeconds = std::abs(offsetSeconds);
-    return QString("UTC%1%2:%3")
-        .arg(sign)
-        .arg(absoluteSeconds / 3600, 2, 10, QLatin1Char('0'))
-        .arg((absoluteSeconds % 3600) / 60, 2, 10, QLatin1Char('0'));
-}
 
 QTimeZone validTimeZoneOrFallback(const QString& timeZoneId)
 {
@@ -45,21 +32,6 @@ const skygate::core::SystemTimeSource& defaultTimeSource()
 {
     static const skygate::core::SystemTimeSource timeSource;
     return timeSource;
-}
-
-QString timeZoneLabel(const QTimeZone& timeZone, const QDateTime& zonedDateTime)
-{
-    QString label = timeZone.abbreviation(zonedDateTime).trimmed();
-    if (label.isEmpty()) {
-        label = timeZone.displayName(zonedDateTime, QTimeZone::ShortName).trimmed();
-    }
-
-    const QString offsetText = formatUtcOffset(timeZone.offsetFromUtc(zonedDateTime));
-    if (label.isEmpty() || label.startsWith(QLatin1String("GMT")) || label.startsWith(QLatin1Char('+'))
-        || label.startsWith(QLatin1Char('-'))) {
-        return offsetText;
-    }
-    return label;
 }
 
 }  // namespace
@@ -92,7 +64,7 @@ QString SkyTimeController::timeZoneId() const
 
 QString SkyTimeController::timeZoneLabel() const
 {
-    return ::timeZoneLabel(m_timeZone, displayDateTime());
+    return SkyQtTimeCodec::timeZoneLabel(displayDateTime());
 }
 
 QString SkyTimeController::timeZoneDetailText() const
@@ -210,11 +182,9 @@ void SkyTimeController::goLiveNow()
 QString SkyTimeController::formatUtcTime(const skygate::core::UtcTimePoint& utcTime, const bool includeSeconds) const
 {
     const QDateTime zonedDateTime = SkyQtTimeCodec::toQDateTimeUtc(utcTime).toTimeZone(m_timeZone);
-    return includeSeconds
-               ? QString("%1 %2").arg(
-                     SkyQtTimeCodec::formatDateTimeText(zonedDateTime), ::timeZoneLabel(m_timeZone, zonedDateTime)
-                 )
-               : QString("%1 %2").arg(zonedDateTime.toString("HH:mm"), ::timeZoneLabel(m_timeZone, zonedDateTime));
+    const QString timeText = includeSeconds ? SkyQtTimeCodec::formatDateTimeText(zonedDateTime)
+                                            : SkyQtTimeCodec::formatTimeText(zonedDateTime, false);
+    return QString("%1 %2").arg(timeText, SkyQtTimeCodec::timeZoneLabel(zonedDateTime));
 }
 
 QString SkyTimeController::formatUtcTimeRange(
@@ -223,13 +193,13 @@ QString SkyTimeController::formatUtcTimeRange(
 {
     const QDateTime startDateTime = SkyQtTimeCodec::toQDateTimeUtc(startUtc).toTimeZone(m_timeZone);
     const QDateTime endDateTime = SkyQtTimeCodec::toQDateTimeUtc(endUtc).toTimeZone(m_timeZone);
-    const QString label = ::timeZoneLabel(m_timeZone, startDateTime);
-    if (startDateTime.date() == endDateTime.date() && ::timeZoneLabel(m_timeZone, endDateTime) == label) {
+    const QString label = SkyQtTimeCodec::timeZoneLabel(startDateTime);
+    if (startDateTime.date() == endDateTime.date() && SkyQtTimeCodec::timeZoneLabel(endDateTime) == label) {
         return QString("%1 %2 / %3 %4")
             .arg(
                 SkyQtTimeCodec::formatDateText(startDateTime.date()),
-                startDateTime.toString("HH:mm:ss"),
-                endDateTime.toString("HH:mm:ss"),
+                SkyQtTimeCodec::formatTimeText(startDateTime),
+                SkyQtTimeCodec::formatTimeText(endDateTime),
                 label
             );
     }
@@ -251,24 +221,20 @@ SkyTimeController::ParseResult
 SkyTimeController::parseDisplayDateTime(const QString& dateText, const QString& timeText) const
 {
     const SkyQtTimeCodec::ParseResult parsed = SkyQtTimeCodec::parseDateTime(dateText, timeText);
-    switch (parsed.error) {
-    case SkyQtTimeCodec::ParseError::InvalidDateSyntax:
-        return {.utcDateTime = {}, .errorText = "Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates."};
-    case SkyQtTimeCodec::ParseError::InvalidYearMagnitude:
-        return {.utcDateTime = {}, .errorText = "Year 0000 is invalid. Use 0001 BCE for the year before 0001 CE."};
-    case SkyQtTimeCodec::ParseError::InvalidCalendarDate:
-        return {.utcDateTime = {}, .errorText = "Enter a valid date."};
-    case SkyQtTimeCodec::ParseError::InvalidTimeSyntax:
-        return {.utcDateTime = {}, .errorText = "Use HH:mm:ss for the time."};
-    case SkyQtTimeCodec::ParseError::None:
-        break;
+    if (parsed.error != SkyQtTimeCodec::ParseError::None) {
+        return {
+            .utcDateTime = {},
+            .errorText = SkyQtTimeCodec::errorText(parsed.error, SkyQtTimeCodec::ErrorScope::LocalDisplay),
+        };
     }
 
-    const QDateTime zonedDateTime(
-        QDate(parsed.year, parsed.month, parsed.day), QTime(parsed.hour, parsed.minute, parsed.second), m_timeZone
-    );
+    const QDateTime zonedDateTime = parsed.toQDateTime(m_timeZone);
     if (!zonedDateTime.isValid()) {
-        return {.utcDateTime = {}, .errorText = "Enter a valid date and time."};
+        return {
+            .utcDateTime = {},
+            .errorText =
+                SkyQtTimeCodec::errorText(SkyQtTimeCodec::ParseError::None, SkyQtTimeCodec::ErrorScope::LocalDisplay),
+        };
     }
 
     return {.utcDateTime = zonedDateTime.toUTC(), .errorText = {}};
@@ -281,7 +247,7 @@ QString SkyTimeController::formattedDateText() const
 
 QString SkyTimeController::formattedTimeText() const
 {
-    return displayDateTime().toString("HH:mm:ss");
+    return SkyQtTimeCodec::formatTimeText(displayDateTime());
 }
 
 void SkyTimeController::emitDisplayTextChanges(const QString& previousDateText, const QString& previousTimeText)

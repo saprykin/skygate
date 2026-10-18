@@ -5,6 +5,7 @@
 #include "SkyNightConditionsAdapter.hpp"
 #include "SkyNightConditionsData.hpp"
 #include "SolarAltitudeThresholds.hpp"
+#include "time/SkyQtTimeCodec.hpp"
 #include "time/SkyTimeController.hpp"
 
 #include "NightConditionsCalculator.hpp"
@@ -83,8 +84,9 @@ private:
             if (event.utcTime.has_value()) {
                 return m_timeController != nullptr
                            ? m_timeController->formatUtcTime(*event.utcTime, false)
-                           : skygate::ui::internal::SkyContextTimeCodec::toQDateTimeUtc(*event.utcTime)
-                                 .toString("HH:mm");
+                           : SkyQtTimeCodec::formatTimeText(
+                                 skygate::ui::internal::SkyContextTimeCodec::toQDateTimeUtc(*event.utcTime), false
+                             );
             }
             return "--";
         case ObservationEventStatus::Type::AlwaysAbove:

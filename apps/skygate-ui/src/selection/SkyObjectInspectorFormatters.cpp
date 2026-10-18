@@ -1,11 +1,8 @@
 #include "SkyObjectInspectorFormatters.hpp"
 #include "ObservationEventCalculator.hpp"
-#include "time/CalendarTime.hpp"
+#include "app/SkyContextTextFormatter.hpp"
 #include "time/SkyQtTimeCodec.hpp"
 #include "time/SkyTimeController.hpp"
-
-#include <QDateTime>
-#include <QTimeZone>
 
 #include <array>
 #include <cmath>
@@ -28,7 +25,7 @@ QString SkyObjectInspectorFormatters::celestialBodyTypeText(const skygate::ephem
 
 QString SkyObjectInspectorFormatters::formatFiniteNumber(const double value, const int precision)
 {
-    return std::isfinite(value) ? QString::number(value, 'f', precision) : QString("--");
+    return std::isfinite(value) ? SkyContextTextFormatter::formatFixed(value, precision) : QString("--");
 }
 
 QString SkyObjectInspectorFormatters::formatMagnitude(const double value)
@@ -187,18 +184,6 @@ QStringList correctionNames(const skygate::ephemeris::EphemerisCorrectionFlags f
     return names;
 }
 
-QString formatDate(const skygate::core::AstronomicalEpoch& epoch)
-{
-    const auto dateTime = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
-    if (!dateTime.has_value()) {
-        return "--";
-    }
-
-    const int historicalYear =
-        skygate::core::CalendarTime::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
-    return SkyQtTimeCodec::formatDateText(QDate(historicalYear, dateTime->month, dateTime->day));
-}
-
 }  // namespace
 
 QString SkyObjectInspectorFormatters::formatEquatorialCoordinate(const skygate::core::EquatorialCoordinate& equatorial)
@@ -324,12 +309,7 @@ SkyObjectInspectorFormatters::formatEphemerisWarnings(const skygate::ephemeris::
 
 QString SkyObjectInspectorFormatters::formatEphemerisDateRange(const skygate::ephemeris::EphemerisDateRange& range)
 {
-    const QString rangeText = QString("%1 to %2").arg(formatDate(range.start), formatDate(range.end));
-    if (range.displayName.empty()) {
-        return rangeText;
-    }
-
-    return QString("%1: %2").arg(QString::fromStdString(range.displayName), rangeText);
+    return SkyQtTimeCodec::formatDateRangeText(range);
 }
 
 QString SkyObjectInspectorFormatters::formatAngularUncertaintyArcsec(const double arcsec)
