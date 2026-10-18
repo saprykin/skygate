@@ -1,6 +1,7 @@
 #include "SkyCatalogCollectionStore.hpp"
 #include "catalog/CatalogCompositionPolicyRules.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
+#include "settings/SkyCacheFiles.hpp"
 #include "settings/SkySettingsKeyBuilder.hpp"
 #include "settings/SkySettingsValueCodecs.hpp"
 
@@ -10,9 +11,7 @@
 #include <QFileInfo>
 #include <QList>
 #include <QLoggingCategory>
-#include <QSaveFile>
 #include <QSettings>
-#include <QStandardPaths>
 
 #include <algorithm>
 #include <cstddef>
@@ -27,33 +26,7 @@ Q_LOGGING_CATEGORY(skygateSettingsLog, "skygate.settings")
 
 QString defaultCatalogCollectionCachePath()
 {
-    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (appDataPath.isEmpty()) {
-        return {};
-    }
-
-    return QDir(appDataPath).filePath(QStringLiteral("catalog-source-cache"));
-}
-
-void appendCachePath(QStringList& cachePaths, const QString& path)
-{
-    if (!path.isEmpty() && !cachePaths.contains(path)) {
-        cachePaths.push_back(path);
-    }
-}
-
-bool removeCacheFiles(const QStringList& cachePaths)
-{
-    bool removedAllCacheFiles = true;
-    for (const QString& cachePath : cachePaths) {
-        QFile cacheFile(cachePath);
-        if (cacheFile.exists() && !cacheFile.remove()) {
-            qCWarning(skygateCatalogCacheLog).noquote()
-                << "Failed to remove catalog cache file" << cachePath << cacheFile.errorString();
-            removedAllCacheFiles = false;
-        }
-    }
-    return removedAllCacheFiles;
+    return SkyCacheFiles::appDataFilePath(QStringLiteral("catalog-source-cache"));
 }
 
 // A stored policy only means something when it names a policy this build knows.
@@ -191,38 +164,12 @@ bool writeCatalogCollectionManifest(const QString& path, const CatalogCollection
         return false;
     }
 
-    const QFileInfo targetInfo(path);
-    QDir targetDir(targetInfo.absolutePath());
-    if (!targetDir.mkpath(".")) {
-        qCWarning(skygateCatalogCacheLog).noquote()
-            << "Failed to create catalog collection cache directory" << targetDir.absolutePath();
-        return false;
-    }
-
     QByteArray content;
     content += QByteArrayLiteral("schemaVersion=") + QByteArray::number(manifest.schemaVersion) + '\n';
     content += QByteArrayLiteral("binarySchemaVersion=") + QByteArray::number(manifest.binarySchemaVersion) + '\n';
     content += QByteArrayLiteral("generation=") + QByteArray::number(manifest.generation) + '\n';
 
-    QSaveFile manifestFile(path);
-    if (!manifestFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        qCWarning(skygateCatalogCacheLog).noquote()
-            << "Failed to open catalog collection manifest for writing" << path << manifestFile.errorString();
-        return false;
-    }
-
-    if (manifestFile.write(content) != content.size()) {
-        qCWarning(skygateCatalogCacheLog).noquote() << "Failed to write complete catalog collection manifest" << path;
-        manifestFile.cancelWriting();
-        return false;
-    }
-
-    if (!manifestFile.commit()) {
-        qCWarning(skygateCatalogCacheLog).noquote()
-            << "Failed to commit catalog collection manifest" << path << manifestFile.errorString();
-        return false;
-    }
-    return true;
+    return SkyCacheFiles::writeFileAtomically(path, content, QStringLiteral("catalog collection manifest"));
 }
 
 quint64
@@ -383,36 +330,7 @@ bool writeCatalogSourceFile(const QString& path, const QByteArray& payload)
     if (path.isEmpty() || payload.isEmpty()) {
         return true;
     }
-
-    const QFileInfo targetInfo(path);
-    QDir targetDir(targetInfo.absolutePath());
-    if (!targetDir.mkpath(".")) {
-        qCWarning(skygateCatalogCacheLog).noquote()
-            << "Failed to create catalog collection cache directory" << targetDir.absolutePath();
-        return false;
-    }
-
-    QSaveFile cacheFile(path);
-    if (!cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        qCWarning(skygateCatalogCacheLog).noquote()
-            << "Failed to open catalog source cache for writing" << path << cacheFile.errorString();
-        return false;
-    }
-
-    const qint64 writtenBytes = cacheFile.write(payload);
-    if (writtenBytes != payload.size()) {
-        qCWarning(skygateCatalogCacheLog).noquote() << "Failed to write complete catalog source cache" << path
-                                                    << "written" << writtenBytes << "expected" << payload.size();
-        cacheFile.cancelWriting();
-        return false;
-    }
-
-    if (!cacheFile.commit()) {
-        qCWarning(skygateCatalogCacheLog).noquote()
-            << "Failed to commit catalog source cache" << path << cacheFile.errorString();
-        return false;
-    }
-    return true;
+    return SkyCacheFiles::writeFileAtomically(path, payload, QStringLiteral("catalog source cache"));
 }
 
 // A referenced sidecar is expected to exist once its path is stored. A missing
@@ -429,17 +347,17 @@ CatalogSourcePayloadReadResult readCatalogSourceFile(const QString& path)
         return {};
     }
 
-    QFile cacheFile(path);
-    if (!cacheFile.exists()) {
+    const SkyCacheFiles::ReadResult result = SkyCacheFiles::readFile(path);
+    if (result.state == SkyCacheFiles::ReadState::Absent) {
         qCWarning(skygateCatalogCacheLog).noquote() << "Referenced catalog source payload is missing" << path;
         return {.unreadable = true};
     }
-    if (!cacheFile.open(QIODevice::ReadOnly)) {
+    if (result.state == SkyCacheFiles::ReadState::Unreadable) {
         qCWarning(skygateCatalogCacheLog).noquote()
-            << "Failed to open catalog source cache" << path << cacheFile.errorString();
+            << "Failed to open catalog source cache" << path << result.errorString;
         return {.unreadable = true};
     }
-    return {.payload = cacheFile.readAll()};
+    return {.payload = result.payload};
 }
 
 void appendCatalogCollectionDirFiles(QStringList& cachePaths, const QString& directory)
@@ -452,9 +370,9 @@ void appendCatalogCollectionDirFiles(QStringList& cachePaths, const QString& dir
     const QStringList entries =
         dir.entryList(QStringList{QStringLiteral("catalog-source-*")}, QDir::Files | QDir::Readable);
     for (const QString& entryName : entries) {
-        appendCachePath(cachePaths, dir.filePath(entryName));
+        SkyCacheFiles::appendUniquePath(cachePaths, dir.filePath(entryName));
     }
-    appendCachePath(cachePaths, catalogCollectionManifestPath(directory));
+    SkyCacheFiles::appendUniquePath(cachePaths, catalogCollectionManifestPath(directory));
 }
 
 void removeObsoleteCatalogCollectionFiles(const QString& directory, const QStringList& referencedPaths)
@@ -589,7 +507,11 @@ bool SkyCatalogCollectionStore::save(const SkyCatalogCollectionCacheSnapshot& sn
     const quint64 generation = highestCatalogCollectionGeneration(directory, settings, committedGeneration) + 1U;
 
     QStringList stagedPaths;
-    const auto discardStagedFiles = [&stagedPaths]() { removeCacheFiles(stagedPaths); };
+    const auto discardStagedFiles = [&stagedPaths]() {
+        // Removal failures are already reported by the helper; staging cleanup
+        // stays best effort because the committed generation is unaffected.
+        (void)SkyCacheFiles::removeFiles(stagedPaths, QStringLiteral("catalog cache"));
+    };
     for (const SkyCatalogSourceCacheRecord& record : snapshot.sources) {
         if (!record.payload.isEmpty()) {
             const QString rawPath = catalogSourceRawPath(directory, record.instanceId, generation);
@@ -848,7 +770,7 @@ bool SkyCatalogCollectionStore::clear() const
     QStringList cachePaths;
     appendCatalogCollectionDirFiles(cachePaths, configuredDirectory);
     appendCatalogCollectionDirFiles(cachePaths, defaultDirectory);
-    const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
+    const bool removedAllCacheFiles = SkyCacheFiles::removeFiles(cachePaths, QStringLiteral("catalog cache"));
 
     settings.remove(QStringLiteral("catalogSources"));
     settings.remove(SkySettingsKeyBuilder::key("catalogCollectionVersion"));
@@ -888,9 +810,9 @@ bool SkyCatalogCollectionStore::evictSource(const QString& instanceId) const
     settings.endGroup();
 
     QStringList cachePaths;
-    appendCachePath(cachePaths, rawPath);
-    appendCachePath(cachePaths, binaryPath);
-    const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
+    SkyCacheFiles::appendUniquePath(cachePaths, rawPath);
+    SkyCacheFiles::appendUniquePath(cachePaths, binaryPath);
+    const bool removedAllCacheFiles = SkyCacheFiles::removeFiles(cachePaths, QStringLiteral("catalog cache"));
 
     // Payload eviction keeps the configured record: identity, order, enabled
     // state, descriptor, and parse contract stay durable. The disposable

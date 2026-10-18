@@ -2,6 +2,7 @@
 #include "support/CatalogCacheTestSupport.hpp"
 #include "support/CatalogCollectionCacheFixture.hpp"
 #include "support/CatalogTestPayloads.hpp"
+#include "support/LogCapture.hpp"
 #include "support/SettingsTestFixture.hpp"
 
 #include <QDir>
@@ -36,6 +37,7 @@ private slots:
     void unreadablePayloadIsReportedDistinctFromEviction();
     void partialCacheSavePreservesConfiguredPeerPath();
     void missingCacheFilesAndMalformedMetadataTolerated();
+    void legacyLoaderReportsOnlyUnreadableCaches();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -269,6 +271,27 @@ void SkyCatalogCacheSettingsTests::missingCacheFilesAndMalformedMetadataTolerate
     QCOMPARE(loadedSnapshot->constellationLineSchemaVersion, 0);
     QCOMPARE(loadedSnapshot->constellationCount, 0U);
     QVERIFY(loadedSnapshot->deepSkyCatalogPayload.isEmpty());
+}
+
+void SkyCatalogCacheSettingsTests::legacyLoaderReportsOnlyUnreadableCaches()
+{
+    m_settings.clearSettings();
+    const QString unreadablePath = m_settings.currentTestFilePath(QStringLiteral("unreadable-star-cache.txt"));
+    QVERIFY(QDir().mkpath(unreadablePath));
+    m_settings.setCatalogCachePaths(
+        unreadablePath, m_settings.currentTestFilePath(QStringLiteral("missing-deep-sky-cache.txt"))
+    );
+
+    const SkySettingsStore store;
+    skygate::ui::tests::LogCapture capture(QtWarningMsg);
+    QVERIFY(!store.loadCatalogCache().has_value());
+
+    // A path that exists but cannot be opened is reported, while the absent
+    // deep-sky and binary slots stay silent.
+    const QString messages = capture.joinedMessages();
+    QVERIFY(messages.contains(QStringLiteral("Failed to open star catalog cache")));
+    QVERIFY(messages.contains(unreadablePath));
+    QVERIFY(!messages.contains(QStringLiteral("deep-sky catalog cache")));
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogCacheSettingsTests)

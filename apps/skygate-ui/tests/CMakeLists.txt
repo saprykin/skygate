@@ -228,6 +228,7 @@ add_skygate_ui_qtest(
     LABELS integration
     TIMEOUT 45
 )
+add_skygate_ui_qtest(skygate-ui-sky-cache-files-tests settings/SkyCacheFilesTests.cpp)
 add_skygate_ui_qtest(
     skygate-ui-catalog-cache-settings-tests
     settings/SkyCatalogCacheSettingsTests.cpp
