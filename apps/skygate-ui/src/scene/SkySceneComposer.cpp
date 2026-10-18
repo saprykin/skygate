@@ -1,5 +1,4 @@
 #include "SkySceneComposer.hpp"
-#include "CelestialReferenceCalculator.hpp"
 #include "SkyOverlayItem.hpp"
 #include "SkySceneCompositionInput.hpp"
 #include "SkySceneCompositionResult.hpp"
@@ -8,22 +7,16 @@
 #include "diagnostics/SkyPerformanceLogging.hpp"
 #include "diagnostics/SkyPerformanceStageTimer.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
-#include "math/Geometry2d.hpp"
 #include "render/SkyCardinalDirectionPolicy.hpp"
+#include "render/SkyReferenceOverlayLabelBuilder.hpp"
 #include "render/SkyRenderLabel.hpp"
 #include "selection/SkyObjectTrailInput.hpp"
 #include "selection/SkySelectionOverlayInput.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
 
 #include <QColor>
-#include <QPointF>
-
-#include <limits>
 
 namespace {
-
-constexpr int kReferenceLabelSampleCount = skygate::ephemeris::CelestialReferenceCalculator::kReferenceCircleSamples;
-constexpr double kReferenceLabelEdgeMarginPx = 36.0;
 
 SkyOverlayItem
 overlayEntry(const QString& kind, const double x, const double y, const QString& text, const QColor& color)
@@ -50,58 +43,6 @@ trailTargetPointers(const skygate::ephemeris::EphemerisSnapshot* snapshot, const
     }
 
     return {};
-}
-
-bool pointIsInsideLabelMargin(
-    const skygate::core::ScreenPoint& point, const skygate::core::ProjectionParams& params
-) noexcept
-{
-    return point.x >= kReferenceLabelEdgeMarginPx && point.x <= (params.viewportWidth - kReferenceLabelEdgeMarginPx)
-           && point.y >= kReferenceLabelEdgeMarginPx
-           && point.y <= (params.viewportHeight - kReferenceLabelEdgeMarginPx);
-}
-
-template <typename CoordinateAt>
-void appendReferenceLayerLabel(
-    std::vector<SkyOverlayItem>& overlayItems,
-    const skygate::core::PreparedProjection& preparedProjection,
-    const QString& text,
-    const QColor& color,
-    CoordinateAt coordinateAt
-)
-{
-    const auto& params = preparedProjection.params();
-    const double targetX = params.viewportWidth * 0.72;
-    const double targetY = params.viewportHeight * 0.34;
-
-    std::optional<QPointF> bestPoint;
-    double bestScore = std::numeric_limits<double>::max();
-    std::optional<QPointF> fallbackPoint;
-    double fallbackScore = std::numeric_limits<double>::max();
-
-    for (int index = 0; index < kReferenceLabelSampleCount; ++index) {
-        const auto projected = preparedProjection.project(coordinateAt(index));
-        if (!projected.isVisible()) {
-            continue;
-        }
-
-        const double score = skygate::core::Geometry2d::squaredDistance2d(projected.x, projected.y, targetX, targetY);
-        if (score < fallbackScore) {
-            fallbackPoint = QPointF(projected.x, projected.y);
-            fallbackScore = score;
-        }
-        if (pointIsInsideLabelMargin(projected, params) && score < bestScore) {
-            bestPoint = QPointF(projected.x, projected.y);
-            bestScore = score;
-        }
-    }
-
-    const std::optional<QPointF>& labelPoint = bestPoint.has_value() ? bestPoint : fallbackPoint;
-    if (!labelPoint.has_value()) {
-        return;
-    }
-
-    overlayItems.push_back(overlayEntry("referenceLine", labelPoint->x(), labelPoint->y(), text, color));
 }
 
 std::vector<SkyOverlayItem> renderLabelsToOverlayItems(const std::span<const SkyRenderLabel> labels)
@@ -257,49 +198,9 @@ std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
     const auto* snapshot = frameResult.snapshot != nullptr ? frameResult.snapshot : sceneFrame.snapshot;
     const auto& skyContext = snapshot != nullptr ? snapshot->context : input.frameInput.skyContext;
 
-    if (overlayLayers.ecliptic) {
-        appendReferenceLayerLabel(
-            overlayItems,
-            *sceneFrame.preparedProjection,
-            "Ecliptic",
-            renderTheme.eclipticLine,
-            [&skyContext](const int index) {
-                return skygate::ephemeris::CelestialReferenceCalculator::eclipticCirclePoint(
-                    index, kReferenceLabelSampleCount, skyContext.observer, skyContext.utcTime
-                );
-            }
-        );
-    }
-
-    if (overlayLayers.celestialEquator) {
-        appendReferenceLayerLabel(
-            overlayItems,
-            *sceneFrame.preparedProjection,
-            "Celestial equator",
-            renderTheme.celestialEquatorLine,
-            [&skyContext](const int index) {
-                return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-                    index, kReferenceLabelSampleCount, 0.0, skyContext.observer, skyContext.utcTime
-                );
-            }
-        );
-    }
-
-    if (overlayLayers.circumpolarBoundary && skyContext.observer.isValid()) {
-        const double boundaryDeclinationDeg =
-            skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(skyContext.observer);
-        appendReferenceLayerLabel(
-            overlayItems,
-            *sceneFrame.preparedProjection,
-            "Circumpolar",
-            renderTheme.circumpolarBoundaryLine,
-            [boundaryDeclinationDeg, &skyContext](const int index) {
-                return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-                    index, kReferenceLabelSampleCount, boundaryDeclinationDeg, skyContext.observer, skyContext.utcTime
-                );
-            }
-        );
-    }
+    skygate::ui::internal::SkyReferenceOverlayLabelBuilder::appendLabels(
+        overlayItems, *sceneFrame.preparedProjection, renderTheme, overlayLayers, skyContext
+    );
 
     if (!overlayLayers.horizon) {
         return overlayItems;

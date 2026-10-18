@@ -288,8 +288,9 @@ void SkyRenderLabelBuilder::appendBodyPointLabels(
             continue;
         }
 
-        if (point.x < edgeMarginPx || point.x > (viewportWidth - edgeMarginPx) || point.y < edgeMarginPx
-            || point.y > (viewportHeight - edgeMarginPx)) {
+        if (!skygate::core::Geometry2d::pointWithinMargin(
+                point.x, point.y, viewportWidth, viewportHeight, edgeMarginPx
+            )) {
             continue;
         }
 

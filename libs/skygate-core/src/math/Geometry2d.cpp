@@ -123,10 +123,17 @@ bool Geometry2d::intersects(const Rect2d& lhs, const Rect2d& rhs) noexcept
     return lhs.left < rhs.right && lhs.right > rhs.left && lhs.top < rhs.bottom && lhs.bottom > rhs.top;
 }
 
+bool Geometry2d::pointWithinMargin(
+    const double x, const double y, const double width, const double height, const double margin
+) noexcept
+{
+    return x >= margin && x <= (width - margin) && y >= margin && y <= (height - margin);
+}
+
 bool Geometry2d::fitsWithin(const Rect2d& rect, const double width, const double height, const double margin) noexcept
 {
-    return rect.left >= margin && rect.right <= (width - margin) && rect.top >= margin
-           && rect.bottom <= (height - margin);
+    return Geometry2d::pointWithinMargin(rect.left, rect.top, width, height, margin)
+           && Geometry2d::pointWithinMargin(rect.right, rect.bottom, width, height, margin);
 }
 
 }  // namespace skygate::core
