@@ -251,6 +251,34 @@ add_skygate_ephemeris_qtest(
     engine/EphemerisDataStalenessTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-data-manifest-tests
+    engine/data/EphemerisDataManifestTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-data-activation-tests
+    engine/data/EphemerisDataActivationTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-delta-t-provider-tests
+    engine/data/DeltaTProviderTests.cpp
+    LABELS "unit;validation;time-eop"
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-earth-orientation-provider-tests
+    engine/data/EarthOrientationProviderTests.cpp
+    LABELS "unit;validation;time-eop"
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-leap-second-provider-tests
+    engine/data/LeapSecondProviderTests.cpp
+    LABELS "unit;validation;time-eop"
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-leap-second-time-scale-service-tests
+    engine/data/LeapSecondTimeScaleServiceTests.cpp
+    LABELS "unit;validation;time-eop"
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-table-interpolation-tests
     engine/TableInterpolationTests.cpp
 )
@@ -401,36 +429,6 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
         skygate-ephemeris-observer-geodesy-tests
         highprecision/ObserverGeodesyTests.cpp
         LABELS "unit;highprecision"
-    )
-    add_skygate_ephemeris_qtest(
-        skygate-ephemeris-data-manifest-tests
-        highprecision/EphemerisDataManifestTests.cpp
-        LABELS "unit;highprecision"
-    )
-    add_skygate_ephemeris_qtest(
-        skygate-ephemeris-data-activation-tests
-        highprecision/EphemerisDataActivationTests.cpp
-        LABELS "unit;highprecision"
-    )
-    add_skygate_ephemeris_qtest(
-        skygate-ephemeris-delta-t-provider-tests
-        highprecision/DeltaTProviderTests.cpp
-        LABELS "unit;highprecision;validation;time-eop"
-    )
-    add_skygate_ephemeris_qtest(
-        skygate-ephemeris-earth-orientation-provider-tests
-        highprecision/EarthOrientationProviderTests.cpp
-        LABELS "unit;highprecision;validation;time-eop"
-    )
-    add_skygate_ephemeris_qtest(
-        skygate-ephemeris-leap-second-provider-tests
-        highprecision/LeapSecondProviderTests.cpp
-        LABELS "unit;highprecision;validation;time-eop"
-    )
-    add_skygate_ephemeris_qtest(
-        skygate-ephemeris-leap-second-time-scale-service-tests
-        highprecision/LeapSecondTimeScaleServiceTests.cpp
-        LABELS "unit;highprecision;validation;time-eop"
     )
 endif()
 
