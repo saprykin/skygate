@@ -20,6 +20,7 @@
 #include "ephemeris/SkyEphemerisUpdateWorkflow.hpp"
 #include "location/LocationCatalogModel.hpp"
 #include "location/SkyDeviceLocationAcquisition.hpp"
+#include "location/SkyLocationStatusText.hpp"
 #include "projections/ProjectionTypeCodec.hpp"
 #include "search/SkyObjectSearchModel.hpp"
 #include "settings/SkySettingsStore.hpp"
@@ -619,18 +620,18 @@ void SkyContextController::updateLocationStatusText()
 {
     switch (m_location.source()) {
     case SkyContextLocationSource::CurrentDevice:
-        setLocationStatusText("Location: Current device");
+        setLocationStatusText(SkyLocationStatusText::currentDevice());
         return;
     case SkyContextLocationSource::City:
         if (!m_location.selectedCityDisplayText().isEmpty()) {
-            setLocationStatusText(QString("Location: City - %1").arg(m_location.selectedCityDisplayText()));
+            setLocationStatusText(SkyLocationStatusText::cityNamed(m_location.selectedCityDisplayText()));
             return;
         }
 
-        setLocationStatusText("Location: City");
+        setLocationStatusText(SkyLocationStatusText::city());
         return;
     case SkyContextLocationSource::Custom:
-        setLocationStatusText("Location: Custom coordinates");
+        setLocationStatusText(SkyLocationStatusText::customCoordinates());
         return;
     }
 }
@@ -654,7 +655,7 @@ void SkyContextController::applyCurrentLocation(const QGeoCoordinate& coordinate
     }
 
     applyObserverLocation(nextObserver);
-    setLocationStatusText("Location: Using current location");
+    setLocationStatusText(SkyLocationStatusText::usingCurrentLocation());
 #else
     static_cast<void>(coordinate);
 #endif
