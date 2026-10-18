@@ -228,12 +228,20 @@ add_skygate_ui_qtest(
     LABELS integration
     TIMEOUT 45
 )
+add_skygate_ui_qtest(
+    skygate-ui-window-size-settings-tests
+    settings/SkyWindowSizeSettingsTests.cpp
+)
 add_skygate_ui_qtest(skygate-ui-sky-cache-files-tests settings/SkyCacheFilesTests.cpp)
 add_skygate_ui_qtest(
     skygate-ui-catalog-cache-settings-tests
     settings/SkyCatalogCacheSettingsTests.cpp
     LABELS integration
     TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-legacy-catalog-cache-store-tests
+    settings/SkyLegacyCatalogCacheStoreTests.cpp
 )
 add_skygate_ui_qtest(
     skygate-ui-collection-generation-tests
@@ -264,6 +272,10 @@ add_skygate_ui_qtest(
     settings/SkyEphemerisCacheSettingsTests.cpp
     LABELS integration
     TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-ephemeris-data-cache-settings-tests
+    settings/SkyEphemerisDataCacheSettingsTests.cpp
 )
 add_skygate_ui_qtest(
     skygate-ui-object-search-model-tests
