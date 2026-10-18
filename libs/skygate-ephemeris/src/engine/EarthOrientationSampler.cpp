@@ -28,6 +28,27 @@ EphemerisEngineWarning::Code EarthOrientationSampler::Sample::engineWarningCode(
     return EphemerisEngineWarning::Code::AccuracyDegraded;
 }
 
+std::string EarthOrientationSampler::Sample::diagnosticTextFor(
+    const Origin origin, const Status status, const bool nearestRowUsedFirstRow
+)
+{
+    switch (origin) {
+    case Origin::ExactRow:
+        return status == Status::Degraded ? "Earth-orientation sample resolved with degraded metadata."
+                                          : "Earth-orientation sample resolved.";
+    case Origin::Interpolated:
+        return status == Status::Degraded ? "Earth-orientation sample interpolated with degraded metadata."
+                                          : "Earth-orientation sample interpolated.";
+    case Origin::NearestRow:
+        return nearestRowUsedFirstRow ? "Earth-orientation sample used the first available row as a degraded fallback."
+                                      : "Earth-orientation sample used the last available row as a degraded fallback.";
+    case Origin::ZeroFallback:
+        return "Earth-orientation data used a degraded zero-value fallback.";
+    }
+
+    return {};
+}
+
 namespace {
 
 constexpr double kEpochKeyEqualityToleranceDays = 1.0e-9;
@@ -75,13 +96,15 @@ missingDataSample(const skygate::core::AstronomicalEpoch& utcEpoch, const EarthO
     EarthOrientationSampler::Sample sample;
     sample.requestedUtcEpoch = utcEpoch;
     sample.status = EarthOrientationSampler::Sample::Status::Degraded;
+    sample.origin = EarthOrientationSampler::Sample::Origin::ZeroFallback;
     sample.addWarning(EarthOrientationSampler::Sample::WarningCode::MissingData);
-    sample.diagnosticText = "Earth-orientation data used a degraded zero-value fallback.";
     return sample;
 }
 
 [[nodiscard]] EarthOrientationSampler::Sample sampleFromEntry(
-    const skygate::core::AstronomicalEpoch& requestedEpoch, const IEarthOrientationProvider::TableEntry& entry
+    const skygate::core::AstronomicalEpoch& requestedEpoch,
+    const IEarthOrientationProvider::TableEntry& entry,
+    const EarthOrientationSampler::Sample::Origin origin
 )
 {
     EarthOrientationSampler::Sample sample;
@@ -92,7 +115,7 @@ missingDataSample(const skygate::core::AstronomicalEpoch& utcEpoch, const EarthO
     sample.predicted = entry.predicted;
     sample.estimated = entry.estimated;
     sample.status = EarthOrientationSampler::Sample::Status::Valid;
-    sample.diagnosticText = "Earth-orientation sample resolved.";
+    sample.origin = origin;
     return sample;
 }
 
@@ -124,7 +147,7 @@ missingDataSample(const skygate::core::AstronomicalEpoch& utcEpoch, const EarthO
     sample.predicted = lower.predicted || upper.predicted;
     sample.estimated = lower.estimated || upper.estimated;
     sample.status = EarthOrientationSampler::Sample::Status::Valid;
-    sample.diagnosticText = "Earth-orientation sample interpolated.";
+    sample.origin = EarthOrientationSampler::Sample::Origin::Interpolated;
     return sample;
 }
 
@@ -171,53 +194,55 @@ EarthOrientationSampler::Sample EarthOrientationSampler::sample(
         );
     }
 
-    if (provider == nullptr || !provider->dataInfo().isUsable() || provider->entries().empty()) {
-        return missingDataSample(utcEpoch, options);
-    }
-
-    const std::span<const IEarthOrientationProvider::TableEntry> entries = provider->entries();
-    const double requestedKey = utcEpoch.sortKey();
-    const auto lowerBound = std::ranges::lower_bound(entries, requestedKey, {}, [](const auto& entry) {
-        return entry.effectiveUtcEpoch.sortKey();
-    });
-
     EarthOrientationSampler::Sample sample;
-    if (lowerBound != entries.end() && sameEpochKey(lowerBound->effectiveUtcEpoch.sortKey(), requestedKey)) {
-        sample = sampleFromEntry(utcEpoch, *lowerBound);
-    } else if (lowerBound == entries.begin()) {
-        if (!options.allowOutOfRangeNearestSampleFallback) {
-            return failedSample(
-                utcEpoch,
-                EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange,
-                "Requested epoch is before the first Earth-orientation row."
-            );
+    // Names the edge an out-of-range fallback reused; other origins ignore it.
+    bool nearestRowUsedFirstRow = false;
+
+    if (provider == nullptr || !provider->dataInfo().isUsable() || provider->entries().empty()) {
+        sample = missingDataSample(utcEpoch, options);
+        if (!sample.isSuccess()) {
+            return sample;
         }
-        sample = sampleFromEntry(utcEpoch, entries.front());
-        addSampleWarning(sample, EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange);
-        sample.diagnosticText = "Earth-orientation sample used the first available row as a degraded fallback.";
-    } else if (lowerBound == entries.end()) {
-        if (!options.allowOutOfRangeNearestSampleFallback) {
-            return failedSample(
-                utcEpoch,
-                EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange,
-                "Requested epoch is after the last Earth-orientation row."
-            );
-        }
-        sample = sampleFromEntry(utcEpoch, entries.back());
-        addSampleWarning(sample, EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange);
-        sample.diagnosticText = "Earth-orientation sample used the last available row as a degraded fallback.";
     } else {
-        sample = interpolateSamples(utcEpoch, *(lowerBound - 1), *lowerBound);
+        const std::span<const IEarthOrientationProvider::TableEntry> entries = provider->entries();
+        const double requestedKey = utcEpoch.sortKey();
+        const auto lowerBound = std::ranges::lower_bound(entries, requestedKey, {}, [](const auto& entry) {
+            return entry.effectiveUtcEpoch.sortKey();
+        });
+
+        if (lowerBound != entries.end() && sameEpochKey(lowerBound->effectiveUtcEpoch.sortKey(), requestedKey)) {
+            sample = sampleFromEntry(utcEpoch, *lowerBound, EarthOrientationSampler::Sample::Origin::ExactRow);
+        } else if (lowerBound == entries.begin()) {
+            if (!options.allowOutOfRangeNearestSampleFallback) {
+                return failedSample(
+                    utcEpoch,
+                    EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange,
+                    "Requested epoch is before the first Earth-orientation row."
+                );
+            }
+            sample = sampleFromEntry(utcEpoch, entries.front(), EarthOrientationSampler::Sample::Origin::NearestRow);
+            nearestRowUsedFirstRow = true;
+            addSampleWarning(sample, EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange);
+        } else if (lowerBound == entries.end()) {
+            if (!options.allowOutOfRangeNearestSampleFallback) {
+                return failedSample(
+                    utcEpoch,
+                    EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange,
+                    "Requested epoch is after the last Earth-orientation row."
+                );
+            }
+            sample = sampleFromEntry(utcEpoch, entries.back(), EarthOrientationSampler::Sample::Origin::NearestRow);
+            addSampleWarning(sample, EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange);
+        } else {
+            sample = interpolateSamples(utcEpoch, *(lowerBound - 1), *lowerBound);
+        }
+
+        applyDataWarnings(sample, provider->dataInfo(), utcEpoch, options);
     }
 
-    applyDataWarnings(sample, provider->dataInfo(), utcEpoch, options);
-    if (sample.status == EarthOrientationSampler::Sample::Status::Degraded
-        && sample.diagnosticText == "Earth-orientation sample resolved.") {
-        sample.diagnosticText = "Earth-orientation sample resolved with degraded metadata.";
-    }
-    if (sample.status == EarthOrientationSampler::Sample::Status::Degraded
-        && sample.diagnosticText == "Earth-orientation sample interpolated.") {
-        sample.diagnosticText = "Earth-orientation sample interpolated with degraded metadata.";
+    if (sample.isSuccess()) {
+        sample.diagnosticText =
+            EarthOrientationSampler::Sample::diagnosticTextFor(sample.origin, sample.status, nearestRowUsedFirstRow);
     }
     return sample;
 }

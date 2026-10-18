@@ -35,6 +35,14 @@ public:
             Failed
         };
 
+        // How the sampler obtained the values for the requested epoch.
+        enum class Origin : std::uint8_t {
+            ExactRow,
+            Interpolated,
+            NearestRow,
+            ZeroFallback
+        };
+
         enum class WarningCode : std::uint8_t {
             StaleData,
             PredictedData,
@@ -51,6 +59,9 @@ public:
         bool predicted = false;
         bool estimated = false;
         Status status = Status::Failed;
+        // Meaningful for successful samples; failed samples never used table
+        // values.
+        Origin origin = Origin::ZeroFallback;
         std::uint32_t warningCodeMask = 0U;
         std::string diagnosticText;
 
@@ -68,6 +79,13 @@ public:
         {
             return (warningCodeMask & BitFlagSetOperations::bit(code)) != 0U;
         }
+
+        // Sentence that describes how the values were obtained. Row origins
+        // add a degradation suffix when the status is degraded, while the
+        // fallback origins already name the degradation in their wording.
+        // `nearestRowUsedFirstRow` only selects the wording of an out-of-range
+        // fallback and is ignored for the other origins.
+        [[nodiscard]] static std::string diagnosticTextFor(Origin origin, Status status, bool nearestRowUsedFirstRow);
 
         [[nodiscard]] static EphemerisEngineWarning::Code engineWarningCode(WarningCode code) noexcept;
     };
