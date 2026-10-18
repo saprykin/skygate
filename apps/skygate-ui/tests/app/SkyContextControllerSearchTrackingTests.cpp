@@ -333,6 +333,7 @@ private slots:
     void focusSearchTargetIgnoresInvalidTargets();
     void trackSearchTargetStartsLiveAndCentersBody();
     void trackSearchTargetNormalizesKind();
+    void searchTreatsNonAsciiSpaceAsData();
     void trackSearchTargetPreservesBceTimelineAnchor();
     void trackedBcePlaybackCatchUpUsesConfiguredStep();
     void trackSearchTargetUsesSelectedEngineRequest();
@@ -595,6 +596,44 @@ void SkyContextControllerSearchTrackingTests::trackSearchTargetNormalizesKind()
     QVERIFY(targetState != nullptr);
     QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
     QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
+}
+
+void SkyContextControllerSearchTrackingTests::searchTreatsNonAsciiSpaceAsData()
+{
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
+        makeBody(
+            "demo_target",
+            "Demo Target",
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            1.0,
+            skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
+        ),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
+    const auto controller = createController(std::move(starCatalog), std::move(ephemerisEngine));
+    configureFocusTestContext(*controller);
+
+    const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
+    const auto* targetState = findStateById(snapshot, "demo_target");
+    QVERIFY(targetState != nullptr);
+
+    controller->setViewCenter(12.0, 123.0);
+    QVERIFY(!controller->focusSearchTarget(QString::fromUtf8("body\xC2\xA0"), "demo_target"));
+    QCOMPARE(controller->viewCenterAltitudeDeg(), 12.0);
+    QCOMPARE(controller->viewCenterAzimuthDeg(), 123.0);
+
+    QVERIFY(!controller->trackSearchTarget(QString::fromUtf8("body\xC2\xA0"), "demo_target"));
+    QVERIFY(!controller->hasTrackedTarget());
+
+    QVERIFY(controller->trackSearchTarget("body", "demo_target"));
+    QVERIFY(controller->hasTrackedTarget());
+    QVERIFY(controller->focusSearchTarget("body", QString::fromUtf8("demo_target\xC2\xA0")));
+    QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
+    QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
+    QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
+    QVERIFY(!controller->hasTrackedTarget());
 }
 
 void SkyContextControllerSearchTrackingTests::trackSearchTargetPreservesBceTimelineAnchor()
