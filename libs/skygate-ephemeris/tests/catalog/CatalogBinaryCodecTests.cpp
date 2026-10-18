@@ -365,6 +365,23 @@ QByteArray makeInvalidTimeScalePayload(const std::uint8_t timeScale)
     return buffer;
 }
 
+QByteArray makePayloadTruncatedAtFixedEquatorialFlag()
+{
+    QByteArray buffer;
+    QDataStream stream(&buffer, QIODevice::WriteOnly);
+    stream.setVersion(QDataStream::Qt_6_5);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    writeBinaryHeader(stream);
+    stream << static_cast<std::uint64_t>(1U);
+    writePayloadString(stream, "hip_test");
+    writePayloadString(stream, "Test");
+    stream << static_cast<std::uint8_t>(skygate::ephemeris::BaseCelestialBody::Kind::Star);
+    stream << 0.0;
+    writeEmptyIdentity(stream);
+    // The decoder reads the fixed-equatorial flag next; the payload ends here.
+    return buffer;
+}
+
 }  // namespace
 
 class CatalogBinaryCodecTests final : public QObject {
@@ -380,6 +397,7 @@ private slots:
     void rejectsInvalidDeepSkyObjectKind();
     void rejectsInvalidIdScope();
     void rejectsInvalidTimeScale();
+    void rejectsPayloadTruncatedAtFixedEquatorialFlag();
     void rejectsKnownDomainIndexOutOfRange();
 };
 
@@ -474,6 +492,12 @@ void CatalogBinaryCodecTests::rejectsInvalidIdScope()
 void CatalogBinaryCodecTests::rejectsInvalidTimeScale()
 {
     const QByteArray payload = makeInvalidTimeScalePayload(0xFFU);
+    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(payload) == nullptr);
+}
+
+void CatalogBinaryCodecTests::rejectsPayloadTruncatedAtFixedEquatorialFlag()
+{
+    const QByteArray payload = makePayloadTruncatedAtFixedEquatorialFlag();
     QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(payload) == nullptr);
 }
 

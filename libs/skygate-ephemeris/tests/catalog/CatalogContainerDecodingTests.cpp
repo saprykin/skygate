@@ -1,6 +1,7 @@
 #include "CatalogArchiveTestSupport.hpp"
 #include "TestHelpers.hpp"
 #include "catalog/CatalogPayloadParser.hpp"
+#include "catalog/io/CatalogContainerSignature.hpp"
 
 #include <QtTest/QtTest>
 
@@ -116,6 +117,7 @@ private slots:
     void reportsAmbiguousArchiveMembers();
     void reportsMissingArchiveMember();
     void validatesExplicitSchemaHint();
+    void recognizesSupportedContainerSignatures();
 };
 
 void CatalogContainerDecodingTests::hygProducesEquivalentBodiesAcrossContainers()
@@ -382,6 +384,32 @@ void CatalogContainerDecodingTests::validatesExplicitSchemaHint()
     );
     QVERIFY(!unrecognizedResult.isSuccess());
     QCOMPARE(unrecognizedResult.errorCode, CatalogLoadResult::ErrorCode::UnsupportedFormat);
+}
+
+void CatalogContainerDecodingTests::recognizesSupportedContainerSignatures()
+{
+    using skygate::ephemeris::CatalogContainerSignature;
+
+    constexpr std::array<unsigned char, 2> kGzipMagic{0x1f, 0x8b};
+    constexpr std::array<unsigned char, 2> kGzipWrongSecondByte{0x1f, 0x8c};
+    constexpr std::array<unsigned char, 1> kGzipFirstByte{0x1f};
+    QVERIFY(CatalogContainerSignature::isGzip(view(kGzipMagic)));
+    QVERIFY(!CatalogContainerSignature::isGzip(view(kGzipWrongSecondByte)));
+    QVERIFY(!CatalogContainerSignature::isGzip(view(kGzipFirstByte)));
+
+    constexpr std::array<std::array<unsigned char, 4>, 3> kZipMagic{{
+        {0x50, 0x4b, 0x03, 0x04},
+        {0x50, 0x4b, 0x05, 0x06},
+        {0x50, 0x4b, 0x07, 0x08},
+    }};
+    for (const auto& zipMagic : kZipMagic) {
+        QVERIFY(CatalogContainerSignature::isZip(view(zipMagic)));
+    }
+
+    constexpr std::array<unsigned char, 4> kCentralDirectoryMagic{0x50, 0x4b, 0x01, 0x02};
+    constexpr std::array<unsigned char, 3> kZipPartialMagic{0x50, 0x4b, 0x03};
+    QVERIFY(!CatalogContainerSignature::isZip(view(kCentralDirectoryMagic)));
+    QVERIFY(!CatalogContainerSignature::isZip(view(kZipPartialMagic)));
 }
 
 QTEST_APPLESS_MAIN(CatalogContainerDecodingTests)

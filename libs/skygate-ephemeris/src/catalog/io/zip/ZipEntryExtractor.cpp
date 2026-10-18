@@ -1,14 +1,13 @@
 #include "ZipEntryExtractor.hpp"
 #include "ZipBinaryUtilities.hpp"
+#include "catalog/io/CatalogContainerSignature.hpp"
 #include "catalog/io/CompressedDataInflater.hpp"
 
 #include <cstddef>
-#include <cstdint>
 
 namespace skygate::ephemeris {
 namespace {
 
-constexpr std::uint32_t kZipLocalFileHeaderSignature = 0x04034b50U;
 constexpr std::size_t kZipLocalFileHeaderSize = 30U;
 
 }  // namespace
@@ -22,7 +21,8 @@ std::optional<std::string> ZipEntryExtractor::extract(const std::string_view zip
     const auto localHeaderSignature = ZipBinaryUtilities::readLe32(zipData, entry.localHeaderOffset);
     const auto fileNameLength = ZipBinaryUtilities::readLe16(zipData, entry.localHeaderOffset + 26U);
     const auto extraFieldLength = ZipBinaryUtilities::readLe16(zipData, entry.localHeaderOffset + 28U);
-    if (!localHeaderSignature.has_value() || *localHeaderSignature != kZipLocalFileHeaderSignature
+    if (!localHeaderSignature.has_value()
+        || *localHeaderSignature != CatalogContainerSignature::kZipLocalFileHeaderSignature
         || !fileNameLength.has_value() || !extraFieldLength.has_value()) {
         return std::nullopt;
     }

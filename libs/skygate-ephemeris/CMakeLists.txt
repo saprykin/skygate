@@ -290,6 +290,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogObjectIdentity.hpp
     src/catalog/io/CatalogParsingUtilities.hpp
     src/catalog/io/CatalogHeaderPolicy.hpp
+    src/catalog/io/CatalogContainerSignature.hpp
     src/catalog/io/CatalogPayloadFormatDetector.hpp
     src/catalog/io/CatalogZipEntrySelection.hpp
     src/catalog/io/CatalogZipEntrySelector.hpp
