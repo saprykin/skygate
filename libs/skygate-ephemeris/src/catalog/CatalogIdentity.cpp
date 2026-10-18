@@ -1,17 +1,9 @@
 #include "CatalogIdentity.hpp"
-#include "StringUtilities.hpp"
 
 #include <algorithm>
-#include <string_view>
+#include <cstddef>
 
 namespace skygate::ephemeris {
-
-bool CatalogIdentity::containsBodyId(const std::span<const BaseCelestialBody* const> bodies, const std::string_view id)
-{
-    return std::any_of(bodies.begin(), bodies.end(), [id](const BaseCelestialBody* body) {
-        return body != nullptr && StringUtilities::equalsIgnoreAsciiCase(body->id, id);
-    });
-}
 
 bool CatalogIdentity::isAnalyticSolarSystemBody(const BaseCelestialBody& body) noexcept
 {

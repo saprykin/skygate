@@ -32,6 +32,16 @@ public:
         const skygate::core::EquatorialCoordinate& lhs, const skygate::core::EquatorialCoordinate& rhs
     ) noexcept;
 
+    // True when two fixed positions place the object in different directions.
+    // The bound is far tighter than the one `sameDirection` applies, because
+    // this comparison only sees records that already claim to describe one
+    // object: a mismatch means two contradictory positions rather than catalog
+    // noise. A merge uses it only to diagnose the contradiction; it never
+    // decides which position a survivor keeps.
+    [[nodiscard]] static bool positionsDiffer(
+        const skygate::core::EquatorialCoordinate& lhs, const skygate::core::EquatorialCoordinate& rhs
+    ) noexcept;
+
     [[nodiscard]] static bool
     sameAstrometry(const CatalogStarAstrometry& winner, const CatalogStarAstrometry& loser) noexcept;
 };

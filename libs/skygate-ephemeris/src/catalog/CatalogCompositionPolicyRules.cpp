@@ -42,4 +42,30 @@ bool CatalogCompositionPolicyRules::contributesDeepSkyObjects(const CatalogCompo
     return policy == CatalogCompositionPolicy::DeepSkyOnly || policy == CatalogCompositionPolicy::DeepSkyFallback;
 }
 
+bool CatalogCompositionPolicyRules::isGapFill(const CatalogCompositionPolicy policy) noexcept
+{
+    switch (policy) {
+    case CatalogCompositionPolicy::AugmentCore:
+    case CatalogCompositionPolicy::DeepSkyFallback:
+        return true;
+    case CatalogCompositionPolicy::Merge:
+    case CatalogCompositionPolicy::DeepSkyOnly:
+        return false;
+    }
+    return false;
+}
+
+bool CatalogCompositionPolicyRules::enablesBundledStarFallback(const CatalogCompositionPolicy policy) noexcept
+{
+    switch (policy) {
+    case CatalogCompositionPolicy::AugmentCore:
+        return true;
+    case CatalogCompositionPolicy::Merge:
+    case CatalogCompositionPolicy::DeepSkyOnly:
+    case CatalogCompositionPolicy::DeepSkyFallback:
+        return false;
+    }
+    return false;
+}
+
 }  // namespace skygate::ephemeris
