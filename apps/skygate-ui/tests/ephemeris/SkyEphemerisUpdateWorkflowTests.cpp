@@ -32,6 +32,7 @@ using skygate::ui::tests::FakeNetworkReply;
 using skygate::ui::tests::FakeNetworkResponse;
 using skygate::ui::tests::SettingsTestFixture;
 using skygate::ui::tests::StagedEphemerisAssetFixture;
+using namespace skygate::ui::internal;
 
 namespace {
 

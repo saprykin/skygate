@@ -20,6 +20,8 @@
 #include <utility>
 #include <vector>
 
+using namespace skygate::ui::internal;
+
 namespace {
 
 Q_LOGGING_CATEGORY(skygateEphemerisUpdateLog, "skygate.ephemeris.update")

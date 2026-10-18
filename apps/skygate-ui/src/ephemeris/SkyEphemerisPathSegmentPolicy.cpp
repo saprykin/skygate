@@ -1,5 +1,7 @@
 #include "SkyEphemerisPathSegmentPolicy.hpp"
 
+namespace skygate::ui::internal {
+
 QString SkyEphemerisPathSegmentPolicy::spellPathSegment(const QString& value, const QString& fallback)
 {
     const QString trimmedValue = value.trimmed();
@@ -18,3 +20,5 @@ QString SkyEphemerisPathSegmentPolicy::spellPathSegment(const QString& value, co
     }
     return result.isEmpty() || result == QStringLiteral(".") ? fallback : result;
 }
+
+}  // namespace skygate::ui::internal

@@ -16,6 +16,8 @@
 #include <utility>
 #include <vector>
 
+using namespace skygate::ui::internal;
+
 namespace {
 
 Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
