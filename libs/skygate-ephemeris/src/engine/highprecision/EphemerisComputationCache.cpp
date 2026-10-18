@@ -1,6 +1,8 @@
 #include "EphemerisComputationCache.hpp"
 #include "PreparedEphemerisRequestState.hpp"
 #include "UtcTimeCodec.hpp"
+#include "hash/Fnv1a64Hasher.hpp"
+#include "hash/HashConstants.hpp"
 
 #include <array>
 #include <bit>
@@ -12,26 +14,14 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-constexpr std::uint64_t kFnvOffsetBasis = 14'695'981'039'346'656'037ULL;
-constexpr std::uint64_t kFnvPrime = 1'099'511'628'211ULL;
-
-void mixByte(std::uint64_t& hash, const std::uint8_t value) noexcept
+void mixUint64(std::uint64_t& hash, const std::uint64_t value) noexcept
 {
-    hash ^= value;
-    hash *= kFnvPrime;
-}
-
-void mixUint64(std::uint64_t& hash, std::uint64_t value) noexcept
-{
-    for (int byteIndex = 0; byteIndex < 8; ++byteIndex) {
-        mixByte(hash, static_cast<std::uint8_t>(value & 0xffU));
-        value >>= 8U;
-    }
+    hash = skygate::core::Fnv1a64Hasher::combine(hash, value);
 }
 
 void mixBool(std::uint64_t& hash, const bool value) noexcept
 {
-    mixByte(hash, value ? 1U : 0U);
+    mixUint64(hash, value ? 1U : 0U);
 }
 
 void mixDouble(std::uint64_t& hash, const double value) noexcept
@@ -42,9 +32,7 @@ void mixDouble(std::uint64_t& hash, const double value) noexcept
 void mixString(std::uint64_t& hash, const std::string_view value) noexcept
 {
     mixUint64(hash, value.size());
-    for (const char character : value) {
-        mixByte(hash, static_cast<std::uint8_t>(character));
-    }
+    hash = skygate::core::Fnv1a64Hasher::hashFrom(hash, value);
 }
 
 void mixEpoch(std::uint64_t& hash, const skygate::core::AstronomicalEpoch& epoch) noexcept
@@ -83,7 +71,7 @@ void mixDateRange(std::uint64_t& hash, const EphemerisDateRange& range) noexcept
 
 [[nodiscard]] std::uint64_t hashRequest(const EphemerisRequest& request) noexcept
 {
-    std::uint64_t hash = kFnvOffsetBasis;
+    std::uint64_t hash = skygate::core::HashConstants::kFnv1a64OffsetBasis;
     mixEpoch(hash, request.epoch);
     mixUint64(hash, static_cast<std::uint64_t>(skygate::core::UtcTimeCodec::toEpochMicros(request.context.utcTime)));
     mixObserver(hash, request.context.observer);
@@ -93,7 +81,7 @@ void mixDateRange(std::uint64_t& hash, const EphemerisDateRange& range) noexcept
 
 [[nodiscard]] std::uint64_t hashDataSetInfo(const EphemerisDatasetInfo& dataSetInfo) noexcept
 {
-    std::uint64_t hash = kFnvOffsetBasis;
+    std::uint64_t hash = skygate::core::HashConstants::kFnv1a64OffsetBasis;
     mixString(hash, dataSetInfo.id);
     mixString(hash, dataSetInfo.displayName);
     mixString(hash, dataSetInfo.version);
@@ -175,7 +163,7 @@ sameEpoch(const skygate::core::AstronomicalEpoch& lhs, const skygate::core::Astr
 }  // namespace
 
 EphemerisComputationCache::EphemerisComputationCache(const std::size_t maxEntries)
-    : m_maxEntries(maxEntries == 0U ? 1U : maxEntries)
+    : m_snapshots(maxEntries), m_preparedStates(maxEntries), m_bodyStates(maxEntries)
 {
 }
 
@@ -212,15 +200,12 @@ std::optional<EphemerisSnapshot> EphemerisComputationCache::findSnapshot(
     const std::string key = makeSnapshotKey(request, catalogIdentity, dataSetInfo);
 
     const std::scoped_lock lock(m_mutex);
-    const auto snapshot = m_snapshots.find(key);
-    if (snapshot == m_snapshots.end()) {
-        return std::nullopt;
-    }
-    if (!matchesIdentity(snapshot->second.identity, request, catalogIdentity, dataSetInfo)) {
+    const SnapshotEntry* entry = m_snapshots.find(key);
+    if (entry == nullptr || !matchesIdentity(entry->identity, request, catalogIdentity, dataSetInfo)) {
         return std::nullopt;
     }
 
-    return snapshot->second.snapshot;
+    return entry->snapshot;
 }
 
 std::optional<CelestialBodyState> EphemerisComputationCache::findSnapshotBodyState(
@@ -233,18 +218,15 @@ std::optional<CelestialBodyState> EphemerisComputationCache::findSnapshotBodySta
     const std::string key = makeSnapshotKey(request, catalogIdentity, dataSetInfo);
 
     const std::scoped_lock lock(m_mutex);
-    const auto snapshot = m_snapshots.find(key);
-    if (snapshot == m_snapshots.end()) {
+    const SnapshotEntry* entry = m_snapshots.find(key);
+    if (entry == nullptr || !matchesIdentity(entry->identity, request, catalogIdentity, dataSetInfo)) {
         return std::nullopt;
     }
-    if (!matchesIdentity(snapshot->second.identity, request, catalogIdentity, dataSetInfo)) {
-        return std::nullopt;
-    }
-    if (bodyIndex >= snapshot->second.snapshot.states.size()) {
+    if (bodyIndex >= entry->snapshot.states.size()) {
         return std::nullopt;
     }
 
-    return snapshot->second.snapshot.states[bodyIndex];
+    return entry->snapshot.states[bodyIndex];
 }
 
 void EphemerisComputationCache::storeSnapshot(
@@ -257,18 +239,13 @@ void EphemerisComputationCache::storeSnapshot(
     const std::string key = makeSnapshotKey(request, catalogIdentity, dataSetInfo);
 
     const std::scoped_lock lock(m_mutex);
-    if (!m_snapshots.contains(key)) {
-        m_snapshotOrder.push_back(key);
-    }
-    m_snapshots[key] = SnapshotEntry{
-        .identity = makeIdentity(request, catalogIdentity, dataSetInfo),
-        .snapshot = snapshot,
-    };
-
-    while (m_snapshotOrder.size() > m_maxEntries) {
-        m_snapshots.erase(m_snapshotOrder.front());
-        m_snapshotOrder.pop_front();
-    }
+    m_snapshots.store(
+        key,
+        SnapshotEntry{
+            .identity = makeIdentity(request, catalogIdentity, dataSetInfo),
+            .snapshot = snapshot,
+        }
+    );
 }
 
 std::shared_ptr<const PreparedEphemerisRequestState> EphemerisComputationCache::findPreparedRequestState(
@@ -280,15 +257,12 @@ std::shared_ptr<const PreparedEphemerisRequestState> EphemerisComputationCache::
     const std::string key = makePreparedStateKey(request, catalogIdentity, dataSetInfo);
 
     const std::scoped_lock lock(m_mutex);
-    const auto preparedState = m_preparedStates.find(key);
-    if (preparedState == m_preparedStates.end()) {
-        return nullptr;
-    }
-    if (!matchesIdentity(preparedState->second.identity, request, catalogIdentity, dataSetInfo)) {
+    const PreparedStateEntry* entry = m_preparedStates.find(key);
+    if (entry == nullptr || !matchesIdentity(entry->identity, request, catalogIdentity, dataSetInfo)) {
         return nullptr;
     }
 
-    return preparedState->second.preparedState;
+    return entry->preparedState;
 }
 
 void EphemerisComputationCache::storePreparedRequestState(
@@ -305,18 +279,13 @@ void EphemerisComputationCache::storePreparedRequestState(
     const std::string key = makePreparedStateKey(request, catalogIdentity, dataSetInfo);
 
     const std::scoped_lock lock(m_mutex);
-    if (!m_preparedStates.contains(key)) {
-        m_preparedStateOrder.push_back(key);
-    }
-    m_preparedStates[key] = PreparedStateEntry{
-        .identity = makeIdentity(request, catalogIdentity, dataSetInfo),
-        .preparedState = std::move(preparedState),
-    };
-
-    while (m_preparedStateOrder.size() > m_maxEntries) {
-        m_preparedStates.erase(m_preparedStateOrder.front());
-        m_preparedStateOrder.pop_front();
-    }
+    m_preparedStates.store(
+        key,
+        PreparedStateEntry{
+            .identity = makeIdentity(request, catalogIdentity, dataSetInfo),
+            .preparedState = std::move(preparedState),
+        }
+    );
 }
 
 std::optional<CelestialBodyState> EphemerisComputationCache::findBodyState(
@@ -329,16 +298,13 @@ std::optional<CelestialBodyState> EphemerisComputationCache::findBodyState(
     const std::string key = makeBodyStateKey(request, catalogIdentity, dataSetInfo, bodyIndex);
 
     const std::scoped_lock lock(m_mutex);
-    const auto bodyState = m_bodyStates.find(key);
-    if (bodyState == m_bodyStates.end()) {
-        return std::nullopt;
-    }
-    if (bodyState->second.bodyIndex != bodyIndex
-        || !matchesIdentity(bodyState->second.identity, request, catalogIdentity, dataSetInfo)) {
+    const BodyStateEntry* entry = m_bodyStates.find(key);
+    if (entry == nullptr || entry->bodyIndex != bodyIndex
+        || !matchesIdentity(entry->identity, request, catalogIdentity, dataSetInfo)) {
         return std::nullopt;
     }
 
-    return bodyState->second.state;
+    return entry->state;
 }
 
 void EphemerisComputationCache::storeBodyState(
@@ -352,29 +318,21 @@ void EphemerisComputationCache::storeBodyState(
     const std::string key = makeBodyStateKey(request, catalogIdentity, dataSetInfo, bodyIndex);
 
     const std::scoped_lock lock(m_mutex);
-    if (!m_bodyStates.contains(key)) {
-        m_bodyStateOrder.push_back(key);
-    }
-    m_bodyStates[key] = BodyStateEntry{
-        .identity = makeIdentity(request, catalogIdentity, dataSetInfo),
-        .bodyIndex = bodyIndex,
-        .state = state,
-    };
-
-    while (m_bodyStateOrder.size() > m_maxEntries) {
-        m_bodyStates.erase(m_bodyStateOrder.front());
-        m_bodyStateOrder.pop_front();
-    }
+    m_bodyStates.store(
+        key,
+        BodyStateEntry{
+            .identity = makeIdentity(request, catalogIdentity, dataSetInfo),
+            .bodyIndex = bodyIndex,
+            .state = state,
+        }
+    );
 }
 
 void EphemerisComputationCache::clear() const
 {
     const std::scoped_lock lock(m_mutex);
-    m_snapshotOrder.clear();
     m_snapshots.clear();
-    m_preparedStateOrder.clear();
     m_preparedStates.clear();
-    m_bodyStateOrder.clear();
     m_bodyStates.clear();
 }
 

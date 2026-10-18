@@ -100,6 +100,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/EphemerisStagedUpdateVerification.cpp
     src/engine/EphemerisStagedUpdateVerificationResult.cpp
     src/engine/EphemerisDataManifest.cpp
+    src/engine/highprecision/EphemerisCacheGateway.hpp
+    src/engine/highprecision/EphemerisCacheGateway.cpp
     src/engine/highprecision/EphemerisComputationCache.hpp
     src/engine/highprecision/EphemerisComputationCache.cpp
     src/engine/highprecision/EphemerisMetadataMerger.hpp

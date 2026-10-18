@@ -4,10 +4,12 @@
 
 #include <cstddef>
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 namespace skygate::ephemeris::highprecision {
 
@@ -68,6 +70,47 @@ public:
     void clear() const override;
 
 private:
+    // Keyed store bounded by capacity. Entries are evicted in insertion order;
+    // a lookup counts as a hit but does not refresh that order.
+    template <typename Entry>
+    class KeyedLruCache final {
+    public:
+        explicit KeyedLruCache(const std::size_t maxEntries) noexcept : m_maxEntries(maxEntries == 0U ? 1U : maxEntries)
+        {
+        }
+
+        // The owning cache serializes access with its own mutex.
+        [[nodiscard]] const Entry* find(const std::string& key) const noexcept
+        {
+            const auto entry = m_entries.find(key);
+            return entry == m_entries.end() ? nullptr : &entry->second;
+        }
+
+        void store(const std::string& key, Entry entry)
+        {
+            if (!m_entries.contains(key)) {
+                m_order.push_back(key);
+            }
+            m_entries.insert_or_assign(key, std::move(entry));
+
+            while (m_order.size() > m_maxEntries) {
+                m_entries.erase(m_order.front());
+                m_order.pop_front();
+            }
+        }
+
+        void clear() noexcept
+        {
+            m_order.clear();
+            m_entries.clear();
+        }
+
+    private:
+        std::size_t m_maxEntries = 1U;
+        std::deque<std::string> m_order;
+        std::unordered_map<std::string, Entry> m_entries;
+    };
+
     struct RequestIdentity {
         EphemerisRequest request;
         const CelestialBodyCatalog* catalogIdentity = nullptr;
@@ -125,14 +168,10 @@ private:
         std::size_t bodyIndex
     );
 
-    std::size_t m_maxEntries = 8U;
     mutable std::mutex m_mutex;
-    mutable std::deque<std::string> m_snapshotOrder;
-    mutable std::unordered_map<std::string, SnapshotEntry> m_snapshots;
-    mutable std::deque<std::string> m_preparedStateOrder;
-    mutable std::unordered_map<std::string, PreparedStateEntry> m_preparedStates;
-    mutable std::deque<std::string> m_bodyStateOrder;
-    mutable std::unordered_map<std::string, BodyStateEntry> m_bodyStates;
+    mutable KeyedLruCache<SnapshotEntry> m_snapshots;
+    mutable KeyedLruCache<PreparedStateEntry> m_preparedStates;
+    mutable KeyedLruCache<BodyStateEntry> m_bodyStates;
 };
 
 }  // namespace skygate::ephemeris::highprecision
