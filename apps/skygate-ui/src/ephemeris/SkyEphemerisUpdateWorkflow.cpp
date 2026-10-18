@@ -1,6 +1,7 @@
 #include "SkyEphemerisUpdateWorkflow.hpp"
 #include "SkyEphemerisDataManager.hpp"
 #include "SkyEphemerisPathSegmentPolicy.hpp"
+#include "SkyEphemerisUpdateOperation.hpp"
 
 #include <QByteArray>
 #include <QDir>
@@ -26,6 +27,7 @@ Q_LOGGING_CATEGORY(skygateEphemerisUpdateLog, "skygate.ephemeris.update")
 constexpr std::uint64_t kMaxEphemerisManifestBytes = 4ULL * 1024ULL * 1024ULL;
 
 using skygate::ephemeris::EphemerisDataManifest;
+using skygate::ui::internal::SkyEphemerisUpdateOperation;
 
 [[nodiscard]] QString sentenceFragment(QString text)
 {
@@ -186,6 +188,13 @@ QString SkyEphemerisUpdateWorkflow::deltaTStatusText() const
 bool SkyEphemerisUpdateWorkflow::updateCancellationRequested() const noexcept
 {
     return m_dataManager != nullptr && m_dataManager->updateCancellationRequested();
+}
+
+bool SkyEphemerisUpdateWorkflow::isCurrentOperation(
+    const std::shared_ptr<SkyEphemerisUpdateOperation>& operation
+) const noexcept
+{
+    return operation != nullptr && operation == m_operation;
 }
 
 bool SkyEphemerisUpdateWorkflow::updateEnabled() const noexcept
@@ -475,6 +484,7 @@ bool SkyEphemerisUpdateWorkflow::updateProfile(const QString& profileId, const Q
 
 void SkyEphemerisUpdateWorkflow::finishUpdate(const bool success, QString statusText)
 {
+    m_operation.reset();
     if (!success && !statusText.trimmed().isEmpty()) {
         qCWarning(skygateEphemerisUpdateLog).noquote() << statusText;
     }
@@ -502,127 +512,154 @@ void SkyEphemerisUpdateWorkflow::continueUpdate(const QString& profileId, const 
         return;
     }
 
-    std::uint64_t totalExpectedBytes = 0U;
-    for (const std::string& assetId : profile->assetIds) {
-        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = updateManifest->asset(assetId);
-        if (asset != nullptr && asset->compression.uncompressedSizeBytes.has_value()) {
-            totalExpectedBytes += *asset->compression.uncompressedSizeBytes;
-        }
+    const QString progressName = profileProgressName(*updateManifest, *profile);
+    const auto operation = std::make_shared<SkyEphemerisUpdateOperation>(
+        *updateManifest, *profile, profileId, progressName, stagedRoot, m_writableCacheRoot
+    );
+    m_operation = operation;
+
+    setStatusText(QStringLiteral("Ephemeris data: Downloading %1...").arg(progressName));
+    dispatchNextAsset();
+}
+
+void SkyEphemerisUpdateWorkflow::dispatchNextAsset()
+{
+    if (m_operation == nullptr) {
+        return;
     }
 
-    const QString progressName = profileProgressName(*updateManifest, *profile);
-    setStatusText(QStringLiteral("Ephemeris data: Downloading %1...").arg(progressName));
+    const std::shared_ptr<SkyEphemerisUpdateOperation> operation = m_operation;
+    if (!operation->hasPendingAsset()) {
+        activateOperation(operation);
+        return;
+    }
 
-    auto request = std::make_shared<SkyEphemerisDataManager::StagedUpdateActivationRequest>();
-    request->manifest = updateManifest;
-    request->profileId = profileId;
-    request->stagedResourceRoot = stagedRoot;
-    request->writableCacheRoot = m_writableCacheRoot;
-    request->revisionToken = QString::fromStdString(profile->id);
+    const skygate::ephemeris::EphemerisDataManifest::Asset* asset = operation->currentAsset();
+    if (asset == nullptr) {
+        finishUpdate(false, QStringLiteral("Ephemeris data: Update profile references a missing asset"));
+        return;
+    }
 
-    const auto completedBytes = std::make_shared<std::uint64_t>(0U);
-    const auto downloadNext = std::make_shared<std::function<void(std::size_t)>>();
-    const auto downloadNextWeak = std::weak_ptr<std::function<void(std::size_t)>>(downloadNext);
+    SkyEphemerisDataManager::StagedUpdateDownloadRequest downloadRequest;
+    downloadRequest.asset = asset;
+    downloadRequest.sourceUrl = QString::fromStdString(asset->sourceUrl);
+    if (downloadRequest.sourceUrl.trimmed().isEmpty()) {
+        downloadRequest.sourceResourceRoot = m_updateResourceRoot;
+    }
+    downloadRequest.stagedResourceRoot = operation->stagedRoot();
+
     const QPointer<SkyEphemerisUpdateWorkflow> workflow(this);
-    *downloadNext = [this,
-                     workflow,
-                     profileId,
-                     updateManifest,
-                     profile,
-                     request,
-                     totalExpectedBytes,
-                     completedBytes,
-                     progressName,
-                     downloadNextWeak,
-                     stagedRoot](const std::size_t assetIndex) {
-        if (workflow.isNull()) {
-            return;
-        }
-        const auto next = downloadNextWeak.lock();
-        if (assetIndex >= profile->assetIds.size()) {
-            setStatusText(QStringLiteral("Ephemeris data: Verifying %1...").arg(progressName));
-            const SkyEphemerisDataManager::StagedUpdateActivationResult activationResult =
-                m_dataManager->activateVerifiedStagedUpdateSet(*request);
-            if (activationResult.isSuccess()) {
-                emit preferredProfileSelected(profileId);
-                if (profileId == QStringLiteral("support-data")) {
-                    m_supportDataUpdateChecked = false;
-                    m_availableEarthOrientationVersion.clear();
-                    m_availableLeapSecondVersion.clear();
-                    m_availableDeltaTVersion.clear();
-                }
-                finishUpdate(true, {});
-            } else {
-                const QString diagnostic =
-                    joinedDiagnostics(activationResult.diagnostics, QStringLiteral("activation failed"));
-                finishUpdate(false, QStringLiteral("Ephemeris data: %1").arg(diagnostic));
-            }
-            return;
-        }
-
-        const std::string assetId = profile->assetIds[assetIndex];
-        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = updateManifest->asset(assetId);
-        if (asset == nullptr) {
-            finishUpdate(false, QStringLiteral("Ephemeris data: Update profile references a missing asset"));
-            return;
-        }
-
-        SkyEphemerisDataManager::StagedUpdateDownloadRequest downloadRequest;
-        downloadRequest.asset = asset;
-        downloadRequest.sourceUrl = QString::fromStdString(asset->sourceUrl);
-        if (downloadRequest.sourceUrl.trimmed().isEmpty()) {
-            downloadRequest.sourceResourceRoot = m_updateResourceRoot;
-        }
-        downloadRequest.stagedResourceRoot = stagedRoot;
-        downloadRequest.cancellationRequested = [workflow] {
-            return workflow.isNull() || workflow->updateCancellationRequested();
-        };
-        downloadRequest.progressHandler = [this, workflow, completedBytes, totalExpectedBytes](
-                                              const std::uint64_t stagedBytes,
-                                              const std::optional<std::uint64_t> totalBytes
-                                          ) {
+    const std::weak_ptr<SkyEphemerisUpdateOperation> operationWeak = operation;
+    downloadRequest.cancellationRequested = [workflow] {
+        return workflow.isNull() || workflow->updateCancellationRequested();
+    };
+    downloadRequest.progressHandler =
+        [workflow, operationWeak](const std::uint64_t stagedBytes, const std::optional<std::uint64_t> totalBytes) {
             if (workflow.isNull()) {
                 return;
             }
-            const std::uint64_t denominator =
-                totalExpectedBytes > 0U ? totalExpectedBytes : *completedBytes + totalBytes.value_or(stagedBytes);
-            if (denominator > 0U) {
-                setUpdateProgress(
-                    static_cast<double>(std::min(*completedBytes + stagedBytes, denominator))
-                    / static_cast<double>(denominator)
-                );
+            const auto currentOperation = operationWeak.lock();
+            if (currentOperation != nullptr) {
+                workflow->reportAssetProgress(currentOperation, stagedBytes, totalBytes);
             }
         };
 
-        m_dataManager->stageEphemerisUpdateAssetAsync(
-            downloadRequest, [=, this](const SkyEphemerisDataManager::StagedUpdateDownloadResult downloadResult) {
-                if (workflow.isNull()) {
-                    return;
-                }
-                if (!downloadResult.isSuccess()) {
-                    const QString diagnostic =
-                        joinedDiagnostics(downloadResult.diagnostics, QStringLiteral("asset download failed"));
-                    finishUpdate(false, QStringLiteral("Ephemeris data: %1").arg(diagnostic));
-                    return;
-                }
-                *completedBytes += asset->compression.uncompressedSizeBytes.value_or(downloadResult.stagedBytes);
-                if (totalExpectedBytes > 0U) {
-                    setUpdateProgress(
-                        static_cast<double>(std::min(*completedBytes, totalExpectedBytes))
-                        / static_cast<double>(totalExpectedBytes)
-                    );
-                }
-                request->requiredKinds.push_back(asset->kind);
-                auto& component = request->expectedComponents.emplace_back(asset->id, asset->kind);
-                component.expectedVersion = asset->version;
-                component.requiredValidityRange = asset->validityRange;
-                if (next != nullptr) {
-                    (*next)(assetIndex + 1);
-                } else {
-                    finishUpdate(false, QStringLiteral("Ephemeris data: Update download flow ended unexpectedly"));
-                }
+    m_dataManager->stageEphemerisUpdateAssetAsync(
+        downloadRequest, [workflow, operationWeak](SkyEphemerisDataManager::StagedUpdateDownloadResult downloadResult) {
+            if (workflow.isNull()) {
+                return;
             }
+            const auto currentOperation = operationWeak.lock();
+            if (currentOperation == nullptr) {
+                return;
+            }
+            if (!downloadResult.isSuccess()) {
+                workflow->failAssetDownload(
+                    currentOperation,
+                    joinedDiagnostics(downloadResult.diagnostics, QStringLiteral("asset download failed"))
+                );
+                return;
+            }
+            workflow->completeAssetDownload(currentOperation, downloadResult.stagedBytes);
+        }
+    );
+}
+
+void SkyEphemerisUpdateWorkflow::reportAssetProgress(
+    const std::shared_ptr<SkyEphemerisUpdateOperation>& operation,
+    const std::uint64_t stagedBytes,
+    const std::optional<std::uint64_t> totalBytes
+)
+{
+    if (!isCurrentOperation(operation)) {
+        return;
+    }
+    if (const std::optional<double> progress = operation->stagedProgress(stagedBytes, totalBytes)) {
+        setUpdateProgress(*progress);
+    }
+}
+
+void SkyEphemerisUpdateWorkflow::completeAssetDownload(
+    const std::shared_ptr<SkyEphemerisUpdateOperation>& operation, const std::uint64_t stagedBytes
+)
+{
+    if (!isCurrentOperation(operation)) {
+        return;
+    }
+
+    const skygate::ephemeris::EphemerisDataManifest::Asset* asset = operation->currentAsset();
+    if (asset == nullptr) {
+        finishUpdate(false, QStringLiteral("Ephemeris data: Update profile references a missing asset"));
+        return;
+    }
+
+    operation->recordStagedAsset(*asset, stagedBytes);
+    if (operation->expectedBytes() > 0U) {
+        setUpdateProgress(
+            static_cast<double>(std::min(operation->completedBytes(), operation->expectedBytes()))
+            / static_cast<double>(operation->expectedBytes())
         );
-    };
-    (*downloadNext)(0);
+    }
+
+    operation->advanceAsset();
+    dispatchNextAsset();
+}
+
+void SkyEphemerisUpdateWorkflow::failAssetDownload(
+    const std::shared_ptr<SkyEphemerisUpdateOperation>& operation, QString diagnostic
+)
+{
+    if (!isCurrentOperation(operation)) {
+        return;
+    }
+    finishUpdate(false, QStringLiteral("Ephemeris data: %1").arg(diagnostic));
+}
+
+void SkyEphemerisUpdateWorkflow::activateOperation(const std::shared_ptr<SkyEphemerisUpdateOperation>& operation)
+{
+    if (!isCurrentOperation(operation)) {
+        return;
+    }
+
+    setStatusText(QStringLiteral("Ephemeris data: Verifying %1...").arg(operation->progressName()));
+    const SkyEphemerisDataManager::StagedUpdateActivationResult activationResult =
+        m_dataManager->activateVerifiedStagedUpdateSet(operation->activationRequest());
+    if (!isCurrentOperation(operation)) {
+        return;
+    }
+
+    if (activationResult.isSuccess()) {
+        emit preferredProfileSelected(operation->profileId());
+        if (operation->profileId() == QStringLiteral("support-data")) {
+            m_supportDataUpdateChecked = false;
+            m_availableEarthOrientationVersion.clear();
+            m_availableLeapSecondVersion.clear();
+            m_availableDeltaTVersion.clear();
+        }
+        finishUpdate(true, {});
+        return;
+    }
+
+    const QString diagnostic = joinedDiagnostics(activationResult.diagnostics, QStringLiteral("activation failed"));
+    finishUpdate(false, QStringLiteral("Ephemeris data: %1").arg(diagnostic));
 }
