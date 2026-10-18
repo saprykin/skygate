@@ -1,6 +1,7 @@
 #pragma once
 
-#include "time/EphemerisDateRange.hpp"
+#include "EphemerisTableDataInfo.hpp"
+#include "EphemerisTableDataStatus.hpp"
 #include "time/AstronomicalEpoch.hpp"
 
 #include <cstdint>
@@ -12,12 +13,8 @@ namespace skygate::ephemeris {
 
 class IDeltaTProvider {
 public:
-    enum class DataStatus : std::uint8_t {
-        Available,
-        Missing,
-        Malformed,
-        Stale
-    };
+    /// The provider keeps its established name for the shared status enum.
+    using DataStatus = EphemerisTableDataStatus;
 
     enum class EstimateStatus : std::uint8_t {
         Available,
@@ -30,7 +27,7 @@ public:
         double deltaTSeconds = 0.0;
     };
 
-    struct DataInfo {
+    struct DataInfo final : EphemerisTableDataInfo {
         struct FallbackModelInfo {
             std::string id;
             std::string displayName;
@@ -45,18 +42,7 @@ public:
             }
         };
 
-        std::string version;
-        std::string provenance;
-        DataStatus status = DataStatus::Missing;
-        std::string diagnosticText;
-        std::optional<EphemerisDateRange> validityRange;
-        std::optional<skygate::core::AstronomicalEpoch> expiresAt;
         std::optional<FallbackModelInfo> ancientFallbackModel;
-
-        [[nodiscard]] bool isUsable() const noexcept
-        {
-            return status == DataStatus::Available || status == DataStatus::Stale;
-        }
     };
 
     struct Estimate {

@@ -7,7 +7,6 @@
 #include "time/CalendarTime.hpp"
 #include "time/EpochCodec.hpp"
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -19,8 +18,9 @@ namespace skygate::ephemeris {
 
 namespace {
 
+constexpr std::string_view kDataLabel = "Leap-second table";
 constexpr std::string_view kValidityRangeId = "leap-seconds";
-constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
+constexpr std::size_t kMetadataMarkerSize = EphemerisTableMetadata::kMetadataLinePrefix.size() - 1U;
 
 [[nodiscard]] std::optional<skygate::core::CivilDateTime> parseIanaCommentDate(const std::string_view text) noexcept
 {
@@ -46,17 +46,16 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
     std::optional<std::string>& diagnosticText
 )
 {
-    if (!line.starts_with("#@")) {
-        return false;
-    }
-    if (EphemerisTableMetadata::applyCommonLine(info, line, "Leap-second table", lineNumber, diagnosticText)) {
+    if (EphemerisTableMetadata::applyCommonLine(info, line, kDataLabel, lineNumber, diagnosticText)) {
         return true;
     }
 
-    const std::optional<std::uint64_t> ntpExpiration = NumericParsingUtilities::parseUint64(line.substr(2U));
+    // The IANA list writes its expiration as a bare NTP timestamp after the
+    // metadata marker.
+    const std::optional<std::uint64_t> ntpExpiration =
+        NumericParsingUtilities::parseUint64(line.substr(kMetadataMarkerSize));
     if (!ntpExpiration.has_value()) {
-        diagnosticText =
-            "Leap-second table contains malformed expiration metadata at line " + std::to_string(lineNumber) + ".";
+        diagnosticText = EphemerisTableMetadata::malformedMetadata(kDataLabel, "expiration", lineNumber);
         return true;
     }
 
@@ -127,9 +126,8 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
     return parseCsvEntryLine(line, entry) || parseIanaEntryLine(line, entry);
 }
 
-[[nodiscard]] LeapSecondTableParser::Result failureResult(
-    ILeapSecondProvider::TableInfo info, const ILeapSecondProvider::TableStatus status, std::string diagnosticText
-)
+[[nodiscard]] LeapSecondTableParser::Result
+failureResult(ILeapSecondProvider::TableInfo info, const EphemerisTableDataStatus status, std::string diagnosticText)
 {
     info.status = status;
     info.diagnosticText = std::move(diagnosticText);
@@ -158,37 +156,18 @@ LeapSecondTableParser::Result LeapSecondTableParser::parse(const EphemerisTextDa
            const std::string_view trimmedLine,
            ILeapSecondProvider::TableEntry& entry) noexcept { return parseEntryLine(trimmedLine, entry); },
         entries,
-        "Leap-second table"
+        kDataLabel
     );
     if (malformedLine.has_value()) {
-        return failureResult(std::move(info), ILeapSecondProvider::TableStatus::Malformed, std::move(*malformedLine));
+        return failureResult(std::move(info), EphemerisTableDataStatus::Malformed, std::move(*malformedLine));
     }
 
-    if (entries.empty()) {
-        return failureResult(
-            std::move(info), ILeapSecondProvider::TableStatus::Malformed, "Leap-second table contains no rows."
+    if (std::optional<std::string> diagnosticText = EphemerisTableMetadata::finalizeParsedTable(
+            info, entries, kDataLabel, kDataLabel, kValidityRangeId, false, true
         );
+        diagnosticText.has_value()) {
+        return failureResult(std::move(info), EphemerisTableDataStatus::Malformed, std::move(*diagnosticText));
     }
-
-    const bool sorted = std::ranges::is_sorted(entries, {}, [](const ILeapSecondProvider::TableEntry& entry) {
-        return entry.effectiveUtcEpoch.sortKey();
-    });
-    if (!sorted) {
-        return failureResult(
-            std::move(info),
-            ILeapSecondProvider::TableStatus::Malformed,
-            "Leap-second table rows are not sorted by UTC date."
-        );
-    }
-
-    info.validityRange = EphemerisTableMetadata::makeRange(
-        kValidityRangeId,
-        kValidityRangeDisplayName,
-        entries.front().effectiveUtcEpoch,
-        info.expiresAt.value_or(entries.back().effectiveUtcEpoch)
-    );
-    info.status = ILeapSecondProvider::TableStatus::Available;
-    info.diagnosticText = "Leap-second table loaded.";
 
     LeapSecondTableParser::Result result;
     result.tableInfo = std::move(info);

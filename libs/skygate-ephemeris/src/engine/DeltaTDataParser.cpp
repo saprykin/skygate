@@ -5,7 +5,6 @@
 #include "TextParsingUtilities.hpp"
 #include "time/CalendarTime.hpp"
 
-#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -16,8 +15,9 @@ namespace skygate::ephemeris {
 
 namespace {
 
+constexpr std::string_view kDataLabel = "Delta T data";
+constexpr std::string_view kRowLabel = "Delta T";
 constexpr std::string_view kValidityRangeId = "delta-t";
-constexpr std::string_view kValidityRangeDisplayName = "Delta T data";
 constexpr std::string_view kAncientFallbackRangeId = "delta-t-ancient-fallback";
 constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T fallback model";
 
@@ -25,21 +25,24 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     IDeltaTProvider::DataInfo& info, const std::string& value, const std::size_t lineNumber, bool& hasFallbackStart
 )
 {
-    const std::optional<skygate::core::CivilDateTime> date = TextParsingUtilities::parseUtcDate(value);
-    const std::optional<skygate::core::AstronomicalEpoch> epoch =
-        date.has_value() ? skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*date) : std::nullopt;
-    if (!epoch.has_value()) {
-        return "Delta T data contains malformed ancient fallback start metadata at line " + std::to_string(lineNumber)
-               + ".";
-    }
-
     IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
         info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
-    fallback.validityRange.id = kAncientFallbackRangeId;
-    fallback.validityRange.displayName = kAncientFallbackRangeDisplayName;
-    fallback.validityRange.start = *epoch;
+    if (std::optional<std::string> diagnosticText = EphemerisTableMetadata::assignRangeEndpoint(
+            fallback.validityRange,
+            &EphemerisDateRange::start,
+            value,
+            kAncientFallbackRangeId,
+            kAncientFallbackRangeDisplayName,
+            kDataLabel,
+            "ancient fallback start",
+            lineNumber,
+            hasFallbackStart
+        );
+        diagnosticText.has_value()) {
+        return diagnosticText;
+    }
+
     info.ancientFallbackModel = std::move(fallback);
-    hasFallbackStart = true;
     return std::nullopt;
 }
 
@@ -47,21 +50,24 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     IDeltaTProvider::DataInfo& info, const std::string& value, const std::size_t lineNumber, bool& hasFallbackEnd
 )
 {
-    const std::optional<skygate::core::CivilDateTime> date = TextParsingUtilities::parseUtcDate(value);
-    const std::optional<skygate::core::AstronomicalEpoch> epoch =
-        date.has_value() ? skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*date) : std::nullopt;
-    if (!epoch.has_value()) {
-        return "Delta T data contains malformed ancient fallback end metadata at line " + std::to_string(lineNumber)
-               + ".";
-    }
-
     IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
         info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
-    fallback.validityRange.id = kAncientFallbackRangeId;
-    fallback.validityRange.displayName = kAncientFallbackRangeDisplayName;
-    fallback.validityRange.end = *epoch;
+    if (std::optional<std::string> diagnosticText = EphemerisTableMetadata::assignRangeEndpoint(
+            fallback.validityRange,
+            &EphemerisDateRange::end,
+            value,
+            kAncientFallbackRangeId,
+            kAncientFallbackRangeDisplayName,
+            kDataLabel,
+            "ancient fallback end",
+            lineNumber,
+            hasFallbackEnd
+        );
+        diagnosticText.has_value()) {
+        return diagnosticText;
+    }
+
     info.ancientFallbackModel = std::move(fallback);
-    hasFallbackEnd = true;
     return std::nullopt;
 }
 
@@ -74,10 +80,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     std::optional<std::string>& diagnosticText
 )
 {
-    if (!line.starts_with("#@ ")) {
-        return false;
-    }
-    if (EphemerisTableMetadata::applyCommonLine(info, line, "Delta T data", lineNumber, diagnosticText)) {
+    if (EphemerisTableMetadata::applyCommonLine(info, line, kDataLabel, lineNumber, diagnosticText)) {
         return true;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "ancient_fallback_start");
@@ -103,8 +106,8 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
         value.has_value()) {
         const std::optional<double> seconds = NumericParsingUtilities::parseFiniteDouble(*value);
         if (!seconds.has_value()) {
-            diagnosticText = "Delta T data contains malformed ancient fallback estimate metadata at line "
-                             + std::to_string(lineNumber) + ".";
+            diagnosticText =
+                EphemerisTableMetadata::malformedMetadata(kDataLabel, "ancient fallback estimate", lineNumber);
             return true;
         }
 
@@ -119,8 +122,8 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
         value.has_value()) {
         const std::optional<double> seconds = NumericParsingUtilities::parseFiniteDouble(*value);
         if (!seconds.has_value() || *seconds < 0.0) {
-            diagnosticText = "Delta T data contains malformed ancient fallback uncertainty metadata at line "
-                             + std::to_string(lineNumber) + ".";
+            diagnosticText =
+                EphemerisTableMetadata::malformedMetadata(kDataLabel, "ancient fallback uncertainty", lineNumber);
             return true;
         }
 
@@ -213,7 +216,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
 }
 
 [[nodiscard]] DeltaTDataParser::Result
-failureResult(IDeltaTProvider::DataInfo info, const IDeltaTProvider::DataStatus status, std::string diagnosticText)
+failureResult(IDeltaTProvider::DataInfo info, const EphemerisTableDataStatus status, std::string diagnosticText)
 {
     info.status = status;
     info.diagnosticText = std::move(diagnosticText);
@@ -244,32 +247,10 @@ DeltaTDataParser::Result DeltaTDataParser::parse(const EphemerisTextDataAsset& a
             return parseEntryLine(trimmedLine, entry);
         },
         entries,
-        "Delta T data"
+        kDataLabel
     );
     if (malformedLine.has_value()) {
-        return failureResult(std::move(info), IDeltaTProvider::DataStatus::Malformed, std::move(*malformedLine));
-    }
-
-    if (entries.empty()) {
-        return failureResult(std::move(info), IDeltaTProvider::DataStatus::Malformed, "Delta T data contains no rows.");
-    }
-
-    const bool sorted = std::ranges::is_sorted(entries, {}, [](const IDeltaTProvider::TableEntry& entry) {
-        return entry.effectiveUtcEpoch.sortKey();
-    });
-    if (!sorted) {
-        return failureResult(
-            std::move(info), IDeltaTProvider::DataStatus::Malformed, "Delta T rows are not sorted by UTC date."
-        );
-    }
-
-    const auto duplicate = std::ranges::adjacent_find(entries, {}, [](const IDeltaTProvider::TableEntry& entry) {
-        return entry.effectiveUtcEpoch.sortKey();
-    });
-    if (duplicate != entries.end()) {
-        return failureResult(
-            std::move(info), IDeltaTProvider::DataStatus::Malformed, "Delta T rows contain duplicate UTC dates."
-        );
+        return failureResult(std::move(info), EphemerisTableDataStatus::Malformed, std::move(*malformedLine));
     }
 
     if (info.ancientFallbackModel.has_value()) {
@@ -297,11 +278,12 @@ DeltaTDataParser::Result DeltaTDataParser::parse(const EphemerisTextDataAsset& a
         info.ancientFallbackModel = std::move(fallback);
     }
 
-    info.validityRange = EphemerisTableMetadata::makeRange(
-        kValidityRangeId, kValidityRangeDisplayName, entries.front().effectiveUtcEpoch, entries.back().effectiveUtcEpoch
-    );
-    info.status = IDeltaTProvider::DataStatus::Available;
-    info.diagnosticText = "Delta T data loaded.";
+    if (std::optional<std::string> diagnosticText = EphemerisTableMetadata::finalizeParsedTable(
+            info, entries, kDataLabel, kRowLabel, kValidityRangeId, true, false
+        );
+        diagnosticText.has_value()) {
+        return failureResult(std::move(info), EphemerisTableDataStatus::Malformed, std::move(*diagnosticText));
+    }
 
     DeltaTDataParser::Result result;
     result.dataInfo = std::move(info);

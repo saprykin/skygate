@@ -75,6 +75,9 @@ private slots:
     void rejectsMalformedExpirationMetadata();
     void reportsStaleTable();
     void exposesValidityRangeMetadata();
+    void acceptsDuplicateRows();
+    void preservesParsingDiagnostics_data();
+    void preservesParsingDiagnostics();
 };
 
 void LeapSecondProviderTests::loadsValidTableFromSnapshot()
@@ -210,6 +213,53 @@ void LeapSecondProviderTests::exposesValidityRangeMetadata()
     QVERIFY(result.tableInfo.validityRange->id == std::string{"leap-seconds"});
     QCOMPARE(result.tableInfo.validityRange->start.julianDatePart1, epochForDate(1972, 1, 1).julianDatePart1);
     QCOMPARE(result.tableInfo.validityRange->end.julianDatePart1, epochForDate(2027, 1, 1).julianDatePart1);
+}
+
+void LeapSecondProviderTests::acceptsDuplicateRows()
+{
+    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
+    asset.content = "effective_utc_date,tai_minus_utc\n"
+                    "1972-01-01,10\n"
+                    "1972-01-01,11\n"
+                    "1972-07-01,12\n";
+
+    const skygate::ephemeris::LeapSecondTableLoader::Result result =
+        skygate::ephemeris::LeapSecondTableLoader::loadFromTextAsset(asset);
+
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.provider != nullptr);
+    QVERIFY(result.tableInfo.isUsable());
+    QCOMPARE(result.provider->entries().size(), std::size_t{3});
+}
+
+void LeapSecondProviderTests::preservesParsingDiagnostics_data()
+{
+    QTest::addColumn<QString>("content");
+    QTest::addColumn<QString>("diagnostic");
+    QTest::newRow("empty") << "" << "Leap-second table contains no rows.";
+    QTest::newRow("comments") << "# comment\n\n" << "Leap-second table contains no rows.";
+    QTest::newRow("unsorted") << "effective_utc_date,tai_minus_utc\n1972-07-01,11\n1972-01-01,10\n"
+                              << "Leap-second table rows are not sorted by UTC date.";
+    QTest::newRow("malformed-date") << "effective_utc_date,tai_minus_utc\n1972-01-01,10\n1972-02-30,11\n"
+                                    << "Leap-second table contains a malformed row at line 3.";
+    QTest::newRow("malformed-expiration") << "#@ expires not-a-date\n1972-01-01,10\n"
+                                          << "Leap-second table contains malformed expiration metadata at line 1.";
+    QTest::newRow("malformed-stamp") << "#@ not-a-timestamp\n1972-01-01,10\n"
+                                     << "Leap-second table contains malformed expiration metadata at line 1.";
+}
+
+void LeapSecondProviderTests::preservesParsingDiagnostics()
+{
+    QFETCH(QString, content);
+    QFETCH(QString, diagnostic);
+    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
+    asset.content = content.toStdString();
+    const skygate::ephemeris::LeapSecondTableLoader::Result result =
+        skygate::ephemeris::LeapSecondTableLoader::loadFromTextAsset(asset);
+    QVERIFY(!result.isSuccess());
+    QVERIFY(result.provider == nullptr);
+    QCOMPARE(result.tableInfo.status, skygate::ephemeris::ILeapSecondProvider::TableStatus::Malformed);
+    QCOMPARE(QString::fromStdString(result.tableInfo.diagnosticText), diagnostic);
 }
 
 QTEST_MAIN(LeapSecondProviderTests)
