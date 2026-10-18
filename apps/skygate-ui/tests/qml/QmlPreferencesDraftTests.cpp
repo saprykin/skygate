@@ -42,7 +42,10 @@ void QmlPreferencesDraftTests::preferencesDraftApplyAndResetRoundTrip()
     QQmlEngine engine;
     setupEngine(engine, *controller);
 
-    const QmlWarningScope warnings;
+    // Applying high-precision ephemeris settings rebuilds the engine against a
+    // test snapshot without Earth-orientation or leap-second data, so the
+    // bootstrap reports that data state through its own logging category.
+    const QmlWarningScope warnings(QmlWarningScope::Forwarding::Enabled, {QStringLiteral("skygate.ephemeris.engine")});
     auto object = createFileComponent(
         engine,
         QStringLiteral("preferences/PreferencesDraft.qml"),
@@ -272,7 +275,10 @@ void QmlPreferencesDraftTests::saveAndRestoreState()
     QQmlEngine engine;
     setupEngine(engine, *controller);
 
-    const QmlWarningScope warnings;
+    // Applying high-precision ephemeris settings rebuilds the engine against a
+    // test snapshot without Earth-orientation or leap-second data, so the
+    // bootstrap reports that data state through its own logging category.
+    const QmlWarningScope warnings(QmlWarningScope::Forwarding::Enabled, {QStringLiteral("skygate.ephemeris.engine")});
     auto object = createFileComponent(
         engine,
         QStringLiteral("preferences/PreferencesDraft.qml"),

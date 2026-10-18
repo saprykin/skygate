@@ -5,8 +5,11 @@
 #include <QMessageLogContext>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QString>
 #include <QStringList>
 #include <QtGlobal>
+
+#include <utility>
 
 namespace skygate::ui::tests {
 
@@ -17,7 +20,15 @@ public:
         Disabled
     };
 
-    explicit QmlWarningScope(const Forwarding forwarding = Forwarding::Enabled) : m_forwarding(forwarding)
+    /// Warnings from these logging categories describe the application state a
+    /// test happens to run against rather than a QML problem, so the scope does
+    /// not collect them.
+    using IgnoredCategories = QStringList;
+
+    explicit QmlWarningScope(
+        const Forwarding forwarding = Forwarding::Enabled, IgnoredCategories ignoredCategories = {}
+    )
+        : m_forwarding(forwarding), m_ignoredCategories(std::move(ignoredCategories))
     {
         skygate::testsupport::detail::MessageLogDispatcher::subscribe(this, &QmlWarningScope::messageHandler);
     }
@@ -40,12 +51,12 @@ public:
 
 private:
     static skygate::testsupport::detail::MessageLogDispatcher::Result
-    messageHandler(void* owner, const QtMsgType type, const QMessageLogContext& /*context*/, const QString& message)
+    messageHandler(void* owner, const QtMsgType type, const QMessageLogContext& context, const QString& message)
     {
         QmlWarningScope* scope = static_cast<QmlWarningScope*>(owner);
 
         QMutexLocker lock(&scope->m_mutex);
-        if (type == QtWarningMsg) {
+        if (type == QtWarningMsg && !scope->ignores(context)) {
             scope->m_messages.push_back(message);
         }
 
@@ -55,8 +66,17 @@ private:
         return skygate::testsupport::detail::MessageLogDispatcher::Result::Continue;
     }
 
-private:
+    [[nodiscard]] bool ignores(const QMessageLogContext& context) const
+    {
+        if (context.category == nullptr || m_ignoredCategories.isEmpty()) {
+            return false;
+        }
+
+        return m_ignoredCategories.contains(QString::fromUtf8(context.category));
+    }
+
     Forwarding m_forwarding = Forwarding::Enabled;
+    IgnoredCategories m_ignoredCategories;
     QStringList m_messages;
     mutable QMutex m_mutex;
 };
