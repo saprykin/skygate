@@ -2,6 +2,18 @@
 
 namespace skygate::ephemeris {
 
+bool CatalogCompositionPolicyRules::isKnown(const CatalogCompositionPolicy policy) noexcept
+{
+    switch (policy) {
+    case CatalogCompositionPolicy::Merge:
+    case CatalogCompositionPolicy::DeepSkyOnly:
+    case CatalogCompositionPolicy::AugmentCore:
+    case CatalogCompositionPolicy::DeepSkyFallback:
+        return true;
+    }
+    return false;
+}
+
 bool CatalogCompositionPolicyRules::participates(
     const CatalogCompositionPolicy policy, const BaseCelestialBody::Kind kind
 ) noexcept

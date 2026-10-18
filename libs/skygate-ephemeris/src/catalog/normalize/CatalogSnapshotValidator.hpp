@@ -3,7 +3,6 @@
 #include "BaseCelestialBody.hpp"
 #include "CelestialBodyCatalog.hpp"
 #include "DeepSkyObjectInfo.hpp"
-#include "time/TimeScale.hpp"
 
 #include <cstddef>
 #include <string>
@@ -44,7 +43,6 @@ public:
     [[nodiscard]] static bool isKnownBodyKind(BaseCelestialBody::Kind kind) noexcept;
     [[nodiscard]] static bool isKnownDeepSkyObjectKind(DeepSkyObjectInfo::Kind kind) noexcept;
     [[nodiscard]] static bool isKnownIdScope(CatalogObjectIdentity::IdScope idScope) noexcept;
-    [[nodiscard]] static bool isKnownTimeScale(skygate::core::TimeScale timeScale) noexcept;
     [[nodiscard]] static bool isOrderEntryValid(
         CelestialBodyCatalog::BodyDomain domain,
         std::size_t bodyIndex,

@@ -1,4 +1,5 @@
 #include "SkyCatalogCollectionStore.hpp"
+#include "catalog/CatalogCompositionPolicyRules.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
 #include "settings/SkySettingsKeyBuilder.hpp"
 #include "settings/SkySettingsValueCodecs.hpp"
@@ -53,6 +54,24 @@ bool removeCacheFiles(const QStringList& cachePaths)
         }
     }
     return removedAllCacheFiles;
+}
+
+// A stored policy only means something when it names a policy this build knows.
+// An unknown value falls back to the merge policy instead of handing
+// composition a value no rule can classify.
+skygate::ephemeris::CatalogCompositionPolicy readCatalogCompositionPolicy(QSettings& settings, const QString& key)
+{
+    const int storedValue = SkySettingsValueCodecs::readIntSetting(
+        settings, key, static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::Merge)
+    );
+    const auto storedPolicy = static_cast<skygate::ephemeris::CatalogCompositionPolicy>(storedValue);
+    if (skygate::ephemeris::CatalogCompositionPolicyRules::isKnown(storedPolicy)) {
+        return storedPolicy;
+    }
+
+    qCWarning(skygateCatalogCacheLog).noquote()
+        << "Invalid catalog composition policy" << key << "value" << storedValue << "- using fallback: merge policy";
+    return skygate::ephemeris::CatalogCompositionPolicy::Merge;
 }
 
 // A stored schema hint only means something when it names a schema this build
@@ -531,9 +550,7 @@ loadCatalogSourceRecord(QSettings& settings, const QString& group, QStringList& 
     record.archiveSelector = settings.value(QStringLiteral("archiveSelector")).toString();
     record.schemaHint = readCatalogSourceSchemaHint(settings, QStringLiteral("schemaHint"));
     record.attribution = settings.value(QStringLiteral("attribution")).toString();
-    record.policy = static_cast<skygate::ephemeris::CatalogCompositionPolicy>(SkySettingsValueCodecs::readIntSetting(
-        settings, QStringLiteral("policy"), static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::Merge)
-    ));
+    record.policy = readCatalogCompositionPolicy(settings, QStringLiteral("policy"));
     record.enabled = SkySettingsValueCodecs::readBoolSetting(settings, QStringLiteral("enabled"), true);
     record.bundled = SkySettingsValueCodecs::readBoolSetting(settings, QStringLiteral("bundled"), false);
     record.order = SkySettingsValueCodecs::readIntSetting(settings, QStringLiteral("order"), 0);
@@ -683,7 +700,9 @@ SkyCatalogCollectionCacheLoadResult SkyCatalogCollectionStore::load() const
         // must not resurrect a cache directory that happens to still hold a
         // manifest.
         const QString generationGroup = catalogCollectionGenerationSettingsGroup(manifest.manifest.generation);
-        if (!settings.value(generationGroup + QLatin1Char('/') + recordsStoredKey).toBool()) {
+        if (!SkySettingsValueCodecs::readBoolSetting(
+                settings, generationGroup + QLatin1Char('/') + recordsStoredKey, false
+            )) {
             qCWarning(skygateCatalogCacheLog).noquote()
                 << "Catalog collection manifest names a generation without stored records" << manifestPath;
             result.state = SkyCatalogCollectionCacheLoadResult::State::Unusable;

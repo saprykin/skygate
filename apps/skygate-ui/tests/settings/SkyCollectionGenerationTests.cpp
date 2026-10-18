@@ -118,6 +118,8 @@ private slots:
     void stageOnlyGenerationIsNotProofOfCommit();
     void truncatedManifestIsUnusableButRecoverable();
     void missingCommittedGenerationRecordsAreUnusable();
+    void invalidPersistedPolicyFallsBackToMerge();
+    void invalidRecordsStoredMarkerIsUnusable();
     void failedLaterSourceRawWriteKeepsCommittedSnapshot();
     void failedSourceBinaryWriteKeepsCommittedSnapshot();
     void failedMetadataPublicationKeepsCommittedSnapshot();
@@ -664,6 +666,68 @@ void SkyCollectionGenerationTests::missingCommittedGenerationRecordsAreUnusable(
     QCOMPARE(missingRecords.failure, SkyCatalogCollectionCacheLoadResult::Failure::CommittedGenerationMissing);
     QVERIFY(missingRecords.diagnostic.contains(QString::number(committedGeneration)));
     QVERIFY(capture.joinedMessages().contains(QStringLiteral("names a generation without stored records")));
+}
+
+void SkyCollectionGenerationTests::invalidPersistedPolicyFallsBackToMerge()
+{
+    const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(CatalogCollectionCacheFixture::sampleCollectionSnapshot()));
+    const quint64 committedGeneration = skygate::ui::tests::committedCatalogCollectionGeneration(directory);
+    QVERIFY(committedGeneration > 0U);
+
+    // Both records carry a policy the schema no longer names. The second one
+    // was stored as a deep-sky policy, so a successful fallback is visible in
+    // the loaded value rather than in a default that happens to match.
+    {
+        QSettings settings;
+        settings.beginGroup(QStringLiteral("catalogSources/%1").arg(committedGeneration));
+        const QStringList recordGroups = settings.childGroups();
+        settings.endGroup();
+        QCOMPARE(recordGroups.size(), 2);
+        for (const QString& recordGroup : recordGroups) {
+            settings.setValue(
+                QStringLiteral("catalogSources/%1/%2/policy").arg(committedGeneration).arg(recordGroup), 200
+            );
+        }
+        settings.sync();
+    }
+
+    skygate::ui::tests::LogCapture capture;
+    const auto loaded = store.loadCatalogCollectionCache();
+    QVERIFY(loaded.isLoaded());
+    QCOMPARE(loaded.snapshot.sources.size(), 2);
+    QCOMPARE(loaded.snapshot.sources[0].policy, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QCOMPARE(loaded.snapshot.sources[1].policy, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QVERIFY(capture.joinedMessages().contains(QStringLiteral("Invalid catalog composition policy")));
+}
+
+void SkyCollectionGenerationTests::invalidRecordsStoredMarkerIsUnusable()
+{
+    const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(oldCollectionSnapshot()));
+    const quint64 committedGeneration = skygate::ui::tests::committedCatalogCollectionGeneration(directory);
+    QVERIFY(committedGeneration > 0U);
+
+    {
+        QSettings settings;
+        settings.setValue(
+            QStringLiteral("catalogSources/%1/recordsStored").arg(committedGeneration), QStringLiteral("maybe")
+        );
+        settings.sync();
+    }
+
+    // An unreadable marker is not proof that the generation's records were
+    // stored, so the generation stays unusable and the warning names the
+    // setting that failed to decode.
+    skygate::ui::tests::LogCapture capture;
+    const auto loaded = store.loadCatalogCollectionCache();
+    QCOMPARE(loaded.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
+    QCOMPARE(loaded.failure, SkyCatalogCollectionCacheLoadResult::Failure::CommittedGenerationMissing);
+    QVERIFY(capture.joinedMessages().contains(QStringLiteral("Invalid boolean setting")));
 }
 
 void SkyCollectionGenerationTests::failedLaterSourceRawWriteKeepsCommittedSnapshot()

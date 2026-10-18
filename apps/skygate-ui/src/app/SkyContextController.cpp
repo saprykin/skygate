@@ -20,6 +20,7 @@
 #include "ephemeris/SkyEphemerisUpdateWorkflow.hpp"
 #include "location/LocationCatalogModel.hpp"
 #include "location/SkyDeviceLocationAcquisition.hpp"
+#include "projections/ProjectionTypeCodec.hpp"
 #include "search/SkyObjectSearchModel.hpp"
 #include "settings/SkySettingsStore.hpp"
 #include "theme/SkyOverlayLayerSettings.hpp"
@@ -460,6 +461,11 @@ QString SkyContextController::selectedCityDisplayText() const
 QAbstractItemModel* SkyContextController::cityCatalogModel() const noexcept
 {
     return m_locationCatalogModel.get();
+}
+
+QStringList SkyContextController::projectionTypeOptions() const
+{
+    return SkyContextProjectionTypeCodec::availableOptions();
 }
 
 QString SkyContextController::projectionTypeText() const

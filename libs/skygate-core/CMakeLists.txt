@@ -22,6 +22,7 @@ add_library(skygate-core STATIC
     src/time/CivilDateTime.hpp
     src/time/EpochCodec.hpp
     src/time/TimeScale.hpp
+    src/time/TimeScaleCodec.hpp
     src/math/AngleMath.hpp
     src/math/CircleHitIndex.hpp
     src/math/CircleHitTarget.hpp
@@ -42,6 +43,7 @@ add_library(skygate-core STATIC
     src/math/Wgs84Geodesy.hpp
     src/projections/AzimuthalEquidistantProjection.hpp
     src/projections/PerspectiveProjection.hpp
+    src/projections/ProjectionTypeCodec.hpp
     src/projections/StereographicProjection.hpp
     src/EquatorialCoordinate.cpp
     src/GeoLocation.cpp
@@ -56,6 +58,7 @@ add_library(skygate-core STATIC
     src/time/AstronomicalTime.cpp
     src/time/CalendarTime.cpp
     src/time/EpochCodec.cpp
+    src/time/TimeScaleCodec.cpp
     src/math/AngleMath.cpp
     src/math/CircleHitIndex.cpp
     src/math/Geometry2d.cpp
@@ -73,6 +76,7 @@ add_library(skygate-core STATIC
     src/projections/AzimuthalEquidistantProjection.cpp
     src/projections/PerspectiveProjection.cpp
     src/projections/ProjectionPipeline.cpp
+    src/projections/ProjectionTypeCodec.cpp
     src/projections/StereographicProjection.cpp
 )
 

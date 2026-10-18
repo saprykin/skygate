@@ -11,6 +11,7 @@
 #include "catalog/InMemoryStarCatalog.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/EphemerisDateRange.hpp"
+#include "time/TimeScaleCodec.hpp"
 #include "catalog/normalize/CatalogSnapshotValidator.hpp"
 
 #include <QDataStream>
@@ -159,7 +160,8 @@ void writeObjectIdentity(QDataStream& stream, const CatalogObjectIdentity& ident
 
 void writeEpoch(QDataStream& stream, const skygate::core::AstronomicalEpoch& epoch)
 {
-    stream << epoch.julianDatePart1 << epoch.julianDatePart2 << static_cast<std::uint8_t>(epoch.timeScale);
+    stream << epoch.julianDatePart1 << epoch.julianDatePart2
+           << static_cast<std::uint8_t>(skygate::core::TimeScaleCodec::toRaw(epoch.timeScale));
 }
 
 [[nodiscard]] bool readEpoch(QDataStream& stream, skygate::core::AstronomicalEpoch& epoch)
@@ -169,11 +171,12 @@ void writeEpoch(QDataStream& stream, const skygate::core::AstronomicalEpoch& epo
     if (stream.status() != QDataStream::Ok) {
         return false;
     }
-    const auto parsedTimeScale = static_cast<skygate::core::TimeScale>(timeScale);
-    if (!CatalogSnapshotValidator::isKnownTimeScale(parsedTimeScale)) {
+    const std::optional<skygate::core::TimeScale> parsedTimeScale =
+        skygate::core::TimeScaleCodec::fromRaw(static_cast<int>(timeScale));
+    if (!parsedTimeScale.has_value()) {
         return false;
     }
-    epoch.timeScale = parsedTimeScale;
+    epoch.timeScale = *parsedTimeScale;
     return true;
 }
 
