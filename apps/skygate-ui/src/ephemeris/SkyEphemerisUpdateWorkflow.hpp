@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SkyEphemerisAssetStatus.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 
 #include <QObject>
@@ -57,6 +58,11 @@ signals:
 
 private:
     [[nodiscard]] bool updateCancellationRequested() const noexcept;
+    [[nodiscard]] bool ensureUpdateReady();
+    [[nodiscard]] bool prepareStagingRoot(const QString& stagedRoot, const QString& stagingLabel);
+    [[nodiscard]] skygate::ui::internal::SkyEphemerisAssetStatus earthOrientationAssetStatus() const;
+    [[nodiscard]] skygate::ui::internal::SkyEphemerisAssetStatus leapSecondAssetStatus() const;
+    [[nodiscard]] skygate::ui::internal::SkyEphemerisAssetStatus deltaTAssetStatus() const;
     [[nodiscard]] bool isCurrentOperation(
         const std::shared_ptr<skygate::ui::internal::SkyEphemerisUpdateOperation>& operation
     ) const noexcept;

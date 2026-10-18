@@ -1,5 +1,7 @@
 #include "SkyEphemerisDataManager.hpp"
+#include "SkyEphemerisAssetStatus.hpp"
 #include "SkyEphemerisCacheController.hpp"
+#include "SkyEphemerisDataCacheSnapshotPolicy.hpp"
 #include "SkyEphemerisDownloadService.hpp"
 #include "SkyEphemerisSnapshotAdapter.hpp"
 #include "settings/SkySettingsStore.hpp"
@@ -19,37 +21,8 @@ Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
 using EphemerisDataCacheSnapshot = SkyEphemerisDataCacheSnapshot;
 using StagedUpdateActivationRequest = SkyEphemerisDataManager::StagedUpdateActivationRequest;
 using StagedUpdateDownloadRequest = SkyEphemerisDataManager::StagedUpdateDownloadRequest;
-
-QString trimmed(const QString& value)
-{
-    return value.trimmed();
-}
-
-EphemerisDataCacheSnapshot normalizedSnapshot(EphemerisDataCacheSnapshot snapshot)
-{
-    snapshot.installedKernelAssetId = trimmed(snapshot.installedKernelAssetId);
-    snapshot.installedKernelProfileId = trimmed(snapshot.installedKernelProfileId);
-    if (snapshot.installedKernelProfileId == QStringLiteral("modern")) {
-        snapshot.installedKernelProfileId = QStringLiteral("de440s-short-range");
-    }
-    snapshot.installedKernelPath = trimmed(snapshot.installedKernelPath);
-    snapshot.installedKernelVersion = trimmed(snapshot.installedKernelVersion);
-    snapshot.installedEarthOrientationPath = trimmed(snapshot.installedEarthOrientationPath);
-    snapshot.installedEarthOrientationVersion = trimmed(snapshot.installedEarthOrientationVersion);
-    snapshot.installedLeapSecondTablePath = trimmed(snapshot.installedLeapSecondTablePath);
-    snapshot.installedLeapSecondTableVersion = trimmed(snapshot.installedLeapSecondTableVersion);
-    snapshot.installedDeltaTDataPath = trimmed(snapshot.installedDeltaTDataPath);
-    snapshot.installedDeltaTDataVersion = trimmed(snapshot.installedDeltaTDataVersion);
-    snapshot.dataRevisionToken = trimmed(snapshot.dataRevisionToken);
-    snapshot.lastUpdateResult = trimmed(snapshot.lastUpdateResult);
-    if (snapshot.dataRevisionToken.isEmpty()) {
-        snapshot.dataRevisionToken = EphemerisDataCacheSnapshot{}.dataRevisionToken;
-    }
-    if (snapshot.lastUpdateResult.isEmpty()) {
-        snapshot.lastUpdateResult = EphemerisDataCacheSnapshot{}.lastUpdateResult;
-    }
-    return snapshot;
-}
+using skygate::ui::internal::SkyEphemerisAssetStatus;
+using skygate::ui::internal::SkyEphemerisDataCacheSnapshotPolicy;
 
 bool hasInstalledMetadata(const EphemerisDataCacheSnapshot& snapshot)
 {
@@ -188,15 +161,34 @@ QString SkyEphemerisDataManager::datasetInfoText() const
     return m_datasetInfoText;
 }
 
-QString SkyEphemerisDataManager::shortRangeKernelStatusText() const
+SkyEphemerisAssetStatus SkyEphemerisDataManager::assetStatus(const AssetId assetId) const
 {
-    if (usingInstalledData() && !m_activeCacheSnapshot.installedKernelVersion.isEmpty()) {
-        return QStringLiteral("Installed: %1").arg(m_activeCacheSnapshot.installedKernelVersion);
+    const QString installedVersion = [this, assetId] {
+        switch (assetId) {
+        case AssetId::PlanetaryKernel:
+            return m_activeCacheSnapshot.installedKernelVersion;
+        case AssetId::EarthOrientation:
+            return m_activeCacheSnapshot.installedEarthOrientationVersion;
+        case AssetId::LeapSecondTable:
+            return m_activeCacheSnapshot.installedLeapSecondTableVersion;
+        case AssetId::DeltaT:
+            return m_activeCacheSnapshot.installedDeltaTDataVersion;
+        }
+        return QString();
+    }();
+
+    if (usingInstalledData() && !installedVersion.isEmpty()) {
+        return SkyEphemerisAssetStatus::installed(installedVersion);
     }
     if (m_activeSource == ActiveSource::MissingInstalledFallback) {
-        return QStringLiteral("Bundled fallback (installed data missing)");
+        return SkyEphemerisAssetStatus::missingInstalledFallback();
     }
-    return QStringLiteral("Bundled fallback");
+    return SkyEphemerisAssetStatus::bundledFallback();
+}
+
+QString SkyEphemerisDataManager::shortRangeKernelStatusText() const
+{
+    return assetStatus(AssetId::PlanetaryKernel).statusText();
 }
 
 QString SkyEphemerisDataManager::longRangeKernelStatusText() const
@@ -205,7 +197,7 @@ QString SkyEphemerisDataManager::longRangeKernelStatusText() const
         const QString version = m_activeCacheSnapshot.installedKernelVersion.isEmpty()
                                     ? QStringLiteral("installed")
                                     : m_activeCacheSnapshot.installedKernelVersion;
-        return QStringLiteral("Installed: %1").arg(version);
+        return SkyEphemerisAssetStatus::installed(version).statusText();
     }
     return QStringLiteral("Not installed");
 }
@@ -226,35 +218,17 @@ QString SkyEphemerisDataManager::kernelDisplayText() const
 
 QString SkyEphemerisDataManager::earthOrientationStatusText() const
 {
-    if (usingInstalledData() && !m_activeCacheSnapshot.installedEarthOrientationVersion.isEmpty()) {
-        return QStringLiteral("Installed: %1").arg(m_activeCacheSnapshot.installedEarthOrientationVersion);
-    }
-    if (m_activeSource == ActiveSource::MissingInstalledFallback) {
-        return QStringLiteral("Bundled fallback (installed data missing)");
-    }
-    return QStringLiteral("Bundled fallback");
+    return assetStatus(AssetId::EarthOrientation).statusText();
 }
 
 QString SkyEphemerisDataManager::leapSecondStatusText() const
 {
-    if (usingInstalledData() && !m_activeCacheSnapshot.installedLeapSecondTableVersion.isEmpty()) {
-        return QStringLiteral("Installed: %1").arg(m_activeCacheSnapshot.installedLeapSecondTableVersion);
-    }
-    if (m_activeSource == ActiveSource::MissingInstalledFallback) {
-        return QStringLiteral("Bundled fallback (installed data missing)");
-    }
-    return QStringLiteral("Bundled fallback");
+    return assetStatus(AssetId::LeapSecondTable).statusText();
 }
 
 QString SkyEphemerisDataManager::deltaTStatusText() const
 {
-    if (usingInstalledData() && !m_activeCacheSnapshot.installedDeltaTDataVersion.isEmpty()) {
-        return QStringLiteral("Installed: %1").arg(m_activeCacheSnapshot.installedDeltaTDataVersion);
-    }
-    if (m_activeSource == ActiveSource::MissingInstalledFallback) {
-        return QStringLiteral("Bundled fallback (installed data missing)");
-    }
-    return QStringLiteral("Bundled fallback");
+    return assetStatus(AssetId::DeltaT).statusText();
 }
 
 std::uint64_t SkyEphemerisDataManager::planetaryKernelCacheSizeBytes() const
@@ -329,7 +303,7 @@ void SkyEphemerisDataManager::setBundledFallbackData(
 
 bool SkyEphemerisDataManager::restoreFromSettings()
 {
-    const EphemerisDataCacheSnapshot configuredSnapshot = normalizedSnapshot(
+    const EphemerisDataCacheSnapshot configuredSnapshot = SkyEphemerisDataCacheSnapshotPolicy::normalizedSnapshot(
         m_settingsStore != nullptr ? m_settingsStore->loadEphemerisDataCache() : EphemerisDataCacheSnapshot{}
     );
 
@@ -379,7 +353,8 @@ bool SkyEphemerisDataManager::clearPlanetaryKernelCache()
         return false;
     }
 
-    EphemerisDataCacheSnapshot snapshot = normalizedSnapshot(m_settingsStore->loadEphemerisDataCache());
+    EphemerisDataCacheSnapshot snapshot =
+        SkyEphemerisDataCacheSnapshotPolicy::normalizedSnapshot(m_settingsStore->loadEphemerisDataCache());
     const QString kernelPath = snapshot.installedKernelPath;
     snapshot.installedKernelAssetId.clear();
     snapshot.installedKernelProfileId.clear();
@@ -413,7 +388,8 @@ bool SkyEphemerisDataManager::clearSupportDataCache()
         return false;
     }
 
-    EphemerisDataCacheSnapshot snapshot = normalizedSnapshot(m_settingsStore->loadEphemerisDataCache());
+    EphemerisDataCacheSnapshot snapshot =
+        SkyEphemerisDataCacheSnapshotPolicy::normalizedSnapshot(m_settingsStore->loadEphemerisDataCache());
     const QStringList supportPaths{
         snapshot.installedEarthOrientationPath,
         snapshot.installedLeapSecondTablePath,
@@ -495,7 +471,7 @@ void SkyEphemerisDataManager::applyCacheSnapshot(
     EphemerisDataCacheSnapshot cacheSnapshot, const ActiveSource source, QString statusText, const bool emitSignals
 )
 {
-    cacheSnapshot = normalizedSnapshot(std::move(cacheSnapshot));
+    cacheSnapshot = SkyEphemerisDataCacheSnapshotPolicy::normalizedSnapshot(std::move(cacheSnapshot));
     QString datasetInfoText;
     switch (source) {
     case ActiveSource::Installed:

@@ -1,5 +1,6 @@
 #include "EphemerisEngineDescriptorRegistry.hpp"
 #include "EphemerisCorrectionFlags.hpp"
+#include "StringUtilities.hpp"
 #include "engine/simple/SimpleEphemerisEngine.hpp"
 
 #include <array>
@@ -82,6 +83,23 @@ const EphemerisEngineDescriptor* EphemerisEngineDescriptorRegistry::findById(con
         }
     }
     return nullptr;
+}
+
+const EphemerisEngineDescriptor*
+EphemerisEngineDescriptorRegistry::findByIdIgnoreAsciiCase(const std::string_view id) noexcept
+{
+    const auto& all = descriptors();
+    for (const EphemerisEngineDescriptor& descriptor : all) {
+        if (StringUtilities::equalsIgnoreAsciiCase(descriptor.id, id)) {
+            return &descriptor;
+        }
+    }
+    return nullptr;
+}
+
+std::string EphemerisEngineDescriptorRegistry::normalizedLookupKey(const std::string_view id)
+{
+    return StringUtilities::normalizedLookupKey(id);
 }
 
 const EphemerisEngineDescriptor*

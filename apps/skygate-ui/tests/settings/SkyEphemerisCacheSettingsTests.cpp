@@ -2,6 +2,7 @@
 #include "support/CatalogCacheTestSupport.hpp"
 #include "support/SettingsTestFixture.hpp"
 
+#include <QRegularExpression>
 #include <QSettings>
 #include <QtTest/QtTest>
 
@@ -116,6 +117,8 @@ void SkyEphemerisCacheSettingsTests::partialAndMalformedCacheMetadataFallsBack()
     settings.setValue("skyContext/ephemerisData/dataRevisionToken", "   ");
     settings.setValue("skyContext/ephemerisData/lastUpdateResult", "");
 
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Invalid blank setting .* - using fallback .*"));
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Invalid blank setting .* - using fallback .*"));
     const SkySettingsStore store;
     const auto loadedSnapshot = store.loadEphemerisDataCache();
     QVERIFY(loadedSnapshot.installedKernelPath.isEmpty());

@@ -59,6 +59,9 @@ add_library(skygate-core STATIC
     src/time/CalendarTime.cpp
     src/time/EpochCodec.cpp
     src/time/TimeScaleCodec.cpp
+    src/hash/Fnv1a64Hasher.cpp
+    src/hash/Fnv1a64Hasher.hpp
+    src/hash/HashConstants.hpp
     src/math/AngleMath.cpp
     src/math/CircleHitIndex.cpp
     src/math/Geometry2d.cpp

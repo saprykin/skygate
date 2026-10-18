@@ -8,27 +8,20 @@
 #include "factory/EphemerisEngineFactory.hpp"
 #include "factory/EphemerisEngineFactoryRequest.hpp"
 #include "factory/EphemerisEngineReplacementPolicy.hpp"
+#include "hash/Fnv1a64Hasher.hpp"
+#include "hash/HashConstants.hpp"
 #include "time/EpochCodec.hpp"
 
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <utility>
 
 namespace {
 
-void appendRevisionComponent(std::uint64_t& revision, const std::string_view value) noexcept
-{
-    constexpr std::uint64_t kFnvPrime = 1'099'511'628'211ULL;
-    for (const char character : value) {
-        revision ^= static_cast<unsigned char>(character);
-        revision *= kFnvPrime;
-    }
-    revision ^= 0xffU;
-    revision *= kFnvPrime;
-}
+using skygate::core::Fnv1a64Hasher;
+using skygate::core::HashConstants;
 
 [[nodiscard]] std::uint64_t textDataAssetRevision(
     const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>& snapshot,
@@ -46,13 +39,10 @@ void appendRevisionComponent(std::uint64_t& revision, const std::string_view val
         return dataRevision;
     }
 
-    constexpr std::uint64_t kFnvOffsetBasis = 14'695'981'039'346'656'037ULL;
-    std::uint64_t revision = kFnvOffsetBasis;
-    revision ^= dataRevision;
-    revision *= 1'099'511'628'211ULL;
-    appendRevisionComponent(revision, asset->id);
-    appendRevisionComponent(revision, asset->version);
-    appendRevisionComponent(revision, asset->provenance);
+    std::uint64_t revision = Fnv1a64Hasher::combine(HashConstants::kFnv1a64OffsetBasis, dataRevision);
+    revision = Fnv1a64Hasher::appendComponent(revision, asset->id);
+    revision = Fnv1a64Hasher::appendComponent(revision, asset->version);
+    revision = Fnv1a64Hasher::appendComponent(revision, asset->provenance);
     return revision;
 }
 

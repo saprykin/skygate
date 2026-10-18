@@ -15,6 +15,7 @@ public:
     [[nodiscard]] static SkyPersistedStateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapshot& snapshot);
     static void saveStateSnapshot(QSettings& settings, const SkyPersistedStateSnapshot& snapshot);
     [[nodiscard]] static std::optional<SkyPersistedStateSnapshot> loadStateSnapshot(QSettings& settings);
+    [[nodiscard]] static SkyLoggingSettingsSnapshot loadLoggingSettings(QSettings& settings);
 };
 
 }  // namespace skygate::ui::internal

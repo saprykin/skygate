@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <string>
 #include <string_view>
 
 class QFileInfo;
@@ -20,6 +21,8 @@ public:
     static constexpr std::string_view kSha256Algorithm = "sha256";
 
     [[nodiscard]] static QString pathToQString(const std::filesystem::path& path);
+    [[nodiscard]] static std::filesystem::path pathFromQString(const QString& path);
+    [[nodiscard]] static QString stringToQString(const std::string& value);
     [[nodiscard]] static bool hasUnsafePathComponent(const std::filesystem::path& path);
     [[nodiscard]] static bool
     sourceSizeMatchesMetadata(const QFileInfo& sourceInfo, const EphemerisDataManifest::Asset& asset);
