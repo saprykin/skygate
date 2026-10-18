@@ -1,4 +1,5 @@
 #include "SkyObjectSearchModel.hpp"
+#include "StringUtilities.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -8,7 +9,7 @@ namespace {
 
 QString normalizedKey(const QString& value)
 {
-    return value.trimmed().toCaseFolded();
+    return QString::fromStdString(skygate::ephemeris::StringUtilities::normalizedLookupKey(value.toStdString()));
 }
 
 QString compactedKey(const QString& value)
