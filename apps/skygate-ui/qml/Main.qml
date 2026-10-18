@@ -41,6 +41,7 @@ ApplicationWindow {
     AboutWindow {
         id: aboutWindow
         objectName: "aboutWindow"
+        theme: skyContext.theme
         transientParentWindow: root
     }
 

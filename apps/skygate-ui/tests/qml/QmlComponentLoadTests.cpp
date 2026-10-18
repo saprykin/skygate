@@ -31,6 +31,7 @@ private slots:
     void preferenceControlUsesSuppliedTheme();
     void aboutWindowLoadsWithBuildMetadata();
     void aboutWindowClosesFromButtonsAndShortcuts();
+    void aboutWindowUsesSuppliedTheme();
     void malformedQmlEmitsCapturedWarning();
 
 private:
@@ -377,7 +378,11 @@ void QmlComponentLoadTests::aboutWindowLoadsWithBuildMetadata()
     engine.rootContext()->setContextProperty("skygateGitHash", QStringLiteral("test-git"));
 
     const QmlWarningScope warnings;
-    auto object = createFileComponent(engine, QStringLiteral("windows/AboutWindow.qml"));
+    auto object = createFileComponent(
+        engine,
+        QStringLiteral("windows/AboutWindow.qml"),
+        {{QStringLiteral("theme"), QVariant::fromValue<QObject*>(controller->theme())}}
+    );
     QVERIFY(object != nullptr);
     QCOMPARE(object->property("title").toString(), QStringLiteral("About SkyGate"));
     QVERIFY(firstObjectWithProperty(object.get(), "text", QStringLiteral("SkyGate")) != nullptr);
@@ -396,7 +401,11 @@ void QmlComponentLoadTests::aboutWindowClosesFromButtonsAndShortcuts()
     engine.rootContext()->setContextProperty("skygateGitHash", QStringLiteral("test-git"));
 
     const QmlWarningScope warnings;
-    auto object = createFileComponent(engine, QStringLiteral("windows/AboutWindow.qml"));
+    auto object = createFileComponent(
+        engine,
+        QStringLiteral("windows/AboutWindow.qml"),
+        {{QStringLiteral("theme"), QVariant::fromValue<QObject*>(controller->theme())}}
+    );
     QVERIFY(object != nullptr);
     auto* window = qobject_cast<QQuickWindow*>(object.get());
     QVERIFY(window != nullptr);
@@ -428,6 +437,48 @@ void QmlComponentLoadTests::aboutWindowClosesFromButtonsAndShortcuts()
     QTRY_VERIFY(window->isVisible());
     QTest::keySequence(window, QKeySequence::Close);
     QTRY_VERIFY(!window->isVisible());
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlComponentLoadTests::aboutWindowUsesSuppliedTheme()
+{
+    auto rootController = makeController();
+    QVERIFY(rootController != nullptr);
+    auto suppliedController = makeController();
+    QVERIFY(suppliedController != nullptr);
+    rootController->setThemeId(QStringLiteral("default"));
+    suppliedController->setThemeId(QStringLiteral("night-vision"));
+
+    QQmlEngine engine;
+    setupEngine(engine, *rootController);
+    engine.rootContext()->setContextProperty("skygateBuildDateTime", QStringLiteral("test-build"));
+    engine.rootContext()->setContextProperty("skygateGitHash", QStringLiteral("test-git"));
+
+    const QmlWarningScope warnings;
+    auto object = createFileComponent(
+        engine,
+        QStringLiteral("windows/AboutWindow.qml"),
+        {{QStringLiteral("theme"), QVariant::fromValue<QObject*>(suppliedController->theme())}}
+    );
+    QVERIFY(object != nullptr);
+    auto* window = qobject_cast<QQuickWindow*>(object.get());
+    QVERIFY(window != nullptr);
+
+    QObject* suppliedTheme = suppliedController->theme();
+    QObject* rootTheme = rootController->theme();
+    QVERIFY(suppliedTheme != nullptr);
+    QVERIFY(rootTheme != nullptr);
+    QCOMPARE(qvariant_cast<QObject*>(window->property("theme")), suppliedTheme);
+    QCOMPARE(window->color(), themeColor(suppliedTheme, "windowBackground"));
+    QVERIFY(window->color() != themeColor(rootTheme, "windowBackground"));
+
+    suppliedController->setThemeId(QStringLiteral("default"));
+    QTRY_COMPARE(window->color(), themeColor(suppliedTheme, "windowBackground"));
+
+    rootController->setThemeId(QStringLiteral("night-vision"));
+    QCoreApplication::processEvents();
+    QCOMPARE(window->color(), themeColor(suppliedTheme, "windowBackground"));
+    QVERIFY(window->color() != themeColor(rootTheme, "windowBackground"));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
