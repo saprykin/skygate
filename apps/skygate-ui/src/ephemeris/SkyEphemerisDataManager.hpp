@@ -1,6 +1,7 @@
 #pragma once
 
-#include "SkyEphemerisAssetStatus.hpp"
+#include "SkyEphemerisActiveSource.hpp"
+#include "SkyEphemerisAssetStatusView.hpp"
 #include "SkyEphemerisCacheController.hpp"
 #include "SkyEphemerisDataCacheSnapshot.hpp"
 #include "SkyEphemerisDownloadService.hpp"
@@ -77,35 +78,20 @@ signals:
     void dataRevisionChanged();
 
 private:
-    enum class ActiveSource : std::uint8_t {
-        BundledFallback,
-        Installed,
-        MissingInstalledFallback
-    };
+    using ActiveSource = skygate::ui::internal::SkyEphemerisActiveSource;
 
-    enum class AssetId : std::uint8_t {
-        PlanetaryKernel,
-        EarthOrientation,
-        LeapSecondTable,
-        DeltaT
-    };
-
-    [[nodiscard]] skygate::ui::internal::SkyEphemerisAssetStatus assetStatus(AssetId assetId) const;
-    void applyCacheSnapshot(
-        SkyEphemerisDataCacheSnapshot cacheSnapshot, ActiveSource source, QString statusText, bool emitSignals
-    );
+    void applyCacheSnapshot(SkyEphemerisDataCacheSnapshot cacheSnapshot, ActiveSource source, bool emitSignals);
 
 private:
     SkySettingsStore* m_settingsStore = nullptr;
     std::unique_ptr<SkyEphemerisDownloadService> m_downloadService;
     SkyEphemerisCacheController m_cacheController;
     SkyEphemerisDataCacheSnapshot m_activeCacheSnapshot;
+    skygate::ui::internal::SkyEphemerisAssetStatusView m_assetStatusView;
     std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> m_activeDataSnapshot;
     const skygate::ephemeris::EphemerisDataManifest* m_bundledFallbackManifest = nullptr;
     QString m_bundledFallbackResourceRoot;
     QString m_bundledFallbackProfileId;
-    QString m_statusText;
-    QString m_datasetInfoText;
     ActiveSource m_activeSource = ActiveSource::BundledFallback;
     std::uint64_t m_dataRevision = 1;
     std::atomic_bool m_updateCancellationRequested = false;
