@@ -4,6 +4,11 @@
 
 namespace skygate::core {
 
+bool ScreenPoint::isVisible() const noexcept
+{
+    return status == ProjectionStatus::Visible;
+}
+
 bool ScreenPoint::isFinite() const noexcept
 {
     return std::isfinite(x) && std::isfinite(y);

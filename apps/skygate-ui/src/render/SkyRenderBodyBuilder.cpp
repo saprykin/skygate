@@ -26,6 +26,9 @@ constexpr double kStarDecimationScaleReferenceWidthPx = 1100.0;
 constexpr double kStarDecimationScaleReferenceHeightPx = 760.0;
 constexpr double kStarDecimationViewportScaleMin = 0.85;
 constexpr double kStarDecimationViewportScaleMax = 1.35;
+// Extra margin so a glyph that is only partly outside the viewport still
+// reaches the render frame.
+constexpr double kDeepSkyGlyphMarginPaddingPx = 2.0;
 
 struct DecimatedStarPoint final {
     SkyRenderPoint point;
@@ -148,24 +151,16 @@ struct DecimatedStarPoint final {
 {
     const skygate::ephemeris::DeepSkyObjectInfo defaultInfo;
     const auto& info = body.deepSkyObjectValue().has_value() ? *body.deepSkyObjectValue() : defaultInfo;
-    const double pixelsPerDeg = std::min(projectionParams.viewportWidth, projectionParams.viewportHeight)
-                                / std::max(1.0, projectionParams.fovDeg);
-    const double majorArcmin = info.majorAxisArcmin.value_or(10.0);
-    const double minorArcmin = info.minorAxisArcmin.value_or(majorArcmin);
-    const double radiusX = ((majorArcmin / 60.0) * pixelsPerDeg) * 0.5;
-    const double radiusY = ((minorArcmin / 60.0) * pixelsPerDeg) * 0.5;
+    const skygate::ui::internal::SkyRenderStylePolicy::GlyphRadii radii =
+        skygate::ui::internal::SkyRenderStylePolicy::deepSkyGlyphRadiiPx(body, projectionParams);
 
     SkyRenderGlyph glyph;
     glyph.x = projected.x;
     glyph.y = projected.y;
     glyph.bodyIndex = bodyIndex;
     glyph.kind = info.kind;
-    glyph.radiusXPx = std::clamp(radiusX, 4.5, 44.0);
-    glyph.radiusYPx = std::clamp(radiusY, 4.0, 32.0);
-    if (info.kind == skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula) {
-        glyph.radiusXPx = std::clamp(radiusX, 5.0, 12.0);
-        glyph.radiusYPx = glyph.radiusXPx;
-    }
+    glyph.radiusXPx = radii.radiusXPx;
+    glyph.radiusYPx = radii.radiusYPx;
     glyph.rotationDeg = info.positionAngleDeg.value_or(0.0);
     glyph.widthPx = 1.25;
     glyph.color = skygate::ui::internal::SkyRenderStylePolicy::colorForBodyType(body.kind, renderTheme);
@@ -176,20 +171,9 @@ struct DecimatedStarPoint final {
     const skygate::ephemeris::BaseCelestialBody& body, const skygate::core::ProjectionParams& projectionParams
 )
 {
-    const skygate::ephemeris::DeepSkyObjectInfo defaultInfo;
-    const auto& info = body.deepSkyObjectValue().has_value() ? *body.deepSkyObjectValue() : defaultInfo;
-    const double pixelsPerDeg = std::min(projectionParams.viewportWidth, projectionParams.viewportHeight)
-                                / std::max(1.0, projectionParams.fovDeg);
-    const double majorArcmin = info.majorAxisArcmin.value_or(10.0);
-    const double minorArcmin = info.minorAxisArcmin.value_or(majorArcmin);
-    double radiusX = std::clamp(((majorArcmin / 60.0) * pixelsPerDeg) * 0.5, 4.5, 44.0);
-    double radiusY = std::clamp(((minorArcmin / 60.0) * pixelsPerDeg) * 0.5, 4.0, 32.0);
-    if (info.kind == skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula) {
-        radiusX = std::clamp(((majorArcmin / 60.0) * pixelsPerDeg) * 0.5, 5.0, 12.0);
-        radiusY = radiusX;
-    }
-
-    return std::max(radiusX, radiusY) + 2.0;
+    const skygate::ui::internal::SkyRenderStylePolicy::GlyphRadii radii =
+        skygate::ui::internal::SkyRenderStylePolicy::deepSkyGlyphRadiiPx(body, projectionParams);
+    return std::max(radii.radiusXPx, radii.radiusYPx) + kDeepSkyGlyphMarginPaddingPx;
 }
 
 }  // namespace
@@ -243,7 +227,7 @@ void SkyRenderBodyBuilder::appendBodies(
             isDeepSkyObject
                 ? projection.projectWithMargin(state.horizontal, deepSkyGlyphMarginPx(body, projection.params()))
                 : projection.project(state.horizontal);
-        if (!projected.isVisible || !projected.isFinite()) {
+        if (!projected.isVisible() || !projected.isFinite()) {
             continue;
         }
 

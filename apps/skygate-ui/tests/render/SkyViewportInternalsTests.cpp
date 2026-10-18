@@ -1,4 +1,5 @@
 #include "math/ViewportMath.hpp"
+#include "render/SkyCardinalDirectionPolicy.hpp"
 #include "render/SkyRenderGlyph.hpp"
 #include "render/SkyRenderLine.hpp"
 #include "render/SkyRenderPoint.hpp"
@@ -24,6 +25,26 @@ std::optional<skygate::core::PreparedProjection> makeProjection()
     return skygate::core::PreparedProjection::create(
         skygate::core::ProjectionType::Stereographic,
         skygate::core::ViewportMath::buildProjectionParams(800.0, 600.0, 45.0, 180.0, 80.0)
+    );
+}
+
+// Azimuthal views wide enough to reach the horizon in every direction.
+std::optional<skygate::core::PreparedProjection> makeWideHorizonProjection(const double centerAzimuthDeg)
+{
+    return skygate::core::PreparedProjection::create(
+        skygate::core::ProjectionType::AzimuthalEquidistant,
+        skygate::core::ViewportMath::buildProjectionParams(800.0, 600.0, 0.0, centerAzimuthDeg, 150.0)
+    );
+}
+
+bool hasSegmentWithColor(
+    const std::vector<skygate::ui::internal::SkyViewportLineSegment>& segments, const QColor& color
+)
+{
+    return std::any_of(
+        segments.begin(), segments.end(), [&color](const skygate::ui::internal::SkyViewportLineSegment& segment) {
+            return segment.color == color;
+        }
     );
 }
 
@@ -63,6 +84,9 @@ class SkyViewportInternalsTests final : public QObject {
 
 private slots:
     void geometryAppendsFrameLinesAndDeepSkyGlyphSegments();
+    void cardinalDirectionPolicyMapsLabelsAndColors();
+    void cardinalGridLinesUsePaletteColors();
+    void glyphExtentRadiusHonoursMinimum();
     void sceneGraphBucketsAndSkipsDegenerateLines();
     void sceneGraphKeepsDistinctAlphaLineBuckets();
     void sceneGraphPreservesLegacyPackedKeyOrder();
@@ -125,6 +149,93 @@ void SkyViewportInternalsTests::geometryAppendsFrameLinesAndDeepSkyGlyphSegments
         }
     );
     QCOMPARE(glyphSegmentCount, 34);
+}
+
+void SkyViewportInternalsTests::cardinalDirectionPolicyMapsLabelsAndColors()
+{
+    skygate::ui::internal::SkyThemeRenderPalette theme;
+    theme.cardinalNorthLine = QColor("#010101");
+    theme.cardinalEastLine = QColor("#020202");
+    theme.cardinalSouthLine = QColor("#030303");
+    theme.cardinalWestLine = QColor("#040404");
+    theme.gridAzimuthLine = QColor("#050505");
+
+    const auto& azimuths = skygate::ui::internal::SkyCardinalDirectionPolicy::kAzimuthsDeg;
+    QCOMPARE(azimuths.size(), 4U);
+    QCOMPARE(azimuths[0], 0.0);
+    QCOMPARE(azimuths[1], 90.0);
+    QCOMPARE(azimuths[2], 180.0);
+    QCOMPARE(azimuths[3], 270.0);
+
+    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::label(0.0), QString("N"));
+    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::label(90.0), QString("E"));
+    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::label(180.0), QString("S"));
+    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::label(270.0), QString("W"));
+    QVERIFY(skygate::ui::internal::SkyCardinalDirectionPolicy::label(45.0).isEmpty());
+
+    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(0.0, theme), theme.cardinalNorthLine);
+    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(90.0, theme), theme.cardinalEastLine);
+    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(180.0, theme), theme.cardinalSouthLine);
+    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(270.0, theme), theme.cardinalWestLine);
+    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(45.0, theme), theme.gridAzimuthLine);
+}
+
+void SkyViewportInternalsTests::cardinalGridLinesUsePaletteColors()
+{
+    skygate::ui::internal::SkyThemeRenderPalette theme;
+    theme.gridAltitudeLine = QColor("#101010");
+    theme.gridAzimuthLine = QColor("#202020");
+    theme.cardinalNorthLine = QColor("#303030");
+    theme.cardinalEastLine = QColor("#404040");
+    theme.cardinalSouthLine = QColor("#505050");
+    theme.cardinalWestLine = QColor("#606060");
+    theme.horizonLine = QColor("#707070");
+
+    SkyOverlayLayerVisibility overlays;
+    overlays.horizon = false;
+
+    const auto northEastProjection = makeWideHorizonProjection(45.0);
+    QVERIFY(northEastProjection.has_value());
+    const auto northEastSegments = skygate::ui::internal::SkyViewportGeometry::buildLineSegments(
+        skygate::ui::internal::SkyViewportGeometryInput{
+            .projection = *northEastProjection,
+            .viewportWidth = 800.0,
+            .viewportHeight = 600.0,
+            .renderTheme = theme,
+            .overlayLayers = overlays
+        }
+    );
+    QVERIFY(hasSegmentWithColor(northEastSegments, theme.cardinalNorthLine));
+    QVERIFY(hasSegmentWithColor(northEastSegments, theme.cardinalEastLine));
+
+    const auto southWestProjection = makeWideHorizonProjection(225.0);
+    QVERIFY(southWestProjection.has_value());
+    const auto southWestSegments = skygate::ui::internal::SkyViewportGeometry::buildLineSegments(
+        skygate::ui::internal::SkyViewportGeometryInput{
+            .projection = *southWestProjection,
+            .viewportWidth = 800.0,
+            .viewportHeight = 600.0,
+            .renderTheme = theme,
+            .overlayLayers = overlays
+        }
+    );
+    QVERIFY(hasSegmentWithColor(southWestSegments, theme.cardinalSouthLine));
+    QVERIFY(hasSegmentWithColor(southWestSegments, theme.cardinalWestLine));
+}
+
+void SkyViewportInternalsTests::glyphExtentRadiusHonoursMinimum()
+{
+    SkyRenderGlyph glyph{.x = 10.0, .y = 20.0, .radiusXPx = 3.0, .radiusYPx = 5.0};
+    QCOMPARE(glyph.extentRadiusPx(8.0), 8.0);
+    QCOMPARE(glyph.extentRadiusPx(12.0), 12.0);
+
+    glyph.radiusYPx = 18.0;
+    QCOMPARE(glyph.extentRadiusPx(8.0), 18.0);
+    QCOMPARE(glyph.extentRadiusPx(12.0), 18.0);
+
+    glyph.radiusXPx = 30.0;
+    QCOMPARE(glyph.extentRadiusPx(8.0), 30.0);
+    QCOMPARE(glyph.extentRadiusPx(12.0), 30.0);
 }
 
 void SkyViewportInternalsTests::sceneGraphBucketsAndSkipsDegenerateLines()

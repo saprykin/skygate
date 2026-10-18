@@ -35,6 +35,7 @@ class SkyHitTargetIndexTests final : public QObject {
 private slots:
     void ignoresBodiesWithoutDisplayNames();
     void pointAndGlyphRadiiFollowUiPolicy();
+    void glyphExtentRadiusFollowsLargestAxis();
     void invalidViewportAndClearReturnNoHits();
     void overlappingTargetsChooseNearestBody();
 };
@@ -73,6 +74,21 @@ void SkyHitTargetIndexTests::pointAndGlyphRadiiFollowUiPolicy()
     QVERIFY(!index.bodyIndexAt(60.1, 50.0, 200.0, 200.0, snapshot).has_value());
     QCOMPARE(index.bodyIndexAt(132.0, 120.0, 200.0, 200.0, snapshot).value_or(99U), 1U);
     QVERIFY(!index.bodyIndexAt(132.1, 120.0, 200.0, 200.0, snapshot).has_value());
+}
+
+void SkyHitTargetIndexTests::glyphExtentRadiusFollowsLargestAxis()
+{
+    const auto snapshot = makeSnapshot({makeBody("wide", "Wide")});
+    SkyRenderFrame frame;
+    frame.glyphs.push_back(
+        SkyRenderGlyph{.x = 100.0, .y = 100.0, .radiusXPx = 30.0, .radiusYPx = 6.0, .bodyIndex = 0U}
+    );
+
+    SkyHitTargetIndex index;
+    index.rebuild(frame, snapshot);
+
+    QCOMPARE(index.bodyIndexAt(129.0, 100.0, 400.0, 400.0, snapshot).value_or(99U), 0U);
+    QVERIFY(!index.bodyIndexAt(131.0, 100.0, 400.0, 400.0, snapshot).has_value());
 }
 
 void SkyHitTargetIndexTests::invalidViewportAndClearReturnNoHits()

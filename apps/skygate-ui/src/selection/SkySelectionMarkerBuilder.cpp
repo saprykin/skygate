@@ -1,6 +1,7 @@
 #include "SkySelectionMarkerBuilder.hpp"
 #include "ConstellationReferenceCalculator.hpp"
 #include "SkySelectionOverlayInput.hpp"
+#include "SkySelectionTargetKind.hpp"
 #include "scene/SkySceneLookupKey.hpp"
 #include "scene/SkySelectionMarker.hpp"
 
@@ -8,6 +9,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <string>
 
 namespace {
 
@@ -16,44 +18,27 @@ SkySelectionMarker selectionMarkerEntry(const double x, const double y)
     return SkySelectionMarker{.visible = true, .kind = "searchSelection", .x = x, .y = y};
 }
 
-bool hasSelectionInputs(const SkySelectionOverlayInput& input)
+std::optional<QPointF> selectedBodyPoint(const SkySelectionOverlayInput& input, const QString& targetId)
 {
-    return input.snapshot != nullptr && input.preparedProjection != nullptr && input.stateIndexByBodyId != nullptr;
-}
-
-std::optional<QPointF> selectedBodyPoint(
-    const skygate::ephemeris::EphemerisSnapshot& snapshot,
-    const QHash<QString, std::size_t>& stateIndexByBodyId,
-    const skygate::core::PreparedProjection& preparedProjection,
-    const QString& targetId
-)
-{
-    const auto stateIndexIt =
-        stateIndexByBodyId.constFind(skygate::ui::internal::SkySceneLookupKey::normalized(targetId));
-    if (stateIndexIt == stateIndexByBodyId.cend()) {
+    const auto stateIndex = input.stateIndexForBodyId(targetId);
+    if (!stateIndex.has_value()) {
         return std::nullopt;
     }
 
-    const auto& state = snapshot.states.at(*stateIndexIt);
+    const auto& state = input.snapshot->states.at(*stateIndex);
     if (!state.horizontal.isFinite()) {
         return std::nullopt;
     }
 
-    const auto projected = preparedProjection.project(state.horizontal);
-    if (!projected.isVisible) {
+    const auto projected = input.preparedProjection->project(state.horizontal);
+    if (!projected.isVisible()) {
         return std::nullopt;
     }
 
     return QPointF(projected.x, projected.y);
 }
 
-std::optional<QPointF> selectedConstellationPoint(
-    const skygate::ephemeris::EphemerisSnapshot& snapshot,
-    const QHash<QString, std::size_t>& stateIndexByBodyId,
-    const skygate::core::PreparedProjection& preparedProjection,
-    const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups,
-    const QString& targetId
-)
+std::optional<QPointF> selectedConstellationPoint(const SkySelectionOverlayInput& input, const QString& targetId)
 {
     const QString normalizedTargetId = skygate::ui::internal::SkySceneLookupKey::normalized(targetId);
     if (normalizedTargetId.isEmpty()) {
@@ -61,25 +46,24 @@ std::optional<QPointF> selectedConstellationPoint(
     }
 
     const auto anchorGroupIt = std::find_if(
-        anchorGroups.begin(),
-        anchorGroups.end(),
+        input.constellationAnchorGroups.begin(),
+        input.constellationAnchorGroups.end(),
         [&normalizedTargetId](const skygate::ephemeris::ConstellationAnchorGroup& anchorGroup) {
             return skygate::ui::internal::SkySceneLookupKey::normalized(anchorGroup.first) == normalizedTargetId;
         }
     );
-    if (anchorGroupIt == anchorGroups.end()) {
+    if (anchorGroupIt == input.constellationAnchorGroups.end()) {
         return std::nullopt;
     }
 
     skygate::ephemeris::ConstellationReferenceCalculator::AnchorCentroidAccumulator accumulator;
     for (const std::string& hipId : anchorGroupIt->second) {
-        const auto stateIndexIt =
-            stateIndexByBodyId.constFind(skygate::ui::internal::SkySceneLookupKey::normalized(hipId));
-        if (stateIndexIt == stateIndexByBodyId.cend()) {
+        const auto stateIndex = input.stateIndexForBodyId(QString::fromStdString(hipId));
+        if (!stateIndex.has_value()) {
             continue;
         }
 
-        accumulator.addAnchor(snapshot.states.at(*stateIndexIt).horizontal);
+        accumulator.addAnchor(input.snapshot->states.at(*stateIndex).horizontal);
     }
 
     const auto center = accumulator.centroid();
@@ -87,8 +71,8 @@ std::optional<QPointF> selectedConstellationPoint(
         return std::nullopt;
     }
 
-    const auto projected = preparedProjection.project(*center);
-    if (!projected.isVisible) {
+    const auto projected = input.preparedProjection->project(*center);
+    if (!projected.isVisible()) {
         return std::nullopt;
     }
 
@@ -99,14 +83,16 @@ std::optional<QPointF> selectedConstellationPoint(
 
 SkySelectionMarker SkySelectionMarkerBuilder::build(const SkySelectionOverlayInput& input) const
 {
-    if (!hasSelectionInputs(input)) {
+    if (!input.hasRequiredSnapshotInputs()) {
         return {};
     }
 
     QString targetKind;
     QString targetId;
     if (!input.selectedObjectTargetId.isEmpty()) {
-        targetKind = "body";
+        targetKind = skygate::ui::internal::SkySelectionTargetKind::token(
+            skygate::ui::internal::SkySelectionTargetKind::Type::Body
+        );
         targetId = input.selectedObjectTargetId;
     } else if (!input.trackedTargetId.trimmed().isEmpty()) {
         targetKind = input.trackedTargetKind;
@@ -120,17 +106,10 @@ SkySelectionMarker SkySelectionMarkerBuilder::build(const SkySelectionOverlayInp
     }
 
     std::optional<QPointF> markerPoint;
-    if (skygate::ui::internal::SkySceneLookupKey::normalized(targetKind) == "body") {
-        markerPoint =
-            selectedBodyPoint(*input.snapshot, *input.stateIndexByBodyId, *input.preparedProjection, targetId);
-    } else if (skygate::ui::internal::SkySceneLookupKey::normalized(targetKind) == "constellationlabel") {
-        markerPoint = selectedConstellationPoint(
-            *input.snapshot,
-            *input.stateIndexByBodyId,
-            *input.preparedProjection,
-            input.constellationAnchorGroups,
-            targetId
-        );
+    if (skygate::ui::internal::SkySelectionTargetKind::isBody(targetKind)) {
+        markerPoint = selectedBodyPoint(input, targetId);
+    } else if (skygate::ui::internal::SkySelectionTargetKind::isConstellationLabel(targetKind)) {
+        markerPoint = selectedConstellationPoint(input, targetId);
     }
 
     if (!markerPoint.has_value()) {

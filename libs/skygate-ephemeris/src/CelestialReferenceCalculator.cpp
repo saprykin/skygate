@@ -1,5 +1,6 @@
 #include "CelestialReferenceCalculator.hpp"
 #include "FixedBodyAltitudeRange.hpp"
+#include "math/MathConstants.hpp"
 #include "math/TimeConstants.hpp"
 #include "reference/EclipticToEquatorialCalculator.hpp"
 #include "reference/EquatorialToHorizontalCalculator.hpp"
@@ -21,6 +22,22 @@ skygate::core::HorizontalCoordinate CelestialReferenceCalculator::eclipticPoint(
     return EquatorialToHorizontalCalculator::compute(
         EclipticToEquatorialCalculator::compute(eclipticLongitudeDeg, 0.0, obliquityDeg), observer, utcTime
     );
+}
+
+skygate::core::HorizontalCoordinate CelestialReferenceCalculator::eclipticCirclePoint(
+    const int sampleIndex,
+    const int sampleCount,
+    const skygate::core::GeoLocation& observer,
+    const skygate::core::UtcTimePoint& utcTime
+) noexcept
+{
+    if (sampleCount <= 0) {
+        return eclipticPoint(0.0, observer, utcTime);
+    }
+
+    const double eclipticLongitudeDeg = skygate::core::MathConstants::kDegreesPerTurn * static_cast<double>(sampleIndex)
+                                        / static_cast<double>(sampleCount);
+    return eclipticPoint(eclipticLongitudeDeg, observer, utcTime);
 }
 
 skygate::core::HorizontalCoordinate CelestialReferenceCalculator::equatorialPoint(

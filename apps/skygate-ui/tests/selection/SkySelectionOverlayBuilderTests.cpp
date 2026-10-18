@@ -10,6 +10,7 @@
 #include "scene/SkySelectionMarker.hpp"
 #include "selection/SkySelectionOverlayBuilder.hpp"
 #include "selection/SkySelectionOverlayInput.hpp"
+#include "selection/SkySelectionTargetKind.hpp"
 #include "support/SkyOverlayTestSupport.hpp"
 #include "time/CalendarTime.hpp"
 #include "time/SkyTimeController.hpp"
@@ -435,7 +436,33 @@ private slots:
     void inspectorAvoidsHighPrecisionSamplingForNonFixed();
     void pinnedInspectorRendersForUnprojectableBody();
     void activeTrailTargetUsesExpectedPriority();
+    void selectionTargetKindTokensMatchContract();
 };
+
+void SkySelectionOverlayBuilderTests::selectionTargetKindTokensMatchContract()
+{
+    using skygate::ui::internal::SkySelectionTargetKind;
+
+    QCOMPARE(SkySelectionTargetKind::token(SkySelectionTargetKind::Type::Body), QString("body"));
+    QCOMPARE(
+        SkySelectionTargetKind::token(SkySelectionTargetKind::Type::ConstellationLabel), QString("constellationLabel")
+    );
+
+    QVERIFY(SkySelectionTargetKind::fromToken("body") == SkySelectionTargetKind::Type::Body);
+    QVERIFY(
+        SkySelectionTargetKind::fromToken(" constellationLabel ") == SkySelectionTargetKind::Type::ConstellationLabel
+    );
+    QVERIFY(
+        SkySelectionTargetKind::fromToken("constellationlabel") == SkySelectionTargetKind::Type::ConstellationLabel
+    );
+    QVERIFY(!SkySelectionTargetKind::fromToken("unknown").has_value());
+    QVERIFY(!SkySelectionTargetKind::fromToken(QString()).has_value());
+
+    QVERIFY(SkySelectionTargetKind::isBody("body"));
+    QVERIFY(!SkySelectionTargetKind::isBody("constellationLabel"));
+    QVERIFY(SkySelectionTargetKind::isConstellationLabel("constellationlabel"));
+    QVERIFY(!SkySelectionTargetKind::isConstellationLabel("body"));
+}
 
 void SkySelectionOverlayBuilderTests::markerPrioritySelectedThenTrackedThenSearch()
 {
@@ -577,7 +604,7 @@ void SkySelectionOverlayBuilderTests::constellationMarkerKeepsCancelResidue()
     // Opposite horizon anchors leave a floating-point residue that still
     // normalizes, so the marker keeps a direction instead of disappearing.
     const skygate::core::ScreenPoint expected = fixture.projection->project({.altitudeDeg = 0.0, .azimuthDeg = 90.0});
-    QVERIFY(expected.isVisible);
+    QVERIFY(expected.isVisible());
     QVERIFY(marker.visible);
     QVERIFY(std::abs(marker.x - expected.x) < 1e-6);
     QVERIFY(std::abs(marker.y - expected.y) < 1e-6);

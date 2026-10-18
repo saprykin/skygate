@@ -16,6 +16,7 @@ struct EquatorialCoordinate {
 
     [[nodiscard]] bool isFinite() const noexcept;
     [[nodiscard]] bool isValid() const noexcept;
+    [[nodiscard]] bool equals(const EquatorialCoordinate& other) const noexcept;
 };
 
 }  // namespace skygate::core
