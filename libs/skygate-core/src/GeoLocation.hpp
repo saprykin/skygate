@@ -16,6 +16,10 @@ struct GeoLocation {
 
     [[nodiscard]] bool isValid() const noexcept;
     [[nodiscard]] bool equals(const GeoLocation& other) const noexcept;
+
+    // Bit identity for cache keys: +0.0 and -0.0 differ here even though
+    // equals() treats them as equal.
+    [[nodiscard]] bool isIdenticalTo(const GeoLocation& other) const noexcept;
 };
 
 }  // namespace skygate::core

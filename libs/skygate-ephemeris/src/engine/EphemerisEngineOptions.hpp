@@ -11,6 +11,10 @@ namespace skygate::ephemeris {
 
 class EphemerisEngineOptions {
 public:
+    // The setters mark these keys in the specified-option mask, which makes
+    // this list the single source of truth for the option set. A new key needs
+    // the same field in operator== and isIdenticalTo below and in the
+    // computation cache's option hash, or the three drift apart.
     enum class Key : std::uint8_t {
         EngineKind,
         CorrectionFlags,
@@ -132,6 +136,10 @@ public:
     }
 
     [[nodiscard]] bool isOptionSet(Key key) const noexcept;
+
+    // Bit identity for cache keys: +0.0 and -0.0 differ here even though
+    // operator== treats them as equal.
+    [[nodiscard]] bool isIdenticalTo(const EphemerisEngineOptions& other) const noexcept;
     [[nodiscard]] bool operator==(const EphemerisEngineOptions& other) const noexcept;
 
 private:

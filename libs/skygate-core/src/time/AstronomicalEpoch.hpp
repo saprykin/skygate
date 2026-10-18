@@ -18,6 +18,10 @@ struct AstronomicalEpoch {
     [[nodiscard]] bool isFiniteUtc() const noexcept;
     [[nodiscard]] double sortKey() const noexcept;
 
+    // Bit identity for cache keys: +0.0 and -0.0 differ here even though
+    // operator== treats them as equal.
+    [[nodiscard]] bool isIdenticalTo(const AstronomicalEpoch& other) const noexcept;
+
     [[nodiscard]] AstronomicalEpoch addSeconds(double offsetSeconds) const noexcept;
     [[nodiscard]] AstronomicalEpoch addSeconds(double offsetSeconds, TimeScale resultScale) const noexcept;
     [[nodiscard]] AstronomicalEpoch addMinutes(double offsetMinutes) const noexcept;
