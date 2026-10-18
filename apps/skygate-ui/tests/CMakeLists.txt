@@ -242,6 +242,24 @@ add_skygate_ui_qtest(
     TIMEOUT 45
 )
 add_skygate_ui_qtest(
+    skygate-ui-collection-manifest-store-tests
+    catalog/SkyCatalogCollectionManifestStoreTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-catalog-source-cache-paths-tests
+    catalog/SkyCatalogSourceCachePathsTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-catalog-source-record-codec-tests
+    catalog/SkyCatalogSourceRecordCodecTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ui_qtest(
     skygate-ui-ephemeris-cache-settings-tests
     settings/SkyEphemerisCacheSettingsTests.cpp
     LABELS integration
