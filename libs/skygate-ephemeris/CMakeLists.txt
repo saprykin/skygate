@@ -114,6 +114,9 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ErfaFrameTransformer.cpp
     src/engine/highprecision/ErfaAstrometry.hpp
     src/engine/highprecision/ErfaAstrometry.cpp
+    src/engine/highprecision/FrameTransformMatrixCache.hpp
+    src/engine/highprecision/FrameTransformMatrixCache.cpp
+    src/engine/highprecision/FrameTransformStageCatalog.hpp
     src/engine/IDeltaTProvider.hpp
     src/engine/ILeapSecondProvider.hpp
     src/engine/LeapSecondTableLoader.hpp
