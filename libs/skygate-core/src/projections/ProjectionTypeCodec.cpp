@@ -1,5 +1,6 @@
 #include "ProjectionTypeCodec.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <optional>
@@ -54,6 +55,11 @@ constexpr std::array<ProjectionType, 3> kOrderedValues{
 }
 
 }  // namespace
+
+bool ProjectionTypeCodec::isKnown(const ProjectionType projectionType) noexcept
+{
+    return std::find(kOrderedValues.begin(), kOrderedValues.end(), projectionType) != kOrderedValues.end();
+}
 
 std::vector<ProjectionType> ProjectionTypeCodec::orderedValues()
 {

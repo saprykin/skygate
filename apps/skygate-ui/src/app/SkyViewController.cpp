@@ -1,18 +1,12 @@
 #include "SkyViewController.hpp"
-#include "ProjectionFactory.hpp"
 #include "SkyViewState.hpp"
 #include "math/ViewportMath.hpp"
+#include "projections/ProjectionTypeCodec.hpp"
 
 #include <algorithm>
 #include <cmath>
-#include <utility>
 
 namespace skygate::ui::internal {
-
-SkyViewController::SkyViewController()
-{
-    m_state.projection = skygate::core::createProjection(m_state.projectionType);
-}
 
 double SkyViewController::magnitudeCutoff() const noexcept
 {
@@ -82,13 +76,11 @@ bool SkyViewController::setProjectionType(const skygate::core::ProjectionType pr
         return false;
     }
 
-    auto projection = skygate::core::createProjection(projectionType);
-    if (projection == nullptr) {
+    if (!skygate::core::ProjectionTypeCodec::isKnown(projectionType)) {
         return false;
     }
 
     m_state.projectionType = projectionType;
-    m_state.projection = std::move(projection);
     return true;
 }
 

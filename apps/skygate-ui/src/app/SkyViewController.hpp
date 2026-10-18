@@ -7,8 +7,6 @@ namespace skygate::ui::internal {
 
 class SkyViewController final {
 public:
-    SkyViewController();
-
     [[nodiscard]] double magnitudeCutoff() const noexcept;
     [[nodiscard]] double centerAltitudeDeg() const noexcept;
     [[nodiscard]] double centerAzimuthDeg() const noexcept;

@@ -1,11 +1,8 @@
 #pragma once
 
-#include "IProjection.hpp"
 #include "ProjectionType.hpp"
 #include "math/ViewportMath.hpp"
 #include "settings/SkyTimelineViewDefaultsPolicy.hpp"
-
-#include <memory>
 
 namespace skygate::ui::internal {
 
@@ -18,7 +15,6 @@ struct SkyViewState final {
     double centerAzimuthDeg = skygate::core::ViewportMath::kDefaultCenterAzimuthDeg;
     double fieldOfViewDeg = SkyTimelineViewDefaultsPolicy::kDefaultFieldOfViewDeg;
     skygate::core::ProjectionType projectionType = skygate::core::ProjectionType::Stereographic;
-    std::unique_ptr<skygate::core::IProjection> projection;
 };
 
 }  // namespace skygate::ui::internal
