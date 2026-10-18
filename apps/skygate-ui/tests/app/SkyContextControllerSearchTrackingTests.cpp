@@ -329,8 +329,10 @@ private slots:
     void focusSearchTargetUsesSelectedEngineRequest();
     void focusSearchTargetUsesSingleBodyLookupForMoon();
     void focusSearchTargetCentersConstellationLabelResult();
+    void focusSearchTargetNormalizesKind();
     void focusSearchTargetIgnoresInvalidTargets();
     void trackSearchTargetStartsLiveAndCentersBody();
+    void trackSearchTargetNormalizesKind();
     void trackSearchTargetPreservesBceTimelineAnchor();
     void trackedBcePlaybackCatchUpUsesConfiguredStep();
     void trackSearchTargetUsesSelectedEngineRequest();
@@ -456,6 +458,75 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetCentersConstellat
     QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
 }
 
+void SkyContextControllerSearchTrackingTests::focusSearchTargetNormalizesKind()
+{
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
+        makeBody(
+            "demo_target",
+            "Demo Target",
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            1.0,
+            skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
+        ),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
+    const auto controller = createController(std::move(starCatalog), std::move(ephemerisEngine));
+    configureFocusTestContext(*controller);
+
+    const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
+    const auto* targetState = findStateById(snapshot, "demo_target");
+    QVERIFY(targetState != nullptr);
+
+    QVERIFY(controller->focusSearchTarget("Body", "demo_target"));
+    QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
+    QCOMPARE(controller->selectedSearchTargetId(), QString("demo_target"));
+    QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
+    QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
+
+    QVERIFY(controller->focusSearchTarget(" body ", "demo_target"));
+    QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
+    QCOMPARE(controller->selectedSearchTargetId(), QString("demo_target"));
+    QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
+    QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
+
+    QVERIFY(skygate::ui::tests::seedOrionConstellationCache());
+    const auto constellationController = createController();
+    skygate::ui::tests::restoreSeededCatalogCache(*constellationController);
+    configureFocusTestContext(*constellationController);
+
+    const auto constellationSnapshot =
+        constellationController->ephemerisEngine()->compute(constellationController->skyContext());
+    const auto* constellationState = findStateById(constellationSnapshot, "hip_27989");
+    QVERIFY(constellationState != nullptr);
+    QVERIFY(
+        std::any_of(
+            constellationController->constellationAnchorGroups().begin(),
+            constellationController->constellationAnchorGroups().end(),
+            [](const SkyContextController::ConstellationAnchorGroup& anchorGroup) {
+                return anchorGroup.first == "Orion";
+            }
+        )
+    );
+
+    QVERIFY(constellationController->focusSearchTarget(" ConstellationLabel ", "Orion"));
+    QCOMPARE(constellationController->selectedSearchTargetKind(), QString("constellationLabel"));
+    QCOMPARE(constellationController->selectedSearchTargetId(), QString("Orion"));
+    QVERIFY(
+        std::abs(constellationController->viewCenterAltitudeDeg() - constellationState->horizontal.altitudeDeg) < 1e-6
+    );
+    QVERIFY(
+        azimuthDifferenceDeg(constellationController->viewCenterAzimuthDeg(), constellationState->horizontal.azimuthDeg)
+        < 1e-6
+    );
+
+    const auto trackingController = createSingleBodyController();
+    QVERIFY(trackingController->trackSearchTarget("body", "demo_target"));
+    QVERIFY(trackingController->focusSearchTarget("Body", "demo_target"));
+    QVERIFY(trackingController->hasTrackedTarget());
+}
+
 void SkyContextControllerSearchTrackingTests::focusSearchTargetIgnoresInvalidTargets()
 {
     const auto controller = createController();
@@ -479,6 +550,34 @@ void SkyContextControllerSearchTrackingTests::trackSearchTargetStartsLiveAndCent
     controller->setViewCenter(12.0, 123.0);
 
     QVERIFY(controller->trackSearchTarget("body", "demo_target"));
+
+    QVERIFY(controller->live());
+    QVERIFY(controller->hasTrackedTarget());
+    QCOMPARE(controller->trackedTargetKind(), QString("body"));
+    QCOMPARE(controller->trackedTargetId(), QString("demo_target"));
+    QCOMPARE(controller->trackedTargetDisplayText(), QString("Demo Target"));
+    QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
+    QCOMPARE(controller->selectedSearchTargetId(), QString("demo_target"));
+
+    const QDateTime timelineUtc = controllerUtcTime(*controller);
+    QCOMPARE(timelineUtc, QDateTime(QDate(2000, 1, 1), QTime(0, 0, 0), QTimeZone::UTC));
+
+    const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
+    const auto* targetState = findStateById(snapshot, "demo_target");
+    QVERIFY(targetState != nullptr);
+    QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
+    QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
+}
+
+void SkyContextControllerSearchTrackingTests::trackSearchTargetNormalizesKind()
+{
+    FakeTimeSource timeSource;
+    const auto controller = createSingleBodyController("demo_target", "Demo Target", &timeSource);
+    controller->setLive(false);
+    QVERIFY(controller->setUtcDateTimeText("2000-01-01", "00:00:00"));
+    controller->setViewCenter(12.0, 123.0);
+
+    QVERIFY(controller->trackSearchTarget(" BODY ", "demo_target"));
 
     QVERIFY(controller->live());
     QVERIFY(controller->hasTrackedTarget());
