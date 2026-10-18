@@ -14,11 +14,6 @@
 namespace skygate::ephemeris {
 namespace {
 
-[[nodiscard]] ObservationEvent unavailableEvent() noexcept
-{
-    return ObservationEvent{.status = ObservationEventStatus::Type::Unresolved};
-}
-
 [[nodiscard]] ObservationEventCalculator::SearchMode
 observationSearchMode(const NightConditionsCalculator::EventSearchMode mode) noexcept
 {
@@ -69,16 +64,16 @@ NightConditions NightConditionsCalculator::compute(
 ) const
 {
     NightConditions conditions;
-    conditions.sunrise = unavailableEvent();
-    conditions.sunset = unavailableEvent();
-    conditions.civilDawn = unavailableEvent();
-    conditions.civilDusk = unavailableEvent();
-    conditions.nauticalDawn = unavailableEvent();
-    conditions.nauticalDusk = unavailableEvent();
-    conditions.astronomicalDawn = unavailableEvent();
-    conditions.astronomicalDusk = unavailableEvent();
-    conditions.moonrise = unavailableEvent();
-    conditions.moonset = unavailableEvent();
+    conditions.sunrise = ObservationEvent{};
+    conditions.sunset = ObservationEvent{};
+    conditions.civilDawn = ObservationEvent{};
+    conditions.civilDusk = ObservationEvent{};
+    conditions.nauticalDawn = ObservationEvent{};
+    conditions.nauticalDusk = ObservationEvent{};
+    conditions.astronomicalDawn = ObservationEvent{};
+    conditions.astronomicalDusk = ObservationEvent{};
+    conditions.moonrise = ObservationEvent{};
+    conditions.moonset = ObservationEvent{};
 
     const skygate::core::ObservationContext& context = request.context;
     if (!context.observer.isValid()) {

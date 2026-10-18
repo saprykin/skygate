@@ -12,6 +12,7 @@ namespace {
 using skygate::core::NaifBodyIds;
 
 struct PlanetIdentityEntry final {
+    PlanetIdentity::Key key;
     std::string_view canonicalId;
     int naifBodyCenterId = 0;
     int naifBarycenterId = 0;
@@ -19,28 +20,38 @@ struct PlanetIdentityEntry final {
 };
 
 constexpr std::array<PlanetIdentityEntry, 8> kPlanetIdentityEntries = {{
-    {.canonicalId = "mercury",
+    {.key = PlanetIdentity::Key::Mercury,
+     .canonicalId = "mercury",
      .naifBodyCenterId = NaifBodyIds::kMercury,
      .naifBarycenterId = NaifBodyIds::kMercuryBarycenter,
      .hasDe440sBodyCenter = true},
-    {.canonicalId = "venus",
+    {.key = PlanetIdentity::Key::Venus,
+     .canonicalId = "venus",
      .naifBodyCenterId = NaifBodyIds::kVenus,
      .naifBarycenterId = NaifBodyIds::kVenusBarycenter,
      .hasDe440sBodyCenter = true},
-    {.canonicalId = "mars", .naifBodyCenterId = NaifBodyIds::kMars, .naifBarycenterId = NaifBodyIds::kMarsBarycenter},
-    {.canonicalId = "jupiter",
+    {.key = PlanetIdentity::Key::Mars,
+     .canonicalId = "mars",
+     .naifBodyCenterId = NaifBodyIds::kMars,
+     .naifBarycenterId = NaifBodyIds::kMarsBarycenter},
+    {.key = PlanetIdentity::Key::Jupiter,
+     .canonicalId = "jupiter",
      .naifBodyCenterId = NaifBodyIds::kJupiter,
      .naifBarycenterId = NaifBodyIds::kJupiterBarycenter},
-    {.canonicalId = "saturn",
+    {.key = PlanetIdentity::Key::Saturn,
+     .canonicalId = "saturn",
      .naifBodyCenterId = NaifBodyIds::kSaturn,
      .naifBarycenterId = NaifBodyIds::kSaturnBarycenter},
-    {.canonicalId = "uranus",
+    {.key = PlanetIdentity::Key::Uranus,
+     .canonicalId = "uranus",
      .naifBodyCenterId = NaifBodyIds::kUranus,
      .naifBarycenterId = NaifBodyIds::kUranusBarycenter},
-    {.canonicalId = "neptune",
+    {.key = PlanetIdentity::Key::Neptune,
+     .canonicalId = "neptune",
      .naifBodyCenterId = NaifBodyIds::kNeptune,
      .naifBarycenterId = NaifBodyIds::kNeptuneBarycenter},
-    {.canonicalId = "pluto",
+    {.key = PlanetIdentity::Key::Pluto,
+     .canonicalId = "pluto",
      .naifBodyCenterId = NaifBodyIds::kPluto,
      .naifBarycenterId = NaifBodyIds::kPlutoBarycenter},
 }};
@@ -54,10 +65,15 @@ std::optional<PlanetIdentity> PlanetIdentity::fromBodyId(const std::string_view 
             continue;
         }
         return PlanetIdentity{
-            entry.canonicalId, entry.naifBodyCenterId, entry.naifBarycenterId, entry.hasDe440sBodyCenter
+            entry.key, entry.canonicalId, entry.naifBodyCenterId, entry.naifBarycenterId, entry.hasDe440sBodyCenter
         };
     }
     return std::nullopt;
+}
+
+PlanetIdentity::Key PlanetIdentity::key() const noexcept
+{
+    return m_key;
 }
 
 std::string_view PlanetIdentity::canonicalId() const noexcept
