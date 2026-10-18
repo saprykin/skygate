@@ -51,6 +51,7 @@ void QmlPreferencesAppearanceTests::generalLoggingControlsBindDraft()
                 Component.onCompleted: resetFromContext()
             }
             PreferencesGeneralSection {
+                theme: skyContext.theme
                 anchors.fill: parent
                 preferencesDraft: draft
             }
@@ -124,6 +125,7 @@ void QmlPreferencesAppearanceTests::appearanceThemeSwitchWorks()
                 Component.onCompleted: resetFromContext()
             }
             PreferencesAppearanceSection {
+                theme: skyContext.theme
                 anchors.fill: parent
                 preferencesDraft: draft
             }
@@ -207,6 +209,7 @@ void QmlPreferencesAppearanceTests::appearanceCheckboxChangesRender()
                 Component.onCompleted: resetFromContext()
             }
             PreferencesAppearanceSection {
+                theme: skyContext.theme
                 anchors.fill: parent
                 preferencesDraft: draft
             }

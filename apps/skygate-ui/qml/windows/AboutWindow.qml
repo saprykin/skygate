@@ -215,6 +215,7 @@ Window {
                 }
 
                 PreferencesActionButton {
+                    theme: aboutWindow.theme
                     objectName: "aboutCloseButton"
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: 4

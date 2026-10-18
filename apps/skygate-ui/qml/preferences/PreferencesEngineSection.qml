@@ -7,6 +7,7 @@ Item {
     id: engineSection
     required property var skyContextController
     required property var preferencesDraft
+    readonly property var theme: skyContextController.theme
 
     function controllerText(propertyName, fallback) {
         const value = skyContextController[propertyName];
@@ -43,19 +44,21 @@ Item {
                 columnSpacing: 8
 
                 PreferencesGroupTitle {
+                    theme: engineSection.theme
                     columnSpan: 2
                     text: "Ephemeris Engine"
                 }
 
                 Label {
                     text: "Engine"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
                 }
 
                 PreferencesComboBox {
+                    theme: engineSection.theme
                     id: ephemerisEngineCombo
                     objectName: "ephemerisEngineSelectorCombo"
                     Layout.fillWidth: true
@@ -78,7 +81,7 @@ Item {
                     visible: engineSection.controllerText("ephemerisEngineStatusText", "") !== ""
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Status"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
@@ -90,7 +93,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: engineSection.controllerText("ephemerisEngineStatusText", "")
-                    color: skyContext.theme.listItemPrimaryText
+                    color: theme.listItemPrimaryText
                     font.pixelSize: 11
                     font.family: "Avenir Next"
                     elide: Text.ElideRight
@@ -101,13 +104,14 @@ Item {
                     visible: engineSection.supportsCorrections()
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Corrections"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
                 }
 
                 PreferencesComboBox {
+                    theme: engineSection.theme
                     id: ephemerisCorrectionCombo
                     objectName: "ephemerisCorrectionPresetCombo"
                     visible: engineSection.supportsCorrections()
@@ -126,7 +130,7 @@ Item {
                     visible: engineSection.supportsAtmosphereSettings()
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Refraction"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
@@ -140,6 +144,7 @@ Item {
                     spacing: 7
 
                     PreferencesCheckBox {
+                        theme: engineSection.theme
                         objectName: "ephemerisRefractionCheckBox"
                         visible: ephemerisRefractionRow.visible
                         checked: preferencesDraft.ephemerisRefractionEnabled
@@ -148,7 +153,7 @@ Item {
 
                     Label {
                         text: "Apply atmospheric refraction"
-                        color: skyContext.theme.formLabelText
+                        color: theme.formLabelText
                         font.family: "Avenir Next"
                         font.pixelSize: 11
                         Layout.alignment: Qt.AlignVCenter
@@ -159,13 +164,14 @@ Item {
                     visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Pressure"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
                 }
 
                 PreferencesTextField {
+                    theme: engineSection.theme
                     objectName: "ephemerisPressureInput"
                     visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.fillWidth: true
@@ -180,13 +186,14 @@ Item {
                     visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Temperature"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
                 }
 
                 PreferencesTextField {
+                    theme: engineSection.theme
                     objectName: "ephemerisTemperatureInput"
                     visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.fillWidth: true
@@ -201,13 +208,14 @@ Item {
                     visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Humidity"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
                 }
 
                 PreferencesTextField {
+                    theme: engineSection.theme
                     objectName: "ephemerisHumidityInput"
                     visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.fillWidth: true
@@ -222,13 +230,14 @@ Item {
                     visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Wavelength"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
                 }
 
                 PreferencesTextField {
+                    theme: engineSection.theme
                     objectName: "ephemerisWavelengthInput"
                     visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.fillWidth: true
@@ -240,6 +249,7 @@ Item {
                 }
 
                 PreferencesGroupTitle {
+                    theme: engineSection.theme
                     columnSpan: 2
                     Layout.topMargin: 8
                     text: "Planetary Kernels"
@@ -247,7 +257,7 @@ Item {
 
                 Label {
                     text: "Installed"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
@@ -257,7 +267,7 @@ Item {
                     objectName: "ephemerisShortRangeKernelStatusLabel"
                     Layout.fillWidth: true
                     text: engineSection.controllerText("ephemerisKernelDisplayText", "Bundled")
-                    color: skyContext.theme.listItemPrimaryText
+                    color: theme.listItemPrimaryText
                     font.pixelSize: 11
                     font.family: "Avenir Next"
                     elide: Text.ElideRight
@@ -266,13 +276,14 @@ Item {
 
                 Label {
                     text: "Download"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
                 }
 
                 PreferencesComboBox {
+                    theme: engineSection.theme
                     id: ephemerisKernelDownloadCombo
                     objectName: "ephemerisKernelDownloadCombo"
                     Layout.fillWidth: true
@@ -295,7 +306,7 @@ Item {
 
                 Label {
                     text: "Cache"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
@@ -309,7 +320,7 @@ Item {
                         objectName: "ephemerisPlanetaryKernelCacheSizeLabel"
                         Layout.fillWidth: true
                         text: engineSection.controllerText("ephemerisPlanetaryKernelCacheSizeText", "0 B")
-                        color: skyContext.theme.listItemPrimaryText
+                        color: theme.listItemPrimaryText
                         font.pixelSize: 11
                         font.family: "Avenir Next"
                         elide: Text.ElideRight
@@ -317,6 +328,7 @@ Item {
                     }
 
                     PreferencesActionButton {
+                        theme: engineSection.theme
                         objectName: "ephemerisPlanetaryKernelClearCacheButton"
                         Layout.preferredWidth: 86
                         text: "Clear"
@@ -325,6 +337,7 @@ Item {
                 }
 
                 PreferencesGroupTitle {
+                    theme: engineSection.theme
                     columnSpan: 2
                     Layout.topMargin: 8
                     text: "Time and Earth Data"
@@ -332,7 +345,7 @@ Item {
 
                 Label {
                     text: "Earth orientation"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
@@ -342,7 +355,7 @@ Item {
                     objectName: "ephemerisEarthOrientationStatusLabel"
                     Layout.fillWidth: true
                     text: engineSection.controllerText("ephemerisEarthOrientationStatusText", "Not installed")
-                    color: skyContext.theme.listItemPrimaryText
+                    color: theme.listItemPrimaryText
                     font.pixelSize: 11
                     font.family: "Avenir Next"
                     elide: Text.ElideRight
@@ -351,7 +364,7 @@ Item {
 
                 Label {
                     text: "Leap seconds"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
@@ -361,7 +374,7 @@ Item {
                     objectName: "ephemerisLeapSecondStatusLabel"
                     Layout.fillWidth: true
                     text: engineSection.controllerText("ephemerisLeapSecondStatusText", "Not installed")
-                    color: skyContext.theme.listItemPrimaryText
+                    color: theme.listItemPrimaryText
                     font.pixelSize: 11
                     font.family: "Avenir Next"
                     elide: Text.ElideRight
@@ -370,7 +383,7 @@ Item {
 
                 Label {
                     text: "Delta T"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
@@ -380,7 +393,7 @@ Item {
                     objectName: "ephemerisDeltaTStatusLabel"
                     Layout.fillWidth: true
                     text: engineSection.controllerText("ephemerisDeltaTStatusText", "Not installed")
-                    color: skyContext.theme.listItemPrimaryText
+                    color: theme.listItemPrimaryText
                     font.pixelSize: 11
                     font.family: "Avenir Next"
                     elide: Text.ElideRight
@@ -389,13 +402,14 @@ Item {
 
                 Label {
                     text: "Download"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
                 }
 
                 PreferencesComboBox {
+                    theme: engineSection.theme
                     id: ephemerisSupportDataDownloadCombo
                     objectName: "ephemerisSupportDataDownloadCombo"
                     Layout.fillWidth: true
@@ -418,7 +432,7 @@ Item {
 
                 Label {
                     text: "Cache"
-                    color: skyContext.theme.formLabelText
+                    color: theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
                     Layout.alignment: Qt.AlignVCenter
@@ -432,7 +446,7 @@ Item {
                         objectName: "ephemerisSupportDataCacheSizeLabel"
                         Layout.fillWidth: true
                         text: engineSection.controllerText("ephemerisSupportDataCacheSizeText", "0 B")
-                        color: skyContext.theme.listItemPrimaryText
+                        color: theme.listItemPrimaryText
                         font.pixelSize: 11
                         font.family: "Avenir Next"
                         elide: Text.ElideRight
@@ -440,6 +454,7 @@ Item {
                     }
 
                     PreferencesActionButton {
+                        theme: engineSection.theme
                         objectName: "ephemerisSupportDataClearCacheButton"
                         Layout.preferredWidth: 86
                         text: "Clear"

@@ -3,7 +3,7 @@ import QtQuick.Controls
 
 TextField {
     id: textControl
-    readonly property var theme: skyContext.theme
+    required property var theme
     property string suffix: ""
     font.family: "Avenir Next"
     font.pixelSize: 11

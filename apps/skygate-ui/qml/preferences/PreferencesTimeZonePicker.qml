@@ -6,7 +6,7 @@ import com.skygate.app 1.0
 
 Item {
     id: root
-    readonly property var theme: skyContext.theme
+    required property var theme
     property var catalogModel
     property string placeholderText: "Choose a timezone"
     property string selectedTimeZoneId: ""
@@ -114,6 +114,7 @@ Item {
             spacing: 8
 
             PreferencesTextField {
+                theme: root.theme
                 id: searchField
                 objectName: "timeZoneSearchField"
                 Layout.fillWidth: true

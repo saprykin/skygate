@@ -109,6 +109,7 @@ Item {
             enabled: !searchToolbarPanel.collapsed
 
             PreferencesTextField {
+                theme: toolbarRoot.theme
                 id: searchField
                 objectName: "searchField"
                 width: toolbarRoot.naturalSearchFieldWidth

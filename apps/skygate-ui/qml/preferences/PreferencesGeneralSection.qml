@@ -7,6 +7,7 @@ import com.skygate.app 1.0
 Item {
     id: root
     required property var preferencesDraft
+    required property var theme
 
     function localPathFromFileUrl(fileUrl) {
         const text = fileUrl.toString()
@@ -37,13 +38,14 @@ Item {
             columnSpacing: 8
 
             PreferencesGroupTitle {
+                theme: root.theme
                 columnSpan: 4
                 text: "Logging"
             }
 
             Label {
                 text: "Output"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 10
                 Layout.alignment: Qt.AlignVCenter
@@ -58,6 +60,7 @@ Item {
                     spacing: 7
 
                     PreferencesCheckBox {
+                        theme: root.theme
                         objectName: "logToTerminalCheckBox"
                         checked: root.preferencesDraft.logToTerminal
                         onToggled: root.preferencesDraft.logToTerminal = checked
@@ -65,7 +68,7 @@ Item {
 
                     Label {
                         text: "Terminal"
-                        color: skyContext.theme.formLabelText
+                        color: theme.formLabelText
                         font.family: "Avenir Next"
                         font.pixelSize: 11
                         Layout.alignment: Qt.AlignVCenter
@@ -76,6 +79,7 @@ Item {
                     spacing: 7
 
                     PreferencesCheckBox {
+                        theme: root.theme
                         objectName: "logToFileCheckBox"
                         checked: root.preferencesDraft.logToFile
                         onToggled: root.preferencesDraft.logToFile = checked
@@ -83,7 +87,7 @@ Item {
 
                     Label {
                         text: "File"
-                        color: skyContext.theme.formLabelText
+                        color: theme.formLabelText
                         font.family: "Avenir Next"
                         font.pixelSize: 11
                         Layout.alignment: Qt.AlignVCenter
@@ -97,7 +101,7 @@ Item {
 
             Label {
                 text: "Log file"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 10
                 Layout.alignment: Qt.AlignVCenter
@@ -109,6 +113,7 @@ Item {
                 spacing: 8
 
                 PreferencesTextField {
+                    theme: root.theme
                     objectName: "logFilePathField"
                     Layout.fillWidth: true
                     Layout.minimumWidth: 260
@@ -119,6 +124,7 @@ Item {
                 }
 
                 PreferencesActionButton {
+                    theme: root.theme
                     objectName: "logFileBrowseButton"
                     text: "Browse..."
                     implicitWidth: 88

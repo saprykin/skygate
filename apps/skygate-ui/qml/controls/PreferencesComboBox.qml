@@ -3,7 +3,7 @@ import QtQuick.Controls
 
 ComboBox {
     id: comboControl
-    readonly property var theme: skyContext.theme
+    required property var theme
     font.family: "Avenir Next"
     font.pixelSize: 11
     implicitHeight: 32
