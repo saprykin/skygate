@@ -12,6 +12,9 @@ namespace skygate::ephemeris {
 // counts to drift from the merge.
 class CatalogCompositionPolicyRules final {
 public:
+    // True when a policy value names a policy this build knows, so persisted
+    // values are checked before they reach composition.
+    [[nodiscard]] static bool isKnown(CatalogCompositionPolicy policy) noexcept;
     [[nodiscard]] static bool participates(CatalogCompositionPolicy policy, BaseCelestialBody::Kind kind) noexcept;
     [[nodiscard]] static bool participates(CatalogCompositionPolicy policy, const BaseCelestialBody& body) noexcept;
     // True when a source of this policy contributes deep-sky bodies to a

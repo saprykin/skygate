@@ -9,6 +9,7 @@
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogStarAstrometry.hpp"
 #include "time/AstronomicalEpoch.hpp"
+#include "time/TimeScaleCodec.hpp"
 
 #include <cmath>
 #include <cstddef>
@@ -24,7 +25,7 @@ namespace {
 
 [[nodiscard]] bool isValidEpoch(const skygate::core::AstronomicalEpoch& epoch) noexcept
 {
-    return epoch.isFinite() && CatalogSnapshotValidator::isKnownTimeScale(epoch.timeScale);
+    return epoch.isFinite() && skygate::core::TimeScaleCodec::isKnown(epoch.timeScale);
 }
 
 [[nodiscard]] bool isValidOptionalFiniteDouble(const std::optional<double> value) noexcept
@@ -232,19 +233,6 @@ bool CatalogSnapshotValidator::isKnownIdScope(const CatalogObjectIdentity::IdSco
     switch (idScope) {
     case CatalogObjectIdentity::IdScope::Global:
     case CatalogObjectIdentity::IdScope::SourceLocal:
-        return true;
-    }
-    return false;
-}
-
-bool CatalogSnapshotValidator::isKnownTimeScale(const skygate::core::TimeScale timeScale) noexcept
-{
-    switch (timeScale) {
-    case skygate::core::TimeScale::Utc:
-    case skygate::core::TimeScale::Tai:
-    case skygate::core::TimeScale::Tt:
-    case skygate::core::TimeScale::Tdb:
-    case skygate::core::TimeScale::Ut1:
         return true;
     }
     return false;

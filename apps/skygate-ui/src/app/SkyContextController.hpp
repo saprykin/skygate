@@ -105,6 +105,7 @@ class SkyContextController final : public QObject {
         NOTIFY selectedCityDisplayTextChanged
     )
     Q_PROPERTY(QAbstractItemModel* cityCatalogModel READ cityCatalogModel CONSTANT)
+    Q_PROPERTY(QStringList projectionTypeOptions READ projectionTypeOptions CONSTANT)
     Q_PROPERTY(QString projectionTypeText READ projectionTypeText NOTIFY projectionTypeChanged)
     Q_PROPERTY(QString themeId READ themeId WRITE setThemeId NOTIFY themeChanged)
     Q_PROPERTY(QVariantList themeOptions READ themeOptions NOTIFY themeOptionsChanged)
@@ -311,6 +312,7 @@ public:
     [[nodiscard]] QString selectedCityId() const;
     [[nodiscard]] QString selectedCityDisplayText() const;
     [[nodiscard]] QAbstractItemModel* cityCatalogModel() const noexcept;
+    [[nodiscard]] QStringList projectionTypeOptions() const;
     [[nodiscard]] QString projectionTypeText() const;
     [[nodiscard]] QString themeId() const;
     [[nodiscard]] QVariantList themeOptions() const;

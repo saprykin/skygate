@@ -210,7 +210,7 @@ Item {
             objectName: "projectionCombo"
             Layout.fillWidth: true
             Layout.columnSpan: 3
-            model: ["Stereographic", "AzimuthalEquidistant", "Perspective"]
+            model: root.preferencesDraft.skyContextController.projectionTypeOptions
 
             Binding on currentIndex {
                 value: Math.max(0, projectionCombo.model.indexOf(root.preferencesDraft.projectionTypeText))

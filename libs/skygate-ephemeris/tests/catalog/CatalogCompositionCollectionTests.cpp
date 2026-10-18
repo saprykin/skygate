@@ -201,6 +201,7 @@ private slots:
     void repeatedImportsKeepWinnerAndContributors();
     void reimportedDescriptorReplacesAbsorbedRecord();
     void deepSkyPoliciesSelectAndCountConsistently();
+    void catalogCompositionPoliciesAreKnown();
 };
 
 void CatalogCompositionCollectionTests::starAndDsoSourcesWithOverlapsAndMixedSource()
@@ -1030,6 +1031,15 @@ void CatalogCompositionCollectionTests::deepSkyPoliciesSelectAndCountConsistentl
         QCOMPARE(result.deepSkyObjectCount, selectsDeepSky ? std::size_t{1} : std::size_t{0});
         QCOMPARE(result.foundDeepSkyObjectCount, countsDeepSky ? std::size_t{1} : std::size_t{0});
     }
+}
+
+void CatalogCompositionCollectionTests::catalogCompositionPoliciesAreKnown()
+{
+    QVERIFY(CatalogCompositionPolicyRules::isKnown(CatalogCompositionPolicy::Merge));
+    QVERIFY(CatalogCompositionPolicyRules::isKnown(CatalogCompositionPolicy::DeepSkyOnly));
+    QVERIFY(CatalogCompositionPolicyRules::isKnown(CatalogCompositionPolicy::AugmentCore));
+    QVERIFY(CatalogCompositionPolicyRules::isKnown(CatalogCompositionPolicy::DeepSkyFallback));
+    QVERIFY(!CatalogCompositionPolicyRules::isKnown(static_cast<CatalogCompositionPolicy>(200)));
 }
 
 QTEST_APPLESS_MAIN(CatalogCompositionCollectionTests)
