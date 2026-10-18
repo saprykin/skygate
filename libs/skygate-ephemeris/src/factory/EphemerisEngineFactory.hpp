@@ -2,9 +2,7 @@
 
 #include "EphemerisEngineFactoryRequest.hpp"
 #include "EphemerisEngineFactoryResult.hpp"
-#include "EphemerisFactoryCreationDiagnosticCode.hpp"
 #include "EphemerisFactoryCreationStatus.hpp"
-#include "EphemerisFactoryFallbackPolicy.hpp"
 #include "catalog/IStarCatalog.hpp"
 
 #include <initializer_list>
@@ -15,11 +13,8 @@ namespace skygate::ephemeris {
 
 class EphemerisEngineFactory final {
 public:
-    [[nodiscard]] static bool allowsSimpleEngineFallback(EphemerisFactoryFallbackPolicy::Type policy) noexcept;
-    [[nodiscard]] static std::string_view displayName(EphemerisFactoryFallbackPolicy::Type policy) noexcept;
     [[nodiscard]] static std::string_view displayName(EphemerisFactoryCreationStatus::Type status) noexcept;
     [[nodiscard]] static bool isCreationSuccess(EphemerisFactoryCreationStatus::Type status) noexcept;
-    [[nodiscard]] static std::string_view diagnosticText(EphemerisFactoryCreationDiagnosticCode code) noexcept;
 
     [[nodiscard]] static EphemerisEngineFactoryResult create(const EphemerisEngineFactoryRequest& request);
     [[nodiscard]] static EphemerisEngineFactoryResult create();

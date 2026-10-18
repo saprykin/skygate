@@ -10,11 +10,7 @@ namespace skygate::ephemeris {
 OwnGalaxyCelestialBody CelestialBodyCatalog::copyOwnGalaxyBody(const BaseCelestialBody& body)
 {
     OwnGalaxyCelestialBody ownGalaxyBody;
-    ownGalaxyBody.id = body.id;
-    ownGalaxyBody.identity = body.identity;
-    ownGalaxyBody.displayName = body.displayName;
-    ownGalaxyBody.kind = body.kind;
-    ownGalaxyBody.visualMagnitude = body.visualMagnitude;
+    body.copySharedFieldsTo(ownGalaxyBody);
     if (const skygate::core::EquatorialCoordinate* fixedEquatorial = body.fixedEquatorialCoordinate()) {
         ownGalaxyBody.fixedEquatorial = *fixedEquatorial;
     }
@@ -27,11 +23,7 @@ OwnGalaxyCelestialBody CelestialBodyCatalog::copyOwnGalaxyBody(const BaseCelesti
 DistantCelestialBody CelestialBodyCatalog::copyDistantBody(const BaseCelestialBody& body)
 {
     DistantCelestialBody distantBody;
-    distantBody.id = body.id;
-    distantBody.identity = body.identity;
-    distantBody.displayName = body.displayName;
-    distantBody.kind = body.kind;
-    distantBody.visualMagnitude = body.visualMagnitude;
+    body.copySharedFieldsTo(distantBody);
     if (const skygate::core::EquatorialCoordinate* fixedEquatorial = body.fixedEquatorialCoordinate()) {
         distantBody.fixedEquatorial = *fixedEquatorial;
     }

@@ -49,4 +49,13 @@ bool BaseCelestialBody::isCatalogStar() const noexcept
     return kind == Kind::Star || fixedEquatorialValue().has_value();
 }
 
+void BaseCelestialBody::copySharedFieldsTo(BaseCelestialBody& target) const
+{
+    target.id = id;
+    target.identity = identity;
+    target.displayName = displayName;
+    target.kind = kind;
+    target.visualMagnitude = visualMagnitude;
+}
+
 }  // namespace skygate::ephemeris

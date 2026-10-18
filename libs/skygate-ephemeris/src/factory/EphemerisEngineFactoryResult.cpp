@@ -37,9 +37,7 @@ EphemerisEngineFactoryResult EphemerisEngineFactoryResult::failure(
 
 bool EphemerisEngineFactoryResult::isSuccess() const noexcept
 {
-    return engine != nullptr
-           && (status == EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine
-               || status == EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback);
+    return engine != nullptr && EphemerisFactoryCreationStatus::isSuccess(status);
 }
 
 bool EphemerisEngineFactoryResult::isFailure() const noexcept

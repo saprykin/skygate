@@ -107,6 +107,23 @@ validateAssetMetadata(const EphemerisDataManifest::Asset& asset, EphemerisStaged
     return valid;
 }
 
+[[nodiscard]] std::string_view
+stagedPayloadVerificationDiagnostic(const EphemerisDataFileUtilities::PayloadVerification verification) noexcept
+{
+    switch (verification) {
+    case EphemerisDataFileUtilities::PayloadVerification::Verified:
+        break;
+    case EphemerisDataFileUtilities::PayloadVerification::EmptyLivePayload:
+        return "Staged live ephemeris asset payload is empty.";
+    case EphemerisDataFileUtilities::PayloadVerification::UncompressedSizeMismatch:
+        return "Staged ephemeris asset uncompressed size does not match manifest metadata.";
+    case EphemerisDataFileUtilities::PayloadVerification::ChecksumMismatch:
+        return "Staged ephemeris asset checksum does not match manifest metadata.";
+    }
+
+    return {};
+}
+
 [[nodiscard]] bool verifyAssetPayload(
     const EphemerisDataManifest::Asset& asset,
     const QString& sourcePath,
@@ -158,20 +175,11 @@ validateAssetMetadata(const EphemerisDataManifest::Asset& asset, EphemerisStaged
         result.diagnostics.insert(result.diagnostics.end(), payload.diagnostics.begin(), payload.diagnostics.end());
         return false;
     }
-    if (asset.live && payload.outputBytes == 0U) {
+    const EphemerisDataFileUtilities::PayloadVerification payloadVerification =
+        EphemerisDataFileUtilities::verifyDecodedPayload(asset, payload.outputBytes, payload.checksum);
+    if (payloadVerification != EphemerisDataFileUtilities::PayloadVerification::Verified) {
         result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
-        addDiagnostic(result, "Staged live ephemeris asset payload is empty.");
-        return false;
-    }
-    if (!asset.live && asset.compression.uncompressedSizeBytes.has_value()
-        && payload.outputBytes != *asset.compression.uncompressedSizeBytes) {
-        result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
-        addDiagnostic(result, "Staged ephemeris asset uncompressed size does not match manifest metadata.");
-        return false;
-    }
-    if (!asset.live && !EphemerisDataFileUtilities::checksumsMatch(payload.checksum, asset.checksum.value)) {
-        result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
-        addDiagnostic(result, "Staged ephemeris asset checksum does not match manifest metadata.");
+        addDiagnostic(result, stagedPayloadVerificationDiagnostic(payloadVerification));
         return false;
     }
 

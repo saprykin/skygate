@@ -43,6 +43,24 @@ bool EphemerisDataFileUtilities::sourceSizeMatchesMetadata(
            || sourceInfo.size() == static_cast<qint64>(*asset.compression.compressedSizeBytes);
 }
 
+EphemerisDataFileUtilities::PayloadVerification EphemerisDataFileUtilities::verifyDecodedPayload(
+    const EphemerisDataManifest::Asset& asset, const std::uint64_t outputBytes, const std::string_view decodedChecksum
+) noexcept
+{
+    if (asset.live) {
+        return outputBytes == 0U ? PayloadVerification::EmptyLivePayload : PayloadVerification::Verified;
+    }
+    if (asset.compression.uncompressedSizeBytes.has_value()
+        && outputBytes != *asset.compression.uncompressedSizeBytes) {
+        return PayloadVerification::UncompressedSizeMismatch;
+    }
+    if (!checksumsMatch(decodedChecksum, asset.checksum.value)) {
+        return PayloadVerification::ChecksumMismatch;
+    }
+
+    return PayloadVerification::Verified;
+}
+
 bool EphemerisDataFileUtilities::cancellationRequested(const std::function<bool()>& callback)
 {
     return callback != nullptr && callback();
