@@ -61,9 +61,28 @@ EphemerisDataFileUtilities::PayloadVerification EphemerisDataFileUtilities::veri
     return PayloadVerification::Verified;
 }
 
+std::string EphemerisDataFileUtilities::payloadVerificationDiagnostic(
+    const PayloadVerification verification, const PayloadVerificationWording& wording
+)
+{
+    const std::string subject = std::string(wording.activity) + ' ' + std::string(wording.subject);
+    switch (verification) {
+    case PayloadVerification::Verified:
+        break;
+    case PayloadVerification::EmptyLivePayload:
+        return std::string(wording.activity) + " live " + std::string(wording.subject) + " payload is empty.";
+    case PayloadVerification::UncompressedSizeMismatch:
+        return subject + ' ' + std::string(wording.sizeDetail) + " does not match manifest metadata.";
+    case PayloadVerification::ChecksumMismatch:
+        return subject + " checksum does not match manifest metadata.";
+    }
+
+    return {};
+}
+
 bool EphemerisDataFileUtilities::cancellationRequested(const std::function<bool()>& callback)
 {
-    return callback != nullptr && callback();
+    return EphemerisDataPayloadReader::cancellationRequested(callback);
 }
 
 bool EphemerisDataFileUtilities::checksumsMatch(const std::string_view actual, const std::string_view expected) noexcept

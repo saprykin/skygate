@@ -2,6 +2,7 @@
 #include "EphemerisDataFileUtilities.hpp"
 #include "EphemerisDataManifest.hpp"
 #include "EphemerisDataPayloadReader.hpp"
+#include "EphemerisPayloadDiagnostics.hpp"
 
 #include <QByteArray>
 #include <QByteArrayView>
@@ -23,7 +24,9 @@ namespace skygate::ephemeris {
 
 namespace {
 
-constexpr std::size_t kIoBufferBytes = 1U << 16U;
+using PayloadDiagnostics = EphemerisPayloadDiagnostics;
+
+constexpr std::string_view kCanceledDiagnostic = "Ephemeris data activation was canceled.";
 
 [[nodiscard]] std::string pathToString(const std::filesystem::path& path)
 {
@@ -78,32 +81,25 @@ constexpr std::size_t kIoBufferBytes = 1U << 16U;
            || startsWithQtResourcePrefix(asset.relativePath);
 }
 
-void addDiagnostic(EphemerisDataActivationResult& result, const std::string_view diagnostic)
-{
-    result.diagnostics.emplace_back(diagnostic);
-}
-
-void markCanceled(EphemerisDataActivationResult& result)
-{
-    result.status = EphemerisDataActivationStatus::Canceled;
-    addDiagnostic(result, "Ephemeris data activation was canceled.");
-}
-
 [[nodiscard]] bool
 verifySha256File(const QString& path, const std::string& expectedHexDigest, EphemerisDataActivationResult& result)
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
-        addDiagnostic(result, "Unable to open active ephemeris data asset for checksum verification.");
+        PayloadDiagnostics::addDiagnostic(
+            result, "Unable to open active ephemeris data asset for checksum verification."
+        );
         return false;
     }
 
     QCryptographicHash hash(QCryptographicHash::Sha256);
-    std::array<char, kIoBufferBytes> buffer{};
+    std::array<char, EphemerisDataPayloadReader::kIoBufferBytes> buffer{};
     while (!file.atEnd()) {
         const qint64 bytesRead = file.read(buffer.data(), static_cast<qint64>(buffer.size()));
         if (bytesRead < 0) {
-            addDiagnostic(result, "Unable to read active ephemeris data asset for checksum verification.");
+            PayloadDiagnostics::addDiagnostic(
+                result, "Unable to read active ephemeris data asset for checksum verification."
+            );
             return false;
         }
         hash.addData(QByteArrayView(buffer.data(), bytesRead));
@@ -111,23 +107,6 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
 
     const std::string actualHexDigest = hash.result().toHex().toStdString();
     return EphemerisDataFileUtilities::checksumsMatch(actualHexDigest, expectedHexDigest);
-}
-
-[[nodiscard]] std::string_view
-activatedPayloadVerificationDiagnostic(const EphemerisDataFileUtilities::PayloadVerification verification) noexcept
-{
-    switch (verification) {
-    case EphemerisDataFileUtilities::PayloadVerification::Verified:
-        break;
-    case EphemerisDataFileUtilities::PayloadVerification::EmptyLivePayload:
-        return "Activated live ephemeris data asset payload is empty.";
-    case EphemerisDataFileUtilities::PayloadVerification::UncompressedSizeMismatch:
-        return "Activated ephemeris data asset size does not match manifest metadata.";
-    case EphemerisDataFileUtilities::PayloadVerification::ChecksumMismatch:
-        return "Activated ephemeris data asset checksum does not match manifest metadata.";
-    }
-
-    return {};
 }
 
 [[nodiscard]] bool existingTargetIsCurrent(
@@ -183,7 +162,7 @@ activatedPayloadVerificationDiagnostic(const EphemerisDataFileUtilities::Payload
         return true;
     }
     if (!targetDirectory.mkpath(QStringLiteral("."))) {
-        addDiagnostic(result, "Unable to create writable ephemeris data cache directory.");
+        PayloadDiagnostics::addDiagnostic(result, "Unable to create writable ephemeris data cache directory.");
         return false;
     }
 
@@ -210,37 +189,41 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
 {
     EphemerisDataActivationResult result;
     if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
-        markCanceled(result);
+        PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
         return result;
     }
     if (request.asset == nullptr) {
-        addDiagnostic(result, "Ephemeris data activation requires an asset.");
+        PayloadDiagnostics::addDiagnostic(result, "Ephemeris data activation requires an asset.");
         return result;
     }
     if (request.writableCacheRoot.empty()) {
-        addDiagnostic(result, "Ephemeris data activation requires a writable cache root.");
+        PayloadDiagnostics::addDiagnostic(result, "Ephemeris data activation requires a writable cache root.");
         return result;
     }
     if (!request.asset->live
         && (request.asset->checksum.algorithm != EphemerisDataFileUtilities::kSha256Algorithm
             || request.asset->checksum.value.empty())) {
-        addDiagnostic(result, "Ephemeris data activation requires a sha256 checksum for the active asset bytes.");
+        PayloadDiagnostics::addDiagnostic(
+            result, "Ephemeris data activation requires a sha256 checksum for the active asset bytes."
+        );
         return result;
     }
     if (request.asset->compression.kind == EphemerisDataManifest::CompressionKind::Zstd
         && !request.asset->compression.uncompressedSizeBytes.has_value()) {
-        addDiagnostic(result, "zstd ephemeris data assets require an expected uncompressed size.");
+        PayloadDiagnostics::addDiagnostic(result, "zstd ephemeris data assets require an expected uncompressed size.");
         return result;
     }
     if (isLargeQtResourceKernel(request)) {
         result.status = EphemerisDataActivationStatus::LargeKernelInQtResource;
-        addDiagnostic(result, "Large solar-system kernels must be bundled as external files, not Qt resources.");
+        PayloadDiagnostics::addDiagnostic(
+            result, "Large solar-system kernels must be bundled as external files, not Qt resources."
+        );
         return result;
     }
 
     const std::optional<std::filesystem::path> relativeTargetPath = activeRelativePath(*request.asset);
     if (!relativeTargetPath.has_value()) {
-        addDiagnostic(result, "Ephemeris data activation requires a safe relative asset path.");
+        PayloadDiagnostics::addDiagnostic(result, "Ephemeris data activation requires a safe relative asset path.");
         return result;
     }
 
@@ -256,12 +239,14 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
     QFileInfo sourceInfo(sourcePath);
     if (!sourceInfo.exists() || !sourceInfo.isFile()) {
         result.status = EphemerisDataActivationStatus::MissingSource;
-        addDiagnostic(result, "Bundled ephemeris data asset source file is missing.");
+        PayloadDiagnostics::addDiagnostic(result, "Bundled ephemeris data asset source file is missing.");
         return result;
     }
     if (!request.asset->live && !EphemerisDataFileUtilities::sourceSizeMatchesMetadata(sourceInfo, *request.asset)) {
         result.status = EphemerisDataActivationStatus::ChecksumMismatch;
-        addDiagnostic(result, "Bundled ephemeris data asset compressed size does not match manifest metadata.");
+        PayloadDiagnostics::addDiagnostic(
+            result, "Bundled ephemeris data asset compressed size does not match manifest metadata."
+        );
         return result;
     }
     if (!prepareTargetDirectory(targetPathString, result)) {
@@ -270,7 +255,9 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
     }
     if (!pathIsWithinCanonicalRoot(request.writableCacheRoot, targetPath.parent_path())) {
         result.status = EphemerisDataActivationStatus::IoError;
-        addDiagnostic(result, "Ephemeris data activation target path escapes the writable cache root.");
+        PayloadDiagnostics::addDiagnostic(
+            result, "Ephemeris data activation target path escapes the writable cache root."
+        );
         return result;
     }
 
@@ -278,12 +265,12 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
     QSaveFile targetFile(targetPathString);
     if (!sourceFile.open(QIODevice::ReadOnly)) {
         result.status = EphemerisDataActivationStatus::MissingSource;
-        addDiagnostic(result, "Unable to open bundled ephemeris data asset source file.");
+        PayloadDiagnostics::addDiagnostic(result, "Unable to open bundled ephemeris data asset source file.");
         return result;
     }
     if (!targetFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         result.status = EphemerisDataActivationStatus::IoError;
-        addDiagnostic(result, "Unable to create temporary ephemeris data cache file.");
+        PayloadDiagnostics::addDiagnostic(result, "Unable to create temporary ephemeris data cache file.");
         return result;
     }
 
@@ -301,18 +288,18 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         return result;
     }
     if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
-        markCanceled(result);
+        PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
         targetFile.cancelWriting();
         return result;
     }
     if (!targetFile.flush()) {
         result.status = EphemerisDataActivationStatus::IoError;
-        addDiagnostic(result, "Unable to flush activated ephemeris data cache file.");
+        PayloadDiagnostics::addDiagnostic(result, "Unable to flush activated ephemeris data cache file.");
         targetFile.cancelWriting();
         return result;
     }
     if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
-        markCanceled(result);
+        PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
         targetFile.cancelWriting();
         return result;
     }
@@ -321,19 +308,24 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         EphemerisDataFileUtilities::verifyDecodedPayload(*request.asset, payload.outputBytes, payload.checksum);
     if (payloadVerification != EphemerisDataFileUtilities::PayloadVerification::Verified) {
         result.status = EphemerisDataActivationStatus::ChecksumMismatch;
-        addDiagnostic(result, activatedPayloadVerificationDiagnostic(payloadVerification));
+        PayloadDiagnostics::addDiagnostic(
+            result,
+            EphemerisDataFileUtilities::payloadVerificationDiagnostic(
+                payloadVerification, EphemerisDataFileUtilities::kActivatedPayloadWording
+            )
+        );
         targetFile.cancelWriting();
         return result;
     }
 
     if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
-        markCanceled(result);
+        PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
         targetFile.cancelWriting();
         return result;
     }
     if (!targetFile.commit()) {
         result.status = EphemerisDataActivationStatus::IoError;
-        addDiagnostic(result, "Unable to atomically promote activated ephemeris data cache file.");
+        PayloadDiagnostics::addDiagnostic(result, "Unable to atomically promote activated ephemeris data cache file.");
         return result;
     }
 

@@ -1,4 +1,5 @@
 #include "EphemerisDataPayloadReader.hpp"
+#include "EphemerisPayloadDiagnostics.hpp"
 
 #include <QByteArrayView>
 #include <QCryptographicHash>
@@ -15,7 +16,9 @@ namespace skygate::ephemeris {
 
 namespace {
 
-constexpr std::size_t kIoBufferBytes = 1U << 16U;
+using PayloadDiagnostics = EphemerisPayloadDiagnostics;
+
+constexpr std::string_view kCanceledDiagnostic = "Ephemeris data payload read was canceled.";
 
 struct ZstdInBuffer {
     const void* src = nullptr;
@@ -133,22 +136,6 @@ private:
     ZstdDStream* m_stream = nullptr;
 };
 
-void addDiagnostic(EphemerisDataPayloadReader::Result& result, const std::string_view diagnostic)
-{
-    result.diagnostics.emplace_back(diagnostic);
-}
-
-[[nodiscard]] bool cancellationRequested(const std::function<bool()>& callback)
-{
-    return callback != nullptr && callback();
-}
-
-void markCanceled(EphemerisDataPayloadReader::Result& result)
-{
-    result.status = EphemerisDataPayloadReader::Status::Canceled;
-    addDiagnostic(result, "Ephemeris data activation was canceled.");
-}
-
 [[nodiscard]] bool copyUncompressedAsset(
     QFile& sourceFile,
     QIODevice& targetFile,
@@ -159,15 +146,15 @@ void markCanceled(EphemerisDataPayloadReader::Result& result)
     const std::function<bool()>& cancellationCallback
 )
 {
-    std::array<char, kIoBufferBytes> buffer{};
+    std::array<char, EphemerisDataPayloadReader::kIoBufferBytes> buffer{};
     while (!sourceFile.atEnd()) {
-        if (cancellationRequested(cancellationCallback)) {
-            markCanceled(result);
+        if (EphemerisDataPayloadReader::cancellationRequested(cancellationCallback)) {
+            PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
             return false;
         }
         const qint64 bytesRead = sourceFile.read(buffer.data(), static_cast<qint64>(buffer.size()));
         if (bytesRead < 0) {
-            addDiagnostic(result, "Unable to read bundled ephemeris data asset.");
+            PayloadDiagnostics::addDiagnostic(result, "Unable to read bundled ephemeris data asset.");
             return false;
         }
         if (bytesRead == 0) {
@@ -176,11 +163,13 @@ void markCanceled(EphemerisDataPayloadReader::Result& result)
         const std::uint64_t chunkBytes = static_cast<std::uint64_t>(bytesRead);
         if (maximumOutputBytes.has_value() && chunkBytes > *maximumOutputBytes - outputBytes) {
             result.status = EphemerisDataPayloadReader::Status::OutputLimitExceeded;
-            addDiagnostic(result, "Ephemeris data asset exceeds the configured maximum output size.");
+            PayloadDiagnostics::addDiagnostic(
+                result, "Ephemeris data asset exceeds the configured maximum output size."
+            );
             return false;
         }
         if (targetFile.write(buffer.data(), bytesRead) != bytesRead) {
-            addDiagnostic(result, "Unable to write ephemeris data asset into the writable cache.");
+            PayloadDiagnostics::addDiagnostic(result, "Unable to write ephemeris data asset into the writable cache.");
             return false;
         }
         hash.addData(QByteArrayView(buffer.data(), bytesRead));
@@ -203,55 +192,59 @@ void markCanceled(EphemerisDataPayloadReader::Result& result)
     const ZstdRuntime& runtime = ZstdRuntime::instance();
     if (!runtime.isAvailable()) {
         result.status = EphemerisDataPayloadReader::Status::UnsupportedCompression;
-        addDiagnostic(result, "zstd runtime library is not available.");
+        PayloadDiagnostics::addDiagnostic(result, "zstd runtime library is not available.");
         return false;
     }
 
     ScopedZstdDStream stream(runtime);
     if (stream.get() == nullptr || !runtime.initDStream(stream.get())) {
         result.status = EphemerisDataPayloadReader::Status::UnsupportedCompression;
-        addDiagnostic(result, "Unable to initialize zstd decompression.");
+        PayloadDiagnostics::addDiagnostic(result, "Unable to initialize zstd decompression.");
         return false;
     }
 
-    std::array<char, kIoBufferBytes> inputBuffer{};
-    std::array<char, kIoBufferBytes> outputBuffer{};
+    std::array<char, EphemerisDataPayloadReader::kIoBufferBytes> inputBuffer{};
+    std::array<char, EphemerisDataPayloadReader::kIoBufferBytes> outputBuffer{};
     std::size_t remainingHint = 1U;
     bool sawFrameEnd = false;
     while (!sourceFile.atEnd()) {
-        if (cancellationRequested(cancellationCallback)) {
-            markCanceled(result);
+        if (EphemerisDataPayloadReader::cancellationRequested(cancellationCallback)) {
+            PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
             return false;
         }
         const qint64 bytesRead = sourceFile.read(inputBuffer.data(), static_cast<qint64>(inputBuffer.size()));
         if (bytesRead < 0) {
-            addDiagnostic(result, "Unable to read compressed ephemeris data asset.");
+            PayloadDiagnostics::addDiagnostic(result, "Unable to read compressed ephemeris data asset.");
             return false;
         }
 
         ZstdInBuffer input{inputBuffer.data(), static_cast<std::size_t>(bytesRead), 0U};
         while (input.pos < input.size) {
-            if (cancellationRequested(cancellationCallback)) {
-                markCanceled(result);
+            if (EphemerisDataPayloadReader::cancellationRequested(cancellationCallback)) {
+                PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
                 return false;
             }
             ZstdOutBuffer output{outputBuffer.data(), outputBuffer.size(), 0U};
             remainingHint = runtime.decompressStream(stream.get(), output, input);
             if (runtime.isError(remainingHint)) {
                 result.status = EphemerisDataPayloadReader::Status::CorruptArchive;
-                addDiagnostic(result, "zstd ephemeris data asset is corrupt or unsupported.");
+                PayloadDiagnostics::addDiagnostic(result, "zstd ephemeris data asset is corrupt or unsupported.");
                 return false;
             }
             if (output.pos > 0U) {
                 const std::uint64_t chunkBytes = static_cast<std::uint64_t>(output.pos);
                 if (maximumOutputBytes.has_value() && chunkBytes > *maximumOutputBytes - outputBytes) {
                     result.status = EphemerisDataPayloadReader::Status::OutputLimitExceeded;
-                    addDiagnostic(result, "Ephemeris data asset exceeds the configured maximum output size.");
+                    PayloadDiagnostics::addDiagnostic(
+                        result, "Ephemeris data asset exceeds the configured maximum output size."
+                    );
                     return false;
                 }
                 if (targetFile.write(outputBuffer.data(), static_cast<qint64>(output.pos))
                     != static_cast<qint64>(output.pos)) {
-                    addDiagnostic(result, "Unable to write decompressed ephemeris data into the writable cache.");
+                    PayloadDiagnostics::addDiagnostic(
+                        result, "Unable to write decompressed ephemeris data into the writable cache."
+                    );
                     return false;
                 }
                 hash.addData(QByteArrayView(outputBuffer.data(), static_cast<qsizetype>(output.pos)));
@@ -263,7 +256,9 @@ void markCanceled(EphemerisDataPayloadReader::Result& result)
 
     if (!sawFrameEnd || remainingHint != 0U) {
         result.status = EphemerisDataPayloadReader::Status::CorruptArchive;
-        addDiagnostic(result, "zstd ephemeris data asset ended before a complete frame was decoded.");
+        PayloadDiagnostics::addDiagnostic(
+            result, "zstd ephemeris data asset ended before a complete frame was decoded."
+        );
         return false;
     }
 
@@ -271,6 +266,11 @@ void markCanceled(EphemerisDataPayloadReader::Result& result)
 }
 
 }  // namespace
+
+bool EphemerisDataPayloadReader::cancellationRequested(const std::function<bool()>& callback)
+{
+    return callback != nullptr && callback();
+}
 
 EphemerisDataPayloadReader::Result EphemerisDataPayloadReader::read(
     const EphemerisDataManifest::CompressionKind compression,

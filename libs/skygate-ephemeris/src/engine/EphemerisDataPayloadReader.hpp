@@ -2,6 +2,7 @@
 
 #include "EphemerisDataManifest.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -30,6 +31,11 @@ public:
         std::string checksum;
         std::vector<std::string> diagnostics;
     };
+
+    // Chunk size used while streaming payload bytes into a target device.
+    static constexpr std::size_t kIoBufferBytes = 1U << 16U;
+
+    [[nodiscard]] static bool cancellationRequested(const std::function<bool()>& callback);
 
     [[nodiscard]] static Result read(
         EphemerisDataManifest::CompressionKind compression,

@@ -1,6 +1,7 @@
 #include "EphemerisStagedUpdateVerification.hpp"
 #include "EphemerisDataFileUtilities.hpp"
 #include "EphemerisDataPayloadReader.hpp"
+#include "EphemerisPayloadDiagnostics.hpp"
 
 #include <QFile>
 #include <QFileInfo>
@@ -36,16 +37,9 @@ protected:
     }
 };
 
-void addDiagnostic(EphemerisStagedUpdateVerificationResult& result, const std::string_view diagnostic)
-{
-    result.diagnostics.emplace_back(diagnostic);
-}
+using PayloadDiagnostics = EphemerisPayloadDiagnostics;
 
-void markCanceled(EphemerisStagedUpdateVerificationResult& result)
-{
-    result.status = EphemerisStagedUpdateVerificationStatus::Canceled;
-    addDiagnostic(result, "Staged ephemeris update verification was canceled.");
-}
+constexpr std::string_view kCanceledDiagnostic = "Staged ephemeris update verification was canceled.";
 
 [[nodiscard]] QString
 stagedSourcePath(const std::filesystem::path& stagedResourceRoot, const EphemerisDataManifest::Asset& asset)
@@ -76,52 +70,43 @@ validateAssetMetadata(const EphemerisDataManifest::Asset& asset, EphemerisStaged
 {
     bool valid = true;
     if (asset.id.empty() || asset.profileId.empty() || asset.version.empty() || asset.relativePath.empty()) {
-        addDiagnostic(result, "Staged ephemeris asset metadata requires id, profile, version, and relative path.");
+        PayloadDiagnostics::addDiagnostic(
+            result, "Staged ephemeris asset metadata requires id, profile, version, and relative path."
+        );
         valid = false;
     }
     if (!asset.live
         && (asset.checksum.algorithm != EphemerisDataFileUtilities::kSha256Algorithm || asset.checksum.value.empty())) {
-        addDiagnostic(result, "Staged ephemeris asset metadata requires a sha256 checksum.");
+        PayloadDiagnostics::addDiagnostic(result, "Staged ephemeris asset metadata requires a sha256 checksum.");
         valid = false;
     }
     const std::filesystem::path relativePath(asset.relativePath);
     if (EphemerisDataFileUtilities::hasUnsafePathComponent(relativePath)) {
-        addDiagnostic(result, "Staged ephemeris asset metadata contains an unsafe relative path.");
+        PayloadDiagnostics::addDiagnostic(result, "Staged ephemeris asset metadata contains an unsafe relative path.");
         valid = false;
     }
     if (asset.compression.kind == EphemerisDataManifest::CompressionKind::Zstd
         && (!asset.compression.compressedSizeBytes.has_value() || !asset.compression.uncompressedSizeBytes.has_value()
             || *asset.compression.compressedSizeBytes == 0U || *asset.compression.uncompressedSizeBytes == 0U)) {
-        addDiagnostic(result, "zstd staged ephemeris assets require positive compressed and uncompressed sizes.");
+        PayloadDiagnostics::addDiagnostic(
+            result, "zstd staged ephemeris assets require positive compressed and uncompressed sizes."
+        );
         valid = false;
     }
     if (!asset.validityRange.isValid()) {
-        addDiagnostic(result, "Staged ephemeris asset metadata requires an ordered finite validity range.");
+        PayloadDiagnostics::addDiagnostic(
+            result, "Staged ephemeris asset metadata requires an ordered finite validity range."
+        );
         valid = false;
     }
     if (asset.validityRange.id.empty() || asset.validityRange.displayName.empty()) {
-        addDiagnostic(result, "Staged ephemeris asset metadata requires validity range id and display name.");
+        PayloadDiagnostics::addDiagnostic(
+            result, "Staged ephemeris asset metadata requires validity range id and display name."
+        );
         valid = false;
     }
 
     return valid;
-}
-
-[[nodiscard]] std::string_view
-stagedPayloadVerificationDiagnostic(const EphemerisDataFileUtilities::PayloadVerification verification) noexcept
-{
-    switch (verification) {
-    case EphemerisDataFileUtilities::PayloadVerification::Verified:
-        break;
-    case EphemerisDataFileUtilities::PayloadVerification::EmptyLivePayload:
-        return "Staged live ephemeris asset payload is empty.";
-    case EphemerisDataFileUtilities::PayloadVerification::UncompressedSizeMismatch:
-        return "Staged ephemeris asset uncompressed size does not match manifest metadata.";
-    case EphemerisDataFileUtilities::PayloadVerification::ChecksumMismatch:
-        return "Staged ephemeris asset checksum does not match manifest metadata.";
-    }
-
-    return {};
 }
 
 [[nodiscard]] bool verifyAssetPayload(
@@ -132,33 +117,33 @@ stagedPayloadVerificationDiagnostic(const EphemerisDataFileUtilities::PayloadVer
 )
 {
     if (EphemerisDataFileUtilities::cancellationRequested(cancellationCallback)) {
-        markCanceled(result);
+        PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
         return false;
     }
 
     QFileInfo sourceInfo(sourcePath);
     if (!sourceInfo.exists() || !sourceInfo.isFile()) {
         result.status = EphemerisStagedUpdateVerificationStatus::MissingAsset;
-        addDiagnostic(result, "Staged ephemeris asset file is missing.");
+        PayloadDiagnostics::addDiagnostic(result, "Staged ephemeris asset file is missing.");
         return false;
     }
     if (!asset.live && !EphemerisDataFileUtilities::sourceSizeMatchesMetadata(sourceInfo, asset)) {
         result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
-        addDiagnostic(result, "Staged ephemeris asset size does not match manifest metadata.");
+        PayloadDiagnostics::addDiagnostic(result, "Staged ephemeris asset size does not match manifest metadata.");
         return false;
     }
 
     QFile sourceFile(sourcePath);
     if (!sourceFile.open(QIODevice::ReadOnly)) {
         result.status = EphemerisStagedUpdateVerificationStatus::IoError;
-        addDiagnostic(result, "Unable to open staged ephemeris asset for verification.");
+        PayloadDiagnostics::addDiagnostic(result, "Unable to open staged ephemeris asset for verification.");
         return false;
     }
 
     HashingWriteDevice sink;
     if (!sink.openForWrite()) {
         result.status = EphemerisStagedUpdateVerificationStatus::IoError;
-        addDiagnostic(result, "Unable to initialize staged ephemeris verification sink.");
+        PayloadDiagnostics::addDiagnostic(result, "Unable to initialize staged ephemeris verification sink.");
         return false;
     }
 
@@ -179,7 +164,12 @@ stagedPayloadVerificationDiagnostic(const EphemerisDataFileUtilities::PayloadVer
         EphemerisDataFileUtilities::verifyDecodedPayload(asset, payload.outputBytes, payload.checksum);
     if (payloadVerification != EphemerisDataFileUtilities::PayloadVerification::Verified) {
         result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
-        addDiagnostic(result, stagedPayloadVerificationDiagnostic(payloadVerification));
+        PayloadDiagnostics::addDiagnostic(
+            result,
+            EphemerisDataFileUtilities::payloadVerificationDiagnostic(
+                payloadVerification, EphemerisDataFileUtilities::kStagedPayloadWording
+            )
+        );
         return false;
     }
 
@@ -193,26 +183,26 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
 {
     EphemerisStagedUpdateVerificationResult result;
     if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
-        markCanceled(result);
+        PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
         return result;
     }
     if (request.manifest == nullptr) {
-        addDiagnostic(result, "Staged ephemeris update verification requires a manifest.");
+        PayloadDiagnostics::addDiagnostic(result, "Staged ephemeris update verification requires a manifest.");
         return result;
     }
     if (request.profileId.empty()) {
-        addDiagnostic(result, "Staged ephemeris update verification requires a profile id.");
+        PayloadDiagnostics::addDiagnostic(result, "Staged ephemeris update verification requires a profile id.");
         return result;
     }
     if (request.stagedResourceRoot.empty()) {
-        addDiagnostic(result, "Staged ephemeris update verification requires a staging root.");
+        PayloadDiagnostics::addDiagnostic(result, "Staged ephemeris update verification requires a staging root.");
         return result;
     }
 
     const EphemerisDataManifest::Profile* profile = request.manifest->profile(request.profileId);
     if (profile == nullptr || profile->assetIds.empty()) {
         result.status = EphemerisStagedUpdateVerificationStatus::UnsupportedProfile;
-        addDiagnostic(result, "Requested ephemeris update profile is not present in the manifest.");
+        PayloadDiagnostics::addDiagnostic(result, "Requested ephemeris update profile is not present in the manifest.");
         return result;
     }
 
@@ -220,23 +210,29 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
     std::vector<EphemerisDataManifest::AssetKind> presentKinds;
     for (const std::string& assetId : profile->assetIds) {
         if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
-            markCanceled(result);
+            PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
             return result;
         }
         const EphemerisDataManifest::Asset* asset = request.manifest->asset(assetId);
         if (asset == nullptr) {
             result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
-            addDiagnostic(result, "Selected ephemeris update profile references a missing manifest asset.");
+            PayloadDiagnostics::addDiagnostic(
+                result, "Selected ephemeris update profile references a missing manifest asset."
+            );
             return result;
         }
         if (!seenAssetIds.insert(asset->id).second) {
             result.status = EphemerisStagedUpdateVerificationStatus::MalformedMetadata;
-            addDiagnostic(result, "Selected ephemeris update profile contains duplicate asset ids.");
+            PayloadDiagnostics::addDiagnostic(
+                result, "Selected ephemeris update profile contains duplicate asset ids."
+            );
             return result;
         }
         if (asset->profileId != request.profileId) {
             result.status = EphemerisStagedUpdateVerificationStatus::MalformedMetadata;
-            addDiagnostic(result, "Selected ephemeris update asset belongs to a different profile.");
+            PayloadDiagnostics::addDiagnostic(
+                result, "Selected ephemeris update asset belongs to a different profile."
+            );
             return result;
         }
         if (!validateAssetMetadata(*asset, result)) {
@@ -249,39 +245,49 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
 
     for (const EphemerisStagedUpdateVerificationRequest::ExpectedComponent& component : request.expectedComponents) {
         if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
-            markCanceled(result);
+            PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
             return result;
         }
         const EphemerisDataManifest::Asset* asset = request.manifest->asset(component.assetId);
         if (asset == nullptr || !hasAssetId(profile->assetIds, component.assetId)) {
             result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
-            addDiagnostic(result, "Selected ephemeris update profile is missing an expected component.");
+            PayloadDiagnostics::addDiagnostic(
+                result, "Selected ephemeris update profile is missing an expected component."
+            );
             return result;
         }
         if (asset->kind != component.kind) {
             result.status = EphemerisStagedUpdateVerificationStatus::WrongComponentKind;
-            addDiagnostic(result, "Selected ephemeris update component kind does not match the expected kind.");
+            PayloadDiagnostics::addDiagnostic(
+                result, "Selected ephemeris update component kind does not match the expected kind."
+            );
             return result;
         }
         if (component.expectedVersion.has_value() && component.expectedVersion->empty()) {
             result.status = EphemerisStagedUpdateVerificationStatus::InvalidRequest;
-            addDiagnostic(result, "Expected staged ephemeris component versions must be non-empty.");
+            PayloadDiagnostics::addDiagnostic(
+                result, "Expected staged ephemeris component versions must be non-empty."
+            );
             return result;
         }
         if (component.expectedVersion.has_value() && asset->version != *component.expectedVersion) {
             result.status = EphemerisStagedUpdateVerificationStatus::MismatchedMetadata;
-            addDiagnostic(result, "Selected ephemeris update component version does not match the expected version.");
+            PayloadDiagnostics::addDiagnostic(
+                result, "Selected ephemeris update component version does not match the expected version."
+            );
             return result;
         }
         if (component.requiredValidityRange.has_value() && !component.requiredValidityRange->isValid()) {
             result.status = EphemerisStagedUpdateVerificationStatus::InvalidRequest;
-            addDiagnostic(result, "Required staged ephemeris component validity ranges must be ordered and finite.");
+            PayloadDiagnostics::addDiagnostic(
+                result, "Required staged ephemeris component validity ranges must be ordered and finite."
+            );
             return result;
         }
         if (component.requiredValidityRange.has_value()
             && !validityRangeCovers(asset->validityRange, *component.requiredValidityRange)) {
             result.status = EphemerisStagedUpdateVerificationStatus::MismatchedMetadata;
-            addDiagnostic(
+            PayloadDiagnostics::addDiagnostic(
                 result, "Selected ephemeris update component validity range does not cover the required range."
             );
             return result;
@@ -290,25 +296,29 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
 
     for (const EphemerisDataManifest::AssetKind kind : request.requiredKinds) {
         if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
-            markCanceled(result);
+            PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
             return result;
         }
         if (!hasKind(presentKinds, kind)) {
             result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
-            addDiagnostic(result, "Selected ephemeris update profile is missing a required component kind.");
+            PayloadDiagnostics::addDiagnostic(
+                result, "Selected ephemeris update profile is missing a required component kind."
+            );
             return result;
         }
     }
 
     for (const std::string& assetId : profile->assetIds) {
         if (EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested)) {
-            markCanceled(result);
+            PayloadDiagnostics::markCanceled(result, kCanceledDiagnostic);
             return result;
         }
         const EphemerisDataManifest::Asset* asset = request.manifest->asset(assetId);
         if (asset == nullptr) {
             result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
-            addDiagnostic(result, "Selected ephemeris update profile references a missing manifest asset.");
+            PayloadDiagnostics::addDiagnostic(
+                result, "Selected ephemeris update profile references a missing manifest asset."
+            );
             return result;
         }
         if (!verifyAssetPayload(

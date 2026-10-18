@@ -226,6 +226,7 @@ add_library(skygate-ephemeris STATIC
     src/engine/EphemerisDataActivationResult.hpp
     src/engine/EphemerisDataActivationStatus.hpp
     src/engine/EphemerisDataPayloadReader.hpp
+    src/engine/EphemerisPayloadDiagnostics.hpp
     src/engine/EphemerisStagedUpdateVerification.hpp
     src/engine/EphemerisStagedUpdateVerificationRequest.hpp
     src/engine/EphemerisStagedUpdateVerificationResult.hpp
