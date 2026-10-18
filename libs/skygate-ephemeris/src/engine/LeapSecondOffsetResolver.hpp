@@ -4,7 +4,6 @@
 #include "TimeScaleConversionResult.hpp"
 #include "TimeScaleServiceOptions.hpp"
 
-#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -16,7 +15,7 @@ public:
     struct Result {
         std::optional<int> offsetSeconds;
         TimeScaleConversionStatus::Type status = TimeScaleConversionStatus::Type::Valid;
-        std::uint32_t warningCodeMask = 0U;
+        TimeScaleConversionResult::WarningMask warningCodeMask;
         std::string diagnosticText;
 
         void addWarning(const TimeScaleConversionWarningCode::Type code) noexcept;
@@ -28,8 +27,6 @@ public:
 
     [[nodiscard]] Result lookupUtcOffset(const skygate::core::AstronomicalEpoch& utcEpoch) const;
     [[nodiscard]] Result lookupTaiOffset(const skygate::core::AstronomicalEpoch& taiEpoch) const;
-
-    static void mergeWarnings(TimeScaleConversionResult& result, const Result& lookup) noexcept;
 
 private:
     std::shared_ptr<const ILeapSecondProvider> m_leapSecondProvider;

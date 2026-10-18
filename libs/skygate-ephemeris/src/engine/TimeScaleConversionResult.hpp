@@ -1,18 +1,19 @@
 #pragma once
 
-#include "BitFlagSetOperations.hpp"
+#include "BitFlagSet.hpp"
 #include "TimeScaleConversionDiagnostics.hpp"
 #include "time/AstronomicalEpoch.hpp"
 
-#include <cstdint>
 #include <string>
 
 namespace skygate::ephemeris {
 
 struct TimeScaleConversionResult {
+    using WarningMask = BitFlagSet<TimeScaleConversionWarningCode::Type>;
+
     skygate::core::AstronomicalEpoch epoch;
     TimeScaleConversionStatus::Type status = TimeScaleConversionStatus::Type::Failed;
-    std::uint32_t warningCodeMask = 0U;
+    WarningMask warningCodeMask;
     std::string diagnosticText;
 
     [[nodiscard]] bool isSuccess() const noexcept
@@ -23,7 +24,7 @@ struct TimeScaleConversionResult {
     [[nodiscard]] static TimeScaleConversionResult success(
         skygate::core::AstronomicalEpoch epoch,
         TimeScaleConversionStatus::Type status = TimeScaleConversionStatus::Type::Valid,
-        std::uint32_t warningCodeMask = 0U,
+        WarningMask warningCodeMask = {},
         std::string diagnosticText = {}
     );
 
@@ -31,20 +32,27 @@ struct TimeScaleConversionResult {
         const skygate::core::AstronomicalEpoch& epoch, skygate::core::TimeScale targetScale, std::string diagnosticText
     );
 
+    [[nodiscard]] static TimeScaleConversionResult failureFromLookup(
+        const skygate::core::AstronomicalEpoch& epoch,
+        skygate::core::TimeScale targetScale,
+        WarningMask warningCodeMask,
+        std::string diagnosticText
+    );
+
     static void mergeWarnings(
         TimeScaleConversionResult& result,
         TimeScaleConversionStatus::Type sourceStatus,
-        std::uint32_t sourceWarningCodeMask
+        WarningMask sourceWarningCodeMask
     ) noexcept;
 
     void addWarning(const TimeScaleConversionWarningCode::Type code) noexcept
     {
-        warningCodeMask |= BitFlagSetOperations::bit(code);
+        warningCodeMask.add(WarningMask::bit(code));
     }
 
     [[nodiscard]] bool hasWarning(const TimeScaleConversionWarningCode::Type code) const noexcept
     {
-        return (warningCodeMask & BitFlagSetOperations::bit(code)) != 0U;
+        return warningCodeMask.has(WarningMask::bit(code));
     }
 };
 

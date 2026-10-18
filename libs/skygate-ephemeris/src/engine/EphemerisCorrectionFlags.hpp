@@ -1,206 +1,153 @@
 #pragma once
 
-#include "BitFlagSetOperations.hpp"
+#include "BitFlagSet.hpp"
+#include "EphemerisCorrectionFlag.hpp"
 
 #include <cstdint>
 
 namespace skygate::ephemeris {
 
-class EphemerisCorrectionFlags {
+// Correction bit set with the named flags the rest of the code spells out.
+class EphemerisCorrectionFlags final : public BitFlagSet<EphemerisCorrectionFlag> {
 public:
-    enum class Type : std::uint32_t {
-        NoCorrections = 0U,
-        Geometric = 1U << 11U,
-        LightTime = 1U << 0U,
-        StellarAberration = 1U << 1U,
-        GravitationalLightDeflection = 1U << 2U,
-        AnnualParallax = 1U << 3U,
-        DiurnalParallax = 1U << 4U,
-        PrecessionNutation = 1U << 5U,
-        EarthOrientation = 1U << 6U,
-        AtmosphericRefraction = 1U << 7U,
-        ProperMotion = 1U << 8U,
-        RadialVelocity = 1U << 9U,
-        StellarParallax = 1U << 10U,
-        Astrometric = (1U << 0U) | (1U << 1U) | (1U << 2U) | (1U << 3U) | (1U << 5U) | (1U << 8U) | (1U << 9U)
-            | (1U << 10U),
-        Apparent =
-            ((1U << 0U) | (1U << 1U) | (1U << 2U) | (1U << 3U) | (1U << 5U) | (1U << 8U) | (1U << 9U) | (1U << 10U)
-             | (1U << 6U)),
-        Topocentric =
-            ((1U << 0U) | (1U << 1U) | (1U << 2U) | (1U << 3U) | (1U << 5U) | (1U << 8U) | (1U << 9U) | (1U << 10U)
-             | (1U << 6U) | (1U << 4U)),
-        ApparentTopocentric =
-            ((1U << 0U) | (1U << 1U) | (1U << 2U) | (1U << 3U) | (1U << 5U) | (1U << 8U) | (1U << 9U) | (1U << 10U)
-             | (1U << 6U) | (1U << 4U) | (1U << 7U))
-    };
-
     constexpr EphemerisCorrectionFlags() noexcept = default;
 
-    constexpr EphemerisCorrectionFlags(const Type type) noexcept : m_type(type) {}
+    constexpr EphemerisCorrectionFlags(const EphemerisCorrectionFlag flag) noexcept
+        : BitFlagSet<EphemerisCorrectionFlag>(flag)
+    {
+    }
 
-    explicit constexpr EphemerisCorrectionFlags(const std::uint32_t bits) noexcept : m_type(static_cast<Type>(bits)) {}
+    explicit constexpr EphemerisCorrectionFlags(const std::uint32_t bits) noexcept
+        : BitFlagSet<EphemerisCorrectionFlag>(bits)
+    {
+    }
+
+    constexpr EphemerisCorrectionFlags(const BitFlagSet<EphemerisCorrectionFlag> flags) noexcept
+        : BitFlagSet<EphemerisCorrectionFlag>(flags)
+    {
+    }
+
+    constexpr EphemerisCorrectionFlags& operator=(const BitFlagSet<EphemerisCorrectionFlag> flags) noexcept
+    {
+        BitFlagSet<EphemerisCorrectionFlag>::operator=(flags);
+        return *this;
+    }
+
+    using BitFlagSet<EphemerisCorrectionFlag>::has;
+    using BitFlagSet<EphemerisCorrectionFlag>::without;
 
     [[nodiscard]] constexpr Type type() const noexcept
     {
-        return m_type;
-    }
-
-    [[nodiscard]] constexpr std::uint32_t bits() const noexcept
-    {
-        return static_cast<std::uint32_t>(m_type);
-    }
-
-    explicit constexpr operator std::uint32_t() const noexcept
-    {
-        return bits();
+        return static_cast<Type>(bits());
     }
 
     constexpr operator Type() const noexcept
     {
-        return m_type;
+        return type();
     }
 
-    [[nodiscard]] constexpr EphemerisCorrectionFlags operator|(const EphemerisCorrectionFlags rhs) const noexcept
-    {
-        return EphemerisCorrectionFlags(bits() | rhs.bits());
-    }
-
-    [[nodiscard]] constexpr EphemerisCorrectionFlags operator&(const EphemerisCorrectionFlags rhs) const noexcept
-    {
-        return EphemerisCorrectionFlags(bits() & rhs.bits());
-    }
-
-    constexpr EphemerisCorrectionFlags& operator|=(const EphemerisCorrectionFlags rhs) noexcept
-    {
-        *this = *this | rhs;
-        return *this;
-    }
-
-    [[nodiscard]] constexpr bool operator==(const EphemerisCorrectionFlags rhs) const noexcept
-    {
-        return bits() == rhs.bits();
-    }
-
-    [[nodiscard]] constexpr bool operator!=(const EphemerisCorrectionFlags rhs) const noexcept
-    {
-        return !(*this == rhs);
-    }
-
-    [[nodiscard]] constexpr bool has(const EphemerisCorrectionFlags flag) const noexcept
-    {
-        return BitFlagSetOperations::hasFlag(*this, flag);
-    }
-
-    [[nodiscard]] constexpr EphemerisCorrectionFlags without(const EphemerisCorrectionFlags removedFlags) const noexcept
-    {
-        return BitFlagSetOperations::withoutFlags(*this, removedFlags);
-    }
-
-    [[nodiscard]] static constexpr bool
-    has(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags flag) noexcept
-    {
-        return BitFlagSetOperations::hasFlag(flags, flag);
-    }
-
-    [[nodiscard]] static constexpr EphemerisCorrectionFlags
-    without(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags removedFlags) noexcept
-    {
-        return BitFlagSetOperations::withoutFlags(flags, removedFlags);
-    }
-
+    // Flags that ask for more than the plain geometric position.
     [[nodiscard]] constexpr bool hasCorrections() const noexcept
     {
         return without(geometric()) != noCorrections();
     }
 
+    [[nodiscard]] static constexpr bool
+    has(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags flag) noexcept
+    {
+        return flags.has(flag);
+    }
+
+    [[nodiscard]] static constexpr EphemerisCorrectionFlags
+    without(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags removedFlags) noexcept
+    {
+        return flags.without(removedFlags);
+    }
+
     [[nodiscard]] static constexpr EphemerisCorrectionFlags noCorrections() noexcept
     {
-        return Type::NoCorrections;
+        return {};
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags geometric() noexcept
     {
-        return Type::Geometric;
+        return EphemerisCorrectionFlag::Geometric;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags lightTime() noexcept
     {
-        return Type::LightTime;
+        return EphemerisCorrectionFlag::LightTime;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags stellarAberration() noexcept
     {
-        return Type::StellarAberration;
+        return EphemerisCorrectionFlag::StellarAberration;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags gravitationalLightDeflection() noexcept
     {
-        return Type::GravitationalLightDeflection;
+        return EphemerisCorrectionFlag::GravitationalLightDeflection;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags annualParallax() noexcept
     {
-        return Type::AnnualParallax;
+        return EphemerisCorrectionFlag::AnnualParallax;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags diurnalParallax() noexcept
     {
-        return Type::DiurnalParallax;
+        return EphemerisCorrectionFlag::DiurnalParallax;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags precessionNutation() noexcept
     {
-        return Type::PrecessionNutation;
+        return EphemerisCorrectionFlag::PrecessionNutation;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags earthOrientation() noexcept
     {
-        return Type::EarthOrientation;
+        return EphemerisCorrectionFlag::EarthOrientation;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags atmosphericRefraction() noexcept
     {
-        return Type::AtmosphericRefraction;
+        return EphemerisCorrectionFlag::AtmosphericRefraction;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags properMotion() noexcept
     {
-        return Type::ProperMotion;
+        return EphemerisCorrectionFlag::ProperMotion;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags radialVelocity() noexcept
     {
-        return Type::RadialVelocity;
+        return EphemerisCorrectionFlag::RadialVelocity;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags stellarParallax() noexcept
     {
-        return Type::StellarParallax;
+        return EphemerisCorrectionFlag::StellarParallax;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags astrometric() noexcept
     {
-        return Type::Astrometric;
+        return EphemerisCorrectionFlag::Astrometric;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags apparent() noexcept
     {
-        return Type::Apparent;
+        return EphemerisCorrectionFlag::Apparent;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags topocentric() noexcept
     {
-        return Type::Topocentric;
+        return EphemerisCorrectionFlag::Topocentric;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags apparentTopocentric() noexcept
     {
-        return Type::ApparentTopocentric;
+        return EphemerisCorrectionFlag::ApparentTopocentric;
     }
-
-private:
-    Type m_type = Type::NoCorrections;
 };
 
 }  // namespace skygate::ephemeris

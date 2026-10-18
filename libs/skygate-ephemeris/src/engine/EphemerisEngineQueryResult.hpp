@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BitFlagSetOperations.hpp"
+#include "BitFlagSet.hpp"
 #include "EphemerisCorrectionFlags.hpp"
 #include "EphemerisDataSourceProvenance.hpp"
 #include "EphemerisEngineQueryStatus.hpp"
@@ -9,7 +9,6 @@
 
 #include <bit>
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <string>
 #include <utility>
@@ -18,8 +17,10 @@
 namespace skygate::ephemeris {
 
 struct EphemerisEngineQueryResult {
+    using WarningMask = BitFlagSet<EphemerisEngineWarning::Code>;
+
     EphemerisEngineQueryStatus::Type status = EphemerisEngineQueryStatus::Type::Valid;
-    std::uint32_t warningCodeMask = 0U;
+    WarningMask warningCodeMask;
     std::vector<EphemerisEngineWarning::Detail> warningDetails;
     std::string dataSourceProvenance;
     EphemerisDataSourceProvenance::Type dataSourceProvenanceKind = EphemerisDataSourceProvenance::Type::Unknown;
@@ -38,7 +39,7 @@ struct EphemerisEngineQueryResult {
 
     void addWarning(const EphemerisEngineWarning::Code code) noexcept
     {
-        warningCodeMask |= BitFlagSetOperations::bit(code);
+        warningCodeMask.add(WarningMask::bit(code));
     }
 
     void addWarning(const EphemerisEngineWarning::Code code, std::string text)
@@ -68,17 +69,17 @@ struct EphemerisEngineQueryResult {
 
     [[nodiscard]] bool hasWarning(const EphemerisEngineWarning::Code code) const noexcept
     {
-        return (warningCodeMask & BitFlagSetOperations::bit(code)) != 0U;
+        return warningCodeMask.has(WarningMask::bit(code));
     }
 
     [[nodiscard]] std::size_t warningCount() const noexcept
     {
-        return static_cast<std::size_t>(std::popcount(warningCodeMask));
+        return static_cast<std::size_t>(std::popcount(warningCodeMask.bits()));
     }
 
     [[nodiscard]] bool hasWarnings() const noexcept
     {
-        return warningCodeMask != 0U;
+        return warningCodeMask.hasAny();
     }
 };
 

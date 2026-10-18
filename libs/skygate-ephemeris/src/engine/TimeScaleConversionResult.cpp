@@ -7,7 +7,7 @@ namespace skygate::ephemeris {
 TimeScaleConversionResult TimeScaleConversionResult::success(
     skygate::core::AstronomicalEpoch epoch,
     const TimeScaleConversionStatus::Type status,
-    const std::uint32_t warningCodeMask,
+    const WarningMask warningCodeMask,
     std::string diagnosticText
 )
 {
@@ -38,13 +38,25 @@ TimeScaleConversionResult TimeScaleConversionResult::failure(
     return result;
 }
 
+TimeScaleConversionResult TimeScaleConversionResult::failureFromLookup(
+    const skygate::core::AstronomicalEpoch& epoch,
+    const skygate::core::TimeScale targetScale,
+    const WarningMask warningCodeMask,
+    std::string diagnosticText
+)
+{
+    TimeScaleConversionResult result = failure(epoch, targetScale, std::move(diagnosticText));
+    result.warningCodeMask = warningCodeMask;
+    return result;
+}
+
 void TimeScaleConversionResult::mergeWarnings(
     TimeScaleConversionResult& result,
     const TimeScaleConversionStatus::Type sourceStatus,
-    const std::uint32_t sourceWarningCodeMask
+    const WarningMask sourceWarningCodeMask
 ) noexcept
 {
-    result.warningCodeMask |= sourceWarningCodeMask;
+    result.warningCodeMask.merge(sourceWarningCodeMask);
     if (sourceStatus == TimeScaleConversionStatus::Type::Degraded
         && result.status == TimeScaleConversionStatus::Type::Valid) {
         result.status = TimeScaleConversionStatus::Type::Degraded;

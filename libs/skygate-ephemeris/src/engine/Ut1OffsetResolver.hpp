@@ -7,7 +7,6 @@
 #include "TimeScaleConversionResult.hpp"
 #include "TimeScaleServiceOptions.hpp"
 
-#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -19,7 +18,7 @@ public:
     struct Result {
         std::optional<double> ut1MinusUtcSeconds;
         TimeScaleConversionStatus::Type status = TimeScaleConversionStatus::Type::Valid;
-        std::uint32_t warningCodeMask = 0U;
+        TimeScaleConversionResult::WarningMask warningCodeMask;
         std::string diagnosticText;
 
         void addWarning(const TimeScaleConversionWarningCode::Type code) noexcept;

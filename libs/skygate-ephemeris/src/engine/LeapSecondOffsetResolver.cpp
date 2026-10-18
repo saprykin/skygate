@@ -1,5 +1,4 @@
 #include "LeapSecondOffsetResolver.hpp"
-#include "BitFlagSetOperations.hpp"
 #include "TimeScaleConversionWarningCode.hpp"
 
 #include <optional>
@@ -167,7 +166,7 @@ namespace {
 
 void LeapSecondOffsetResolver::Result::addWarning(const TimeScaleConversionWarningCode::Type code) noexcept
 {
-    warningCodeMask |= BitFlagSetOperations::bit(code);
+    warningCodeMask.add(TimeScaleConversionResult::WarningMask::bit(code));
 }
 
 LeapSecondOffsetResolver::LeapSecondOffsetResolver(
@@ -187,11 +186,6 @@ LeapSecondOffsetResolver::Result
 LeapSecondOffsetResolver::lookupTaiOffset(const skygate::core::AstronomicalEpoch& taiEpoch) const
 {
     return skygate::ephemeris::lookupTaiOffset(m_leapSecondProvider, m_options, taiEpoch);
-}
-
-void LeapSecondOffsetResolver::mergeWarnings(TimeScaleConversionResult& result, const Result& lookup) noexcept
-{
-    TimeScaleConversionResult::mergeWarnings(result, lookup.status, lookup.warningCodeMask);
 }
 
 }  // namespace skygate::ephemeris
