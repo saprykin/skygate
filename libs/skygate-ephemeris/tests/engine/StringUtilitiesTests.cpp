@@ -14,6 +14,7 @@ private slots:
     void recognizesAsciiWhitespaceCharacters();
     void consumesLinesPreservingWhitespace();
     void appendsUniqueValuesIgnoringAsciiCase();
+    void normalizedLookupKeyIsAsciiOnly();
 };
 
 void StringUtilitiesTests::normalizesAsciiStrings()
@@ -67,6 +68,26 @@ void StringUtilitiesTests::appendsUniqueValuesIgnoringAsciiCase()
     QVERIFY(!StringUtilities::appendUniqueIgnoreAsciiCase(values, "m 31"));
     QVERIFY(StringUtilities::appendUniqueIgnoreAsciiCase(values, "NGC 224"));
     QCOMPARE(values.size(), 2U);
+}
+
+void StringUtilitiesTests::normalizedLookupKeyIsAsciiOnly()
+{
+    using namespace skygate::ephemeris;
+
+    QCOMPARE(StringUtilities::normalizedLookupKey("NGC 0224"), std::string("ngc 0224"));
+    QCOMPARE(StringUtilities::normalizedLookupKey("Orion Nebula"), std::string("orion nebula"));
+    QCOMPARE(StringUtilities::normalizedLookupKey(" \t\n\r\f\v"), std::string(""));
+    QCOMPARE(StringUtilities::normalizedLookupKey(""), std::string(""));
+    QCOMPARE(StringUtilities::normalizedLookupKey("  M 31 "), std::string("m 31"));
+    QCOMPARE(StringUtilities::normalizedLookupKey(std::string("\xC3\x89RI")), std::string("\xC3\x89ri"));
+    QCOMPARE(
+        StringUtilities::normalizedLookupKey(std::string("\xD0\x97\xD0\x92\xD0\x95\xD0\x97\xD0\x94\xD0\x90")),
+        std::string("\xD0\x97\xD0\x92\xD0\x95\xD0\x97\xD0\x94\xD0\x90")
+    );
+    QCOMPARE(
+        StringUtilities::normalizedLookupKey(std::string("\xC2\xA0Orion\xC2\xA0")), std::string("\xC2\xA0orion\xC2\xA0")
+    );
+    QCOMPARE(StringUtilities::normalizedLookupKey("HIP_42"), std::string("hip_42"));
 }
 
 QTEST_APPLESS_MAIN(StringUtilitiesTests)
