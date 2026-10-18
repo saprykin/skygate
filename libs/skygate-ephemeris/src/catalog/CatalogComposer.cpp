@@ -4,6 +4,7 @@
 #include "CatalogFactory.hpp"
 #include "CatalogIdentity.hpp"
 #include "StringUtilities.hpp"
+#include "catalog/CatalogCompositionLogging.hpp"
 #include "catalog/CatalogCompositionPolicyRules.hpp"
 
 #include <QLoggingCategory>
@@ -20,8 +21,6 @@
 
 namespace skygate::ephemeris {
 namespace {
-
-Q_LOGGING_CATEGORY(skygateCatalogCompositionLog, "skygate.catalog.composition")
 
 void assignCompositionCounts(
     CatalogCompositionResult& result,
@@ -91,11 +90,10 @@ void assignCompositionCounts(
         if (identityKey.empty()) {
             return "catalog composition rejected source " + std::to_string(index) + ": the source identity is empty.";
         }
-        if (std::find(seenKeys.begin(), seenKeys.end(), identityKey) != seenKeys.end()) {
+        if (!StringUtilities::appendUnique(seenKeys, identityKey)) {
             return "catalog composition rejected source " + std::to_string(index) + ": source identity '" + sourceId
                    + "' duplicates another source in the collection.";
         }
-        seenKeys.push_back(identityKey);
     }
     return std::nullopt;
 }

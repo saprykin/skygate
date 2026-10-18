@@ -14,6 +14,12 @@ namespace {
 // larger separation is an unrelated coordinate model rather than noise.
 constexpr double kDirectionToleranceArcseconds = 1.0;
 
+// Two fixed positions that differ by more than this angular separation name
+// different positions. The bound is far below the precision of any catalog, so
+// it separates contradictory records from rounding noise without hiding a
+// disagreement about where the object sits.
+constexpr double kPositionToleranceRadians = 1.0e-9;
+
 // Right-ascension difference projected onto the tangent plane at the mean
 // declination, so it can be combined with the declination difference as one
 // small-angle separation.
@@ -42,6 +48,13 @@ constexpr double kDirectionToleranceArcseconds = 1.0;
            <= kDirectionToleranceArcseconds * skygate::core::MathConstants::kArcsecondsToRadians;
 }
 
+[[nodiscard]] double angularSeparationRadians(
+    const skygate::core::EquatorialCoordinate& lhs, const skygate::core::EquatorialCoordinate& rhs
+) noexcept
+{
+    return std::hypot(tangentPlaneRaDifferenceRadians(lhs, rhs), declinationDifferenceRadians(lhs, rhs));
+}
+
 }  // namespace
 
 bool CatalogCoordinateModel::sameDirection(
@@ -52,7 +65,15 @@ bool CatalogCoordinateModel::sameDirection(
         return false;
     }
 
-    return withinDirectionTolerance(tangentPlaneRaDifferenceRadians(lhs, rhs), declinationDifferenceRadians(lhs, rhs));
+    return angularSeparationRadians(lhs, rhs)
+           <= kDirectionToleranceArcseconds * skygate::core::MathConstants::kArcsecondsToRadians;
+}
+
+bool CatalogCoordinateModel::positionsDiffer(
+    const skygate::core::EquatorialCoordinate& lhs, const skygate::core::EquatorialCoordinate& rhs
+) noexcept
+{
+    return angularSeparationRadians(lhs, rhs) > kPositionToleranceRadians;
 }
 
 bool CatalogCoordinateModel::sameAstrometry(

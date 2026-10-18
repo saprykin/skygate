@@ -1,6 +1,7 @@
 #include "CatalogCompositionMerger.hpp"
 
 #include "StringUtilities.hpp"
+#include "catalog/CatalogCompositionLogging.hpp"
 #include "catalog/CatalogCompositionPolicyRules.hpp"
 #include "catalog/CatalogCoordinateModel.hpp"
 #include "catalog/CatalogIdentifier.hpp"
@@ -25,10 +26,6 @@
 
 namespace skygate::ephemeris {
 namespace {
-
-Q_LOGGING_CATEGORY(skygateCatalogCompositionLog, "skygate.catalog.composition")
-
-constexpr double kCoordinateTolerance = 1e-9;
 
 // A source-local id is a record key of exactly one source instance: the
 // generator restarts in every payload (for example hyg_auto_1 for every
@@ -453,12 +450,6 @@ bool hasContradictoryIdentifiers(const BaseCelestialBody& lhs, const BaseCelesti
     return false;
 }
 
-bool coordinatesConflict(const skygate::core::EquatorialCoordinate& lhs, const skygate::core::EquatorialCoordinate& rhs)
-{
-    return std::abs(lhs.rightAscensionHours - rhs.rightAscensionHours) > kCoordinateTolerance
-           || std::abs(lhs.declinationDeg - rhs.declinationDeg) > kCoordinateTolerance;
-}
-
 void logFixedCoordinateConflict(const BaseCelestialBody& kept, const BaseCelestialBody& conflicting)
 {
     const QString message =
@@ -744,8 +735,8 @@ void replaceCoordinateModelInPlace(
     const FieldOrigins replacedOrigins = winnerOrigins;
     const std::optional<skygate::core::EquatorialCoordinate> loserFixed = loser.fixedEquatorialValue();
     const CatalogStarAstrometry* loserAstrometry = loser.catalogStarAstrometry();
-    const bool replacedFixedConflicts =
-        replacedFixed.has_value() && loserFixed.has_value() && coordinatesConflict(*replacedFixed, *loserFixed);
+    const bool replacedFixedConflicts = replacedFixed.has_value() && loserFixed.has_value()
+                                        && CatalogCoordinateModel::positionsDiffer(*replacedFixed, *loserFixed);
     const bool loserAstrometryContradictsFixed =
         loserFixed.has_value() && loserAstrometry != nullptr
         && !CatalogCoordinateModel::sameDirection(loserAstrometry->referenceEquatorial, *loserFixed);
@@ -825,7 +816,7 @@ void mergeLosingFixedPosition(
         || (winnerOrigins.fixedEquatorial.has_value() && loserOrigins.fixedEquatorial.has_value()
             && loserValueWins(*loserOrigins.fixedEquatorial, *winnerOrigins.fixedEquatorial, precedence));
     if (!loserOutranks) {
-        if (winnerHasFixed && coordinatesConflict(*winner.fixedEquatorial, *loserFixed)) {
+        if (winnerHasFixed && CatalogCoordinateModel::positionsDiffer(*winner.fixedEquatorial, *loserFixed)) {
             logFixedCoordinateConflict(winner, loser);
         }
         return;
@@ -838,7 +829,7 @@ void mergeLosingFixedPosition(
         return;
     }
 
-    if (winnerHasFixed && coordinatesConflict(*winner.fixedEquatorial, *loserFixed)) {
+    if (winnerHasFixed && CatalogCoordinateModel::positionsDiffer(*winner.fixedEquatorial, *loserFixed)) {
         logFixedCoordinateConflict(loser, winner);
     }
     winner.fixedEquatorial = *loserFixed;
@@ -1116,6 +1107,30 @@ void absorbSurvivors(
     }
 }
 
+// Appends `winner` as the survivor of every absorbed position. The absorbed
+// survivors merge into `winner` under origin precedence, and their positions
+// are vacated and removed from the index before the survivor is registered, so
+// later rows resolve to the new survivor and never to a vacated body.
+template <typename WinnerBody>
+std::size_t appendAbsorbedSurvivor(
+    MergeAccumulator& accumulator,
+    CatalogIdentityIndex& index,
+    WinnerBody winner,
+    FieldOrigins winnerOrigins,
+    const std::vector<std::size_t>& absorbedPositions,
+    std::string sourceId,
+    std::vector<std::string> priorContributors,
+    const SourcePrecedence& sourcePrecedence
+)
+{
+    absorbSurvivors(winner, winnerOrigins, accumulator, absorbedPositions, sourcePrecedence);
+    for (const std::size_t absorbed : absorbedPositions) {
+        accumulator.vacate(absorbed);
+        index.remove(absorbed);
+    }
+    return accumulator.append(winner, std::move(sourceId), std::move(winnerOrigins), std::move(priorContributors));
+}
+
 // Appends `incoming` as the survivor of every absorbed position. The incoming
 // record supplies the public canonical id because it is the later record that
 // establishes the shared authoritative identity or replaces an earlier
@@ -1125,14 +1140,12 @@ void absorbSurvivors(
 // source rank is higher or its row is earlier within the same source, so a
 // later replacing source's value overrides the survivor it absorbs while a
 // bridge over one source's own survivors never demotes the earlier supplying
-// rows. Absorbed positions are vacated and removed from the index before the
-// winner is registered, so later rows resolve to the winner and never to a
-// vacated body. Absorption retains each absorbed body's
-// canonical id and canonical equivalences on the winner, so the earlier keys
-// keep resolving to the survivor. A value the incoming record does not supply
-// follows the origin precedence of the absorbed survivors that do, and the
-// contributor id order follows configured source precedence rather than
-// accumulator position order.
+// rows. Absorption retains each absorbed body's canonical id and canonical
+// equivalences on the winner, so the earlier keys keep resolving to the
+// survivor. A value the incoming record does not supply follows the origin
+// precedence of the absorbed survivors that do, and the contributor id order
+// follows configured source precedence rather than accumulator position
+// order.
 std::size_t absorbSurvivorsAndAppend(
     MergeAccumulator& accumulator,
     CatalogIdentityIndex& index,
@@ -1145,25 +1158,31 @@ std::size_t absorbSurvivorsAndAppend(
 {
     std::vector<std::string> priorContributors = collectContributors(accumulator, absorbedPositions, sourcePrecedence);
     FieldOrigins winnerOrigins = std::move(incomingOrigins);
+    // The incoming record decides which body domain owns the survivor; the
+    // absorb and append bookkeeping is the same for both domains.
     std::size_t position = 0;
     if (incoming.kind == BaseCelestialBody::Kind::DeepSkyObject) {
-        DistantCelestialBody winner = CelestialBodyCatalog::copyDistantBody(incoming);
-        absorbSurvivors(winner, winnerOrigins, accumulator, absorbedPositions, sourcePrecedence);
-        for (const std::size_t absorbed : absorbedPositions) {
-            accumulator.vacate(absorbed);
-            index.remove(absorbed);
-        }
-        position =
-            accumulator.append(winner, std::move(sourceId), std::move(winnerOrigins), std::move(priorContributors));
+        position = appendAbsorbedSurvivor(
+            accumulator,
+            index,
+            CelestialBodyCatalog::copyDistantBody(incoming),
+            std::move(winnerOrigins),
+            absorbedPositions,
+            std::move(sourceId),
+            std::move(priorContributors),
+            sourcePrecedence
+        );
     } else {
-        OwnGalaxyCelestialBody winner = CelestialBodyCatalog::copyOwnGalaxyBody(incoming);
-        absorbSurvivors(winner, winnerOrigins, accumulator, absorbedPositions, sourcePrecedence);
-        for (const std::size_t absorbed : absorbedPositions) {
-            accumulator.vacate(absorbed);
-            index.remove(absorbed);
-        }
-        position =
-            accumulator.append(winner, std::move(sourceId), std::move(winnerOrigins), std::move(priorContributors));
+        position = appendAbsorbedSurvivor(
+            accumulator,
+            index,
+            CelestialBodyCatalog::copyOwnGalaxyBody(incoming),
+            std::move(winnerOrigins),
+            absorbedPositions,
+            std::move(sourceId),
+            std::move(priorContributors),
+            sourcePrecedence
+        );
     }
     index.add(accumulator.at(position), position);
     return position;
@@ -1266,15 +1285,6 @@ std::size_t appendDeduped(
         accumulator.append(body, std::string(sourceId), fieldOriginsOf(body, sourceRank, rowOrdinal));
     index.add(body, position);
     return position;
-}
-
-// Gap-fill policies never replace an existing survivor: a body whose shared
-// identity decision resolves it to an existing equivalent is preserved
-// instead of appended. AugmentCore and DeepSkyFallback differ in which bodies
-// they select, not in precedence.
-bool isGapFillPolicy(const CatalogCompositionPolicy policy)
-{
-    return policy == CatalogCompositionPolicy::AugmentCore || policy == CatalogCompositionPolicy::DeepSkyFallback;
 }
 
 // Applies the shared identity decision to one body of a gap-fill source and
@@ -1459,8 +1469,8 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
         // AugmentCore additionally enables the bundled bright-star fallback
         // when no other source supplies a star; DeepSkyFallback fills missing
         // deep-sky identities only.
-        if (isGapFillPolicy(source.policy)) {
-            if (source.policy == CatalogCompositionPolicy::AugmentCore) {
+        if (CatalogCompositionPolicyRules::isGapFill(source.policy)) {
+            if (CatalogCompositionPolicyRules::enablesBundledStarFallback(source.policy)) {
                 augmentCoreEnabled = true;
                 if (augmentCoreSourceId.empty()) {
                     augmentCoreSourceId = source.sourceId;
