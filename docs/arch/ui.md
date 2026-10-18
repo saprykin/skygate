@@ -237,8 +237,15 @@ hint, archive selector, related-dataset URLs, attribution, and category.
 
 Owns bundled manifest state and installed high-precision data cache state.
 Reports kernel, Earth-orientation, leap-second, and Delta T status to QML.
-Stages and atomically activates verified ephemeris data updates. Emits
-data-revision changes that invalidate the selected engine and scene caches.
+Derives the short kernel label from the active data source and the kernel
+asset, profile, and version metadata. `SkyContextController` exposes that
+label as the read-only `ephemerisKernelDisplayText` property, notified with
+the other ephemeris data status properties. Bundled fallback, missing
+installed data, and kernel metadata that names no known family all produce
+`Bundled`. Preferences binds the kernel row label to the property, so the
+presentation does not depend on status wording. Stages and atomically
+activates verified ephemeris data updates. Emits data-revision changes that
+invalidate the selected engine and scene caches.
 
 ### SkyEphemerisUpdateWorkflow
 
