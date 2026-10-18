@@ -244,6 +244,7 @@ private slots:
     void usesBodyCentersWhenBarycenterPreferred();
     void appliesLightTimeFromRetardedTargetAndEarth();
     void computesLightTimeRaDecAgainstHorizonsFixture();
+    void normalizesRetardedEpochAcrossDayBoundary();
     void unavailableLightTimeInputsKeepGeometric();
     void appliesStellarAberrationFromEarthVelocity();
     void skipsStellarAberrationWhenDisabled();
@@ -508,6 +509,46 @@ void SolarSystemStateCalculatorTests::computesLightTimeRaDecAgainstHorizonsFixtu
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::lightTime()
+        )
+    );
+}
+
+void SolarSystemStateCalculatorTests::normalizesRetardedEpochAcrossDayBoundary()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    const Vector3d lightTimeVector{
+        .x = PhysicalConstants::kSpeedOfLightAuPerDay * 0.25,
+        .y = 0.0,
+        .z = 0.0,
+    };
+    provider->response(499, 399) = makeKernelVector(lightTimeVector);
+    provider->response(399, 0) = makeKernelVector({.x = 0.0, .y = 0.0, .z = 0.0});
+    provider->response(499, 0) = makeKernelVector(lightTimeVector);
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.epoch = {
+        .julianDatePart1 = 2'460'310.0,
+        .julianDatePart2 = 0.1,
+        .timeScale = skygate::core::TimeScale::Tdb,
+    };
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
+
+    QCOMPARE(provider->callCount(), 5);
+    for (std::size_t index = 2U; index < provider->calls().size(); ++index) {
+        const skygate::ephemeris::tests::TestCalcephKernel::Call& call = provider->calls()[index];
+        QCOMPARE(call.centerNaifId, 0);
+        QCOMPARE(call.epoch.julianDatePart1, 2'460'309.0);
+        QVERIFY(std::abs(call.epoch.julianDatePart2 - 0.85) < 1.0e-12);
+        QCOMPARE(
+            static_cast<std::uint8_t>(call.epoch.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tdb)
+        );
+    }
+    QVERIFY(result.equatorial.has_value());
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.appliedCorrections, EphemerisCorrectionFlags::lightTime()

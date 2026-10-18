@@ -156,12 +156,7 @@ makeStatusResult(const EphemerisEngineQueryStatus::Type status, const EphemerisE
 [[nodiscard]] skygate::core::AstronomicalEpoch
 retardedEpoch(const skygate::core::AstronomicalEpoch& epoch, const double lightTimeDays) noexcept
 {
-    return skygate::core::AstronomicalEpoch{
-        .julianDatePart1 = epoch.julianDatePart1,
-        .julianDatePart2 = epoch.julianDatePart2 - lightTimeDays,
-        .timeScale = epoch.timeScale,
-    }
-        .normalized();
+    return epoch.addDays(-lightTimeDays);
 }
 
 [[nodiscard]] TargetKernelState computeTargetKernelState(
