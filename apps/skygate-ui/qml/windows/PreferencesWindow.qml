@@ -29,32 +29,38 @@ Window {
     property color textPrimary: theme.textPrimary
     property color textSecondary: theme.textSecondary
     property color textMuted: theme.textMuted
-    property int selectedPage: 0
+    // Section identities follow the preferencesSectionStack child order.
+    readonly property int generalSection: 0
+    readonly property int skySection: 1
+    readonly property int engineSection: 2
+    readonly property int appearanceSection: 3
+    readonly property int catalogSection: 4
+    property int selectedPage: generalSection
     readonly property bool catalogBusy: skyContextController !== null
                                         && (skyContextController.downloadingCatalog
                                             || skyContextController.catalogProcessing)
     readonly property bool ephemerisBusy: skyContextController !== null
                                            && skyContextController.ephemerisDataUpdateInProgress
-    readonly property bool footerBusy: (selectedPage === 2 && ephemerisBusy)
-                                       || (selectedPage === 4 && catalogBusy)
-    readonly property bool footerCancelable: (selectedPage === 2 && ephemerisBusy)
-                                             || (selectedPage === 4
+    readonly property bool footerBusy: (selectedPage === engineSection && ephemerisBusy)
+                                       || (selectedPage === catalogSection && catalogBusy)
+    readonly property bool footerCancelable: (selectedPage === engineSection && ephemerisBusy)
+                                             || (selectedPage === catalogSection
                                                  && skyContextController !== null
                                                  && skyContextController.downloadingCatalog)
-    readonly property bool applyEnabled: !(selectedPage === 1
+    readonly property bool applyEnabled: !(selectedPage === skySection
                                            && preferencesDraft.locationSourceText === "City"
                                            && preferencesDraft.selectedCityId === "")
     readonly property string currentSectionDescription: {
-        if (selectedPage === 0) {
+        if (selectedPage === generalSection) {
             return "Application behavior and diagnostics"
         }
-        if (selectedPage === 1) {
+        if (selectedPage === skySection) {
             return "Observer location and projection"
         }
-        if (selectedPage === 2) {
+        if (selectedPage === engineSection) {
             return "Ephemeris engine and data settings"
         }
-        if (selectedPage === 3) {
+        if (selectedPage === appearanceSection) {
             return "Theme and visual presentation"
         }
         return "Star and deep-sky catalog management"
@@ -244,40 +250,40 @@ Window {
                             theme: preferencesWindow.theme
                             objectName: "preferencesGeneralSectionButton"
                             label: "General"
-                            active: preferencesWindow.selectedPage === 0
-                            onClicked: preferencesWindow.selectedPage = 0
+                            active: preferencesWindow.selectedPage === preferencesWindow.generalSection
+                            onClicked: preferencesWindow.selectedPage = preferencesWindow.generalSection
                         }
 
                         PreferencesSectionButton {
                             theme: preferencesWindow.theme
                             objectName: "preferencesSkySectionButton"
                             label: "Sky"
-                            active: preferencesWindow.selectedPage === 1
-                            onClicked: preferencesWindow.selectedPage = 1
+                            active: preferencesWindow.selectedPage === preferencesWindow.skySection
+                            onClicked: preferencesWindow.selectedPage = preferencesWindow.skySection
                         }
 
                         PreferencesSectionButton {
                             theme: preferencesWindow.theme
                             objectName: "preferencesEngineSectionButton"
                             label: "Engine"
-                            active: preferencesWindow.selectedPage === 2
-                            onClicked: preferencesWindow.selectedPage = 2
+                            active: preferencesWindow.selectedPage === preferencesWindow.engineSection
+                            onClicked: preferencesWindow.selectedPage = preferencesWindow.engineSection
                         }
 
                         PreferencesSectionButton {
                             theme: preferencesWindow.theme
                             objectName: "preferencesAppearanceSectionButton"
                             label: "Appearance"
-                            active: preferencesWindow.selectedPage === 3
-                            onClicked: preferencesWindow.selectedPage = 3
+                            active: preferencesWindow.selectedPage === preferencesWindow.appearanceSection
+                            onClicked: preferencesWindow.selectedPage = preferencesWindow.appearanceSection
                         }
 
                         PreferencesSectionButton {
                             theme: preferencesWindow.theme
                             objectName: "preferencesCatalogSectionButton"
                             label: "Catalog"
-                            active: preferencesWindow.selectedPage === 4
-                            onClicked: preferencesWindow.selectedPage = 4
+                            active: preferencesWindow.selectedPage === preferencesWindow.catalogSection
+                            onClicked: preferencesWindow.selectedPage = preferencesWindow.catalogSection
                         }
 
                         Item {
