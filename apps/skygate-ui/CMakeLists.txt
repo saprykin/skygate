@@ -162,12 +162,14 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/SkyCatalogSourceDescriptor.hpp
     src/catalog/SkyCatalogSourceInstance.cpp
     src/catalog/SkyCatalogSourceInstance.hpp
+    src/catalog/SkyCatalogSourceIds.hpp
     src/catalog/SkyCatalogSourceCollectionModel.cpp
     src/catalog/SkyCatalogSourceCollectionModel.hpp
     src/catalog/SkyCatalogSourcePresetModel.cpp
     src/catalog/SkyCatalogSourcePresetModel.hpp
     src/catalog/SkyCatalogText.cpp
     src/catalog/SkyCatalogText.hpp
+    src/catalog/SkyPayloadView.hpp
     src/catalog/CatalogPayloadParseService.cpp
     src/catalog/CatalogPayloadParseService.hpp
     src/app/SkyContextController.cpp

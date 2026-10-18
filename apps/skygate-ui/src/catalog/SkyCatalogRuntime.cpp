@@ -1,6 +1,8 @@
 #include "SkyCatalogRuntime.hpp"
 #include "SkyCatalogRuntimeBuildOptions.hpp"
 #include "SkyCatalogRuntimeResult.hpp"
+#include "SkyCatalogSourceIds.hpp"
+#include "SkyCatalogText.hpp"
 
 #include "catalog/CatalogComposer.hpp"
 #include "catalog/CatalogFactory.hpp"
@@ -8,16 +10,15 @@
 #include "catalog/constellation/ConstellationReferenceResolver.hpp"
 
 #include <QHash>
-#include <QLocale>
 
 #include <algorithm>
+#include <optional>
 #include <unordered_set>
 #include <utility>
 
 namespace skygate::ui::internal {
 namespace {
 
-constexpr const char* kPrimarySourceId = "primary";
 constexpr const char* kBundledCoreSourceId = "bundled-core";
 constexpr const char* kBundledDeepSkySourceId = "bundled-deep-sky";
 
@@ -49,7 +50,7 @@ SkyCatalogRuntime::SkyCatalogRuntime(std::unique_ptr<skygate::ephemeris::IStarCa
     if (sourceCatalog != nullptr) {
         m_sources.push_back(
             SkyCatalogSourceRecord{
-                .instanceId = QString::fromLatin1(kPrimarySourceId),
+                .instanceId = QString::fromLatin1(SkyCatalogSourceIds::kPrimarySlot),
                 .title = QStringLiteral("Bundled"),
                 .version = QString(),
                 .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
@@ -231,12 +232,12 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::initialize(const SkyCatalogRuntimeBui
         if (m_sources.empty()) {
             auto bundledCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
             if (bundledCatalog == nullptr) {
-                return activationFailureResult(QStringLiteral("Catalog: Failed to load"));
+                return activationFailureResult(SkyCatalogText::loadFailed());
             }
 
             return applySource(
                 SkyCatalogSourceRecord{
-                    .instanceId = QString::fromLatin1(kPrimarySourceId),
+                    .instanceId = QString::fromLatin1(SkyCatalogSourceIds::kPrimarySlot),
                     .title = QStringLiteral("Bundled"),
                     .version = QString(),
                     .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
@@ -259,14 +260,11 @@ SkyCatalogRuntime::applySource(SkyCatalogSourceRecord source, const SkyCatalogRu
     if (source.catalog == nullptr) {
         // A source without a catalog is never installed: the last accepted
         // collection stays active and the operation reports the error.
-        return activationFailureResult(QStringLiteral("Catalog: Failed to load"));
+        return activationFailureResult(SkyCatalogText::loadFailed());
     }
 
-    const auto existing =
-        std::find_if(m_sources.begin(), m_sources.end(), [&source](const SkyCatalogSourceRecord& candidate) {
-            return candidate.instanceId == source.instanceId;
-        });
-    if (existing == m_sources.end()) {
+    const std::optional<std::size_t> existingIndex = sourceIndex(source.instanceId);
+    if (!existingIndex.has_value()) {
         m_sources.push_back(std::move(source));
         const SkyCatalogRuntimeResult result = rebuildActiveCatalog(options);
         if (!result.succeeded) {
@@ -276,20 +274,19 @@ SkyCatalogRuntime::applySource(SkyCatalogSourceRecord source, const SkyCatalogRu
         return result;
     }
 
-    const std::size_t existingIndex = static_cast<std::size_t>(std::distance(m_sources.begin(), existing));
-    SkyCatalogSourceRecord previous = std::move(m_sources[existingIndex]);
+    SkyCatalogSourceRecord previous = std::move(m_sources[*existingIndex]);
     // The related dataset is owned by the instance and changes only through
     // the explicit related-data operations, so replacing the catalog keeps it
     // until its owner replaces or clears the dataset.
     source.constellationData = std::move(previous.constellationData);
-    m_sources[existingIndex] = std::move(source);
+    m_sources[*existingIndex] = std::move(source);
 
     const SkyCatalogRuntimeResult result = rebuildActiveCatalog(options);
     if (!result.succeeded) {
         // The rejected replacement is not kept configured: the previous
         // record, including its owned related dataset, stays in place.
-        previous.constellationData = std::move(m_sources[existingIndex].constellationData);
-        m_sources[existingIndex] = std::move(previous);
+        previous.constellationData = std::move(m_sources[*existingIndex].constellationData);
+        m_sources[*existingIndex] = std::move(previous);
     }
     return result;
 }
@@ -298,20 +295,16 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::setSourceEnabled(
     const QString& instanceId, const bool enabled, const SkyCatalogRuntimeBuildOptions& options
 )
 {
-    const auto existing =
-        std::find_if(m_sources.begin(), m_sources.end(), [&instanceId](const SkyCatalogSourceRecord& candidate) {
-            return candidate.instanceId == instanceId;
-        });
-    if (existing == m_sources.end() || existing->enabled == enabled) {
+    const std::optional<std::size_t> existingIndex = sourceIndex(instanceId);
+    if (!existingIndex.has_value() || m_sources[*existingIndex].enabled == enabled) {
         return SkyCatalogRuntimeResult{};
     }
 
-    const std::size_t existingIndex = static_cast<std::size_t>(std::distance(m_sources.begin(), existing));
-    m_sources[existingIndex].enabled = enabled;
+    m_sources[*existingIndex].enabled = enabled;
     const SkyCatalogRuntimeResult result = rebuildActiveCatalog(options);
     if (!result.succeeded) {
         // The rejected participation change is not kept configured.
-        m_sources[existingIndex].enabled = !enabled;
+        m_sources[*existingIndex].enabled = !enabled;
     }
     return result;
 }
@@ -319,21 +312,17 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::setSourceEnabled(
 SkyCatalogRuntimeResult
 SkyCatalogRuntime::removeSource(const QString& instanceId, const SkyCatalogRuntimeBuildOptions& options)
 {
-    const auto existing =
-        std::find_if(m_sources.begin(), m_sources.end(), [&instanceId](const SkyCatalogSourceRecord& candidate) {
-            return candidate.instanceId == instanceId;
-        });
-    if (existing == m_sources.end()) {
+    const std::optional<std::size_t> existingIndex = sourceIndex(instanceId);
+    if (!existingIndex.has_value()) {
         return SkyCatalogRuntimeResult{};
     }
 
-    const std::size_t existingIndex = static_cast<std::size_t>(std::distance(m_sources.begin(), existing));
-    SkyCatalogSourceRecord removed = std::move(m_sources[existingIndex]);
-    m_sources.erase(m_sources.begin() + static_cast<std::ptrdiff_t>(existingIndex));
+    SkyCatalogSourceRecord removed = std::move(m_sources[*existingIndex]);
+    m_sources.erase(m_sources.begin() + static_cast<std::ptrdiff_t>(*existingIndex));
     const SkyCatalogRuntimeResult result = rebuildActiveCatalog(options);
     if (!result.succeeded) {
         // The rejected removal restores the removed record at its position.
-        m_sources.insert(m_sources.begin() + static_cast<std::ptrdiff_t>(existingIndex), std::move(removed));
+        m_sources.insert(m_sources.begin() + static_cast<std::ptrdiff_t>(*existingIndex), std::move(removed));
     }
     return result;
 }
@@ -342,15 +331,12 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::moveSource(
     const QString& instanceId, const std::size_t targetIndex, const SkyCatalogRuntimeBuildOptions& options
 )
 {
-    const auto existing =
-        std::find_if(m_sources.begin(), m_sources.end(), [&instanceId](const SkyCatalogSourceRecord& candidate) {
-            return candidate.instanceId == instanceId;
-        });
-    if (existing == m_sources.end()) {
+    const std::optional<std::size_t> existingIndex = sourceIndex(instanceId);
+    if (!existingIndex.has_value()) {
         return SkyCatalogRuntimeResult{};
     }
 
-    const auto currentIndex = static_cast<std::size_t>(std::distance(m_sources.begin(), existing));
+    const std::size_t currentIndex = *existingIndex;
     const std::size_t clampedTarget = std::min(targetIndex, m_sources.size() - 1);
     if (currentIndex == clampedTarget) {
         return SkyCatalogRuntimeResult{};
@@ -462,8 +448,7 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
     if (!composed.isSuccess()) {
         const QString detail = QString::fromStdString(composed.errorDetail).trimmed();
         return activationFailureResult(
-            detail.isEmpty() ? QStringLiteral("Catalog: Failed to load")
-                             : QStringLiteral("Catalog: Collection rejected: %1").arg(detail)
+            detail.isEmpty() ? SkyCatalogText::loadFailed() : SkyCatalogText::collectionRejected(detail)
         );
     }
 
@@ -526,32 +511,31 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::activationFailureResult(const QString
 
 QString SkyCatalogRuntime::buildStatusText() const
 {
-    const QLocale locale = QLocale::system();
-    return QStringLiteral("Catalog: %1 (%2 objects, %3 deep sky, %4 constellations)")
-        .arg(
-            participationSummary(),
-            locale.toString(static_cast<qulonglong>(m_bodyCount)),
-            locale.toString(static_cast<qulonglong>(m_deepSkyObjectCount)),
-            locale.toString(static_cast<qulonglong>(constellationCount()))
-        );
+    return SkyCatalogText::collectionSummary(
+        participationSummary(), m_bodyCount, m_deepSkyObjectCount, constellationCount()
+    );
+}
+
+std::optional<std::size_t> SkyCatalogRuntime::sourceIndex(const QString& instanceId) const
+{
+    for (std::size_t index = 0; index < m_sources.size(); ++index) {
+        if (m_sources[index].instanceId == instanceId) {
+            return index;
+        }
+    }
+    return std::nullopt;
 }
 
 SkyCatalogSourceRecord* SkyCatalogRuntime::findSource(const QString& instanceId)
 {
-    const auto it =
-        std::find_if(m_sources.begin(), m_sources.end(), [&instanceId](const SkyCatalogSourceRecord& candidate) {
-            return candidate.instanceId == instanceId;
-        });
-    return it != m_sources.end() ? &*it : nullptr;
+    const std::optional<std::size_t> index = sourceIndex(instanceId);
+    return index.has_value() ? &m_sources[*index] : nullptr;
 }
 
 const SkyCatalogSourceRecord* SkyCatalogRuntime::findSource(const QString& instanceId) const
 {
-    const auto it =
-        std::find_if(m_sources.begin(), m_sources.end(), [&instanceId](const SkyCatalogSourceRecord& candidate) {
-            return candidate.instanceId == instanceId;
-        });
-    return it != m_sources.end() ? &*it : nullptr;
+    const std::optional<std::size_t> index = sourceIndex(instanceId);
+    return index.has_value() ? &m_sources[*index] : nullptr;
 }
 
 void SkyCatalogRuntime::rebuildSourceParticipation(const std::vector<std::string>& contributingSourceIds)

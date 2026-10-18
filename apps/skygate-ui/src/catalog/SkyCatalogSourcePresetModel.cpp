@@ -1,4 +1,5 @@
 #include "SkyCatalogSourcePresetModel.hpp"
+#include "SkyCatalogPresets.hpp"
 
 #include <utility>
 
@@ -33,7 +34,7 @@ SkyCatalogSourcePresetModel::SkyCatalogSourcePresetModel(
         Row row;
         row.custom = true;
         row.descriptor.title = option.title;
-        row.descriptor.legacyPresetIndex = 2;
+        row.descriptor.legacyPresetIndex = SkyCatalogPresets::kCustomLegacyPresetIndex;
         row.category = option.category;
         m_rows.push_back(std::move(row));
     }

@@ -8,6 +8,8 @@
 #include "SkyCatalogRelatedDataCodec.hpp"
 #include "SkyCatalogSourcePersistEntry.hpp"
 #include "SkyCatalogSourceRestoreEntry.hpp"
+#include "SkyCatalogText.hpp"
+#include "SkyPayloadView.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogIdentity.hpp"
@@ -17,7 +19,6 @@
 
 #include <QLoggingCategory>
 
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -41,11 +42,6 @@ QString stripSavedSuffixes(const QString& sourceLabel)
         normalizedSourceLabel = normalizedSourceLabel.trimmed();
     }
     return normalizedSourceLabel;
-}
-
-std::string_view payloadView(const QByteArray& payload)
-{
-    return std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()));
 }
 
 QString savedLabel(const QString& sourceLabel, const QString& fallbackLabel)
@@ -160,7 +156,7 @@ SkyCatalogCacheController::DecodedCatalog SkyCatalogCacheController::decodeSourc
             .archiveMember = sourceRecord.archiveSelector, .schemaHint = sourceRecord.schemaHint
         };
         const skygate::ephemeris::CatalogParseRequest request =
-            parseOptions.makeRequest(payloadView(sourceRecord.payload));
+            parseOptions.makeRequest(SkyPayloadView::of(sourceRecord.payload));
 
         const skygate::ephemeris::CatalogPayloadParser parser;
         auto restoredResult = parser.parseResult(request);
@@ -256,11 +252,13 @@ void SkyCatalogCacheController::appendRestoredSource(
                 << sourceRecord.instanceId;
         } else {
             std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs =
-                SkyCatalogRelatedDataCodec::parseConstellationLineRows(payloadView(sourceRecord.constellationLineRows));
+                SkyCatalogRelatedDataCodec::parseConstellationLineRows(
+                    SkyPayloadView::of(sourceRecord.constellationLineRows)
+                );
             std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups;
             if (!sourceRecord.constellationAnchorGroupRows.isEmpty()) {
                 anchorGroups = SkyCatalogRelatedDataCodec::parseConstellationAnchorGroupRows(
-                    payloadView(sourceRecord.constellationAnchorGroupRows)
+                    SkyPayloadView::of(sourceRecord.constellationAnchorGroupRows)
                 );
             }
             // An unreadable line or anchor payload must not become a partial
@@ -465,11 +463,7 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::restoreCollection(
         // collection again.
         SkyCatalogCollectionRestoreResult result;
         result.unusableCommittedCollection = true;
-        result.statusText = QStringLiteral(
-                                "Catalog: Saved catalog configuration unreadable; the active collection stays in use. "
-                                "Add, update, or reorder a catalog source to rewrite the saved configuration: %1"
-        )
-                                .arg(collection.diagnostic);
+        result.statusText = SkyCatalogText::savedCollectionUnreadable(collection.diagnostic);
         qCWarning(skygateCatalogCacheLog).noquote()
             << "Catalog collection cache unusable; rejecting the restore instead of migrating the legacy cache:"
             << collection.diagnostic;

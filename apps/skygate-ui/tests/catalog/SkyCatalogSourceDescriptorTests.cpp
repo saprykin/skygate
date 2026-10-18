@@ -14,6 +14,7 @@ private slots:
     void starPresetsCarryStableIdsAndMetadata();
     void deepSkyPresetsCarryStableIdsAndMetadata();
     void legacyPresetIndexConversionPreserved();
+    void categoriesMapToCompositionPolicies();
     void presetAliasesResolveToStableIds();
     void renamingInstanceKeepsInstanceId();
     void descriptorInstancesAllocateIndependentIds();
@@ -96,6 +97,23 @@ void SkyCatalogSourceDescriptorTests::legacyPresetIndexConversionPreserved()
     QCOMPARE(SkyCatalogPresets::normalizeDeepSkyCatalogPresetIndex(1), 1);
     QCOMPARE(SkyCatalogPresets::normalizeDeepSkyCatalogPresetIndex(2), 2);
     QCOMPARE(SkyCatalogPresets::normalizeDeepSkyCatalogPresetIndex(99), 2);
+}
+
+void SkyCatalogSourceDescriptorTests::categoriesMapToCompositionPolicies()
+{
+    using skygate::ephemeris::CatalogCompositionPolicy;
+    using skygate::ui::internal::SkyCatalogPresets;
+
+    const QString starCategory = SkyCatalogPresets::starCategory();
+    const QString deepSkyCategory = SkyCatalogPresets::deepSkyCategory();
+
+    QCOMPARE(SkyCatalogPresets::policyForCategory(deepSkyCategory), CatalogCompositionPolicy::DeepSkyOnly);
+    QCOMPARE(SkyCatalogPresets::policyForCategory(starCategory), CatalogCompositionPolicy::Merge);
+    QCOMPARE(SkyCatalogPresets::policyForCategory(QString()), CatalogCompositionPolicy::Merge);
+
+    QCOMPARE(SkyCatalogPresets::categoryForPolicy(CatalogCompositionPolicy::DeepSkyOnly), deepSkyCategory);
+    QCOMPARE(SkyCatalogPresets::categoryForPolicy(CatalogCompositionPolicy::Merge), starCategory);
+    QCOMPARE(SkyCatalogPresets::categoryForPolicy(CatalogCompositionPolicy::AugmentCore), starCategory);
 }
 
 void SkyCatalogSourceDescriptorTests::presetAliasesResolveToStableIds()

@@ -965,9 +965,7 @@ void SkyContextController::refreshCatalogSourceCollectionModel()
         entry.instanceId = viewEntry.instanceId;
         entry.title = viewEntry.title;
         entry.version = viewEntry.version;
-        entry.category = viewEntry.policy == skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly
-                             ? SkyCatalogPresets::deepSkyCategory()
-                             : SkyCatalogPresets::starCategory();
+        entry.category = SkyCatalogPresets::categoryForPolicy(viewEntry.policy);
         entry.enabled = viewEntry.enabled;
         entry.bundled = viewEntry.bundled;
         entry.busy = viewEntry.busy;
