@@ -6,6 +6,7 @@
 #include "SkyCatalogRuntimeResult.hpp"
 #include "SkyCatalogSourceImportResult.hpp"
 #include "SkyCatalogSourceInstance.hpp"
+#include "SkyCatalogSourceOperation.hpp"
 #include "SkyCatalogSourcePersistEntry.hpp"
 #include "SkyCatalogSourceRecord.hpp"
 #include "SkyCatalogSourceRestoreEntry.hpp"
@@ -178,32 +179,32 @@ QVector<SkyCatalogManager::SourceViewEntry> SkyCatalogManager::sourceViewEntries
         entry.bundled = source.bundled;
         entry.objectCount = source.catalog != nullptr ? source.catalog->bodies().size() : 0U;
 
-        const SourceOperation* operation = findOperation(source.instanceId);
-        if (operation != nullptr && !operation->statusText.isEmpty()) {
-            entry.busy = operation->busy;
-            entry.hasError = operation->hasError;
-            entry.statusText = operation->statusText;
+        const SkyCatalogSourceOperation* operation = findOperation(source.instanceId);
+        if (operation != nullptr && !operation->statusText().isEmpty()) {
+            entry.busy = operation->isBusy();
+            entry.hasError = operation->hasError();
+            entry.statusText = operation->statusText();
         } else {
             entry.statusText = source.enabled ? QStringLiteral("Active") : QStringLiteral("Disabled");
         }
         entries.push_back(std::move(entry));
     }
 
-    for (const SourceOperation& operation : m_sourceOperations) {
-        if (m_runtime->hasSource(operation.instance.instanceId)) {
+    for (const SkyCatalogSourceOperation& operation : m_sourceOperations) {
+        if (m_runtime->hasSource(operation.attempt().instanceId)) {
             continue;
         }
 
         SourceViewEntry entry;
-        entry.instanceId = operation.instance.instanceId;
-        entry.title = operation.instance.title;
-        entry.version = operation.instance.version;
-        entry.policy = operation.policy;
+        entry.instanceId = operation.attempt().instanceId;
+        entry.title = operation.attempt().title;
+        entry.version = operation.attempt().version;
+        entry.policy = operation.policy();
         entry.enabled = false;
         entry.bundled = false;
-        entry.busy = operation.busy;
-        entry.hasError = operation.hasError;
-        entry.statusText = operation.statusText.isEmpty() ? QStringLiteral("Pending") : operation.statusText;
+        entry.busy = operation.isBusy();
+        entry.hasError = operation.hasError();
+        entry.statusText = operation.statusText().isEmpty() ? QStringLiteral("Pending") : operation.statusText();
         entries.push_back(std::move(entry));
     }
 
@@ -436,11 +437,11 @@ void SkyCatalogManager::retrySource(const QString& instanceId)
         return;
     }
 
-    const SourceOperation* operation = findOperation(instanceId);
+    const SkyCatalogSourceOperation* operation = findOperation(instanceId);
     if (operation == nullptr) {
         return;
     }
-    loadSourceInstance(operation->instance, operation->policy);
+    loadSourceInstance(operation->attempt(), operation->policy());
 }
 
 void SkyCatalogManager::cancelCatalogDownload()
@@ -461,10 +462,8 @@ void SkyCatalogManager::cancelCatalogDownload()
     setDownloadingCatalog(false);
     setCatalogProcessing(false);
     setStatusText(QStringLiteral("Catalog: Download canceled."));
-    if (SourceOperation* operation = findOperation(activeInstanceId)) {
-        operation->busy = false;
-        operation->hasError = false;
-        operation->statusText = QStringLiteral("Canceled");
+    if (SkyCatalogSourceOperation* operation = findOperation(activeInstanceId)) {
+        operation->markCanceled(QStringLiteral("Canceled"));
     }
     emit sourcesChanged();
 }
@@ -615,25 +614,21 @@ bool SkyCatalogManager::restoreCatalogCache()
     // therefore finds no current operation and can no longer apply its source
     // to the replacement, not even when a restored instance reuses its ID or
     // when the reply belongs to a pending related download.
-    QVector<SourceOperation> restoredOperations;
+    QVector<SkyCatalogSourceOperation> restoredOperations;
     restoredOperations.reserve(static_cast<qsizetype>(restoreResult.sources.size()));
     for (std::size_t index = 0; index < restoreResult.sources.size(); ++index) {
         const SkyCatalogSourceRestoreEntry& entry = restoreResult.sources[index];
-        SourceOperation operation;
-        operation.instance = entry.instance;
-        operation.policy = restoredPolicies[index];
-        operation.revision = ++m_nextOperationRevision;
-        commitAcceptedSourceFacts(operation, entry.payload);
+        SkyCatalogSourceOperation operation(entry.instance, restoredPolicies[index], ++m_nextOperationRevision);
+        operation.accept(entry.payload);
         if (unavailableInstanceIds.contains(entry.instance.instanceId)) {
-            operation.hasError = true;
-            operation.statusText = SkyCatalogText::sourcePayloadUnavailable();
+            operation.fail(SkyCatalogText::sourcePayloadUnavailable());
         }
         restoredOperations.push_back(std::move(operation));
     }
     // The replaced records lose ownership of their transfers, so the old work
     // is retired before the collection is swapped: its replies are aborted
     // instead of running on with results that can no longer be accepted.
-    for (SourceOperation& operation : m_sourceOperations) {
+    for (SkyCatalogSourceOperation& operation : m_sourceOperations) {
         retireSourceOperation(operation);
     }
     m_sourceOperations = std::move(restoredOperations);
@@ -677,13 +672,13 @@ void SkyCatalogManager::loadSourceInstance(
         instance.instanceId = SkyCatalogSourceInstance::allocateInstanceId();
     }
 
-    SourceOperation* operation = upsertOperation(instance, policy);
+    SkyCatalogSourceOperation* operation = upsertOperation(instance, policy);
     // Loading or updating this instance supersedes the work of its previous
     // incarnation only: every other source keeps its pending requests, its
     // revisions, and its reported status. The retired transfers are aborted
     // before the replacement operation takes ownership.
     invalidatePendingSourceWork(instance.instanceId);
-    const std::uint64_t revision = operation->revision;
+    const std::uint64_t revision = operation->revision();
 
     // The active identity and the cancel handle are published before the first
     // row notification, so a receiver of that notification can cancel the
@@ -691,20 +686,19 @@ void SkyCatalogManager::loadSourceInstance(
     std::shared_ptr<CatalogDownloadCancellation> catalogCancellation;
     if (!instance.urls.isEmpty()) {
         catalogCancellation = std::make_shared<CatalogDownloadCancellation>();
-        operation->catalogCancellation = catalogCancellation;
     }
 
     m_activeDownloadInstanceId = instance.instanceId;
-    operation->busy = true;
-    operation->hasError = false;
-    operation->statusText = instance.urls.isEmpty() ? QStringLiteral("Loading...") : QStringLiteral("Downloading...");
+    operation->beginWork(
+        instance.urls.isEmpty() ? QStringLiteral("Loading...") : QStringLiteral("Downloading..."), catalogCancellation
+    );
     emit sourcesChanged();
 
     // The notification is user code and may have canceled or replaced this
     // operation. Reacquire the record by identity and revision instead of
     // keeping the pointer across the boundary.
     operation = findOperation(instance.instanceId);
-    if (operation == nullptr || operation->revision != revision) {
+    if (operation == nullptr || operation->revision() != revision) {
         if (catalogCancellation != nullptr) {
             catalogCancellation->cancel();
         }
@@ -722,10 +716,7 @@ void SkyCatalogManager::loadSourceInstance(
 
     if (m_importWorkflow == nullptr || !m_importWorkflow->isAvailable()) {
         m_activeDownloadInstanceId.clear();
-        operation->busy = false;
-        operation->hasError = true;
-        operation->statusText = QStringLiteral("Network unavailable");
-        operation->catalogCancellation.reset();
+        operation->fail(QStringLiteral("Network unavailable"));
         setStatusText(QStringLiteral("Catalog: Network unavailable"));
         emit sourcesChanged();
         return;
@@ -735,13 +726,13 @@ void SkyCatalogManager::loadSourceInstance(
     setDownloadingCatalog(true);
 
     operation = findOperation(instance.instanceId);
-    if (operation == nullptr || operation->revision != revision) {
+    if (operation == nullptr || operation->revision() != revision) {
         catalogCancellation->cancel();
         return;
     }
     m_activeDownloadInstanceId = instance.instanceId;
     if (catalogCancellation->isCanceled()) {
-        operation->catalogCancellation.reset();
+        operation->releaseCatalogWork();
         return;
     }
 
@@ -768,23 +759,21 @@ void SkyCatalogManager::loadSourceInstance(
 }
 
 void SkyCatalogManager::applyBundledSource(
-    SourceOperation& operation, const skygate::ephemeris::CatalogCompositionPolicy policy
+    SkyCatalogSourceOperation& operation, const skygate::ephemeris::CatalogCompositionPolicy policy
 )
 {
     auto bundledCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     if (bundledCatalog == nullptr) {
-        operation.busy = false;
-        operation.hasError = true;
-        operation.statusText = QStringLiteral("Failed to load");
+        operation.fail(QStringLiteral("Failed to load"));
         setStatusText(QStringLiteral("Catalog: Failed to load"));
         emit sourcesChanged();
         return;
     }
 
     SkyCatalogSourceRecord record;
-    record.instanceId = operation.instance.instanceId;
-    record.title = operation.instance.title;
-    record.version = operation.instance.version;
+    record.instanceId = operation.attempt().instanceId;
+    record.title = operation.attempt().title;
+    record.version = operation.attempt().version;
     record.policy = policy;
     record.enabled = true;
     record.bundled = true;
@@ -792,42 +781,35 @@ void SkyCatalogManager::applyBundledSource(
     record.foundObjectCount = 0;
 
     SkyCatalogRuntimeResult result = m_runtime->applySource(std::move(record), runtimeBuildOptions());
-    operation.busy = false;
     if (!result.succeeded) {
         // The runtime refused the transition: the row reports the operation
         // error and the committed collection stays active.
-        operation.hasError = true;
-        operation.statusText = operationErrorText(result.statusText);
+        operation.fail(operationErrorText(result.statusText));
         applyRuntimeResult(result);
         return;
     }
 
-    operation.hasError = false;
-    applyRelatedDeclarationTransition(operation, operation.instance.relatedDatasetUrls, result);
-    // A completed load leaves no operation status behind: the settled row state
-    // is the collection's own state, so disabling the source afterwards is
-    // presented as disabled instead of as the active source it once loaded.
-    operation.statusText.clear();
+    applyRelatedDeclarationTransition(operation, operation.attempt().relatedDatasetUrls, result);
     // The bundled source has no payload, so its accepted facts are the
     // configuration that was just activated.
-    commitAcceptedSourceFacts(operation, QByteArray());
+    operation.accept(QByteArray());
     persistCatalogCache();
     applyRuntimeResult(result);
 }
 
 void SkyCatalogManager::applyRelatedDeclarationTransition(
-    const SourceOperation& operation,
+    const SkyCatalogSourceOperation& operation,
     const QStringList& acceptedRelatedDatasetUrls,
     SkyCatalogRuntimeResult& activationResult
 )
 {
-    const bool relatedDeclarationRemoved = acceptedRelatedDatasetUrls.isEmpty() && operation.hasAcceptedInstance
-                                           && !operation.acceptedInstance.relatedDatasetUrls.isEmpty();
+    const bool relatedDeclarationRemoved = acceptedRelatedDatasetUrls.isEmpty() && operation.hasAcceptedFacts()
+                                           && !operation.acceptedInstance().relatedDatasetUrls.isEmpty();
     if (acceptedRelatedDatasetUrls.isEmpty() && !relatedDeclarationRemoved) {
         return;
     }
 
-    const SkyCatalogRuntimeResult clearResult = m_runtime->clearSourceConstellationRefs(operation.instance.instanceId);
+    const SkyCatalogRuntimeResult clearResult = m_runtime->clearSourceConstellationRefs(operation.attempt().instanceId);
     activationResult.catalogChanged = activationResult.catalogChanged || clearResult.catalogChanged;
     activationResult.datasetInfoChanged = activationResult.datasetInfoChanged || clearResult.datasetInfoChanged;
     // The clear is part of the committed replacement, so every published summary
@@ -867,16 +849,13 @@ void SkyCatalogManager::handleSourceImportFinished(
 )
 {
     setCatalogProcessing(false);
-    SourceOperation* operation = findOperation(instanceId);
-    if (operation == nullptr || operation->revision != revision) {
+    SkyCatalogSourceOperation* operation = findOperation(instanceId);
+    if (operation == nullptr || operation->revision() != revision) {
         return;
     }
-    operation->catalogCancellation.reset();
 
     if (result.catalog == nullptr) {
-        operation->busy = false;
-        operation->hasError = true;
-        operation->statusText = result.errorText;
+        operation->fail(result.errorText);
         setDownloadingCatalog(false);
         setStatusText(result.errorText);
         emit sourcesChanged();
@@ -896,9 +875,7 @@ void SkyCatalogManager::handleSourceImportFinished(
         // operation reports the error instead of proceeding as if the source
         // were active. Nothing was accepted, so the previously accepted
         // descriptor and payload stay in place together.
-        operation->busy = false;
-        operation->hasError = true;
-        operation->statusText = operationErrorText(runtimeResult.statusText);
+        operation->fail(operationErrorText(runtimeResult.statusText));
         setDownloadingCatalog(false);
         applyRuntimeResult(runtimeResult);
         return;
@@ -906,13 +883,7 @@ void SkyCatalogManager::handleSourceImportFinished(
 
     applyRelatedDeclarationTransition(*operation, relatedDatasetUrls, runtimeResult);
 
-    operation->busy = false;
-    operation->hasError = false;
-    // A completed load leaves no operation status behind: the settled row state
-    // is the collection's own state, so disabling the source afterwards is
-    // presented as disabled instead of as the active source it once loaded.
-    operation->statusText.clear();
-    commitAcceptedSourceFacts(*operation, acceptedPayload);
+    operation->accept(acceptedPayload);
     persistCatalogCache();
 
     applyRuntimeResult(runtimeResult);
@@ -948,20 +919,16 @@ void SkyCatalogManager::downloadConstellationLinesAfterCatalog(
         return;
     }
 
-    SourceOperation* operation = findOperation(instanceId);
-    if (operation == nullptr || operation->revision != revision) {
+    SkyCatalogSourceOperation* operation = findOperation(instanceId);
+    if (operation == nullptr || operation->revision() != revision) {
         return;
     }
 
     // The cancel handle is owned and pending before the first status callback
     // runs, so a cancellation from that callback stops the request before it
     // is issued.
-    if (operation->relatedCancellation != nullptr) {
-        operation->relatedCancellation->cancel();
-    }
     const auto relatedCancellation = std::make_shared<CatalogDownloadCancellation>();
-    operation->relatedCancellation = relatedCancellation;
-    operation->constellationPending = true;
+    operation->beginRelatedWork(relatedCancellation);
 
     m_importWorkflow->downloadConstellationLines(
         relatedCancellation,
@@ -976,9 +943,8 @@ void SkyCatalogManager::downloadConstellationLinesAfterCatalog(
             if (!isOperationCurrent(instanceId, revision)) {
                 return;
             }
-            if (SourceOperation* operation = findOperation(instanceId)) {
-                operation->constellationPending = false;
-                operation->relatedCancellation.reset();
+            if (SkyCatalogSourceOperation* operation = findOperation(instanceId)) {
+                operation->finishRelatedWork();
             }
             handleConstellationLineImportFinished(instanceId, catalogSummaryText, std::move(lineResult));
         }
@@ -1017,23 +983,14 @@ void SkyCatalogManager::handleConstellationLineImportFinished(
     persistCatalogCache();
 }
 
-void SkyCatalogManager::retireSourceOperation(SourceOperation& operation)
+void SkyCatalogManager::retireSourceOperation(SkyCatalogSourceOperation& operation)
 {
-    operation.revision = ++m_nextOperationRevision;
-    if (operation.catalogCancellation != nullptr) {
-        operation.catalogCancellation->cancel();
-        operation.catalogCancellation.reset();
-    }
-    if (operation.relatedCancellation != nullptr) {
-        operation.relatedCancellation->cancel();
-        operation.relatedCancellation.reset();
-    }
-    operation.constellationPending = false;
+    operation.retire(++m_nextOperationRevision);
 }
 
 void SkyCatalogManager::invalidatePendingSourceWork(const QString& instanceId)
 {
-    SourceOperation* operation = findOperation(instanceId);
+    SkyCatalogSourceOperation* operation = findOperation(instanceId);
     if (operation == nullptr) {
         return;
     }
@@ -1043,15 +1000,15 @@ void SkyCatalogManager::invalidatePendingSourceWork(const QString& instanceId)
 
 void SkyCatalogManager::invalidateAllPendingSourceWork()
 {
-    for (SourceOperation& operation : m_sourceOperations) {
+    for (SkyCatalogSourceOperation& operation : m_sourceOperations) {
         retireSourceOperation(operation);
     }
 }
 
 bool SkyCatalogManager::hasPendingConstellationWork() const
 {
-    for (const SourceOperation& operation : m_sourceOperations) {
-        if (operation.constellationPending) {
+    for (const SkyCatalogSourceOperation& operation : m_sourceOperations) {
+        if (operation.hasPendingRelatedWork()) {
             return true;
         }
     }
@@ -1128,14 +1085,12 @@ void SkyCatalogManager::handleCatalogImportStatus(
     }
 
     setCatalogProcessing(status.isProcessing());
-    SourceOperation* operation = findOperation(instanceId);
-    if (operation == nullptr || operation->revision != revision) {
+    SkyCatalogSourceOperation* operation = findOperation(instanceId);
+    if (operation == nullptr || operation->revision() != revision) {
         return;
     }
 
-    operation->busy = true;
-    operation->hasError = false;
-    operation->statusText = status.text;
+    operation->reportProgress(status.text);
     emit sourcesChanged();
 }
 
@@ -1194,20 +1149,21 @@ void SkyCatalogManager::persistCatalogCache() const
         // even when it has no operation record. An evicted payload stays out
         // of the record even though the accepted in-memory snapshot still
         // carries it: only an accepted load repopulates the payload.
-        const SourceOperation* operation = findOperation(source.instanceId);
-        const bool payloadEvicted = operation != nullptr && operation->payloadEvicted;
-        if (operation != nullptr && operation->hasAcceptedInstance) {
-            entry.descriptorId = operation->acceptedInstance.descriptorId;
-            entry.title = operation->acceptedInstance.title;
-            entry.version = operation->acceptedInstance.version;
-            entry.urls = operation->acceptedInstance.urls;
-            entry.relatedDatasetUrls = operation->acceptedInstance.relatedDatasetUrls;
-            entry.archiveSelector = operation->acceptedInstance.archiveSelector;
-            entry.schemaHint = operation->acceptedInstance.schemaHint;
-            entry.attribution = operation->acceptedInstance.attribution;
+        const SkyCatalogSourceOperation* operation = findOperation(source.instanceId);
+        const bool payloadEvicted = operation != nullptr && operation->payloadEvicted();
+        if (operation != nullptr && operation->hasAcceptedFacts()) {
+            const SkyCatalogSourceInstance& acceptedInstance = operation->acceptedInstance();
+            entry.descriptorId = acceptedInstance.descriptorId;
+            entry.title = acceptedInstance.title;
+            entry.version = acceptedInstance.version;
+            entry.urls = acceptedInstance.urls;
+            entry.relatedDatasetUrls = acceptedInstance.relatedDatasetUrls;
+            entry.archiveSelector = acceptedInstance.archiveSelector;
+            entry.schemaHint = acceptedInstance.schemaHint;
+            entry.attribution = acceptedInstance.attribution;
             if (!source.bundled && !payloadEvicted) {
                 entry.catalog = source.catalog.get();
-                entry.payload = operation->acceptedPayload;
+                entry.payload = operation->acceptedPayload();
             }
         }
 
@@ -1235,42 +1191,37 @@ void SkyCatalogManager::persistCatalogCache() const
     m_cacheController->persistCollection(request);
 }
 
-SkyCatalogManager::SourceOperation* SkyCatalogManager::upsertOperation(
+SkyCatalogSourceOperation* SkyCatalogManager::upsertOperation(
     const SkyCatalogSourceInstance& source, const skygate::ephemeris::CatalogCompositionPolicy policy
 )
 {
     // Requesting a configuration records it as the instance's attempt without
     // touching the accepted facts: an attempt that is never accepted must not
     // replace what persistence and consumers still see as the source.
-    SourceOperation* existing = findOperation(source.instanceId);
+    SkyCatalogSourceOperation* existing = findOperation(source.instanceId);
     if (existing != nullptr) {
-        existing->instance = source;
-        existing->policy = policy;
+        existing->beginAttempt(source, policy);
         return existing;
     }
 
-    SourceOperation operation;
-    operation.instance = source;
-    operation.policy = policy;
-    operation.revision = ++m_nextOperationRevision;
-    m_sourceOperations.push_back(std::move(operation));
+    m_sourceOperations.push_back(SkyCatalogSourceOperation(source, policy, ++m_nextOperationRevision));
     return &m_sourceOperations.back();
 }
 
-SkyCatalogManager::SourceOperation* SkyCatalogManager::findOperation(const QString& instanceId)
+SkyCatalogSourceOperation* SkyCatalogManager::findOperation(const QString& instanceId)
 {
-    for (SourceOperation& operation : m_sourceOperations) {
-        if (operation.instance.instanceId == instanceId) {
+    for (SkyCatalogSourceOperation& operation : m_sourceOperations) {
+        if (operation.attempt().instanceId == instanceId) {
             return &operation;
         }
     }
     return nullptr;
 }
 
-const SkyCatalogManager::SourceOperation* SkyCatalogManager::findOperation(const QString& instanceId) const
+const SkyCatalogSourceOperation* SkyCatalogManager::findOperation(const QString& instanceId) const
 {
-    for (const SourceOperation& operation : m_sourceOperations) {
-        if (operation.instance.instanceId == instanceId) {
+    for (const SkyCatalogSourceOperation& operation : m_sourceOperations) {
+        if (operation.attempt().instanceId == instanceId) {
             return &operation;
         }
     }
@@ -1280,7 +1231,7 @@ const SkyCatalogManager::SourceOperation* SkyCatalogManager::findOperation(const
 void SkyCatalogManager::removeOperation(const QString& instanceId)
 {
     for (int index = 0; index < m_sourceOperations.size(); ++index) {
-        if (m_sourceOperations[index].instance.instanceId == instanceId) {
+        if (m_sourceOperations[index].attempt().instanceId == instanceId) {
             retireSourceOperation(m_sourceOperations[index]);
             m_sourceOperations.removeAt(index);
             return;
@@ -1290,23 +1241,13 @@ void SkyCatalogManager::removeOperation(const QString& instanceId)
 
 void SkyCatalogManager::markSourcePayloadEvicted(const QString& instanceId)
 {
-    if (SourceOperation* operation = findOperation(instanceId)) {
-        operation->payloadEvicted = true;
+    if (SkyCatalogSourceOperation* operation = findOperation(instanceId)) {
+        operation->markPayloadEvicted();
     }
 }
 
 bool SkyCatalogManager::isOperationCurrent(const QString& instanceId, const std::uint64_t revision) const
 {
-    const SourceOperation* operation = findOperation(instanceId);
-    return operation != nullptr && operation->revision == revision;
-}
-
-void SkyCatalogManager::commitAcceptedSourceFacts(SourceOperation& operation, QByteArray payload)
-{
-    operation.acceptedInstance = operation.instance;
-    operation.acceptedPayload = std::move(payload);
-    operation.hasAcceptedInstance = true;
-    // A successful activation supersedes an earlier payload eviction: the
-    // accepted facts now describe a payload that may be persisted again.
-    operation.payloadEvicted = false;
+    const SkyCatalogSourceOperation* operation = findOperation(instanceId);
+    return operation != nullptr && operation->revision() == revision;
 }
