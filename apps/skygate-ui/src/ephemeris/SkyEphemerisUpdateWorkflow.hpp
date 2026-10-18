@@ -5,10 +5,16 @@
 #include <QObject>
 #include <QString>
 
+#include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 
 class SkyEphemerisDataManager;
+
+namespace skygate::ui::internal {
+class SkyEphemerisUpdateOperation;
+}
 
 // Runs one ephemeris data update: manifest refresh, profile asset downloads
 // through `SkyEphemerisDataManager`, progress accounting, and verified
@@ -51,6 +57,9 @@ signals:
 
 private:
     [[nodiscard]] bool updateCancellationRequested() const noexcept;
+    [[nodiscard]] bool isCurrentOperation(
+        const std::shared_ptr<skygate::ui::internal::SkyEphemerisUpdateOperation>& operation
+    ) const noexcept;
     void setStatusText(QString statusText);
     void setUpdateProgress(double progress) noexcept;
     void refreshManifestAsync(
@@ -58,8 +67,22 @@ private:
     );
     void finishUpdate(bool success, QString statusText);
     void continueUpdate(const QString& profileId, const QString& stagedRoot);
+    void dispatchNextAsset();
+    void reportAssetProgress(
+        const std::shared_ptr<skygate::ui::internal::SkyEphemerisUpdateOperation>& operation,
+        std::uint64_t stagedBytes,
+        std::optional<std::uint64_t> totalBytes
+    );
+    void completeAssetDownload(
+        const std::shared_ptr<skygate::ui::internal::SkyEphemerisUpdateOperation>& operation, std::uint64_t stagedBytes
+    );
+    void failAssetDownload(
+        const std::shared_ptr<skygate::ui::internal::SkyEphemerisUpdateOperation>& operation, QString diagnostic
+    );
+    void activateOperation(const std::shared_ptr<skygate::ui::internal::SkyEphemerisUpdateOperation>& operation);
 
 private:
+    std::shared_ptr<skygate::ui::internal::SkyEphemerisUpdateOperation> m_operation;
     SkyEphemerisDataManager* m_dataManager = nullptr;
     const skygate::ephemeris::EphemerisDataManifest* m_bundledFallbackManifest = nullptr;
     std::optional<skygate::ephemeris::EphemerisDataManifest> m_refreshedManifest;
