@@ -81,18 +81,30 @@ unsupportedEpochWarningCode(const EphemerisRequest& request) noexcept
     return std::nullopt;
 }
 
+// Starting point shared by every state this engine reports: the body index,
+// unset coordinates, and the simple-engine provenance. Callers either fill in
+// the computed coordinates or keep the unset values for unsupported cases.
+[[nodiscard]] CelestialBodyState makeSimpleBodyState(const std::size_t bodyIndex) noexcept
+{
+    const double notAvailable = std::numeric_limits<double>::quiet_NaN();
+
+    CelestialBodyState state;
+    state.bodyIndex = static_cast<std::uint32_t>(bodyIndex);
+    state.equatorial.rightAscensionHours = notAvailable;
+    state.equatorial.declinationDeg = notAvailable;
+    state.horizontal.altitudeDeg = notAvailable;
+    state.horizontal.azimuthDeg = notAvailable;
+    state.metadata.dataSourceProvenanceKind = EphemerisDataSourceProvenance::Type::SimpleEngine;
+    state.metadata.dataSourceProvenance = kSimpleDataSourceProvenance;
+    return state;
+}
+
 [[nodiscard]] CelestialBodyState
 makeUnsupportedEpochState(const std::size_t bodyIndex, const EphemerisEngineWarning::Code warningCode) noexcept
 {
-    CelestialBodyState state;
-    state.bodyIndex = static_cast<std::uint32_t>(bodyIndex);
-    state.equatorial.rightAscensionHours = std::numeric_limits<double>::quiet_NaN();
-    state.equatorial.declinationDeg = std::numeric_limits<double>::quiet_NaN();
-    state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
-    state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
+    CelestialBodyState state = makeSimpleBodyState(bodyIndex);
     state.metadata.status = EphemerisEngineQueryStatus::Type::Unsupported;
     state.metadata.addWarning(warningCode);
-    state.metadata.dataSourceProvenance = kSimpleDataSourceProvenance;
     return state;
 }
 
@@ -278,13 +290,7 @@ CelestialBodyState SimpleEphemerisEngine::computeStateForBody(
     const BaseCelestialBody& body, const std::size_t bodyIndex, const skygate::core::ObservationContext& context
 ) const
 {
-    CelestialBodyState state;
-    state.bodyIndex = static_cast<std::uint32_t>(bodyIndex);
-    state.equatorial.rightAscensionHours = std::numeric_limits<double>::quiet_NaN();
-    state.equatorial.declinationDeg = std::numeric_limits<double>::quiet_NaN();
-    state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
-    state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
-    state.metadata.dataSourceProvenance = kSimpleDataSourceProvenance;
+    CelestialBodyState state = makeSimpleBodyState(bodyIndex);
 
     if (const auto equatorial = m_bodyStateCalculator.computeEquatorial(body, context.utcTime);
         equatorial.has_value()) {

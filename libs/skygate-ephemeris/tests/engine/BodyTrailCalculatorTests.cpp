@@ -1,4 +1,5 @@
 #include "UtcTimeCodec.hpp"
+#include "time/EpochCodec.hpp"
 #include "trail/BodyTrailCalculator.hpp"
 
 #include <QtTest/QtTest>
@@ -335,10 +336,22 @@ void BodyTrailCalculatorTests::requestSamplingPreservesOptionsAndUpdatesEpochs()
         static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric())
     );
     QVERIFY(!engine.requestSamples()[0].options.enableAtmosphericRefraction());
-    QCOMPARE(engine.requestSamples()[0].epoch.julianDatePart1, 2'451'545.0);
-    QVERIFY(std::abs(engine.requestSamples()[0].epoch.julianDatePart2 - (0.25 - (1.0 / 24.0))) < 1e-12);
-    QVERIFY(std::abs(engine.requestSamples()[1].epoch.julianDatePart2 - (0.25 - (0.5 / 24.0))) < 1e-12);
-    QCOMPARE(engine.requestSamples()[2].epoch.julianDatePart2, 0.25);
+
+    // The sampled epochs follow the shifted UTC instants instead of the base
+    // request epoch, whose Julian date differs from the request context time.
+    QVERIFY(
+        engine.requestSamples()[0].epoch
+        == skygate::core::EpochCodec::epochFromUtcTime(skygate::core::UtcTimePoint(std::chrono::seconds(-3000)))
+    );
+    QVERIFY(
+        engine.requestSamples()[1].epoch
+        == skygate::core::EpochCodec::epochFromUtcTime(skygate::core::UtcTimePoint(std::chrono::seconds(-1200)))
+    );
+    QVERIFY(
+        engine.requestSamples()[2].epoch
+        == skygate::core::EpochCodec::epochFromUtcTime(skygate::core::UtcTimePoint(std::chrono::seconds(600)))
+    );
+    QVERIFY(engine.requestSamples()[2].epoch.timeScale == skygate::core::TimeScale::Utc);
 }
 
 void BodyTrailCalculatorTests::rejectsInvalidOptions()

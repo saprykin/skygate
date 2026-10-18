@@ -30,16 +30,6 @@
 
 namespace skygate::ephemeris {
 
-bool EphemerisEngineFactory::allowsSimpleEngineFallback(const EphemerisFactoryFallbackPolicy::Type policy) noexcept
-{
-    return policy == EphemerisFactoryFallbackPolicy::Type::AllowSimpleEngineFallback;
-}
-
-std::string_view EphemerisEngineFactory::displayName(const EphemerisFactoryFallbackPolicy::Type policy) noexcept
-{
-    return EphemerisFactoryFallbackPolicy::displayName(policy);
-}
-
 std::string_view EphemerisEngineFactory::displayName(const EphemerisFactoryCreationStatus::Type status) noexcept
 {
     return EphemerisFactoryCreationStatus::displayName(status);
@@ -47,19 +37,13 @@ std::string_view EphemerisEngineFactory::displayName(const EphemerisFactoryCreat
 
 bool EphemerisEngineFactory::isCreationSuccess(const EphemerisFactoryCreationStatus::Type status) noexcept
 {
-    return status == EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine
-           || status == EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback;
-}
-
-std::string_view EphemerisEngineFactory::diagnosticText(const EphemerisFactoryCreationDiagnosticCode code) noexcept
-{
-    return EphemerisFactoryCreationDiagnostic::text(code);
+    return EphemerisFactoryCreationStatus::isSuccess(status);
 }
 
 namespace {
 
 [[nodiscard]] EphemerisFactoryCreationDiagnostic makeDiagnostic(
-    const EphemerisFactoryCreationDiagnosticCode code,
+    const EphemerisFactoryCreationDiagnostic::Code code,
     const EphemerisFactoryCreationDiagnosticSeverity severity,
     std::string text = {}
 )
@@ -73,7 +57,7 @@ makeInvalidFactoryRequestResult(const EphemerisEngineKind::Type requestedKind)
     return EphemerisEngineFactoryResult::failure(
         EphemerisFactoryCreationStatus::Type::FailedInvalidRequest,
         {EphemerisFactoryCreationDiagnostic{
-            EphemerisFactoryCreationDiagnosticCode::InvalidRequest,
+            EphemerisFactoryCreationDiagnostic::Code::InvalidRequest,
             EphemerisFactoryCreationDiagnosticSeverity::Error,
             "The requested ephemeris engine kind is not supported.",
         }},
@@ -85,8 +69,8 @@ makeInvalidFactoryRequestResult(const EphemerisEngineKind::Type requestedKind)
 highPrecisionFailureStatus(const std::vector<EphemerisFactoryCreationDiagnostic>& diagnostics) noexcept
 {
     for (const EphemerisFactoryCreationDiagnostic& diagnostic : diagnostics) {
-        if (diagnostic.code == EphemerisFactoryCreationDiagnosticCode::EngineCreationFailed
-            || diagnostic.code == EphemerisFactoryCreationDiagnosticCode::InvalidRequest) {
+        if (diagnostic.code == EphemerisFactoryCreationDiagnostic::Code::EngineCreationFailed
+            || diagnostic.code == EphemerisFactoryCreationDiagnostic::Code::InvalidRequest) {
             return EphemerisFactoryCreationStatus::Type::FailedCreationError;
         }
     }
@@ -111,10 +95,10 @@ void appendCalcephDiagnostics(
     const skygate::ephemeris::highprecision::ICalcephKernel& kernel
 )
 {
-    const EphemerisFactoryCreationDiagnosticCode code =
+    const EphemerisFactoryCreationDiagnostic::Code code =
         kernel.status() == skygate::ephemeris::highprecision::ICalcephKernel::Status::CalcephUnavailable
-            ? EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable
-            : EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable;
+            ? EphemerisFactoryCreationDiagnostic::Code::HighPrecisionUnavailable
+            : EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable;
 
     if (kernel.diagnostics().empty()) {
         diagnostics.push_back(makeDiagnostic(code, EphemerisFactoryCreationDiagnosticSeverity::Error));
@@ -200,35 +184,35 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
 
     if (needsDefaultCalcephKernelProvider && request.activeDataSnapshot == nullptr) {
         diagnostics.push_back(makeDiagnostic(
-            EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable,
+            EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable,
             EphemerisFactoryCreationDiagnosticSeverity::Error,
             "An active ephemeris data snapshot is required for high-precision engine creation."
         ));
     }
     if (needsDefaultCalcephKernelProvider && request.dataManifest == nullptr) {
         diagnostics.push_back(makeDiagnostic(
-            EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable,
+            EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable,
             EphemerisFactoryCreationDiagnosticSeverity::Error,
             "An ephemeris data manifest is required for high-precision engine creation."
         ));
     }
     if (request.datasetManifest == nullptr && request.dataManifest == nullptr) {
         diagnostics.push_back(makeDiagnostic(
-            EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable,
+            EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable,
             EphemerisFactoryCreationDiagnosticSeverity::Error,
             "An ephemeris dataset manifest is required for high-precision engine creation."
         ));
     }
     if (request.timeScaleService == nullptr) {
         diagnostics.push_back(makeDiagnostic(
-            EphemerisFactoryCreationDiagnosticCode::RequiredTimeScaleServiceUnavailable,
+            EphemerisFactoryCreationDiagnostic::Code::RequiredTimeScaleServiceUnavailable,
             EphemerisFactoryCreationDiagnosticSeverity::Error,
             "A time-scale service is required for high-precision engine creation."
         ));
     }
     if (request.earthOrientationProvider == nullptr) {
         diagnostics.push_back(makeDiagnostic(
-            EphemerisFactoryCreationDiagnosticCode::RequiredEarthOrientationProviderUnavailable,
+            EphemerisFactoryCreationDiagnostic::Code::RequiredEarthOrientationProviderUnavailable,
             EphemerisFactoryCreationDiagnosticSeverity::Error,
             "An Earth-orientation provider is required for high-precision engine creation."
         ));
@@ -251,7 +235,7 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
             kernelProvider->openKernel();
         if (kernel == nullptr) {
             diagnostics.push_back(makeDiagnostic(
-                EphemerisFactoryCreationDiagnosticCode::EngineCreationFailed,
+                EphemerisFactoryCreationDiagnostic::Code::EngineCreationFailed,
                 EphemerisFactoryCreationDiagnosticSeverity::Error,
                 "The CALCEPH kernel provider did not return a kernel."
             ));
@@ -305,7 +289,7 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
         }
     }
 
-    if (EphemerisEngineFactory::allowsSimpleEngineFallback(request.fallbackPolicy)) {
+    if (EphemerisFactoryFallbackPolicy::allowsSimpleEngineFallback(request.fallbackPolicy)) {
         return EphemerisEngineFactoryResult::success(
             std::make_unique<SimpleEphemerisEngine>(
                 request.catalog != nullptr ? *request.catalog : CelestialBodyCatalog{}, request.options

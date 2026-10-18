@@ -161,39 +161,123 @@ constexpr double kFinalsTwoDigitYearPivotMjd = 51543.0;
     return true;
 }
 
-[[nodiscard]] bool parseFinals2000AWhitespaceEntryLine(
-    const std::vector<std::string_view>& columns, IEarthOrientationProvider::TableEntry& entry
-) noexcept
+// The FINALS 2000A rows address the same fields in two layouts: a whitespace
+// table and the original fixed-width file. The mappings below only locate a
+// field; parsing and assignment are shared by both layouts.
+struct Finals2000AColumns {
+    std::string_view twoDigitYear;
+    std::string_view month;
+    std::string_view day;
+    std::string_view mjd;
+    std::string_view polarMotionFlag;
+    std::string_view polarMotionX;
+    std::string_view polarMotionY;
+    std::string_view ut1Flag;
+    std::string_view ut1MinusUtc;
+};
+
+struct Finals2000ADate {
+    int twoDigitYear = 0;
+    int month = 0;
+    int day = 0;
+    double mjd = 0.0;
+};
+
+[[nodiscard]] std::string_view
+whitespaceColumn(const std::vector<std::string_view>& columns, const std::size_t index) noexcept
 {
-    if (columns.size() < 11U || (columns[4] != "I" && columns[4] != "P") || (columns[9] != "I" && columns[9] != "P")) {
+    return index < columns.size() ? columns[index] : std::string_view{};
+}
+
+[[nodiscard]] Finals2000AColumns finals2000AWhitespaceColumns(const std::vector<std::string_view>& columns) noexcept
+{
+    return Finals2000AColumns{
+        .twoDigitYear = whitespaceColumn(columns, 0U),
+        .month = whitespaceColumn(columns, 1U),
+        .day = whitespaceColumn(columns, 2U),
+        .mjd = whitespaceColumn(columns, 3U),
+        .polarMotionFlag = whitespaceColumn(columns, 4U),
+        .polarMotionX = whitespaceColumn(columns, 5U),
+        .polarMotionY = whitespaceColumn(columns, 7U),
+        .ut1Flag = whitespaceColumn(columns, 9U),
+        .ut1MinusUtc = whitespaceColumn(columns, 10U),
+    };
+}
+
+[[nodiscard]] Finals2000AColumns finals2000AFixedWidthColumns(const std::string_view line) noexcept
+{
+    return Finals2000AColumns{
+        .twoDigitYear = TextParsingUtilities::fixedColumn(line, 0U, 2U),
+        .month = TextParsingUtilities::fixedColumn(line, 2U, 2U),
+        .day = TextParsingUtilities::fixedColumn(line, 4U, 2U),
+        .mjd = TextParsingUtilities::fixedColumn(line, 7U, 8U),
+        .polarMotionFlag = TextParsingUtilities::fixedColumn(line, 16U, 1U),
+        .polarMotionX = TextParsingUtilities::fixedColumn(line, 18U, 9U),
+        .polarMotionY = TextParsingUtilities::fixedColumn(line, 37U, 9U),
+        .ut1Flag = TextParsingUtilities::fixedColumn(line, 57U, 1U),
+        .ut1MinusUtc = TextParsingUtilities::fixedColumn(line, 58U, 10U),
+    };
+}
+
+[[nodiscard]] std::optional<Finals2000ADate> finals2000ADate(const Finals2000AColumns& columns) noexcept
+{
+    const std::optional<int> twoDigitYear = NumericParsingUtilities::parseInt(columns.twoDigitYear);
+    const std::optional<int> month = NumericParsingUtilities::parseInt(columns.month);
+    const std::optional<int> day = NumericParsingUtilities::parseInt(columns.day);
+    const std::optional<double> mjd = NumericParsingUtilities::parseFiniteDouble(columns.mjd);
+    if (!twoDigitYear.has_value() || !month.has_value() || !day.has_value() || !mjd.has_value()
+        || !finalsYearFromMjd(*twoDigitYear, *mjd).has_value()) {
+        return std::nullopt;
+    }
+
+    return Finals2000ADate{
+        .twoDigitYear = *twoDigitYear,
+        .month = *month,
+        .day = *day,
+        .mjd = *mjd,
+    };
+}
+
+[[nodiscard]] bool
+parseFinals2000AColumns(const Finals2000AColumns& columns, IEarthOrientationProvider::TableEntry& entry) noexcept
+{
+    const std::optional<Finals2000ADate> date = finals2000ADate(columns);
+    if (!date.has_value() || columns.polarMotionFlag.size() != 1U || columns.ut1Flag.size() != 1U) {
         return false;
     }
 
-    const std::optional<int> twoDigitYear = NumericParsingUtilities::parseInt(columns[0]);
-    const std::optional<int> month = NumericParsingUtilities::parseInt(columns[1]);
-    const std::optional<int> day = NumericParsingUtilities::parseInt(columns[2]);
-    const std::optional<double> mjd = NumericParsingUtilities::parseFiniteDouble(columns[3]);
-    const std::optional<double> polarMotionXArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[5]);
-    const std::optional<double> polarMotionYArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[7]);
-    const std::optional<double> ut1MinusUtcSeconds = NumericParsingUtilities::parseFiniteDouble(columns[10]);
-    if (!twoDigitYear.has_value() || !month.has_value() || !day.has_value() || !mjd.has_value()
-        || !polarMotionXArcseconds.has_value() || !polarMotionYArcseconds.has_value()
-        || !ut1MinusUtcSeconds.has_value()) {
+    const std::optional<double> polarMotionXArcseconds =
+        NumericParsingUtilities::parseFiniteDouble(columns.polarMotionX);
+    const std::optional<double> polarMotionYArcseconds =
+        NumericParsingUtilities::parseFiniteDouble(columns.polarMotionY);
+    const std::optional<double> ut1MinusUtcSeconds = NumericParsingUtilities::parseFiniteDouble(columns.ut1MinusUtc);
+    if (!polarMotionXArcseconds.has_value() || !polarMotionYArcseconds.has_value() || !ut1MinusUtcSeconds.has_value()) {
         return false;
     }
 
     return assignFinals2000AEntry(
-        *twoDigitYear,
-        *month,
-        *day,
-        *mjd,
-        columns[4].front(),
-        columns[9].front(),
+        date->twoDigitYear,
+        date->month,
+        date->day,
+        date->mjd,
+        columns.polarMotionFlag.front(),
+        columns.ut1Flag.front(),
         *polarMotionXArcseconds,
         *polarMotionYArcseconds,
         *ut1MinusUtcSeconds,
         entry
     );
+}
+
+[[nodiscard]] bool parseFinals2000AWhitespaceEntryLine(
+    const std::vector<std::string_view>& columns, IEarthOrientationProvider::TableEntry& entry
+) noexcept
+{
+    if (columns.size() < 11U) {
+        return false;
+    }
+
+    return parseFinals2000AColumns(finals2000AWhitespaceColumns(columns), entry);
 }
 
 [[nodiscard]] bool
@@ -206,40 +290,7 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
         return true;
     }
 
-    const std::optional<int> twoDigitYear =
-        NumericParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 0U, 2U));
-    const std::optional<int> month = NumericParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 2U, 2U));
-    const std::optional<int> day = NumericParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 4U, 2U));
-    const std::optional<double> mjd =
-        NumericParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 7U, 8U));
-    if (!twoDigitYear.has_value() || !month.has_value() || !day.has_value() || !mjd.has_value()) {
-        return false;
-    }
-
-    const char polarMotionFlag = line.size() > 16U ? line[16U] : '\0';
-    const char ut1Flag = line.size() > 57U ? line[57U] : '\0';
-    const std::optional<double> polarMotionXArcseconds =
-        NumericParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 18U, 9U));
-    const std::optional<double> polarMotionYArcseconds =
-        NumericParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 37U, 9U));
-    const std::optional<double> ut1MinusUtcSeconds =
-        NumericParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 58U, 10U));
-    if (!polarMotionXArcseconds.has_value() || !polarMotionYArcseconds.has_value() || !ut1MinusUtcSeconds.has_value()) {
-        return false;
-    }
-
-    return assignFinals2000AEntry(
-        *twoDigitYear,
-        *month,
-        *day,
-        *mjd,
-        polarMotionFlag,
-        ut1Flag,
-        *polarMotionXArcseconds,
-        *polarMotionYArcseconds,
-        *ut1MinusUtcSeconds,
-        entry
-    );
+    return parseFinals2000AColumns(finals2000AFixedWidthColumns(line), entry);
 }
 
 [[nodiscard]] bool parseIersC04EntryLine(std::string_view line, IEarthOrientationProvider::TableEntry& entry) noexcept
@@ -330,30 +381,17 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
 {
     const std::vector<std::string_view> columns = TextParsingUtilities::splitAsciiWhitespace(line);
     if (columns.size() == 4U) {
-        const std::optional<int> twoDigitYear = NumericParsingUtilities::parseInt(columns[0]);
-        const std::optional<int> month = NumericParsingUtilities::parseInt(columns[1]);
-        const std::optional<int> day = NumericParsingUtilities::parseInt(columns[2]);
-        const std::optional<double> mjd = NumericParsingUtilities::parseFiniteDouble(columns[3]);
-        return twoDigitYear.has_value() && month.has_value() && day.has_value() && mjd.has_value()
-               && finalsYearFromMjd(*twoDigitYear, *mjd).has_value();
+        return finals2000ADate(finals2000AWhitespaceColumns(columns)).has_value();
     }
 
-    const std::optional<int> twoDigitYear =
-        NumericParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 0U, 2U));
-    const std::optional<int> month = NumericParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 2U, 2U));
-    const std::optional<int> day = NumericParsingUtilities::parseInt(TextParsingUtilities::fixedColumn(line, 4U, 2U));
-    const std::optional<double> mjd =
-        NumericParsingUtilities::parseFiniteDouble(TextParsingUtilities::fixedColumn(line, 7U, 8U));
-    if (!twoDigitYear.has_value() || !month.has_value() || !day.has_value() || !mjd.has_value()
-        || !finalsYearFromMjd(*twoDigitYear, *mjd).has_value()) {
+    const Finals2000AColumns fixedWidthColumns = finals2000AFixedWidthColumns(line);
+    if (!finals2000ADate(fixedWidthColumns).has_value()) {
         return false;
     }
 
-    return TextParsingUtilities::fixedColumn(line, 16U, 1U).empty()
-           && TextParsingUtilities::fixedColumn(line, 18U, 9U).empty()
-           && TextParsingUtilities::fixedColumn(line, 37U, 9U).empty()
-           && TextParsingUtilities::fixedColumn(line, 57U, 1U).empty()
-           && TextParsingUtilities::fixedColumn(line, 58U, 10U).empty();
+    return fixedWidthColumns.polarMotionFlag.empty() && fixedWidthColumns.polarMotionX.empty()
+           && fixedWidthColumns.polarMotionY.empty() && fixedWidthColumns.ut1Flag.empty()
+           && fixedWidthColumns.ut1MinusUtc.empty();
 }
 
 [[nodiscard]] bool isIgnorableHeaderLine(const std::string_view line) noexcept

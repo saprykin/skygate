@@ -524,7 +524,7 @@ void EphemerisEngineFactorySelectionTests::invalidEngineKindReturnsStructuredInv
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.diagnostics.front().code),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::InvalidRequest)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::InvalidRequest)
     );
     QVERIFY(result.diagnostics.front().isError());
     QVERIFY(!result.diagnostics.front().displayText().empty());
@@ -611,22 +611,14 @@ void EphemerisEngineFactorySelectionTests::exposesFactoryFallbackPolicyHelpers()
     constexpr auto strictPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
     constexpr auto fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::AllowSimpleEngineFallback;
 
-    QVERIFY(!skygate::ephemeris::EphemerisEngineFactory::allowsSimpleEngineFallback(strictPolicy));
-    QVERIFY(skygate::ephemeris::EphemerisEngineFactory::allowsSimpleEngineFallback(fallbackPolicy));
-    QCOMPARE(
-        skygate::ephemeris::EphemerisEngineFactory::displayName(strictPolicy),
-        skygate::ephemeris::EphemerisFactoryFallbackPolicy::displayName(strictPolicy)
-    );
-    QCOMPARE(
-        skygate::ephemeris::EphemerisEngineFactory::displayName(fallbackPolicy),
-        skygate::ephemeris::EphemerisFactoryFallbackPolicy::displayName(fallbackPolicy)
-    );
+    QVERIFY(!skygate::ephemeris::EphemerisFactoryFallbackPolicy::allowsSimpleEngineFallback(strictPolicy));
+    QVERIFY(skygate::ephemeris::EphemerisFactoryFallbackPolicy::allowsSimpleEngineFallback(fallbackPolicy));
     QVERIFY(
-        skygate::ephemeris::EphemerisEngineFactory::displayName(strictPolicy)
+        skygate::ephemeris::EphemerisFactoryFallbackPolicy::displayName(strictPolicy)
         == std::string_view{"strict high precision"}
     );
     QVERIFY(
-        skygate::ephemeris::EphemerisEngineFactory::displayName(fallbackPolicy)
+        skygate::ephemeris::EphemerisFactoryFallbackPolicy::displayName(fallbackPolicy)
         == std::string_view{"allow simple engine fallback"}
     );
 }

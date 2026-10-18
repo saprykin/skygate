@@ -3,7 +3,7 @@
 namespace skygate::ephemeris {
 
 EphemerisFactoryCreationDiagnostic::EphemerisFactoryCreationDiagnostic(
-    const EphemerisFactoryCreationDiagnosticCode diagnosticCode,
+    const Code diagnosticCode,
     const EphemerisFactoryCreationDiagnosticSeverity diagnosticSeverity,
     std::string diagnosticText
 )
@@ -20,20 +20,20 @@ std::string_view EphemerisFactoryCreationDiagnostic::displayText() const noexcep
     return text(code);
 }
 
-std::string_view EphemerisFactoryCreationDiagnostic::text(const EphemerisFactoryCreationDiagnosticCode code) noexcept
+std::string_view EphemerisFactoryCreationDiagnostic::text(const Code code) noexcept
 {
     switch (code) {
-    case EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable:
+    case Code::HighPrecisionUnavailable:
         return "High-precision ephemeris creation is unavailable.";
-    case EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable:
+    case Code::RequiredEphemerisDataUnavailable:
         return "Required ephemeris data is unavailable.";
-    case EphemerisFactoryCreationDiagnosticCode::RequiredTimeScaleServiceUnavailable:
+    case Code::RequiredTimeScaleServiceUnavailable:
         return "Required time-scale service is unavailable.";
-    case EphemerisFactoryCreationDiagnosticCode::RequiredEarthOrientationProviderUnavailable:
+    case Code::RequiredEarthOrientationProviderUnavailable:
         return "Required Earth-orientation provider is unavailable.";
-    case EphemerisFactoryCreationDiagnosticCode::InvalidRequest:
+    case Code::InvalidRequest:
         return "The ephemeris engine factory request is invalid.";
-    case EphemerisFactoryCreationDiagnosticCode::EngineCreationFailed:
+    case Code::EngineCreationFailed:
         return "Ephemeris engine creation failed.";
     }
 
