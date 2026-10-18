@@ -289,6 +289,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/normalize/CatalogBodyNormalization.hpp
     src/catalog/normalize/CatalogSnapshotValidator.hpp
     src/catalog/CatalogBodyParseResult.hpp
+    src/catalog/bundled/BundledCatalogData.hpp
     src/catalog/bundled/BundledCatalogParser.hpp
     src/catalog/CatalogIdentifier.hpp
     src/catalog/CatalogIdentity.hpp
@@ -396,6 +397,7 @@ add_library(skygate-ephemeris STATIC
     src/NightConditionsCalculator.cpp
     src/ObservationEventCalculator.cpp
     src/ObservationEventSearch.cpp
+    src/catalog/bundled/BundledCatalogData.cpp
     src/catalog/bundled/BundledCatalogParser.cpp
     src/catalog/io/CsvRowTokenizer.cpp
     src/catalog/hyg/HygCatalogParser.cpp
