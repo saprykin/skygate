@@ -52,7 +52,7 @@ ObservationEventCalculator::SearchMode EphemerisComputationPolicy::inspectorEven
 {
     (void)request;
     if (engine.traits().supportsGuidedEventSearch && engine.traits().trustsGuidedSearchResult && body != nullptr
-        && !body->fixedEquatorialValue().has_value()) {
+        && !body->hasFixedEquatorial()) {
         return ObservationEventCalculator::SearchMode::GuidedApproximate;
     }
 

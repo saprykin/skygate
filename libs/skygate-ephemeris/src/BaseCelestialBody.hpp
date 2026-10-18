@@ -53,6 +53,12 @@ public:
     [[nodiscard]] virtual const CatalogStarAstrometry* catalogStarAstrometry() const noexcept;
     [[nodiscard]] virtual const DeepSkyObjectInfo* deepSkyObjectInfo() const noexcept;
 
+    // True when the body carries a catalog fixed equatorial coordinate.
+    [[nodiscard]] bool hasFixedEquatorial() const noexcept
+    {
+        return fixedEquatorialValue().has_value();
+    }
+
     [[nodiscard]] bool isCatalogStar() const noexcept;
 
     // Copies the fields every catalog domain object shares. Optional metadata
