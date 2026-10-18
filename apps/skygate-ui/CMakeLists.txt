@@ -21,6 +21,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/location/SkyDeviceLocationAcquisition.hpp
     src/location/SkyLocationPermissionGate.cpp
     src/location/SkyLocationPermissionGate.hpp
+    src/location/SkyLocationStatusText.cpp
+    src/location/SkyLocationStatusText.hpp
     src/search/SkyObjectSearchModel.cpp
     src/search/SkyObjectSearchModel.hpp
     src/theme/SkyOverlayLayerSettings.cpp
@@ -37,6 +39,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/ephemeris/SkyEphemerisAssetStatus.hpp
     src/ephemeris/SkyEphemerisCacheController.cpp
     src/ephemeris/SkyEphemerisCacheController.hpp
+    src/ephemeris/SkyEphemerisDataCacheSnapshot.cpp
     src/ephemeris/SkyEphemerisDataCacheSnapshot.hpp
     src/ephemeris/SkyEphemerisDataCacheSnapshotPolicy.cpp
     src/ephemeris/SkyEphemerisDataCacheSnapshotPolicy.hpp
@@ -55,6 +58,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/ephemeris/SkyEphemerisSettingsPolicy.hpp
     src/ephemeris/SkyEphemerisSnapshotAdapter.cpp
     src/ephemeris/SkyEphemerisSnapshotAdapter.hpp
+    src/ephemeris/SkyEphemerisStatusText.cpp
+    src/ephemeris/SkyEphemerisStatusText.hpp
     src/ephemeris/SkyEphemerisUpdateOperation.hpp
     src/ephemeris/SkyEphemerisUpdateWorkflow.cpp
     src/ephemeris/SkyEphemerisUpdateWorkflow.hpp

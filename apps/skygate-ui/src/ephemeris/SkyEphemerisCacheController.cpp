@@ -205,6 +205,7 @@ EphemerisDataCacheSnapshot cacheSnapshotForActivatedProfile(
             snapshot.installedKernelAssetId = EphemerisDataFileUtilities::stringToQString(asset->id);
             snapshot.installedKernelProfileId = EphemerisDataFileUtilities::stringToQString(asset->profileId);
             snapshot.installedKernelVersion = EphemerisDataFileUtilities::stringToQString(asset->version);
+            snapshot.installedKernelLongRange = profile.longRange;
             if (activePath != activePaths.end()) {
                 snapshot.installedKernelPath = EphemerisDataFileUtilities::pathToQString(activePath->second);
             }

@@ -77,6 +77,25 @@ int readWindowDimension(QSettings& settings, const QString& key, const int fallb
     return ok ? value : fallback;
 }
 
+// Reads the range stored alongside the installed kernel. Settings written
+// before the range was recorded have no value here, which leaves that case to
+// the kernel metadata. An unreadable value is reported and treated the same.
+std::optional<bool> readInstalledKernelLongRange(QSettings& settings)
+{
+    const QString key = ephemerisDataCacheKey("installedKernelLongRange");
+    if (!settings.contains(key)) {
+        return std::nullopt;
+    }
+
+    if (const std::optional<bool> storedRange = SkySettingsValueCodecs::boolFromSettingValue(settings.value(key))) {
+        return storedRange;
+    }
+    qCWarning(skygateEphemerisDataCacheLog).noquote()
+        << "Invalid boolean setting" << key << "value" << settings.value(key).toString()
+        << "- reading the range from the installed kernel metadata";
+    return std::nullopt;
+}
+
 // A missing legacy cache file is first use, while a file that exists but cannot
 // be opened is a storage problem worth reporting.
 void loadCachePayload(const QString& path, const QString& logNoun, QByteArray& payload)
@@ -374,6 +393,11 @@ bool SkySettingsStore::saveEphemerisDataCache(const SkyEphemerisDataCacheSnapsho
     settings.setValue(ephemerisDataCacheKey("installedKernelProfileId"), snapshot.installedKernelProfileId);
     settings.setValue(ephemerisDataCacheKey("installedKernelPath"), snapshot.installedKernelPath);
     settings.setValue(ephemerisDataCacheKey("installedKernelVersion"), snapshot.installedKernelVersion);
+    if (snapshot.installedKernelLongRange.has_value()) {
+        settings.setValue(ephemerisDataCacheKey("installedKernelLongRange"), *snapshot.installedKernelLongRange);
+    } else {
+        settings.remove(ephemerisDataCacheKey("installedKernelLongRange"));
+    }
     settings.setValue(ephemerisDataCacheKey("installedEarthOrientationPath"), snapshot.installedEarthOrientationPath);
     settings.setValue(
         ephemerisDataCacheKey("installedEarthOrientationVersion"), snapshot.installedEarthOrientationVersion
@@ -410,6 +434,10 @@ SkyEphemerisDataCacheSnapshot SkySettingsStore::loadEphemerisDataCache() const
     snapshot.installedKernelProfileId = settings.value(ephemerisDataCacheKey("installedKernelProfileId")).toString();
     snapshot.installedKernelPath = settings.value(ephemerisDataCacheKey("installedKernelPath")).toString();
     snapshot.installedKernelVersion = settings.value(ephemerisDataCacheKey("installedKernelVersion")).toString();
+    snapshot.installedKernelLongRange = readInstalledKernelLongRange(settings);
+    if (!snapshot.installedKernelLongRange.has_value()) {
+        snapshot.installedKernelLongRange = SkyEphemerisDataCacheSnapshot::legacyKernelLongRange(snapshot);
+    }
     snapshot.installedEarthOrientationPath =
         settings.value(ephemerisDataCacheKey("installedEarthOrientationPath")).toString();
     snapshot.installedEarthOrientationVersion =
