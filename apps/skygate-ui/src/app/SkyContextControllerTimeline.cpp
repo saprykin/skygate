@@ -1,14 +1,11 @@
 #include "SkyContextController.hpp"
-#include "SkyContextLocationSource.hpp"
 #include "SkyContextProjectionTypeCodec.hpp"
 #include "SkyContextTimeCodec.hpp"
 #include "SkyContextUtcDateTimeTextCodec.hpp"
 #include "engine/EphemerisComputationPolicy.hpp"
-#include "location/SkyDeviceLocationAcquisition.hpp"
 #include "math/ViewportMath.hpp"
 #include "time/SkyTimeController.hpp"
 
-#include <algorithm>
 #include <chrono>
 #include <cmath>
 
@@ -236,68 +233,6 @@ bool SkyContextController::setUtcDateTimeText(const QString& utcDateText, const 
     return true;
 }
 
-void SkyContextController::setLatitudeText(const QString& latitudeText)
-{
-    bool isValidNumber = false;
-    const double latitude = latitudeText.trimmed().toDouble(&isValidNumber);
-    skygate::core::GeoLocation nextObserver = m_location.observer();
-    nextObserver.latitudeDeg = latitude;
-    if (!isValidNumber || !nextObserver.isValid()) {
-        emit latitudeTextChanged();
-        return;
-    }
-
-    if (m_location.observer().latitudeDeg == nextObserver.latitudeDeg) {
-        return;
-    }
-
-    if (m_location.source() != SkyContextLocationSource::Custom) {
-        setLocationSource(SkyContextLocationSource::Custom);
-    }
-
-    applyObserverLocation(nextObserver);
-}
-
-void SkyContextController::setLongitudeText(const QString& longitudeText)
-{
-    bool isValidNumber = false;
-    const double longitude = longitudeText.trimmed().toDouble(&isValidNumber);
-    skygate::core::GeoLocation nextObserver = m_location.observer();
-    nextObserver.longitudeDeg = longitude;
-    if (!isValidNumber || !nextObserver.isValid()) {
-        emit longitudeTextChanged();
-        return;
-    }
-
-    if (m_location.observer().longitudeDeg == nextObserver.longitudeDeg) {
-        return;
-    }
-
-    if (m_location.source() != SkyContextLocationSource::Custom) {
-        setLocationSource(SkyContextLocationSource::Custom);
-    }
-
-    applyObserverLocation(nextObserver);
-}
-
-void SkyContextController::setElevationText(const QString& elevationText)
-{
-    bool isValidNumber = false;
-    const double elevation = elevationText.trimmed().toDouble(&isValidNumber);
-    skygate::core::GeoLocation nextObserver = m_location.observer();
-    nextObserver.elevationMeters = elevation;
-    if (!isValidNumber || !nextObserver.isValid()) {
-        emit elevationTextChanged();
-        return;
-    }
-
-    if (m_location.observer().elevationMeters == nextObserver.elevationMeters) {
-        return;
-    }
-
-    applyObserverLocation(nextObserver);
-}
-
 void SkyContextController::setProjectionTypeText(const QString& projectionTypeText)
 {
     const auto parsedType = SkyContextProjectionTypeCodec::fromString(projectionTypeText);
@@ -315,42 +250,25 @@ void SkyContextController::tickUtcTime()
         return;
     }
 
-    skygate::core::UtcTimePoint nextUtc = m_liveClock.currentUtc();
-    const skygate::core::UtcTimePoint currentWallUtc = currentUtcTime();
     const skygate::core::UtcTimePoint timelineUtc = m_location.utcTime();
-    const bool catchingUpToCurrentUtc = m_timeline.catchingUpToCurrentUtc() && timelineUtc < currentWallUtc;
-    if (catchingUpToCurrentUtc) {
-        const double elapsedSeconds = std::max(1.0, std::chrono::duration<double>(nextUtc - timelineUtc).count());
-        const double timelineAdvanceSeconds =
-            elapsedSeconds * m_timeline.speedMultiplier() * static_cast<double>(m_timeline.stepSeconds());
-        if (timelineAdvanceSeconds <= 0.0) {
-            return;
-        }
-
-        nextUtc = timelineUtc
-                  + std::chrono::duration_cast<skygate::core::UtcTimePoint::duration>(
-                      std::chrono::duration<double>(timelineAdvanceSeconds)
-                  );
-        if (nextUtc > currentWallUtc) {
-            nextUtc = currentWallUtc;
-        }
+    const skygate::core::UtcTimePoint clockUtc = m_liveClock.currentUtc();
+    const skygate::core::UtcTimePoint wallUtc = currentUtcTime();
+    const auto advancement = m_timeline.computeCatchUpAdvancement(timelineUtc, clockUtc, wallUtc);
+    if (!advancement.has_value()) {
+        return;
     }
 
+    const skygate::core::UtcTimePoint& nextUtc = advancement->nextUtc;
     m_timeController->setUtcTimePoint(nextUtc);
     if (liveRecomputeThrottled(nextUtc)) {
         return;
     }
 
-    if (catchingUpToCurrentUtc) {
-        m_timeline.setCatchingUpToCurrentUtc(nextUtc < currentWallUtc);
-        setCurrentUtcTime(nextUtc);
-        m_liveClock.resetAnchor(nextUtc);
-        markLiveRecomputeTick(nextUtc);
-        return;
-    }
-
-    m_timeline.setCatchingUpToCurrentUtc(false);
+    m_timeline.setCatchingUpToCurrentUtc(advancement->catchingUpToCurrentUtc);
     setCurrentUtcTime(nextUtc);
+    if (advancement->advancedWhileCatchingUp) {
+        m_liveClock.resetAnchor(nextUtc);
+    }
     markLiveRecomputeTick(nextUtc);
 }
 
@@ -396,44 +314,6 @@ void SkyContextController::setViewFieldOfViewDeg(const double viewFieldOfViewDeg
 
     emit viewDirectionChanged();
     emit skyContextChanged();
-}
-
-void SkyContextController::applyObserverLocation(const skygate::core::GeoLocation& observer)
-{
-    if (!observer.isValid()) {
-        return;
-    }
-
-    const bool latitudeChanged = m_location.observer().latitudeDeg != observer.latitudeDeg;
-    const bool longitudeChanged = m_location.observer().longitudeDeg != observer.longitudeDeg;
-    const bool elevationChanged = m_location.observer().elevationMeters != observer.elevationMeters;
-    if (!latitudeChanged && !longitudeChanged && !elevationChanged) {
-        return;
-    }
-
-    m_location.setObserver(observer);
-    if (latitudeChanged) {
-        emit latitudeTextChanged();
-    }
-    if (longitudeChanged) {
-        emit longitudeTextChanged();
-    }
-    if (elevationChanged) {
-        emit elevationTextChanged();
-    }
-    emit nightConditionsChanged();
-    if (!recenterTrackedTarget(true)) {
-        emit skyContextChanged();
-    }
-}
-
-void SkyContextController::refreshCurrentLocation()
-{
-    if (m_location.source() != SkyContextLocationSource::CurrentDevice) {
-        return;
-    }
-
-    m_deviceLocationAcquisition->start();
 }
 
 void SkyContextController::setProjectionType(const skygate::core::ProjectionType projectionType)

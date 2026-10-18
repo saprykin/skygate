@@ -167,6 +167,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/SkyCatalogRelatedDataCodec.cpp
     src/catalog/SkyCatalogRelatedDataCodec.hpp
     src/app/SkyContextControllerCatalog.cpp
+    src/app/SkyContextControllerLocation.cpp
     src/app/SkyContextControllerNightConditions.cpp
     src/app/SkyContextControllerSearch.cpp
     src/app/SkyContextControllerSettings.cpp
@@ -194,6 +195,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/app/SkySearchController.hpp
     src/app/SkySearchState.hpp
     src/app/SkySelectedCityChange.hpp
+    src/app/SkyTimelineCatchUpResult.hpp
     src/app/SkyTimelineController.cpp
     src/app/SkyTimelineController.hpp
     src/app/SkyTimelineState.hpp

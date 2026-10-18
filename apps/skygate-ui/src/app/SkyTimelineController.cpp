@@ -1,5 +1,7 @@
 #include "SkyTimelineController.hpp"
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 
 namespace skygate::ui::internal {
@@ -27,6 +29,42 @@ int SkyTimelineController::stepSeconds() const noexcept
 bool SkyTimelineController::catchingUpToCurrentUtc() const noexcept
 {
     return m_state.catchingUpToCurrentUtc;
+}
+
+std::optional<SkyTimelineCatchUpResult> SkyTimelineController::computeCatchUpAdvancement(
+    const skygate::core::UtcTimePoint& timelineUtc,
+    const skygate::core::UtcTimePoint& clockUtc,
+    const skygate::core::UtcTimePoint& wallUtc
+) const noexcept
+{
+    if (!m_state.catchingUpToCurrentUtc || timelineUtc >= wallUtc) {
+        return SkyTimelineCatchUpResult{
+            .nextUtc = clockUtc,
+            .advancedWhileCatchingUp = false,
+            .catchingUpToCurrentUtc = false,
+        };
+    }
+
+    const double elapsedSeconds = std::max(1.0, std::chrono::duration<double>(clockUtc - timelineUtc).count());
+    const double timelineAdvanceSeconds =
+        elapsedSeconds * m_state.speedMultiplier * static_cast<double>(m_state.stepSeconds);
+    if (timelineAdvanceSeconds <= 0.0) {
+        return std::nullopt;
+    }
+
+    skygate::core::UtcTimePoint nextUtc = timelineUtc
+                                          + std::chrono::duration_cast<skygate::core::UtcTimePoint::duration>(
+                                              std::chrono::duration<double>(timelineAdvanceSeconds)
+                                          );
+    if (nextUtc > wallUtc) {
+        nextUtc = wallUtc;
+    }
+
+    return SkyTimelineCatchUpResult{
+        .nextUtc = nextUtc,
+        .advancedWhileCatchingUp = true,
+        .catchingUpToCurrentUtc = nextUtc < wallUtc,
+    };
 }
 
 bool SkyTimelineController::setLive(const bool live) noexcept
