@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SkyLoggingSettingsSnapshot.hpp"
 #include "SkyPersistedStateSnapshot.hpp"
 #include "catalog/SkyCatalogCollectionCacheLoadResult.hpp"
 #include "catalog/SkyCatalogCollectionCacheSnapshot.hpp"
@@ -18,6 +19,7 @@ public:
     [[nodiscard]] std::optional<SkyPersistedStateSnapshot> loadState() const;
     [[nodiscard]] bool saveMainWindowSize(const QSize& size) const;
     [[nodiscard]] QSize loadMainWindowSize() const;
+    [[nodiscard]] skygate::ui::internal::SkyLoggingSettingsSnapshot loadLoggingSettings() const;
     [[nodiscard]] bool clearCatalogCache() const;
     [[nodiscard]] bool clearDeepSkyCatalogCache() const;
     [[nodiscard]] bool saveCatalogCache(const SkyCatalogLegacyCacheSnapshot& snapshot) const;

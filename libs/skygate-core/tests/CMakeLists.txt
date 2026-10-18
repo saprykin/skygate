@@ -53,6 +53,7 @@ add_skygate_core_qtest(skygate-core-geolocation-tests types/GeoLocationTests.cpp
 add_skygate_core_qtest(skygate-core-equatorial-coordinate-tests types/EquatorialCoordinateTests.cpp)
 add_skygate_core_qtest(skygate-core-core-types-tests types/CoreTypesTests.cpp)
 add_skygate_core_qtest(skygate-core-angle-math-tests math/AngleMathTests.cpp)
+add_skygate_core_qtest(skygate-core-fnv1a64-hasher-tests hash/Fnv1a64HasherTests.cpp)
 add_skygate_core_qtest(skygate-core-math-constants-tests math/MathConstantsTests.cpp)
 add_skygate_core_qtest(skygate-core-time-constants-tests math/TimeConstantsTests.cpp)
 add_skygate_core_qtest(skygate-core-time-codec-tests time/TimeCodecTests.cpp)

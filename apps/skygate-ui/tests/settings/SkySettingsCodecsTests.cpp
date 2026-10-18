@@ -215,6 +215,7 @@ void SkySettingsCodecsTests::savingBlankLogPathStoresDefaultPath()
     snapshot.ephemeris.preferredDataProfileId = "";
 
     skygate::ui::internal::SkySettingsSnapshotCodecs::saveStateSnapshot(settings, snapshot);
+    ignoreFallbackWarnings(2);
     const auto loaded = skygate::ui::internal::SkySettingsSnapshotCodecs::loadStateSnapshot(settings);
     QVERIFY(loaded.has_value());
     QCOMPARE(loaded->logToTerminal, false);

@@ -22,11 +22,6 @@ using skygate::ephemeris::EphemerisDataManifest;
 using skygate::ephemeris::EphemerisKernelDataAsset;
 using skygate::ephemeris::EphemerisTextDataAsset;
 
-std::filesystem::path pathFromQString(const QString& path)
-{
-    return std::filesystem::path(path.toStdString());
-}
-
 const EphemerisDataManifest::Profile*
 bundledFallbackProfile(const EphemerisDataManifest* manifest, const QString& profileId)
 {
@@ -166,7 +161,8 @@ SkyEphemerisSnapshotAdapter::solarSystemKernelAsset(const std::string_view asset
         }
 
         const std::filesystem::path activePath =
-            pathFromQString(m_bundledFallbackResourceRoot) / std::filesystem::path(manifestAsset->relativePath);
+            EphemerisDataFileUtilities::pathFromQString(m_bundledFallbackResourceRoot)
+            / std::filesystem::path(manifestAsset->relativePath);
         const QFileInfo activeFileInfo(EphemerisDataFileUtilities::pathToQString(activePath));
         if (!activeFileInfo.exists() || !activeFileInfo.isFile()) {
             return std::nullopt;

@@ -10,11 +10,12 @@
 #include "SkyViewSettingsSnapshot.hpp"
 #include "diagnostics/SkyLogging.hpp"
 #include "engine/EphemerisEngineDescriptorRegistry.hpp"
+#include "ephemeris/SkyEphemerisDataProfileIds.hpp"
 
 #include <QSettings>
 
-#include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace skygate::ui::internal {
 namespace {
@@ -204,7 +205,7 @@ void saveLoggingSettings(QSettings& settings, const SkyLoggingSettingsSnapshot& 
     settings.setValue(settingsKey("logging/logFilePath"), logFilePath);
 }
 
-SkyLoggingSettingsSnapshot loadLoggingSettings(QSettings& settings)
+SkyLoggingSettingsSnapshot readLoggingSettings(QSettings& settings)
 {
     SkyLoggingSettingsSnapshot snapshot;
     snapshot.logToTerminal =
@@ -226,25 +227,17 @@ SkyLoggingSettingsSnapshot loadLoggingSettings(QSettings& settings)
 
 [[nodiscard]] EphemerisEngineKind::Type ephemerisEngineKindFromString(const QString& text)
 {
-    const QString normalizedText = text.trimmed().toLower();
-    for (std::size_t index = 0; index < EphemerisEngineDescriptorRegistry::count(); ++index) {
-        const auto& descriptor = EphemerisEngineDescriptorRegistry::descriptorAt(index);
-        if (QString::fromStdString(descriptor.id).toLower() == normalizedText) {
-            return descriptor.kind;
-        }
+    const std::string normalizedText = EphemerisEngineDescriptorRegistry::normalizedLookupKey(text.toStdString());
+    const auto* descriptor = EphemerisEngineDescriptorRegistry::findByIdIgnoreAsciiCase(normalizedText);
+    if (descriptor != nullptr) {
+        return descriptor->kind;
     }
 
-    if (normalizedText == QStringLiteral("highprecision") || normalizedText == QStringLiteral("high-precision")) {
+    if (normalizedText == "high-precision") {
         return EphemerisEngineKind::Type::HighPrecision;
     }
 
     return EphemerisEngineDescriptorRegistry::defaultDescriptor().kind;
-}
-
-[[nodiscard]] QString normalizedNonBlankSetting(QSettings& settings, const QString& key, const QString& fallback)
-{
-    const QString value = settings.value(key, fallback).toString().trimmed();
-    return value.isEmpty() ? fallback : value;
 }
 
 [[nodiscard]] EphemerisCorrectionFlags
@@ -289,8 +282,9 @@ SkyEphemerisUserSettingsSnapshot loadEphemerisUserSettings(QSettings& settings)
     );
     snapshot.correctionFlags =
         readCorrectionFlags(settings, settingsKey("ephemeris/correctionFlags"), snapshot.correctionFlags);
-    snapshot.correctionPresetId =
-        normalizedNonBlankSetting(settings, settingsKey("ephemeris/correctionPresetId"), snapshot.correctionPresetId);
+    snapshot.correctionPresetId = SkySettingsValueCodecs::readNonBlankStringSetting(
+        settings, settingsKey("ephemeris/correctionPresetId"), snapshot.correctionPresetId
+    );
     snapshot.fallbackToSimpleEngine = SkySettingsValueCodecs::readBoolSetting(
         settings, settingsKey("ephemeris/fallbackToSimpleEngine"), snapshot.fallbackToSimpleEngine
     );
@@ -309,17 +303,17 @@ SkyEphemerisUserSettingsSnapshot loadEphemerisUserSettings(QSettings& settings)
     snapshot.observingWavelengthMicrometers = SkySettingsValueCodecs::readDoubleSetting(
         settings, settingsKey("ephemeris/observingWavelengthMicrometers"), snapshot.observingWavelengthMicrometers
     );
-    snapshot.preferredDataProfileId = normalizedNonBlankSetting(
-        settings, settingsKey("ephemeris/preferredDataProfileId"), snapshot.preferredDataProfileId
+    snapshot.preferredDataProfileId = SkyEphemerisDataProfileIds::canonical(
+        SkySettingsValueCodecs::readNonBlankStringSetting(
+            settings, settingsKey("ephemeris/preferredDataProfileId"), snapshot.preferredDataProfileId
+        )
     );
-    if (snapshot.preferredDataProfileId == QStringLiteral("modern")) {
-        snapshot.preferredDataProfileId = QStringLiteral("de440s-short-range");
-    }
     snapshot.onlineUpdatesEnabled = SkySettingsValueCodecs::readBoolSetting(
         settings, settingsKey("ephemeris/onlineUpdatesEnabled"), snapshot.onlineUpdatesEnabled
     );
-    snapshot.updatePresetId =
-        normalizedNonBlankSetting(settings, settingsKey("ephemeris/updatePresetId"), snapshot.updatePresetId);
+    snapshot.updatePresetId = SkySettingsValueCodecs::readNonBlankStringSetting(
+        settings, settingsKey("ephemeris/updatePresetId"), snapshot.updatePresetId
+    );
     snapshot.updateManifestUrl =
         settings.value(settingsKey("ephemeris/updateManifestUrl"), snapshot.updateManifestUrl).toString().trimmed();
     return snapshot;
@@ -343,6 +337,11 @@ SkyEphemerisUserSettingsSnapshot loadEphemerisUserSettings(QSettings& settings)
 }
 
 }  // namespace
+
+SkyLoggingSettingsSnapshot SkySettingsSnapshotCodecs::loadLoggingSettings(QSettings& settings)
+{
+    return readLoggingSettings(settings);
+}
 
 SkyStateSettingsSnapshot SkySettingsSnapshotCodecs::splitStateSnapshot(const SkyPersistedStateSnapshot& snapshot)
 {
@@ -439,7 +438,7 @@ std::optional<SkyPersistedStateSnapshot> SkySettingsSnapshotCodecs::loadStateSna
     domains.location = loadLocationSettings(settings);
     domains.overlayLayers = loadOverlaySettings(settings);
     domains.catalogSources = loadCatalogSourceSettings(settings);
-    domains.logging = loadLoggingSettings(settings);
+    domains.logging = SkySettingsSnapshotCodecs::loadLoggingSettings(settings);
     domains.ephemerisSettingsPresent = hasEphemerisUserSettings(settings);
     if (domains.ephemerisSettingsPresent) {
         domains.ephemeris = loadEphemerisUserSettings(settings);

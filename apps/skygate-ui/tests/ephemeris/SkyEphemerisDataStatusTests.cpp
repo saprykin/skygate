@@ -1,5 +1,8 @@
 #include "engine/EphemerisDataManifest.hpp"
+#include "ephemeris/SkyEphemerisAssetStatus.hpp"
+#include "ephemeris/SkyEphemerisDataCacheSnapshotPolicy.hpp"
 #include "ephemeris/SkyEphemerisDataManager.hpp"
+#include "ephemeris/SkyEphemerisDataProfileIds.hpp"
 #include "settings/SkySettingsStore.hpp"
 #include "support/EphemerisDataCacheSnapshotFixture.hpp"
 #include "support/SettingsTestFixture.hpp"
@@ -19,6 +22,9 @@
 #include <string_view>
 #include <utility>
 
+using skygate::ui::internal::SkyEphemerisAssetStatus;
+using skygate::ui::internal::SkyEphemerisDataCacheSnapshotPolicy;
+using skygate::ui::internal::SkyEphemerisDataProfileIds;
 using skygate::ui::tests::EphemerisDataCacheSnapshotFixture;
 using skygate::ui::tests::SettingsTestFixture;
 
@@ -99,6 +105,9 @@ private slots:
     void kernelDisplayTextForInstalledKernels();
     void kernelDisplayTextForLegacyProfile();
     void kernelDisplayTextForUnexpectedMetadata();
+    void normalizedSnapshotTrimsAndDefaults();
+    void profileIdsCanonicalizeLegacyAlias();
+    void assetStatusDecodesManagerText();
 
 private:
     SettingsTestFixture m_settings;
@@ -379,6 +388,81 @@ void SkyEphemerisDataStatusTests::revisionSignalEmitsOnlyWhenActiveDataChanges()
     QVERIFY(manager.restoreFromSettings());
     QCOMPARE(activeDataSpy.count(), 1);
     QCOMPARE(revisionSpy.count(), 1);
+}
+
+void SkyEphemerisDataStatusTests::normalizedSnapshotTrimsAndDefaults()
+{
+    SkyEphemerisDataCacheSnapshot snapshot;
+    snapshot.installedKernelAssetId = QStringLiteral("  de440s-kernel  ");
+    snapshot.installedKernelProfileId = QStringLiteral(" modern ");
+    snapshot.installedKernelPath = QStringLiteral("  /tmp/de440s.bsp  ");
+    snapshot.installedKernelVersion = QStringLiteral("  DE440s-2026a  ");
+    snapshot.installedEarthOrientationPath = QStringLiteral("  /tmp/eop.txt  ");
+    snapshot.installedEarthOrientationVersion = QStringLiteral("  2026-05-07  ");
+    snapshot.installedLeapSecondTablePath = QStringLiteral("  /tmp/leap-seconds.list  ");
+    snapshot.installedLeapSecondTableVersion = QStringLiteral("  2026a  ");
+    snapshot.installedDeltaTDataPath = QStringLiteral("  /tmp/delta-t.csv  ");
+    snapshot.installedDeltaTDataVersion = QStringLiteral("  2026a  ");
+    snapshot.dataRevisionToken = QStringLiteral("   ");
+    snapshot.lastUpdateResult = QStringLiteral("  ");
+
+    const SkyEphemerisDataCacheSnapshot normalized = SkyEphemerisDataCacheSnapshotPolicy::normalizedSnapshot(snapshot);
+
+    QCOMPARE(normalized.installedKernelAssetId, QString("de440s-kernel"));
+    QCOMPARE(normalized.installedKernelProfileId, QString("de440s-short-range"));
+    QCOMPARE(normalized.installedKernelPath, QString("/tmp/de440s.bsp"));
+    QCOMPARE(normalized.installedKernelVersion, QString("DE440s-2026a"));
+    QCOMPARE(normalized.installedEarthOrientationPath, QString("/tmp/eop.txt"));
+    QCOMPARE(normalized.installedEarthOrientationVersion, QString("2026-05-07"));
+    QCOMPARE(normalized.installedLeapSecondTablePath, QString("/tmp/leap-seconds.list"));
+    QCOMPARE(normalized.installedLeapSecondTableVersion, QString("2026a"));
+    QCOMPARE(normalized.installedDeltaTDataPath, QString("/tmp/delta-t.csv"));
+    QCOMPARE(normalized.installedDeltaTDataVersion, QString("2026a"));
+    QCOMPARE(normalized.dataRevisionToken, QString("bundled"));
+    QCOMPARE(normalized.lastUpdateResult, QString("Bundled fallback"));
+}
+
+void SkyEphemerisDataStatusTests::profileIdsCanonicalizeLegacyAlias()
+{
+    QCOMPARE(SkyEphemerisDataProfileIds::canonical(QStringLiteral("modern")), QString("de440s-short-range"));
+    QCOMPARE(SkyEphemerisDataProfileIds::canonical(QStringLiteral("  modern  ")), QString("de440s-short-range"));
+    QCOMPARE(SkyEphemerisDataProfileIds::canonical(QStringLiteral("de441-long-range")), QString("de441-long-range"));
+    QCOMPARE(SkyEphemerisDataProfileIds::canonical(QString()), QString());
+    QCOMPARE(QString(SkyEphemerisDataProfileIds::kDefaultProfileId), QString("de440s-short-range"));
+}
+
+void SkyEphemerisDataStatusTests::assetStatusDecodesManagerText()
+{
+    const SkyEphemerisAssetStatus bundled = SkyEphemerisAssetStatus::fromStatusText(QStringLiteral("Bundled fallback"));
+    QCOMPARE(
+        static_cast<std::uint8_t>(bundled.source()),
+        static_cast<std::uint8_t>(SkyEphemerisAssetStatus::Source::BundledFallback)
+    );
+    QVERIFY(!bundled.isInstalled());
+    QVERIFY(bundled.version().isEmpty());
+    QCOMPARE(bundled.displayText(), QString("Bundled"));
+    QCOMPARE(bundled.statusText(), QString("Bundled fallback"));
+
+    const SkyEphemerisAssetStatus missing =
+        SkyEphemerisAssetStatus::fromStatusText(QStringLiteral("Bundled fallback (installed data missing)"));
+    QCOMPARE(
+        static_cast<std::uint8_t>(missing.source()),
+        static_cast<std::uint8_t>(SkyEphemerisAssetStatus::Source::MissingInstalledFallback)
+    );
+    QVERIFY(!missing.isInstalled());
+    QCOMPARE(missing.displayText(), QString("Bundled"));
+    QCOMPARE(missing.statusText(), QString("Bundled fallback (installed data missing)"));
+
+    const SkyEphemerisAssetStatus installed =
+        SkyEphemerisAssetStatus::fromStatusText(QStringLiteral("Installed: 2026a"));
+    QCOMPARE(
+        static_cast<std::uint8_t>(installed.source()),
+        static_cast<std::uint8_t>(SkyEphemerisAssetStatus::Source::Installed)
+    );
+    QVERIFY(installed.isInstalled());
+    QCOMPARE(installed.version(), QString("2026a"));
+    QCOMPARE(installed.displayText(), QString("2026a"));
+    QCOMPARE(installed.statusText(), QString("Installed: 2026a"));
 }
 
 QTEST_GUILESS_MAIN(SkyEphemerisDataStatusTests)

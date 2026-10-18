@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SkyEphemerisAssetStatus.hpp"
 #include "SkyEphemerisCacheController.hpp"
 #include "SkyEphemerisDataCacheSnapshot.hpp"
 #include "SkyEphemerisDownloadService.hpp"
@@ -82,6 +83,14 @@ private:
         MissingInstalledFallback
     };
 
+    enum class AssetId : std::uint8_t {
+        PlanetaryKernel,
+        EarthOrientation,
+        LeapSecondTable,
+        DeltaT
+    };
+
+    [[nodiscard]] skygate::ui::internal::SkyEphemerisAssetStatus assetStatus(AssetId assetId) const;
     void applyCacheSnapshot(
         SkyEphemerisDataCacheSnapshot cacheSnapshot, ActiveSource source, QString statusText, bool emitSignals
     );

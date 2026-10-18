@@ -3,6 +3,7 @@
 #include "engine/EphemerisCorrectionFlags.hpp"
 #include "engine/EphemerisEngineKind.hpp"
 #include "engine/EphemerisEngineOptions.hpp"
+#include "ephemeris/SkyEphemerisDataProfileIds.hpp"
 
 #include <QString>
 
@@ -20,7 +21,7 @@ struct SkyEphemerisUserSettingsSnapshot final {
     double relativeHumidity = skygate::ephemeris::EphemerisEngineOptions::kDefaultRelativeHumidity;
     double observingWavelengthMicrometers =
         skygate::ephemeris::EphemerisEngineOptions::kDefaultObservingWavelengthMicrometers;
-    QString preferredDataProfileId = QStringLiteral("de440s-short-range");
+    QString preferredDataProfileId = QString(skygate::ui::internal::SkyEphemerisDataProfileIds::kDefaultProfileId);
     bool onlineUpdatesEnabled = true;
     QString updatePresetId = QStringLiteral("bundled");
     QString updateManifestUrl;

@@ -46,6 +46,7 @@ private slots:
     void normalizedUpdateManifestUrlFillsDefaultWhenEmpty();
     void engineOptionsFromSettingsCopiesAllFields();
     void settingsForEngineSwitchAppliesDefaults();
+    void defaultWritableCacheRootEndsWithEphemerisData();
 };
 
 void SkyEphemerisSettingsPolicyTests::presetFlagsMatchPresetIndex_data()
@@ -326,6 +327,13 @@ void SkyEphemerisSettingsPolicyTests::settingsForEngineSwitchAppliesDefaults()
         QCOMPARE(result->observingWavelengthMicrometers, 0.68);
         QCOMPARE(result->preferredDataProfileId, QStringLiteral("custom-profile"));
     }
+}
+
+void SkyEphemerisSettingsPolicyTests::defaultWritableCacheRootEndsWithEphemerisData()
+{
+    const QString writableCacheRoot = SkyEphemerisSettingsPolicy::defaultWritableCacheRoot();
+    QVERIFY(!writableCacheRoot.isEmpty());
+    QVERIFY(writableCacheRoot.endsWith(QStringLiteral("/ephemeris-data")));
 }
 
 QTEST_GUILESS_MAIN(SkyEphemerisSettingsPolicyTests)
