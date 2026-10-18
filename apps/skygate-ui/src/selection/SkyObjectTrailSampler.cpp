@@ -9,9 +9,7 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cmath>
 #include <memory>
-#include <numbers>
 #include <optional>
 #include <vector>
 
@@ -23,11 +21,6 @@ constexpr int kObjectTrailSampleStepMinutes = 30;
 constexpr int kObjectTrailAdaptiveRenderStepMinutes = 10;
 constexpr int kObjectTrailAdaptiveSampleStepMinutes = 120;
 constexpr double kObjectTrailAdaptiveMaxInterpolationErrorDeg = 0.05;
-
-// For two unit vectors the cross-product magnitude is the sine of their angle.
-// Below this value the rotation axis is unresolved and the directions are
-// treated as collinear.
-constexpr double kObjectTrailCollinearSinTolerance = 1e-9;
 
 void copyCommonBodyFields(
     skygate::ephemeris::BaseCelestialBody& target, const skygate::ephemeris::BaseCelestialBody& source
@@ -83,16 +76,6 @@ equatorialEqual(const skygate::core::EquatorialCoordinate& lhs, const skygate::c
 {
     return lhs.latitudeDeg == rhs.latitudeDeg && lhs.longitudeDeg == rhs.longitudeDeg
            && lhs.elevationMeters == rhs.elevationMeters;
-}
-
-[[nodiscard]] skygate::core::Vector3d perpendicularAxis(const skygate::core::Vector3d& vector) noexcept
-{
-    const skygate::core::Vector3d zAxis{.x = 0.0, .y = 0.0, .z = 1.0};
-    skygate::core::Vector3d axis = vector.cross(zAxis);
-    if (axis.length() <= kObjectTrailCollinearSinTolerance) {
-        axis = vector.cross(skygate::core::Vector3d{.x = 1.0, .y = 0.0, .z = 0.0});
-    }
-    return axis.normalized().value_or(skygate::core::Vector3d{.x = 0.0, .y = 0.0, .z = 1.0});
 }
 
 [[nodiscard]] std::optional<skygate::core::HorizontalCoordinate> interpolateSampleAtOffset(
@@ -180,20 +163,13 @@ void alignTrailToSelectedState(
         skygate::core::SphericalGeometry::horizontalToUnitVector(*presentSample->horizontal);
     const skygate::core::Vector3d selectedNow =
         skygate::core::SphericalGeometry::horizontalToUnitVector(selectedHorizontal);
-    const double dot = std::clamp(guidanceNow.dot(selectedNow), -1.0, 1.0);
-    skygate::core::Vector3d axis = guidanceNow.cross(selectedNow);
-    const double axisLength = axis.length();
-    double angleRad = 0.0;
-    if (axisLength <= kObjectTrailCollinearSinTolerance) {
-        if (dot > 0.0) {
-            presentSample->horizontal = selectedHorizontal;
-            return;
-        }
-        axis = perpendicularAxis(guidanceNow);
-        angleRad = std::numbers::pi;
-    } else {
-        axis = axis.normalized().value_or(skygate::core::Vector3d{.x = 0.0, .y = 0.0, .z = 1.0});
-        angleRad = std::atan2(axisLength, dot);
+    const skygate::core::Vector3d axis =
+        skygate::core::SphericalGeometry::rotationAxisBetween(guidanceNow, selectedNow);
+    const double angleRad = skygate::core::SphericalGeometry::rotationAngleBetween(guidanceNow, selectedNow, axis);
+    if (angleRad <= 0.0) {
+        // Nothing to rotate, so the sampled directions keep their exact values.
+        presentSample->horizontal = selectedHorizontal;
+        return;
     }
 
     for (skygate::ephemeris::BodyTrailSample& sample : samples) {
