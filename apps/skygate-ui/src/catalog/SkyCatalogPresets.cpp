@@ -1,8 +1,13 @@
 #include "SkyCatalogPresets.hpp"
+#include "StringUtilities.hpp"
 
 #include <QString>
 
+#include <string>
+#include <string_view>
 #include <utility>
+
+using skygate::ephemeris::StringUtilities;
 
 namespace skygate::ui::internal {
 namespace {
@@ -95,23 +100,35 @@ const QVector<SkyCatalogSourceDescriptor>& deepSkyDescriptors()
     return descriptors;
 }
 
-QString canonicalStarPresetId(const QString& presetId)
+// The retired preset IDs are aliases of the IDs the descriptors carry, so a
+// stored preset selection keeps resolving after its preset was replaced.
+std::string canonicalStarPresetId(std::string normalizedId)
 {
-    if (presetId == QStringLiteral("hyg_v3")) {
-        return QStringLiteral("hyg_v42");
+    if (normalizedId == "hyg_v3") {
+        return "hyg_v42";
     }
-    return presetId;
+    return normalizedId;
 }
 
-QString canonicalDeepSkyPresetId(const QString& presetId)
+std::string canonicalDeepSkyPresetId(std::string normalizedId)
 {
-    if (presetId == QStringLiteral("bundled")) {
-        return QStringLiteral("bundled_messier");
+    if (normalizedId == "bundled") {
+        return "bundled_messier";
     }
-    return presetId;
+    return normalizedId;
 }
 
 }  // namespace
+
+std::string SkyCatalogPresets::normalizedPresetId(const std::string_view presetId)
+{
+    return StringUtilities::normalizedLookupKey(presetId);
+}
+
+bool SkyCatalogPresets::presetIdMatches(const std::string_view registeredId, const std::string_view requestedId)
+{
+    return StringUtilities::equalsIgnoreAsciiCase(registeredId, requestedId);
+}
 
 int SkyCatalogPresets::normalizeCatalogPresetIndex(const int presetIndex) noexcept
 {
@@ -121,7 +138,7 @@ int SkyCatalogPresets::normalizeCatalogPresetIndex(const int presetIndex) noexce
     if (presetIndex == 1 || presetIndex == 3) {
         return 1;
     }
-    return 2;
+    return kCustomLegacyPresetIndex;
 }
 
 int SkyCatalogPresets::normalizeDeepSkyCatalogPresetIndex(const int presetIndex) noexcept
@@ -132,7 +149,7 @@ int SkyCatalogPresets::normalizeDeepSkyCatalogPresetIndex(const int presetIndex)
     if (presetIndex == 1) {
         return 1;
     }
-    return 2;
+    return kCustomLegacyPresetIndex;
 }
 
 QString SkyCatalogPresets::defaultCatalogUrlText()
@@ -157,11 +174,22 @@ QString SkyCatalogPresets::deepSkyCategory()
     return QStringLiteral("Deep sky");
 }
 
+skygate::ephemeris::CatalogCompositionPolicy SkyCatalogPresets::policyForCategory(const QString& category)
+{
+    return category == deepSkyCategory() ? skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly
+                                         : skygate::ephemeris::CatalogCompositionPolicy::Merge;
+}
+
+QString SkyCatalogPresets::categoryForPolicy(const skygate::ephemeris::CatalogCompositionPolicy policy)
+{
+    return policy == skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly ? deepSkyCategory() : starCategory();
+}
+
 std::optional<SkyCatalogSourceDescriptor> SkyCatalogPresets::starSourceDescriptor(const QString& presetId)
 {
-    const QString canonicalId = canonicalStarPresetId(presetId.trimmed().toLower());
+    const std::string canonicalId = canonicalStarPresetId(normalizedPresetId(presetId.toStdString()));
     for (const SkyCatalogSourceDescriptor& descriptor : starDescriptors()) {
-        if (descriptor.sourceId == canonicalId) {
+        if (presetIdMatches(descriptor.sourceId.toStdString(), canonicalId)) {
             return descriptor;
         }
     }
@@ -170,9 +198,9 @@ std::optional<SkyCatalogSourceDescriptor> SkyCatalogPresets::starSourceDescripto
 
 std::optional<SkyCatalogSourceDescriptor> SkyCatalogPresets::deepSkySourceDescriptor(const QString& presetId)
 {
-    const QString canonicalId = canonicalDeepSkyPresetId(presetId.trimmed().toLower());
+    const std::string canonicalId = canonicalDeepSkyPresetId(normalizedPresetId(presetId.toStdString()));
     for (const SkyCatalogSourceDescriptor& descriptor : deepSkyDescriptors()) {
-        if (descriptor.sourceId == canonicalId) {
+        if (presetIdMatches(descriptor.sourceId.toStdString(), canonicalId)) {
             return descriptor;
         }
     }

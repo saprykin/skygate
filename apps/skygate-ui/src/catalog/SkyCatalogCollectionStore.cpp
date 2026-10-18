@@ -80,18 +80,11 @@ skygate::ephemeris::CatalogCompositionPolicy readCatalogCompositionPolicy(QSetti
 skygate::ephemeris::CatalogSourceType readCatalogSourceSchemaHint(QSettings& settings, const QString& key)
 {
     const auto noHint = skygate::ephemeris::CatalogSourceType::Unknown;
-    if (!settings.contains(key)) {
-        return noHint;
-    }
-
-    bool ok = false;
-    const int storedValue = settings.value(key).toInt(&ok);
-    if (ok) {
-        const auto storedType = static_cast<skygate::ephemeris::CatalogSourceType>(storedValue);
-        if (storedType == skygate::ephemeris::CatalogSourceType::Unknown
-            || skygate::ephemeris::CatalogSchemaRegistry::find(storedType) != nullptr) {
-            return storedType;
-        }
+    const auto storedType = static_cast<skygate::ephemeris::CatalogSourceType>(
+        SkySettingsValueCodecs::readIntSetting(settings, key, static_cast<int>(noHint))
+    );
+    if (storedType == noHint || skygate::ephemeris::CatalogSchemaRegistry::find(storedType) != nullptr) {
+        return storedType;
     }
 
     qCWarning(skygateSettingsLog).noquote() << "Invalid catalog source schema hint" << key << "value"

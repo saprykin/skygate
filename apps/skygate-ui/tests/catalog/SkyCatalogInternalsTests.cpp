@@ -14,6 +14,7 @@ class SkyCatalogInternalsTests final : public QObject {
 private slots:
     void catalogTextFormatsStableStatusMessages();
     void catalogTextComposesSummaryDetails();
+    void catalogTextDropsStatusPrefix();
     void catalogImportStatusKeepsPhaseIndependentOfText();
     void constellationStoreKeepsCustomRefsAndCounts();
     void constellationStoreClearDropsRefsAndCounts();
@@ -32,6 +33,20 @@ void SkyCatalogInternalsTests::catalogTextFormatsStableStatusMessages()
     QCOMPARE(SkyCatalogText::starCacheClearResult(false), QString("Catalog: Star catalog cache clear failed"));
     QCOMPARE(SkyCatalogText::deepSkyCacheClearResult(true), QString("Catalog: Deep-sky catalog cache cleared"));
     QCOMPARE(SkyCatalogText::deepSkyCacheClearResult(false), QString("Catalog: Deep-sky catalog cache clear failed"));
+}
+
+void SkyCatalogInternalsTests::catalogTextDropsStatusPrefix()
+{
+    using skygate::ui::internal::SkyCatalogText;
+
+    QCOMPARE(QString::fromLatin1(SkyCatalogText::kStatusPrefix), QString("Catalog: "));
+    QCOMPARE(SkyCatalogText::withoutStatusPrefix("Catalog: Loaded"), QString("Loaded"));
+    QCOMPARE(SkyCatalogText::withoutStatusPrefix("Catalog: "), QString(""));
+    QCOMPARE(SkyCatalogText::withoutStatusPrefix("Imported 4 line refs"), QString("Imported 4 line refs"));
+    QCOMPARE(SkyCatalogText::withoutStatusPrefix(""), QString(""));
+
+    // Only a leading prefix is a status prefix.
+    QCOMPARE(SkyCatalogText::withoutStatusPrefix("Loaded | Catalog: tail"), QString("Loaded | Catalog: tail"));
 }
 
 void SkyCatalogInternalsTests::catalogImportStatusKeepsPhaseIndependentOfText()

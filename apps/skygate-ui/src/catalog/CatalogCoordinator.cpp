@@ -3,8 +3,8 @@
 #include "catalog/CatalogDownloadCancellation.hpp"
 #include "catalog/CatalogDownloadService.hpp"
 #include "catalog/CatalogPayloadParseService.hpp"
+#include "catalog/SkyCatalogText.hpp"
 
-#include <QLocale>
 #include <QLoggingCategory>
 #include <QNetworkAccessManager>
 #include <QObject>
@@ -14,6 +14,7 @@
 #include <utility>
 
 using skygate::ui::internal::SkyCatalogImportStatus;
+using skygate::ui::internal::SkyCatalogText;
 
 namespace {
 
@@ -58,7 +59,7 @@ QString catalogLoadErrorText(const skygate::ephemeris::CatalogLoadResult& loadRe
         description = QString("%1 (%2)").arg(description, QString::fromStdString(loadResult.errorDetail));
     }
 
-    return QString("Catalog: Source %1 parse failed: %2").arg(sourceUrl, description);
+    return SkyCatalogText::sourceParseFailed(sourceUrl, description);
 }
 }  // namespace
 
@@ -81,7 +82,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
 {
     if (m_downloadService == nullptr || m_parseService == nullptr) {
         DownloadResult result;
-        result.errorText = "Catalog: Network unavailable";
+        result.errorText = SkyCatalogText::networkUnavailable();
         completionHandler(std::move(result));
         return;
     }
@@ -106,7 +107,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
             if (downloadResult.payload.isEmpty()) {
                 DownloadResult result;
                 result.errorText =
-                    downloadResult.errorText.isEmpty() ? QString("Catalog: Download failed") : downloadResult.errorText;
+                    downloadResult.errorText.isEmpty() ? SkyCatalogText::downloadFailed() : downloadResult.errorText;
                 result.sourceUrl = downloadResult.sourceUrl;
                 completionHandler(std::move(result));
                 return;
@@ -115,7 +116,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
             if (statusHandler) {
                 statusHandler(
                     SkyCatalogImportStatus{
-                        .text = QStringLiteral("Catalog: Processing downloaded catalog..."),
+                        .text = SkyCatalogText::processingDownloadedCatalog(),
                         .phase = SkyCatalogImportStatus::Phase::Processing,
                     }
                 );
@@ -130,7 +131,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                 callbackContext != nullptr ? callbackContext : static_cast<QObject*>(m_networkAccessManager);
             if (contextObject == nullptr) {
                 DownloadResult result;
-                result.errorText = "Catalog: Callback context unavailable";
+                result.errorText = SkyCatalogText::callbackContextUnavailable();
                 result.sourceUrl = downloadResult.sourceUrl;
                 completionHandler(std::move(result));
                 return;
@@ -147,10 +148,9 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                         return;
                     }
 
-                    const QString countText = QLocale::system().toString(static_cast<qulonglong>(parsedObjectCount));
                     statusHandler(
                         SkyCatalogImportStatus{
-                            .text = QString("Catalog: Processing... %1 objects parsed").arg(countText),
+                            .text = SkyCatalogText::processingParsedObjects(parsedObjectCount),
                             .phase = SkyCatalogImportStatus::Phase::Processing,
                         }
                     );
@@ -197,7 +197,7 @@ void CatalogCoordinator::downloadRawDataFromUrls(
 {
     if (m_downloadService == nullptr) {
         RawDownloadResult result;
-        result.errorText = "Catalog: Network unavailable";
+        result.errorText = SkyCatalogText::networkUnavailable();
         completionHandler(std::move(result));
         return;
     }

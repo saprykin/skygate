@@ -2,24 +2,20 @@
 #include "CatalogCoordinator.hpp"
 #include "CatalogParseOptions.hpp"
 #include "SkyCatalogSourceImportResult.hpp"
+#include "SkyCatalogText.hpp"
 #include "SkyConstellationLineImportResult.hpp"
+#include "SkyPayloadView.hpp"
 #include "catalog/CatalogIdentity.hpp"
 #include "catalog/stellarium/StellariumConstellationParser.hpp"
 
 #include <QLoggingCategory>
 
-#include <string_view>
 #include <utility>
 
 namespace skygate::ui::internal {
 namespace {
 
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
-
-std::string_view payloadView(const QByteArray& payload)
-{
-    return std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()));
-}
 
 }  // namespace
 
@@ -49,7 +45,7 @@ void SkyCatalogImportWorkflow::downloadSource(
         result.sourceLabel = source.title;
         result.sourceId = source.instanceId;
         result.sourceVersion = source.version;
-        result.errorText = "Catalog: Network unavailable";
+        result.errorText = SkyCatalogText::networkUnavailable();
         completionHandler(std::move(result));
         return;
     }
@@ -85,7 +81,7 @@ void SkyCatalogImportWorkflow::downloadSource(
             result.foundObjectCount = skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(bodies);
             if (result.foundObjectCount == 0U) {
                 result.catalog.reset();
-                result.errorText = "Catalog: Downloaded deep-sky catalog contains no DSOs";
+                result.errorText = SkyCatalogText::emptyDeepSkyCatalog();
             }
             completionHandler(std::move(result));
         }
@@ -102,7 +98,7 @@ void SkyCatalogImportWorkflow::downloadConstellationLines(
 {
     if (m_catalogCoordinator == nullptr) {
         SkyConstellationLineImportResult result;
-        result.statusSuffix = "no constellation data (Catalog: Network unavailable)";
+        result.statusSuffix = SkyCatalogText::missingConstellationData(SkyCatalogText::networkUnavailable());
         completionHandler(std::move(result));
         return;
     }
@@ -116,7 +112,7 @@ void SkyCatalogImportWorkflow::downloadConstellationLines(
             SkyConstellationLineImportResult result;
             if (lineResult.payload.isEmpty()) {
                 const QString reason = lineResult.errorText.isEmpty() ? QString("unavailable") : lineResult.errorText;
-                result.statusSuffix = QString("no constellation data (%1)").arg(reason);
+                result.statusSuffix = SkyCatalogText::missingConstellationData(reason);
                 qCWarning(skygateCatalogParseLog).noquote()
                     << "Constellation line download unavailable; no bundled fallback:" << reason;
                 completionHandler(std::move(result));
@@ -124,13 +120,14 @@ void SkyCatalogImportWorkflow::downloadConstellationLines(
             }
 
             const skygate::ephemeris::StellariumConstellationParser parser;
-            auto parsedData = parser.parse(payloadView(lineResult.payload));
+            auto parsedData = parser.parse(SkyPayloadView::of(lineResult.payload));
             if (parsedData.lineRefs.empty()) {
                 QString payloadPreview = QString::fromUtf8(lineResult.payload.left(120)).simplified();
                 if (payloadPreview.isEmpty()) {
                     payloadPreview = "<empty>";
                 }
-                result.statusSuffix = QString("no constellation data (parse failed: %1)").arg(payloadPreview);
+                result.statusSuffix =
+                    SkyCatalogText::missingConstellationData(QString("parse failed: %1").arg(payloadPreview));
                 qCWarning(skygateCatalogParseLog).noquote()
                     << "Constellation line parse failed; no bundled fallback. Payload preview:" << payloadPreview;
                 completionHandler(std::move(result));

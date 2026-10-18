@@ -2,15 +2,18 @@
 
 #include "catalog/CatalogParseRequest.hpp"
 #include "catalog/CatalogPayloadParser.hpp"
+#include "catalog/SkyPayloadView.hpp"
 
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
 #include <QThreadPool>
 
+#include <cstddef>
 #include <memory>
-#include <string_view>
 #include <utility>
+
+using skygate::ui::internal::SkyPayloadView;
 
 void CatalogPayloadParseService::parseAsync(
     QByteArray payload,
@@ -43,8 +46,8 @@ void CatalogPayloadParseService::parseAsync(
             );
         };
 
-        const std::string_view payloadView(payload.constData(), static_cast<std::size_t>(payload.size()));
-        const skygate::ephemeris::CatalogParseRequest request = parseOptions.makeRequest(payloadView, reportProgress);
+        const skygate::ephemeris::CatalogParseRequest request =
+            parseOptions.makeRequest(SkyPayloadView::of(payload), reportProgress);
 
         const skygate::ephemeris::CatalogPayloadParser parser;
         const auto parsedResult = std::make_shared<skygate::ephemeris::CatalogLoadResult>(parser.parseResult(request));
