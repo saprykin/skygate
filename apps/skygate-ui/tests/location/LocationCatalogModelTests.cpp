@@ -11,6 +11,8 @@ private slots:
     void groupsFilteredRowsByCountry();
     void resolvesCityByStableId();
     void includesRussiaAndMoscow();
+    void skipsMalformedCatalogRows();
+    void rejectsCatalogWithoutRequiredColumns();
 };
 
 void LocationCatalogModelTests::loadsBundledCatalog()
@@ -72,6 +74,32 @@ void LocationCatalogModelTests::includesRussiaAndMoscow()
     QVERIFY(cityEntry.has_value());
     QCOMPARE(cityEntry->countryName, QString("Russia"));
     QCOMPARE(cityEntry->cityName, QString("Moscow"));
+}
+
+void LocationCatalogModelTests::skipsMalformedCatalogRows()
+{
+    const QString csv = QStringLiteral(
+        "id,countryName,cityName,latitudeDeg,longitudeDeg\n"
+        "ch-zurich,Switzerland,Zurich,47.3769,8.5417\n"
+        "ch-basel,Switzerland,Basel\n"
+        "ch-bern,Switzerland,Bern,nan,7.4474\n"
+        "ch-geneva,Switzerland,,46.2044,6.1432\n"
+        "ch-lugano,Switzerland,Lugano,1e400,8.9511\n"
+    );
+
+    const auto entries = LocationCatalogModel::parseCatalog(csv);
+
+    QVERIFY(entries.has_value());
+    QCOMPARE(entries->size(), 1);
+    QCOMPARE(entries->constFirst().id, QStringLiteral("ch-zurich"));
+    QCOMPARE(entries->constFirst().latitudeDeg, 47.3769);
+}
+
+void LocationCatalogModelTests::rejectsCatalogWithoutRequiredColumns()
+{
+    const auto entries = LocationCatalogModel::parseCatalog(QStringLiteral("id,countryName\nch-zurich,Switzerland\n"));
+
+    QVERIFY(!entries.has_value());
 }
 
 QTEST_GUILESS_MAIN(LocationCatalogModelTests)

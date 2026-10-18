@@ -163,6 +163,36 @@ struct NetworkDownloadState final {
     bool completed = false;
 };
 
+enum class StagedProgressTotal : std::uint8_t {
+    Unknown,
+    StagedBytes,
+};
+
+// Appends one network payload to the staged file, enforcing the staging cap and
+// reporting progress for the bytes the file accepted.
+[[nodiscard]] bool
+appendStagedPayload(NetworkDownloadState& state, const QByteArray& payload, const StagedProgressTotal progressTotal)
+{
+    const std::uint64_t incomingBytes = static_cast<std::uint64_t>(payload.size());
+    if (incomingBytes > state.stagingByteCap || state.result.stagedBytes > state.stagingByteCap - incomingBytes) {
+        state.result.status = StagedUpdateDownloadStatus::IoError;
+        addDiagnostic(state.result, QStringLiteral("Ephemeris update download exceeded the declared staging size."));
+        return false;
+    }
+    if (state.stagedFile->write(payload) != payload.size()) {
+        state.result.status = StagedUpdateDownloadStatus::IoError;
+        addDiagnostic(state.result, QStringLiteral("Unable to write ephemeris update staging file."));
+        return false;
+    }
+
+    state.result.stagedBytes += incomingBytes;
+    const std::optional<std::uint64_t> totalBytes = progressTotal == StagedProgressTotal::StagedBytes
+                                                        ? std::optional<std::uint64_t>{state.result.stagedBytes}
+                                                        : std::nullopt;
+    reportDownloadProgress(state.request, state.result.stagedBytes, totalBytes);
+    return true;
+}
+
 }  // namespace
 
 SkyEphemerisDownloadService::SkyEphemerisDownloadService(QNetworkAccessManager* networkAccessManager, QObject* parent)
@@ -372,24 +402,9 @@ void SkyEphemerisDownloadService::stageNetworkUrl(
         if (payload.isEmpty()) {
             return;
         }
-        const std::uint64_t incomingBytes = static_cast<std::uint64_t>(payload.size());
-        if (incomingBytes > state->stagingByteCap
-            || state->result.stagedBytes > state->stagingByteCap - incomingBytes) {
-            state->result.status = StagedUpdateDownloadStatus::IoError;
-            addDiagnostic(
-                state->result, QStringLiteral("Ephemeris update download exceeded the declared staging size.")
-            );
+        if (!appendStagedPayload(*state, payload, StagedProgressTotal::Unknown)) {
             state->reply->abort();
-            return;
         }
-        if (state->stagedFile->write(payload) != payload.size()) {
-            state->result.status = StagedUpdateDownloadStatus::IoError;
-            addDiagnostic(state->result, QStringLiteral("Unable to write ephemeris update staging file."));
-            state->reply->abort();
-            return;
-        }
-        state->result.stagedBytes += incomingBytes;
-        reportDownloadProgress(state->request, state->result.stagedBytes, std::nullopt);
     });
 
     QObject::connect(
@@ -429,20 +444,7 @@ void SkyEphemerisDownloadService::stageNetworkUrl(
 
         const QByteArray remainingPayload = state->reply->readAll();
         if (!remainingPayload.isEmpty() && state->result.status != StagedUpdateDownloadStatus::IoError) {
-            const std::uint64_t incomingBytes = static_cast<std::uint64_t>(remainingPayload.size());
-            if (incomingBytes > state->stagingByteCap
-                || state->result.stagedBytes > state->stagingByteCap - incomingBytes) {
-                state->result.status = StagedUpdateDownloadStatus::IoError;
-                addDiagnostic(
-                    state->result, QStringLiteral("Ephemeris update download exceeded the declared staging size.")
-                );
-            } else if (state->stagedFile->write(remainingPayload) != remainingPayload.size()) {
-                state->result.status = StagedUpdateDownloadStatus::IoError;
-                addDiagnostic(state->result, QStringLiteral("Unable to write ephemeris update staging file."));
-            } else {
-                state->result.stagedBytes += incomingBytes;
-                reportDownloadProgress(state->request, state->result.stagedBytes, state->result.stagedBytes);
-            }
+            (void)appendStagedPayload(*state, remainingPayload, StagedProgressTotal::StagedBytes);
         }
 
         const QNetworkReply::NetworkError networkError = state->reply->error();

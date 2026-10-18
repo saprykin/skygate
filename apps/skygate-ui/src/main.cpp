@@ -110,22 +110,12 @@ struct StartupEphemerisDataConfiguration final {
 
 bool applyOutputText(skygate::ui::SkyLoggingConfiguration& configuration, const QString& outputText)
 {
-    const QString normalizedOutput = outputText.trimmed().toLower();
-    if (normalizedOutput == QStringLiteral("terminal")) {
-        configuration.logToTerminal = true;
-        configuration.logToFile = false;
-    } else if (normalizedOutput == QStringLiteral("file")) {
-        configuration.logToTerminal = false;
-        configuration.logToFile = true;
-    } else if (normalizedOutput == QStringLiteral("both")) {
-        configuration.logToTerminal = true;
-        configuration.logToFile = true;
-    } else if (normalizedOutput == QStringLiteral("none")) {
-        configuration.logToTerminal = false;
-        configuration.logToFile = false;
-    } else {
+    const std::optional<skygate::ui::SkyLogging::Output> output = skygate::ui::SkyLogging::outputFromText(outputText);
+    if (!output.has_value()) {
         return false;
     }
+
+    skygate::ui::SkyLogging::applyOutput(configuration, *output);
     return true;
 }
 

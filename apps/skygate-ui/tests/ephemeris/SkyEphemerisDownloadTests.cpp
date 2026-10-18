@@ -51,6 +51,8 @@ private slots:
     void init();
     void stagesAssetFromSourceUrl();
     void asyncNetworkDownloadStagesWithoutBlocking();
+    void stagesChunkedNetworkDownload();
+    void stagesManuallyFinishedNetworkDownload();
     void rejectsPlainHttpSourceUrls();
     void rejectsOversizedNetworkStaging();
     void cancelDuringDownloadKeepsStagingAndActiveData();
@@ -150,6 +152,104 @@ void SkyEphemerisDownloadTests::asyncNetworkDownloadStagesWithoutBlocking()
     QCOMPARE(result.stagedBytes, static_cast<std::uint64_t>(payload.size()));
     QCOMPARE(networkAccessManager.requestedUrls().size(), 1);
     QCOMPARE(networkAccessManager.requestedUrls().constFirst(), sourceUrl);
+
+    QFile stagedFile(result.stagedPath);
+    QVERIFY(stagedFile.open(QIODevice::ReadOnly));
+    QCOMPARE(stagedFile.readAll(), payload);
+}
+
+void SkyEphemerisDownloadTests::stagesChunkedNetworkDownload()
+{
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    SkyEphemerisDownloadService service(&networkAccessManager);
+
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    const QByteArray payload(kPayload.data(), static_cast<qsizetype>(kPayload.size()));
+    const QByteArray chunkedPayload = payload.repeated(8);
+
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = StagedEphemerisAssetFixture::stagedAsset(
+        "download-kernel", skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel, "kernels/de440s.bsp"
+    );
+    const QString sourceUrl = QStringLiteral("https://example.test/kernels/de440s.bsp");
+    asset.sourceUrl = sourceUrl.toStdString();
+    networkAccessManager.enqueueResponse(sourceUrl, {.payload = chunkedPayload, .chunkSize = 32});
+
+    SkyEphemerisDownloadService::StagedUpdateDownloadRequest request;
+    request.asset = &asset;
+    request.sourceUrl = sourceUrl;
+    request.stagedResourceRoot = stagedRoot.path();
+    int progressCount = 0;
+    std::uint64_t progressBytes = 0U;
+    request.progressHandler = [&progressCount,
+                               &progressBytes](const std::uint64_t stagedBytes, const std::optional<std::uint64_t>) {
+        ++progressCount;
+        progressBytes = stagedBytes;
+    };
+
+    bool completed = false;
+    SkyEphemerisDownloadService::StagedUpdateDownloadResult result;
+    service.stageAsync(
+        request, [&completed, &result](SkyEphemerisDownloadService::StagedUpdateDownloadResult stagedResult) {
+            completed = true;
+            result = std::move(stagedResult);
+        }
+    );
+
+    QTRY_VERIFY_WITH_TIMEOUT(completed, 5000);
+    const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
+    QVERIFY2(result.isSuccess(), failureMessage.constData());
+    QCOMPARE(result.stagedBytes, static_cast<std::uint64_t>(chunkedPayload.size()));
+    QVERIFY(progressCount > 1);
+    QCOMPARE(progressBytes, static_cast<std::uint64_t>(chunkedPayload.size()));
+
+    QFile stagedFile(result.stagedPath);
+    QVERIFY(stagedFile.open(QIODevice::ReadOnly));
+    QCOMPARE(stagedFile.readAll(), chunkedPayload);
+}
+
+void SkyEphemerisDownloadTests::stagesManuallyFinishedNetworkDownload()
+{
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    SkyEphemerisDownloadService service(&networkAccessManager);
+
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    const QByteArray payload(kPayload.data(), static_cast<qsizetype>(kPayload.size()));
+
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = StagedEphemerisAssetFixture::stagedAsset(
+        "download-kernel", skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel, "kernels/de440s.bsp"
+    );
+    const QString sourceUrl = QStringLiteral("https://example.test/kernels/de440s.bsp");
+    asset.sourceUrl = sourceUrl.toStdString();
+    networkAccessManager.enqueueResponse(sourceUrl, {.payload = payload, .manualFinish = true});
+
+    SkyEphemerisDownloadService::StagedUpdateDownloadRequest request;
+    request.asset = &asset;
+    request.sourceUrl = sourceUrl;
+    request.stagedResourceRoot = stagedRoot.path();
+
+    bool completed = false;
+    SkyEphemerisDownloadService::StagedUpdateDownloadResult result;
+    service.stageAsync(
+        request, [&completed, &result](SkyEphemerisDownloadService::StagedUpdateDownloadResult stagedResult) {
+            completed = true;
+            result = std::move(stagedResult);
+        }
+    );
+
+    const QList<skygate::ui::tests::FakeNetworkReply*> replies = networkAccessManager.issuedReplies();
+    QCOMPARE(replies.size(), 1);
+    skygate::ui::tests::FakeNetworkReply* const reply = replies.constFirst();
+    QVERIFY(!reply->isFinished());
+    QVERIFY(!completed);
+
+    reply->finishNow();
+
+    QTRY_VERIFY_WITH_TIMEOUT(completed, 5000);
+    const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
+    QVERIFY2(result.isSuccess(), failureMessage.constData());
+    QCOMPARE(result.stagedBytes, static_cast<std::uint64_t>(payload.size()));
 
     QFile stagedFile(result.stagedPath);
     QVERIFY(stagedFile.open(QIODevice::ReadOnly));

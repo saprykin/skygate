@@ -22,6 +22,7 @@ private slots:
     void cleanup();
     void defaultConfigurationUsesTerminalOnly();
     void parsesLevelText();
+    void parsesOutputText();
     void writesFileOnlyLogs();
     void infoFileThresholdIncludesWarningsAndErrors();
     void respectsDisabledOutputs();
@@ -110,6 +111,46 @@ void SkyLoggingTests::parsesLevelText()
     QCOMPARE(*skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("critical")), QtCriticalMsg);
     QCOMPARE(*skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("fatal")), QtFatalMsg);
     QVERIFY(!skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("verbose")).has_value());
+}
+
+void SkyLoggingTests::parsesOutputText()
+{
+    skygate::ui::SkyLoggingConfiguration configuration = skygate::ui::SkyLogging::defaultConfiguration();
+
+    const auto terminal = skygate::ui::SkyLogging::outputFromText(QStringLiteral(" Terminal "));
+    QVERIFY(terminal.has_value());
+    QVERIFY(*terminal == skygate::ui::SkyLogging::Output::Terminal);
+    skygate::ui::SkyLogging::applyOutput(configuration, *terminal);
+    QVERIFY(configuration.logToTerminal);
+    QVERIFY(!configuration.logToFile);
+    QCOMPARE(skygate::ui::SkyLogging::outputSummary(configuration), QStringLiteral("terminal"));
+
+    const auto file = skygate::ui::SkyLogging::outputFromText(QStringLiteral("FILE"));
+    QVERIFY(file.has_value());
+    QVERIFY(*file == skygate::ui::SkyLogging::Output::File);
+    skygate::ui::SkyLogging::applyOutput(configuration, *file);
+    QVERIFY(!configuration.logToTerminal);
+    QVERIFY(configuration.logToFile);
+    QCOMPARE(skygate::ui::SkyLogging::outputSummary(configuration), QStringLiteral("file"));
+
+    const auto both = skygate::ui::SkyLogging::outputFromText(QStringLiteral("both"));
+    QVERIFY(both.has_value());
+    QVERIFY(*both == skygate::ui::SkyLogging::Output::Both);
+    skygate::ui::SkyLogging::applyOutput(configuration, *both);
+    QVERIFY(configuration.logToTerminal);
+    QVERIFY(configuration.logToFile);
+    QCOMPARE(skygate::ui::SkyLogging::outputSummary(configuration), QStringLiteral("both"));
+
+    const auto none = skygate::ui::SkyLogging::outputFromText(QStringLiteral("none"));
+    QVERIFY(none.has_value());
+    QVERIFY(*none == skygate::ui::SkyLogging::Output::None);
+    skygate::ui::SkyLogging::applyOutput(configuration, *none);
+    QVERIFY(!configuration.logToTerminal);
+    QVERIFY(!configuration.logToFile);
+    QCOMPARE(skygate::ui::SkyLogging::outputSummary(configuration), QStringLiteral("none"));
+
+    QVERIFY(!skygate::ui::SkyLogging::outputFromText(QStringLiteral("stdout")).has_value());
+    QVERIFY(!skygate::ui::SkyLogging::outputFromText(QString()).has_value());
 }
 
 void SkyLoggingTests::writesFileOnlyLogs()
