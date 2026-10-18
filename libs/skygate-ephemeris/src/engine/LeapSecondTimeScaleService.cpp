@@ -209,7 +209,10 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convertCivilDateTime(
     if (!precedingLookup.offsetSeconds.has_value() || !nextLookup.offsetSeconds.has_value()
         || *nextLookup.offsetSeconds != *precedingLookup.offsetSeconds + 1) {
         TimeScaleConversionResult result = TimeScaleConversionResult::failureFromLookup(
-            *epoch, targetScale, precedingLookup.warningCodeMask, precedingLookup.diagnosticText
+            *epoch,
+            targetScale,
+            precedingLookup.warningCodeMask,
+            "Civil date/time does not identify a configured positive leap second."
         );
         result.warningCodeMask.merge(nextLookup.warningCodeMask);
         result.addWarning(TimeScaleConversionWarningCode::Type::InvalidInput);

@@ -160,6 +160,7 @@ private slots:
     void roundTripsTaiAndTtHelpers();
     void handlesLeapSecondBoundaryOffsets();
     void convertsPositiveLeapSecondCivilLabel();
+    void reportsUnconfiguredLeapSecondLabelText();
     void convertsAtTableRangeBoundaries();
     void reportsOutOfRangeWithoutFallback();
     void reportsReverseOutOfRangeWithoutFallback();
@@ -168,6 +169,7 @@ private slots:
     void keepsChainWarningsThroughDegradedUt1ToTai();
     void mergesChainWarningsIntoDegradedTdbResult();
     void convertsTtToTdbWithDocumentedApproximation();
+    void keepsOnlyTheTdbApproximationWarningBit();
     void roundTripsTtAndTdbPreservingPrecision();
     void convertsUtcToTdbThroughTt();
     void convertsUtcToUt1FromExactEopSample();
@@ -291,6 +293,35 @@ void LeapSecondTimeScaleServiceTests::convertsPositiveLeapSecondCivilLabel()
     const skygate::ephemeris::TimeScaleConversionResult afterTai =
         service.convert(makeUtcEpoch(2017, 1, 1, 0, 0, 0), skygate::core::TimeScale::Tai);
     compareSecondsBetween(afterTai.epoch, tai.epoch, 1.0);
+}
+
+void LeapSecondTimeScaleServiceTests::reportsUnconfiguredLeapSecondLabelText()
+{
+    const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
+
+    const skygate::core::CivilDateTime notALeapSecond{
+        .astronomicalYear = 2016,
+        .month = 6,
+        .day = 30,
+        .hour = 23,
+        .minute = 59,
+        .second = 60,
+        .timeScale = skygate::core::TimeScale::Utc,
+    };
+    QVERIFY(skygate::core::CalendarTime::isValidCivilDateTime(notALeapSecond));
+
+    const skygate::ephemeris::TimeScaleConversionResult result =
+        service.convertCivilDateTime(notALeapSecond, skygate::core::TimeScale::Tai);
+
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Type::Failed)
+    );
+    QCOMPARE(
+        result.diagnosticText, std::string("Civil date/time does not identify a configured positive leap second.")
+    );
+    QVERIFY(result.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::Type::InvalidInput));
 }
 
 void LeapSecondTimeScaleServiceTests::convertsAtTableRangeBoundaries()
@@ -481,6 +512,24 @@ void LeapSecondTimeScaleServiceTests::convertsTtToTdbWithDocumentedApproximation
     )
                  .empty());
     QVERIFY(std::abs(secondsBetween(tdb.epoch, tt) - -0.00007260319547380129) < 2.0e-3);
+}
+
+void LeapSecondTimeScaleServiceTests::keepsOnlyTheTdbApproximationWarningBit()
+{
+    const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
+    const skygate::core::AstronomicalEpoch tt = makeEpoch(skygate::core::TimeScale::Tt, 2018, 1, 1, 12, 0, 0);
+    const std::uint32_t tdbApproximationBit = skygate::ephemeris::TimeScaleConversionResult::WarningMask::bit(
+        skygate::ephemeris::TimeScaleConversionWarningCode::Type::TdbApproximationApplied
+    );
+
+    const skygate::ephemeris::TimeScaleConversionResult tdb = service.convert(tt, skygate::core::TimeScale::Tdb);
+    QVERIFY(tdb.isSuccess());
+    QCOMPARE(tdb.warningCodeMask.bits(), tdbApproximationBit);
+
+    const skygate::ephemeris::TimeScaleConversionResult ttAgain =
+        service.convert(tdb.epoch, skygate::core::TimeScale::Tt);
+    QVERIFY(ttAgain.isSuccess());
+    QCOMPARE(ttAgain.warningCodeMask.bits(), tdbApproximationBit);
 }
 
 void LeapSecondTimeScaleServiceTests::roundTripsTtAndTdbPreservingPrecision()

@@ -9,8 +9,11 @@ void EphemerisTimeScaleMetadataMerger::mergeKernelEpochTimeScaleMetadata(
     EphemerisEngineQueryResult& metadata, const TimeScaleConversionResult& conversion
 ) noexcept
 {
-    const bool onlyTdbApproximation =
-        !conversion.warningCodeMask.without(TimeScaleConversionWarningCode::Type::TdbApproximationApplied).hasAny();
+    const TimeScaleConversionResult::WarningMask tdbApproximationMask =
+        TimeScaleConversionResult::WarningMask::fromBits(
+            TimeScaleConversionResult::WarningMask::bit(TimeScaleConversionWarningCode::Type::TdbApproximationApplied)
+        );
+    const bool onlyTdbApproximation = !conversion.warningCodeMask.without(tdbApproximationMask).hasAny();
     if (conversion.status == TimeScaleConversionStatus::Type::Degraded && onlyTdbApproximation) {
         return;
     }
