@@ -35,8 +35,11 @@ qt_add_library(skygate-ui-lib STATIC
     src/diagnostics/SkyLoggingConfiguration.hpp
     src/diagnostics/SkyPerformanceLogging.cpp
     src/diagnostics/SkyPerformanceLogging.hpp
+    src/ephemeris/SkyEphemerisActiveSource.hpp
     src/ephemeris/SkyEphemerisAssetStatus.cpp
     src/ephemeris/SkyEphemerisAssetStatus.hpp
+    src/ephemeris/SkyEphemerisAssetStatusView.cpp
+    src/ephemeris/SkyEphemerisAssetStatusView.hpp
     src/diagnostics/SkyPerformanceStageTimer.cpp
     src/diagnostics/SkyPerformanceStageTimer.hpp
     src/ephemeris/SkyEphemerisCacheController.cpp

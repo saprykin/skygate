@@ -1,5 +1,7 @@
 #include "engine/EphemerisDataManifest.hpp"
+#include "ephemeris/SkyEphemerisActiveSource.hpp"
 #include "ephemeris/SkyEphemerisAssetStatus.hpp"
+#include "ephemeris/SkyEphemerisAssetStatusView.hpp"
 #include "ephemeris/SkyEphemerisDataCacheSnapshotPolicy.hpp"
 #include "ephemeris/SkyEphemerisDataManager.hpp"
 #include "ephemeris/SkyEphemerisDataProfileIds.hpp"
@@ -22,7 +24,9 @@
 #include <string_view>
 #include <utility>
 
+using skygate::ui::internal::SkyEphemerisActiveSource;
 using skygate::ui::internal::SkyEphemerisAssetStatus;
+using skygate::ui::internal::SkyEphemerisAssetStatusView;
 using skygate::ui::internal::SkyEphemerisDataCacheSnapshotPolicy;
 using skygate::ui::internal::SkyEphemerisDataProfileIds;
 using skygate::ui::tests::EphemerisDataCacheSnapshotFixture;
@@ -109,6 +113,7 @@ private slots:
     void normalizedSnapshotTrimsAndDefaults();
     void profileIdsCanonicalizeLegacyAlias();
     void assetStatusDecodesManagerText();
+    void assetStatusViewPresentsSourceAndSnapshot();
 
 private:
     SettingsTestFixture m_settings;
@@ -503,6 +508,36 @@ void SkyEphemerisDataStatusTests::assetStatusDecodesManagerText()
     QCOMPARE(installed.version(), QString("2026a"));
     QCOMPARE(installed.displayText(), QString("2026a"));
     QCOMPARE(installed.statusText(), QString("Installed: 2026a"));
+}
+
+void SkyEphemerisDataStatusTests::assetStatusViewPresentsSourceAndSnapshot()
+{
+    SkyEphemerisDataCacheSnapshot snapshot;
+    snapshot.installedKernelVersion = QStringLiteral("DE440s-2026a");
+    snapshot.installedEarthOrientationVersion = QStringLiteral("EOP-test");
+    snapshot.dataRevisionToken = QStringLiteral("installed-rev");
+    snapshot.lastUpdateResult = QStringLiteral("Installed data active");
+
+    const SkyEphemerisAssetStatusView installed(snapshot, SkyEphemerisActiveSource::Installed);
+    QCOMPARE(installed.statusText(), QString("Ephemeris data: Installed data active"));
+    QVERIFY(installed.datasetInfoText().contains(QStringLiteral("Kernel DE440s-2026a")));
+    QVERIFY(installed.datasetInfoText().contains(QStringLiteral("EOP EOP-test")));
+    QCOMPARE(installed.shortRangeKernelStatusText(), QString("Installed: DE440s-2026a"));
+    QCOMPARE(installed.earthOrientationStatusText(), QString("Installed: EOP-test"));
+    QCOMPARE(installed.leapSecondStatusText(), QString("Bundled fallback"));
+    QCOMPARE(installed.dataRevisionToken(), QString("installed-rev"));
+    QCOMPARE(installed.lastUpdateResultText(), QString("Installed data active"));
+
+    const SkyEphemerisAssetStatusView missing(snapshot, SkyEphemerisActiveSource::MissingInstalledFallback);
+    QCOMPARE(missing.statusText(), QString("Ephemeris data: Installed data missing; bundled fallback active"));
+    QCOMPARE(missing.datasetInfoText(), QString("Bundled fallback (installed data missing)"));
+    QCOMPARE(missing.shortRangeKernelStatusText(), QString("Bundled fallback (installed data missing)"));
+
+    const SkyEphemerisAssetStatusView bundled;
+    QCOMPARE(bundled.statusText(), QString("Ephemeris data: Bundled fallback"));
+    QCOMPARE(bundled.datasetInfoText(), QString("Bundled fallback"));
+    QCOMPARE(bundled.kernelDisplayText(), QString("Bundled"));
+    QCOMPARE(bundled.dataRevisionToken(), QString("bundled"));
 }
 
 QTEST_GUILESS_MAIN(SkyEphemerisDataStatusTests)
