@@ -20,17 +20,20 @@ double Geometry2d::length2d(const double x, const double y) noexcept
     return std::hypot(x, y);
 }
 
-Vector2d Geometry2d::rotatedOffsetPoint2d(
-    const double originX, const double originY, const double offsetX, const double offsetY, const double rotationDeg
-) noexcept
+Vector2d Geometry2d::rotatePoint2d(const double x, const double y, const double rotationDeg) noexcept
 {
     const double rotationRadians = AngleMath::toRadians(rotationDeg);
     const double cosRotation = std::cos(rotationRadians);
     const double sinRotation = std::sin(rotationRadians);
-    return Vector2d{
-        .x = originX + (offsetX * cosRotation) - (offsetY * sinRotation),
-        .y = originY + (offsetX * sinRotation) + (offsetY * cosRotation)
-    };
+    return Vector2d{.x = (x * cosRotation) - (y * sinRotation), .y = (x * sinRotation) + (y * cosRotation)};
+}
+
+Vector2d Geometry2d::rotatedOffsetPoint2d(
+    const double originX, const double originY, const double offsetX, const double offsetY, const double rotationDeg
+) noexcept
+{
+    const Vector2d rotatedOffset = Geometry2d::rotatePoint2d(offsetX, offsetY, rotationDeg);
+    return Vector2d{.x = originX + rotatedOffset.x, .y = originY + rotatedOffset.y};
 }
 
 Vector2d Geometry2d::ellipseOffsetPoint2d(
@@ -67,6 +70,16 @@ std::int32_t Geometry2d::gridCellIndex(const double coordinate, const double cel
     }
 
     return static_cast<std::int32_t>(std::floor(coordinate / cellSize));
+}
+
+GridCellRange Geometry2d::gridCellRange(const Rect2d& rect, const double cellSize) noexcept
+{
+    return GridCellRange{
+        .minX = Geometry2d::gridCellIndex(rect.left, cellSize),
+        .maxX = Geometry2d::gridCellIndex(rect.right, cellSize),
+        .minY = Geometry2d::gridCellIndex(rect.top, cellSize),
+        .maxY = Geometry2d::gridCellIndex(rect.bottom, cellSize),
+    };
 }
 
 std::uint64_t Geometry2d::packedGridCellKey(const std::int32_t cellX, const std::int32_t cellY) noexcept

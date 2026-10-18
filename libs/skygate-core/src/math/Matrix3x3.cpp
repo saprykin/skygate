@@ -43,6 +43,8 @@ Matrix3x3 Matrix3x3::identity() noexcept
 
 Matrix3x3 Matrix3x3::rotationZ(const double radians) noexcept
 {
+    // Positive radians turn clockwise in the xy-plane seen from +Z, the
+    // opposite sign of Geometry2d::rotatePoint2d.
     const double sine = std::sin(radians);
     const double cosine = std::cos(radians);
     return {

@@ -3,7 +3,7 @@
 #include "ProjectionParams.hpp"
 #include "ProjectionType.hpp"
 #include "ScreenPoint.hpp"
-#include "math/Vector3d.hpp"
+#include "projections/ProjectionFrame.hpp"
 
 #include <optional>
 
@@ -20,14 +20,7 @@ public:
     [[nodiscard]] ScreenPoint projectWithMargin(const HorizontalCoordinate& coordinate, double marginPx) const noexcept;
 
 private:
-    ProjectionType m_projectionType = ProjectionType::Stereographic;
-    ProjectionParams m_params;
-    Vector3d m_center;
-    Vector3d m_right;
-    Vector3d m_up;
-    double m_circularMaxRadius = 0.0;
-    double m_rectHalfWidth = 0.0;
-    double m_rectHalfHeight = 0.0;
+    ProjectionFrame m_frame;
 };
 
 }  // namespace skygate::core

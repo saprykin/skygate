@@ -6,25 +6,6 @@
 
 namespace skygate::core {
 
-ScreenPoint ProjectionPipeline::culledPoint() noexcept
-{
-    return {};
-}
-
-ScreenPoint ProjectionPipeline::invalidCoordinatePoint() noexcept
-{
-    ScreenPoint point;
-    point.status = ProjectionStatus::InvalidCoordinate;
-    return point;
-}
-
-ScreenPoint ProjectionPipeline::invalidParametersPoint() noexcept
-{
-    ScreenPoint point;
-    point.status = ProjectionStatus::InvalidParameters;
-    return point;
-}
-
 ScreenPoint ProjectionPipeline::finishCircular(
     const double projectedX,
     const double projectedY,
@@ -34,23 +15,23 @@ ScreenPoint ProjectionPipeline::finishCircular(
 ) noexcept
 {
     if (maxRadius <= MathConstants::kEpsilon || !std::isfinite(maxRadius)) {
-        return invalidParametersPoint();
+        return ScreenPoint::invalidParameters();
     }
 
     const double scale = (0.5 * std::min(params.viewportWidth, params.viewportHeight)) / maxRadius;
     if (!std::isfinite(scale) || scale <= MathConstants::kEpsilon) {
-        return invalidParametersPoint();
+        return ScreenPoint::invalidParameters();
     }
 
     const double boundedMarginPx = std::max(0.0, marginPx);
     if (std::hypot(projectedX, projectedY) > (maxRadius + (boundedMarginPx / scale))) {
-        return culledPoint();
+        return ScreenPoint::culled();
     }
 
     const double screenX = (0.5 * params.viewportWidth) + (projectedX * scale);
     const double screenY = (0.5 * params.viewportHeight) - (projectedY * scale);
     if (!std::isfinite(screenX) || !std::isfinite(screenY)) {
-        return invalidParametersPoint();
+        return ScreenPoint::invalidParameters();
     }
 
     return visiblePoint(screenX, screenY);
@@ -66,18 +47,18 @@ ScreenPoint ProjectionPipeline::finishRectangular(
 ) noexcept
 {
     if (halfWidth <= MathConstants::kEpsilon || halfHeight <= MathConstants::kEpsilon) {
-        return invalidParametersPoint();
+        return ScreenPoint::invalidParameters();
     }
 
     if (!std::isfinite(halfWidth) || !std::isfinite(halfHeight)) {
-        return invalidParametersPoint();
+        return ScreenPoint::invalidParameters();
     }
 
     const double scaleX = params.viewportWidth / (halfWidth * 2.0);
     const double scaleY = params.viewportHeight / (halfHeight * 2.0);
     if (!std::isfinite(scaleX) || !std::isfinite(scaleY) || scaleX <= MathConstants::kEpsilon
         || scaleY <= MathConstants::kEpsilon) {
-        return invalidParametersPoint();
+        return ScreenPoint::invalidParameters();
     }
 
     const double boundedMarginPx = std::max(0.0, marginPx);
@@ -85,7 +66,7 @@ ScreenPoint ProjectionPipeline::finishRectangular(
     const double marginY = boundedMarginPx / scaleY;
     if (std::abs(projectedX) > (halfWidth + marginX + MathConstants::kEpsilon)
         || std::abs(projectedY) > (halfHeight + marginY + MathConstants::kEpsilon)) {
-        return culledPoint();
+        return ScreenPoint::culled();
     }
 
     const double normalizedX = projectedX / halfWidth;
@@ -93,7 +74,7 @@ ScreenPoint ProjectionPipeline::finishRectangular(
     const double screenX = ((normalizedX + 1.0) * 0.5) * params.viewportWidth;
     const double screenY = ((1.0 - normalizedY) * 0.5) * params.viewportHeight;
     if (!std::isfinite(screenX) || !std::isfinite(screenY)) {
-        return invalidParametersPoint();
+        return ScreenPoint::invalidParameters();
     }
 
     return visiblePoint(screenX, screenY);

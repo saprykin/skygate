@@ -27,6 +27,7 @@ add_library(skygate-core STATIC
     src/math/CircleHitIndex.hpp
     src/math/CircleHitTarget.hpp
     src/math/Geometry2d.hpp
+    src/math/GridCellRange.hpp
     src/math/LineSegment2d.hpp
     src/math/LinePattern.hpp
     src/math/Matrix3x3.hpp
@@ -76,6 +77,7 @@ add_library(skygate-core STATIC
     src/ProjectionFactory.cpp
     src/projections/ProjectionAlgorithms.cpp
     src/projections/ProjectionAlgorithms.hpp
+    src/projections/ProjectionFrame.hpp
     src/projections/AzimuthalEquidistantProjection.cpp
     src/projections/PerspectiveProjection.cpp
     src/projections/ProjectionPipeline.cpp
