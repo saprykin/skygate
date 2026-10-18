@@ -23,6 +23,7 @@ private slots:
     void comparesChecksumsIgnoringAsciiCase();
     void matchesSourceSizeAgainstMetadata();
     void reportsCancellationRequests();
+    void reportsPayloadVerificationDiagnostics();
     void mapsPayloadStatusToActivationStatus();
     void mapsPayloadStatusToVerificationStatus();
     void verifiesDecodedPayloadAgainstMetadata();
@@ -95,6 +96,54 @@ void EphemerisDataFileUtilitiesTests::reportsCancellationRequests()
     QVERIFY(!EphemerisDataFileUtilities::cancellationRequested(std::function<bool()>{}));
     QVERIFY(!EphemerisDataFileUtilities::cancellationRequested([] { return false; }));
     QVERIFY(EphemerisDataFileUtilities::cancellationRequested([] { return true; }));
+}
+
+void EphemerisDataFileUtilitiesTests::reportsPayloadVerificationDiagnostics()
+{
+    using skygate::ephemeris::EphemerisDataFileUtilities;
+    using PayloadVerification = skygate::ephemeris::EphemerisDataFileUtilities::PayloadVerification;
+
+    const auto stagedDiagnostic = [](const PayloadVerification verification) {
+        return QString::fromStdString(
+            EphemerisDataFileUtilities::payloadVerificationDiagnostic(
+                verification, EphemerisDataFileUtilities::kStagedPayloadWording
+            )
+        );
+    };
+    const auto activatedDiagnostic = [](const PayloadVerification verification) {
+        return QString::fromStdString(
+            EphemerisDataFileUtilities::payloadVerificationDiagnostic(
+                verification, EphemerisDataFileUtilities::kActivatedPayloadWording
+            )
+        );
+    };
+
+    QCOMPARE(
+        stagedDiagnostic(PayloadVerification::EmptyLivePayload),
+        QStringLiteral("Staged live ephemeris asset payload is empty.")
+    );
+    QCOMPARE(
+        stagedDiagnostic(PayloadVerification::UncompressedSizeMismatch),
+        QStringLiteral("Staged ephemeris asset uncompressed size does not match manifest metadata.")
+    );
+    QCOMPARE(
+        stagedDiagnostic(PayloadVerification::ChecksumMismatch),
+        QStringLiteral("Staged ephemeris asset checksum does not match manifest metadata.")
+    );
+    QCOMPARE(
+        activatedDiagnostic(PayloadVerification::EmptyLivePayload),
+        QStringLiteral("Activated live ephemeris data asset payload is empty.")
+    );
+    QCOMPARE(
+        activatedDiagnostic(PayloadVerification::UncompressedSizeMismatch),
+        QStringLiteral("Activated ephemeris data asset size does not match manifest metadata.")
+    );
+    QCOMPARE(
+        activatedDiagnostic(PayloadVerification::ChecksumMismatch),
+        QStringLiteral("Activated ephemeris data asset checksum does not match manifest metadata.")
+    );
+    QVERIFY(stagedDiagnostic(PayloadVerification::Verified).isEmpty());
+    QVERIFY(activatedDiagnostic(PayloadVerification::Verified).isEmpty());
 }
 
 void EphemerisDataFileUtilitiesTests::mapsPayloadStatusToActivationStatus()

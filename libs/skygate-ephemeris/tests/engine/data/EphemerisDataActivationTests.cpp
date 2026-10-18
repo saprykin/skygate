@@ -260,6 +260,7 @@ private slots:
     void rejectsStagedLiveAssetWithEmptyPayload();
     void verifiesCompressedStagedAssetWithoutExtracting();
     void cancelsStagedUpdateVerification();
+    void stagedCancellationNeverReportsActivation();
     void rejectsStagedUpdateChecksumFailure();
     void acceptsUppercaseStagedUpdateChecksum();
     void rejectsStagedUpdateWrongComponentKind();
@@ -721,6 +722,43 @@ void EphemerisDataActivationTests::cancelsStagedUpdateVerification()
     );
     QVERIFY(!result.diagnostics.empty());
     QVERIFY(result.verifiedAssetIds.empty());
+}
+
+void EphemerisDataActivationTests::stagedCancellationNeverReportsActivation()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    const skygate::ephemeris::EphemerisDataManifest manifest = makeStagedManifest();
+    writeAllStagedAssets(stagedRoot, manifest);
+    skygate::ephemeris::EphemerisStagedUpdateVerificationRequest request = verificationRequest(manifest, stagedRoot);
+
+    // The verification checks for cancellation once on entry, once per profile
+    // asset, once per expected component, once per required kind, and once
+    // before reading a payload. Cancel on the check the payload read performs
+    // so that the payload diagnostics reach the staged result.
+    const int checksBeforePayloadRead = 1 + static_cast<int>(manifest.profiles.front().assetIds.size())
+                                        + static_cast<int>(request.expectedComponents.size())
+                                        + static_cast<int>(request.requiredKinds.size()) + 2;
+    int cancellationChecks = 0;
+    request.cancellationRequested = [&cancellationChecks, checksBeforePayloadRead] {
+        ++cancellationChecks;
+        return cancellationChecks > checksBeforePayloadRead;
+    };
+
+    const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(request);
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Canceled)
+    );
+    QVERIFY(!result.diagnostics.empty());
+    bool reportsPayloadRead = false;
+    for (const std::string& diagnostic : result.diagnostics) {
+        QVERIFY2(diagnostic.find("activation") == std::string::npos, diagnostic.c_str());
+        reportsPayloadRead = reportsPayloadRead || diagnostic.find("payload") != std::string::npos;
+    }
+    QVERIFY(reportsPayloadRead);
 }
 
 void EphemerisDataActivationTests::rejectsStagedUpdateChecksumFailure()

@@ -26,9 +26,30 @@ public:
         ChecksumMismatch
     };
 
+    // Wording that a reporting path uses for decoded payload diagnostics. The
+    // activity and subject name the asset, for example "Staged ephemeris
+    // asset", and the size detail is the size wording that path reports.
+    struct PayloadVerificationWording {
+        std::string_view activity;
+        std::string_view subject;
+        std::string_view sizeDetail;
+    };
+
     EphemerisDataFileUtilities() = delete;
 
     static constexpr std::string_view kSha256Algorithm = "sha256";
+
+    static constexpr PayloadVerificationWording kStagedPayloadWording{
+        .activity = "Staged",
+        .subject = "ephemeris asset",
+        .sizeDetail = "uncompressed size",
+    };
+
+    static constexpr PayloadVerificationWording kActivatedPayloadWording{
+        .activity = "Activated",
+        .subject = "ephemeris data asset",
+        .sizeDetail = "size",
+    };
 
     [[nodiscard]] static QString pathToQString(const std::filesystem::path& path);
     [[nodiscard]] static std::filesystem::path pathFromQString(const QString& path);
@@ -41,6 +62,8 @@ public:
     [[nodiscard]] static PayloadVerification verifyDecodedPayload(
         const EphemerisDataManifest::Asset& asset, std::uint64_t outputBytes, std::string_view decodedChecksum
     ) noexcept;
+    [[nodiscard]] static std::string
+    payloadVerificationDiagnostic(PayloadVerification verification, const PayloadVerificationWording& wording);
     [[nodiscard]] static bool cancellationRequested(const std::function<bool()>& callback);
     [[nodiscard]] static bool checksumsMatch(std::string_view actual, std::string_view expected) noexcept;
 
