@@ -230,6 +230,8 @@ add_library(skygate-ephemeris STATIC
     src/factory/EphemerisEngineFactoryResult.hpp
     src/factory/EphemerisEngineReplacementPolicy.hpp
     src/factory/EphemerisFactoryCreationDiagnostic.hpp
+    src/factory/EphemerisFactoryDiagnostics.hpp
+    src/factory/HighPrecisionEngineAssembly.hpp
     src/factory/IEphemerisDiagnosticsSink.hpp
     src/engine/EphemerisEngineQueries.hpp
     src/engine/EphemerisPrecisionPolicy.hpp
@@ -378,6 +380,8 @@ add_library(skygate-ephemeris STATIC
     src/factory/EphemerisEngineFactoryResult.cpp
     src/factory/EphemerisEngineReplacementPolicy.cpp
     src/factory/EphemerisFactoryCreationDiagnostic.cpp
+    src/factory/EphemerisFactoryDiagnostics.cpp
+    src/factory/HighPrecisionEngineAssembly.cpp
     src/engine/EphemerisEngineQueries.cpp
     src/time/EphemerisDateRange.cpp
     src/engine/EphemerisEngineDescriptorRegistry.cpp
