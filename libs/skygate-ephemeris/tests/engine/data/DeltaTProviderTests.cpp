@@ -92,6 +92,8 @@ private slots:
     void rejectsAncientFallbackWithoutEstimate();
     void rejectsPartialAncientFallbackRanges();
     void reportsStaleData();
+    void preservesParsingDiagnostics_data();
+    void preservesParsingDiagnostics();
 };
 
 void DeltaTProviderTests::loadsPresentDataFromSnapshot()
@@ -375,6 +377,48 @@ void DeltaTProviderTests::reportsStaleData()
         static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Stale)
     );
     QVERIFY(!result.dataInfo.diagnosticText.empty());
+}
+
+void DeltaTProviderTests::preservesParsingDiagnostics_data()
+{
+    QTest::addColumn<QString>("content");
+    QTest::addColumn<QString>("diagnostic");
+    QTest::newRow("empty") << "" << "Delta T data contains no rows.";
+    QTest::newRow("comments") << "# comment\n\n" << "Delta T data contains no rows.";
+    QTest::newRow("unsorted") << "effective_utc_date,delta_t_seconds\n2000-01-01,63.83\n1900-01-01,-2.72\n"
+                              << "Delta T rows are not sorted by UTC date.";
+    QTest::newRow("duplicate") << "effective_utc_date,delta_t_seconds\n1900-01-01,-2.72\n1900-01-01,-2.70\n"
+                               << "Delta T rows contain duplicate UTC dates.";
+    QTest::newRow("malformed-date") << "effective_utc_date,delta_t_seconds\n1900-01-01,-2.72\n1900-02-30,63.83\n"
+                                    << "Delta T data contains a malformed row at line 3.";
+    QTest::newRow("malformed-expiration") << "#@ expires not-a-date\n1900-01-01,-2.72\n"
+                                          << "Delta T data contains malformed expiration metadata at line 1.";
+    QTest::newRow("malformed-fallback-start")
+        << "#@ ancient_fallback_start 1600-02-30\n1900-01-01,-2.72\n"
+        << "Delta T data contains malformed ancient fallback start metadata at line 1.";
+    QTest::newRow("malformed-fallback-end")
+        << "#@ ancient_fallback_end 1600-02-30\n1900-01-01,-2.72\n"
+        << "Delta T data contains malformed ancient fallback end metadata at line 1.";
+    QTest::newRow("malformed-fallback-estimate")
+        << "#@ ancient_fallback_delta_t_seconds unlimited\n1900-01-01,-2.72\n"
+        << "Delta T data contains malformed ancient fallback estimate metadata at line 1.";
+    QTest::newRow("malformed-fallback-uncertainty")
+        << "#@ ancient_fallback_uncertainty_seconds -1\n1900-01-01,-2.72\n"
+        << "Delta T data contains malformed ancient fallback uncertainty metadata at line 1.";
+}
+
+void DeltaTProviderTests::preservesParsingDiagnostics()
+{
+    QFETCH(QString, content);
+    QFETCH(QString, diagnostic);
+    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
+    asset.content = content.toStdString();
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(asset);
+    QVERIFY(!result.isSuccess());
+    QVERIFY(result.provider == nullptr);
+    QCOMPARE(result.dataInfo.status, skygate::ephemeris::IDeltaTProvider::DataStatus::Malformed);
+    QCOMPARE(QString::fromStdString(result.dataInfo.diagnosticText), diagnostic);
 }
 
 QTEST_MAIN(DeltaTProviderTests)

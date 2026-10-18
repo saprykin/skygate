@@ -1,24 +1,19 @@
 #pragma once
 
-#include "time/EphemerisDateRange.hpp"
+#include "EphemerisTableDataInfo.hpp"
+#include "EphemerisTableDataStatus.hpp"
 #include "time/AstronomicalEpoch.hpp"
+#include "time/EphemerisDateRange.hpp"
 
-#include <cstdint>
 #include <optional>
 #include <span>
-#include <string>
 
 namespace skygate::ephemeris {
 
 class IEarthOrientationProvider {
 public:
-    enum class DataStatus : std::uint8_t {
-        Available,
-        Missing,
-        Malformed,
-        Stale,
-        Estimated
-    };
+    /// The provider keeps its established name for the shared status enum.
+    using DataStatus = EphemerisTableDataStatus;
 
     struct TableEntry {
         skygate::core::AstronomicalEpoch effectiveUtcEpoch;
@@ -29,19 +24,17 @@ public:
         bool estimated = false;
     };
 
-    struct DataInfo {
-        std::string version;
-        std::string provenance;
-        DataStatus status = DataStatus::Missing;
-        std::string diagnosticText;
-        std::optional<EphemerisDateRange> validityRange;
-        std::optional<EphemerisDateRange> predictionRange;
-        std::optional<skygate::core::AstronomicalEpoch> expiresAt;
-
-        [[nodiscard]] bool isUsable() const noexcept
+    struct DataInfo final : EphemerisTableDataInfo {
+        DataInfo() noexcept
+            : EphemerisTableDataInfo(
+                  {EphemerisTableDataStatus::Available,
+                   EphemerisTableDataStatus::Stale,
+                   EphemerisTableDataStatus::Estimated}
+              )
         {
-            return status == DataStatus::Available || status == DataStatus::Stale || status == DataStatus::Estimated;
         }
+
+        std::optional<EphemerisDateRange> predictionRange;
     };
 
     virtual ~IEarthOrientationProvider() = default;

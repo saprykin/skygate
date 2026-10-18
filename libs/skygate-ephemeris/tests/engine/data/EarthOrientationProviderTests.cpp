@@ -559,6 +559,8 @@ void EarthOrientationProviderTests::preservesParsingDiagnostics_data()
     QTest::newRow("comments") << "# comment\n\n" << "Earth-orientation data contains no rows.";
     QTest::newRow("unsorted") << "2026-04-02,0.1,0.2,0.3\n2026-04-01,0.1,0.2,0.3\n"
                               << "Earth-orientation rows are not sorted by UTC date.";
+    QTest::newRow("malformed-date") << "2026-04-01,0.1,0.2,0.3\n2026-02-30,0.1,0.2,0.3\n"
+                                    << "Earth-orientation data contains a malformed row at line 2.";
     QTest::newRow("line-number") << "# comment\n\n2026-04-01,invalid,0.2,0.3\n"
                                  << "Earth-orientation data contains a malformed row at line 3.";
     QTest::newRow("infinity") << "2026-04-01,inf,0.2,0.3"

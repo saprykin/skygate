@@ -17,8 +17,9 @@ namespace skygate::ephemeris {
 
 namespace {
 
+constexpr std::string_view kDataLabel = "Earth-orientation data";
+constexpr std::string_view kRowLabel = "Earth-orientation";
 constexpr std::string_view kValidityRangeId = "earth-orientation";
-constexpr std::string_view kValidityRangeDisplayName = "Earth-orientation data";
 constexpr std::string_view kPredictionRangeId = "earth-orientation-prediction";
 constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation prediction interval";
 
@@ -35,20 +36,23 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     bool& hasPredictionStart
 )
 {
-    const std::optional<skygate::core::CivilDateTime> date = TextParsingUtilities::parseUtcDate(value);
-    const std::optional<skygate::core::AstronomicalEpoch> epoch =
-        date.has_value() ? skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*date) : std::nullopt;
-    if (!epoch.has_value()) {
-        return "Earth-orientation data contains malformed prediction start metadata at line "
-               + std::to_string(lineNumber) + ".";
+    EphemerisDateRange range = info.predictionRange.value_or(EphemerisDateRange{});
+    if (std::optional<std::string> diagnosticText = EphemerisTableMetadata::assignRangeEndpoint(
+            range,
+            &EphemerisDateRange::start,
+            value,
+            kPredictionRangeId,
+            kPredictionRangeDisplayName,
+            kDataLabel,
+            "prediction start",
+            lineNumber,
+            hasPredictionStart
+        );
+        diagnosticText.has_value()) {
+        return diagnosticText;
     }
 
-    EphemerisDateRange range = info.predictionRange.value_or(EphemerisDateRange{});
-    range.id = kPredictionRangeId;
-    range.displayName = kPredictionRangeDisplayName;
-    range.start = *epoch;
     info.predictionRange = range;
-    hasPredictionStart = true;
     return std::nullopt;
 }
 
@@ -59,20 +63,23 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     bool& hasPredictionEnd
 )
 {
-    const std::optional<skygate::core::CivilDateTime> date = TextParsingUtilities::parseUtcDate(value);
-    const std::optional<skygate::core::AstronomicalEpoch> epoch =
-        date.has_value() ? skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*date) : std::nullopt;
-    if (!epoch.has_value()) {
-        return "Earth-orientation data contains malformed prediction end metadata at line " + std::to_string(lineNumber)
-               + ".";
+    EphemerisDateRange range = info.predictionRange.value_or(EphemerisDateRange{});
+    if (std::optional<std::string> diagnosticText = EphemerisTableMetadata::assignRangeEndpoint(
+            range,
+            &EphemerisDateRange::end,
+            value,
+            kPredictionRangeId,
+            kPredictionRangeDisplayName,
+            kDataLabel,
+            "prediction end",
+            lineNumber,
+            hasPredictionEnd
+        );
+        diagnosticText.has_value()) {
+        return diagnosticText;
     }
 
-    EphemerisDateRange range = info.predictionRange.value_or(EphemerisDateRange{});
-    range.id = kPredictionRangeId;
-    range.displayName = kPredictionRangeDisplayName;
-    range.end = *epoch;
     info.predictionRange = range;
-    hasPredictionEnd = true;
     return std::nullopt;
 }
 
@@ -85,10 +92,7 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     std::optional<std::string>& diagnosticText
 )
 {
-    if (!line.starts_with("#@ ")) {
-        return false;
-    }
-    if (EphemerisTableMetadata::applyCommonLine(info, line, "Earth-orientation data", lineNumber, diagnosticText)) {
+    if (EphemerisTableMetadata::applyCommonLine(info, line, kDataLabel, lineNumber, diagnosticText)) {
         return true;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "prediction_start");
@@ -400,9 +404,7 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
 }
 
 [[nodiscard]] EarthOrientationDataParser::Result failureResult(
-    IEarthOrientationProvider::DataInfo info,
-    const IEarthOrientationProvider::DataStatus status,
-    std::string diagnosticText
+    IEarthOrientationProvider::DataInfo info, const EphemerisTableDataStatus status, std::string diagnosticText
 )
 {
     info.status = status;
@@ -436,50 +438,29 @@ EarthOrientationDataParser::Result EarthOrientationDataParser::parse(const Ephem
            const std::string_view,
            IEarthOrientationProvider::TableEntry& entry) noexcept { return parseEntryLine(rawLine, entry); },
         entries,
-        "Earth-orientation data"
+        kDataLabel
     );
     if (malformedLine.has_value()) {
-        return failureResult(
-            std::move(info), IEarthOrientationProvider::DataStatus::Malformed, std::move(*malformedLine)
-        );
-    }
-
-    if (entries.empty()) {
-        return failureResult(
-            std::move(info),
-            IEarthOrientationProvider::DataStatus::Malformed,
-            "Earth-orientation data contains no rows."
-        );
-    }
-
-    const bool sorted = std::ranges::is_sorted(entries, {}, [](const IEarthOrientationProvider::TableEntry& entry) {
-        return entry.effectiveUtcEpoch.sortKey();
-    });
-    if (!sorted) {
-        return failureResult(
-            std::move(info),
-            IEarthOrientationProvider::DataStatus::Malformed,
-            "Earth-orientation rows are not sorted by UTC date."
-        );
+        return failureResult(std::move(info), EphemerisTableDataStatus::Malformed, std::move(*malformedLine));
     }
 
     if (info.predictionRange.has_value()) {
-        EphemerisDateRange predictionRange = *info.predictionRange;
-        if (!hasPredictionStart || !hasPredictionEnd || !predictionRange.isValid()) {
+        if (!hasPredictionStart || !hasPredictionEnd || !info.predictionRange->isValid()) {
             return failureResult(
                 std::move(info),
-                IEarthOrientationProvider::DataStatus::Malformed,
+                EphemerisTableDataStatus::Malformed,
                 "Earth-orientation prediction metadata must include a valid start and end range."
             );
         }
-        info.predictionRange = std::move(predictionRange);
     }
 
-    info.validityRange = EphemerisTableMetadata::makeRange(
-        kValidityRangeId, kValidityRangeDisplayName, entries.front().effectiveUtcEpoch, entries.back().effectiveUtcEpoch
-    );
-    info.status = IEarthOrientationProvider::DataStatus::Available;
-    info.diagnosticText = "Earth-orientation data loaded.";
+    if (std::optional<std::string> diagnosticText = EphemerisTableMetadata::finalizeParsedTable(
+            info, entries, kDataLabel, kRowLabel, kValidityRangeId, false, false
+        );
+        diagnosticText.has_value()) {
+        return failureResult(std::move(info), EphemerisTableDataStatus::Malformed, std::move(*diagnosticText));
+    }
+
     EarthOrientationDataParser::Result result;
     result.dataInfo = std::move(info);
     result.entries = std::move(entries);
