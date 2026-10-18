@@ -15,7 +15,7 @@ Window {
     maximumWidth: 420
     maximumHeight: 372
     visible: false
-    readonly property var theme: skyContext.theme
+    required property var theme
     color: theme.windowBackground
     property Window transientParentWindow
     readonly property bool useAttachedDialog: Qt.platform.os !== "linux"
