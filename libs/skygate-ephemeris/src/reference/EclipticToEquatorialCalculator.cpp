@@ -1,6 +1,6 @@
 #include "EclipticToEquatorialCalculator.hpp"
 #include "math/AngleMath.hpp"
-#include "math/MathConstants.hpp"
+#include "math/SphericalGeometry.hpp"
 
 #include <cmath>
 
@@ -22,12 +22,7 @@ skygate::core::EquatorialCoordinate EclipticToEquatorialCalculator::compute(
     const double yEq = yEcl * std::cos(epsRad) - zEcl * std::sin(epsRad);
     const double zEq = yEcl * std::sin(epsRad) + zEcl * std::cos(epsRad);
 
-    skygate::core::EquatorialCoordinate equatorial;
-    equatorial.rightAscensionHours = skygate::core::AngleMath::normalizeHours(
-        skygate::core::AngleMath::toDegrees(std::atan2(yEq, xEq)) / skygate::core::MathConstants::kDegreesPerHour
-    );
-    equatorial.declinationDeg = skygate::core::AngleMath::toDegrees(std::asin(zEq));
-    return equatorial;
+    return skygate::core::SphericalGeometry::equatorialFromUnitVector({.x = xEq, .y = yEq, .z = zEq});
 }
 
 }  // namespace skygate::ephemeris

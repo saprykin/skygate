@@ -14,11 +14,6 @@ constexpr int kMaxAdaptiveSubsegments = 512;
 constexpr double kMinAngularStepDeg = 0.05;
 constexpr double kMaxAngularStepDeg = 5.0;
 
-[[nodiscard]] double angularDistanceRad(const Vector3d& start, const Vector3d& end) noexcept
-{
-    return std::acos(std::clamp(start.dot(end), -1.0, 1.0));
-}
-
 [[nodiscard]] int adaptiveSubsegmentCount(const ProjectionParams& params, const double angularDistance) noexcept
 {
     if (!std::isfinite(angularDistance) || angularDistance <= MathConstants::kEpsilon) {
@@ -70,7 +65,7 @@ void appendAdaptiveProjectedSegment(
 {
     const Vector3d startVector = SphericalGeometry::horizontalToUnitVector(startCoordinate.normalizedAzimuth());
     const Vector3d endVector = SphericalGeometry::horizontalToUnitVector(endCoordinate.normalizedAzimuth());
-    const double angularDistance = angularDistanceRad(startVector, endVector);
+    const double angularDistance = SphericalGeometry::angularSeparationRad(startVector, endVector);
     const int subsegmentCount = adaptiveSubsegmentCount(projection.params(), angularDistance);
 
     ScreenPoint previousPoint = projection.project(startCoordinate);

@@ -110,8 +110,7 @@ ScreenPoint ProjectionAlgorithms::project(
         );
     }
     case ProjectionType::AzimuthalEquidistant: {
-        const double cosAngularDistance = std::clamp(target.dot(frame.center), -1.0, 1.0);
-        const double angularDistance = std::acos(cosAngularDistance);
+        const double angularDistance = SphericalGeometry::angularSeparationRad(target, frame.center);
         if (!isFinite(angularDistance)) {
             return ProjectionPipeline::invalidParametersPoint();
         }

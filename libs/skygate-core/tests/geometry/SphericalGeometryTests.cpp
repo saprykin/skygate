@@ -38,9 +38,13 @@ class SphericalGeometryTests final : public QObject {
     Q_OBJECT
 
 private slots:
+    void equatorialDirectionsMapToUnitVectors();
+    void equatorialUnitVectorsRoundTrip();
+    void equatorialRoundTripPreservesPoles();
     void horizontalCoordinatesMapToUnitVectors();
     void unitVectorsMapToHorizontalCoordinates();
     void measuresSeparationsBetweenDirections();
+    void separatesUnitVectorDirections();
     void separatesNearParallelAndWrappedAzimuths();
     void interpolatesHorizontalCoordinatesAtEndpoints();
     void interpolatesAcrossAzimuthWraparound();
@@ -49,10 +53,76 @@ private slots:
     void fallsBackToZenithForNonFiniteDirection();
     void rotatesUnitVectorsAroundAxis();
     void rotationFallsBackToZenithForZeroVector();
+    void computesRotationAxisBetweenDirections();
+    void computesRotationAngleBetweenDirections();
     void buildsOrthonormalProjectionBasis();
+    void projectionBasisCenterMatchesDirection();
     void projectionBasisNormalizesAzimuthAndSupportsNadir();
     void rejectsInvalidProjectionCenterKeepsOutputs();
 };
+
+void SphericalGeometryTests::equatorialDirectionsMapToUnitVectors()
+{
+    compareVector(
+        skygate::core::SphericalGeometry::equatorialToUnitVector({.rightAscensionHours = 0.0, .declinationDeg = 0.0}),
+        {1.0, 0.0, 0.0}
+    );
+    compareVector(
+        skygate::core::SphericalGeometry::equatorialToUnitVector({.rightAscensionHours = 6.0, .declinationDeg = 0.0}),
+        {0.0, 1.0, 0.0}
+    );
+    compareVector(
+        skygate::core::SphericalGeometry::equatorialToUnitVector({.rightAscensionHours = 13.5, .declinationDeg = 90.0}),
+        {0.0, 0.0, 1.0}
+    );
+    compareVector(
+        skygate::core::SphericalGeometry::equatorialToUnitVector(
+            {.rightAscensionHours = 13.5, .declinationDeg = -90.0}
+        ),
+        {0.0, 0.0, -1.0}
+    );
+}
+
+void SphericalGeometryTests::equatorialUnitVectorsRoundTrip()
+{
+    const skygate::core::EquatorialCoordinate pairs[] = {
+        {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
+        {.rightAscensionHours = 6.0, .declinationDeg = 45.0},
+        {.rightAscensionHours = 23.999, .declinationDeg = -12.5},
+        {.rightAscensionHours = 17.25, .declinationDeg = -89.5},
+    };
+
+    for (const skygate::core::EquatorialCoordinate& pair : pairs) {
+        const skygate::core::EquatorialCoordinate roundTrip =
+            skygate::core::SphericalGeometry::equatorialFromUnitVector(
+                skygate::core::SphericalGeometry::equatorialToUnitVector(pair)
+            );
+        QVERIFY(isNear(roundTrip.rightAscensionHours, pair.rightAscensionHours, 1e-9));
+        QVERIFY(isNear(roundTrip.declinationDeg, pair.declinationDeg, 1e-9));
+    }
+
+    // Right ascension wraps at 24h, so both ends name the same direction.
+    compareVector(
+        skygate::core::SphericalGeometry::equatorialToUnitVector({.rightAscensionHours = 0.0, .declinationDeg = 30.0}),
+        skygate::core::SphericalGeometry::equatorialToUnitVector({.rightAscensionHours = 24.0, .declinationDeg = 30.0})
+    );
+}
+
+void SphericalGeometryTests::equatorialRoundTripPreservesPoles()
+{
+    for (const double declinationDeg : {90.0, -90.0}) {
+        const skygate::core::Vector3d direction = skygate::core::SphericalGeometry::equatorialToUnitVector(
+            {.rightAscensionHours = 3.0, .declinationDeg = declinationDeg}
+        );
+        compareVector(direction, {.x = 0.0, .y = 0.0, .z = declinationDeg > 0.0 ? 1.0 : -1.0});
+
+        const skygate::core::EquatorialCoordinate roundTrip =
+            skygate::core::SphericalGeometry::equatorialFromUnitVector(direction);
+        QVERIFY(isNear(roundTrip.declinationDeg, declinationDeg, 1e-9));
+        QVERIFY(roundTrip.rightAscensionHours >= 0.0);
+        QVERIFY(roundTrip.rightAscensionHours < 24.0);
+    }
+}
 
 void SphericalGeometryTests::horizontalCoordinatesMapToUnitVectors()
 {
@@ -109,6 +179,39 @@ void SphericalGeometryTests::measuresSeparationsBetweenDirections()
         ),
         180.0,
         1e-4
+    ));
+}
+
+void SphericalGeometryTests::separatesUnitVectorDirections()
+{
+    const skygate::core::Vector3d north{.x = 0.0, .y = 1.0, .z = 0.0};
+    const skygate::core::Vector3d east{.x = 1.0, .y = 0.0, .z = 0.0};
+    const skygate::core::Vector3d south{.x = 0.0, .y = -1.0, .z = 0.0};
+
+    QVERIFY(isNear(skygate::core::SphericalGeometry::angularSeparationRad(north, north), 0.0, 1e-12));
+    QVERIFY(isNear(
+        skygate::core::SphericalGeometry::angularSeparationRad(north, east),
+        skygate::core::MathConstants::kPi / 2.0,
+        1e-12
+    ));
+    QVERIFY(isNear(
+        skygate::core::SphericalGeometry::angularSeparationRad(north, south), skygate::core::MathConstants::kPi, 1e-12
+    ));
+
+    // Unnormalized directions with an over-long dot product must be clamped.
+    QVERIFY(isNear(
+        skygate::core::SphericalGeometry::angularSeparationRad(
+            {.x = 0.0, .y = 2.0, .z = 0.0}, {.x = 0.0, .y = 3.0, .z = 0.0}
+        ),
+        0.0,
+        1e-12
+    ));
+    QVERIFY(isNear(
+        skygate::core::SphericalGeometry::angularSeparationRad(
+            {.x = 0.0, .y = 2.0, .z = 0.0}, {.x = 0.0, .y = -3.0, .z = 0.0}
+        ),
+        skygate::core::MathConstants::kPi,
+        1e-12
     ));
 }
 
@@ -249,6 +352,49 @@ void SphericalGeometryTests::rotationFallsBackToZenithForZeroVector()
     );
 }
 
+void SphericalGeometryTests::computesRotationAxisBetweenDirections()
+{
+    const skygate::core::Vector3d north{.x = 0.0, .y = 1.0, .z = 0.0};
+    const skygate::core::Vector3d east{.x = 1.0, .y = 0.0, .z = 0.0};
+    const skygate::core::Vector3d south{.x = 0.0, .y = -1.0, .z = 0.0};
+    const skygate::core::Vector3d zenith{.x = 0.0, .y = 0.0, .z = 1.0};
+    const skygate::core::Vector3d nadir{.x = 0.0, .y = 0.0, .z = -1.0};
+
+    compareVector(skygate::core::SphericalGeometry::rotationAxisBetween(north, east), {.x = 0.0, .y = 0.0, .z = -1.0});
+
+    // Collinear directions fall back to the polar axis, then to the equinox.
+    compareVector(skygate::core::SphericalGeometry::rotationAxisBetween(north, south), {.x = 1.0, .y = 0.0, .z = 0.0});
+    compareVector(skygate::core::SphericalGeometry::rotationAxisBetween(zenith, nadir), {.x = 0.0, .y = 1.0, .z = 0.0});
+
+    QVERIFY(isNear(skygate::core::SphericalGeometry::rotationAxisBetween(north, north).length(), 1.0, 1e-12));
+}
+
+void SphericalGeometryTests::computesRotationAngleBetweenDirections()
+{
+    const skygate::core::Vector3d north{.x = 0.0, .y = 1.0, .z = 0.0};
+    const skygate::core::Vector3d east{.x = 1.0, .y = 0.0, .z = 0.0};
+    const skygate::core::Vector3d south{.x = 0.0, .y = -1.0, .z = 0.0};
+
+    const skygate::core::Vector3d quadrantAxis = skygate::core::SphericalGeometry::rotationAxisBetween(north, east);
+    const double quadrantAngle = skygate::core::SphericalGeometry::rotationAngleBetween(north, east, quadrantAxis);
+    QVERIFY(isNear(quadrantAngle, skygate::core::MathConstants::kPi / 2.0, 1e-12));
+    compareVector(skygate::core::SphericalGeometry::rotatedAroundAxis(north, quadrantAxis, quadrantAngle), east);
+
+    QVERIFY(isNear(
+        skygate::core::SphericalGeometry::rotationAngleBetween(
+            north, north, skygate::core::SphericalGeometry::rotationAxisBetween(north, north)
+        ),
+        0.0,
+        1e-12
+    ));
+
+    // Anti-parallel directions leave no cross product; the turn is a half turn.
+    const skygate::core::Vector3d opposedAxis = skygate::core::SphericalGeometry::rotationAxisBetween(north, south);
+    const double opposedAngle = skygate::core::SphericalGeometry::rotationAngleBetween(north, south, opposedAxis);
+    QVERIFY(isNear(opposedAngle, skygate::core::MathConstants::kPi, 1e-12));
+    compareVector(skygate::core::SphericalGeometry::rotatedAroundAxis(north, opposedAxis, opposedAngle), south);
+}
+
 void SphericalGeometryTests::buildsOrthonormalProjectionBasis()
 {
     skygate::core::Vector3d center;
@@ -307,6 +453,29 @@ void SphericalGeometryTests::projectionBasisNormalizesAzimuthAndSupportsNadir()
     QVERIFY(isNear(nadirCenter.dot(nadirRight), 0.0));
     QVERIFY(isNear(nadirCenter.dot(nadirUp), 0.0));
     QVERIFY(isNear(nadirRight.dot(nadirUp), 0.0));
+}
+
+void SphericalGeometryTests::projectionBasisCenterMatchesDirection()
+{
+    const skygate::core::HorizontalCoordinate centers[] = {
+        {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
+        {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
+        {.altitudeDeg = -30.0, .azimuthDeg = -45.0},
+        {.altitudeDeg = 89.0, .azimuthDeg = 359.0},
+    };
+
+    for (const skygate::core::HorizontalCoordinate& centerCoordinate : centers) {
+        skygate::core::Vector3d center;
+        skygate::core::Vector3d right;
+        skygate::core::Vector3d up;
+        QVERIFY(skygate::core::SphericalGeometry::tryBuildProjectionBasis(centerCoordinate, center, right, up));
+
+        const skygate::core::Vector3d expectedCenter =
+            skygate::core::SphericalGeometry::horizontalToUnitVector(centerCoordinate.normalizedAzimuth());
+        QCOMPARE(center.x, expectedCenter.x);
+        QCOMPARE(center.y, expectedCenter.y);
+        QCOMPARE(center.z, expectedCenter.z);
+    }
 }
 
 void SphericalGeometryTests::rejectsInvalidProjectionCenterKeepsOutputs()

@@ -1,6 +1,6 @@
 #include "EquatorialToHorizontalCalculator.hpp"
 #include "math/AngleMath.hpp"
-#include "math/MathConstants.hpp"
+#include "math/SphericalGeometry.hpp"
 #include "time/AstronomicalTime.hpp"
 
 #include <cmath>
@@ -16,7 +16,7 @@ skygate::core::HorizontalCoordinate EquatorialToHorizontalCalculator::compute(
     const double gmstDeg = skygate::core::AstronomicalTime::greenwichMeanSiderealTimeDeg(utcTime);
     const double localSiderealDeg = skygate::core::AngleMath::normalizeDegrees(gmstDeg + observer.longitudeDeg);
     const double hourAngleDeg = skygate::core::AngleMath::normalizeDegreesSigned(
-        localSiderealDeg - equatorial.rightAscensionHours * skygate::core::MathConstants::kDegreesPerHour
+        localSiderealDeg - skygate::core::AngleMath::hoursToDegrees(equatorial.rightAscensionHours)
     );
 
     const double hourAngleRad = skygate::core::AngleMath::toRadians(hourAngleDeg);
@@ -31,11 +31,9 @@ skygate::core::HorizontalCoordinate EquatorialToHorizontalCalculator::compute(
     const double yHor = y;
     const double zHor = x * std::cos(latitudeRad) + z * std::sin(latitudeRad);
 
-    skygate::core::HorizontalCoordinate horizontal;
-    horizontal.altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(zHor));
-    horizontal.azimuthDeg =
-        skygate::core::AngleMath::normalizeDegrees(skygate::core::AngleMath::toDegrees(std::atan2(yHor, xHor)) + 180.0);
-    return horizontal;
+    // xHor and yHor are the south and west components, so they are negated to
+    // feed the north-toward-east azimuth convention.
+    return skygate::core::SphericalGeometry::horizontalFromUnitVector({.x = -yHor, .y = -xHor, .z = zHor});
 }
 
 }  // namespace skygate::ephemeris
