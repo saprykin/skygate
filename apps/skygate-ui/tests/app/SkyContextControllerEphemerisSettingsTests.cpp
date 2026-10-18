@@ -9,7 +9,9 @@
 #include <QFile>
 #include <QFileInfo>
 
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <utility>
@@ -241,6 +243,28 @@ void verifyEphemerisUserSettings(
     QCOMPARE(actual.updateManifestUrl, expected.updateManifestUrl);
 }
 
+void expectRejectedAtmosphereText(
+    SkyContextController& controller,
+    QSignalSpy& ephemerisSettingsSpy,
+    QSignalSpy& skyContextSpy,
+    const std::uint64_t expectedRevision,
+    void (SkyContextController::*setter)(const QString& text),
+    QString (SkyContextController::*getter)() const,
+    const QString& text
+)
+{
+    const QString textBefore = (controller.*getter)();
+    const int settingsCountBefore = ephemerisSettingsSpy.count();
+    const int skyContextCountBefore = skyContextSpy.count();
+
+    (controller.*setter)(text);
+
+    QCOMPARE((controller.*getter)(), textBefore);
+    QCOMPARE(ephemerisSettingsSpy.count(), settingsCountBefore + 1);
+    QCOMPARE(skyContextSpy.count(), skyContextCountBefore);
+    QCOMPARE(controller.ephemerisRequestContext().engineOptionsRevision, expectedRevision);
+}
+
 }  // namespace
 
 class SkyContextControllerEphemerisSettingsTests final : public QObject {
@@ -262,6 +286,15 @@ private slots:
     void unchangedSettingsKeepOptionsRevision();
     void optionFieldChangeBumpsOptionsRevision();
     void engineModelExposesRegistryLabelsAndCapabilities();
+    void correctionPresetMappingsMatchEngineFlags();
+    void invalidCorrectionPresetKeepsOptionsAndNotifies();
+    void invalidEngineKindKeepsOptionsAndNotifies();
+    void atmosphereTextBoundsAcceptEdges();
+    void invalidAtmosphereTextKeepsOptionsAndNotifies();
+    void acceptedSettingsNotifyAndBumpRevisionOnce();
+    void unchangedOptionSettersKeepRevision();
+    void engineSwitchKeepsUnrelatedSettings();
+    void savedSnapshotMirrorsAppliedEngineOptions();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -605,6 +638,343 @@ void SkyContextControllerEphemerisSettingsTests::engineModelExposesRegistryLabel
     QVERIFY(!controller->ephemerisEngineDefaultRefractionEnabled(-1));
     QCOMPARE(controller->ephemerisEngineDefaultCorrectionPresetIndex(99), 0);
     QVERIFY(!controller->ephemerisEngineDefaultRefractionEnabled(99));
+}
+
+void SkyContextControllerEphemerisSettingsTests::correctionPresetMappingsMatchEngineFlags()
+{
+    const auto controller = createController(false);
+    controller->setEphemerisEngineKindIndex(1);
+    controller->setEphemerisRefractionEnabled(false);
+
+    const std::array<std::pair<int, skygate::ephemeris::EphemerisCorrectionFlags>, 4> presets{{
+        {0, skygate::ephemeris::EphemerisCorrectionFlags::geometric()},
+        {1, skygate::ephemeris::EphemerisCorrectionFlags::astrometric()},
+        {2, skygate::ephemeris::EphemerisCorrectionFlags::apparent()},
+        {3, skygate::ephemeris::EphemerisCorrectionFlags::topocentric()},
+    }};
+    for (const auto& [presetIndex, expectedFlags] : presets) {
+        controller->setEphemerisCorrectionPresetIndex(presetIndex);
+        QCOMPARE(controller->ephemerisCorrectionPresetIndex(), presetIndex);
+        QCOMPARE(controller->ephemerisEngine()->options().correctionFlags(), expectedFlags);
+    }
+
+    controller->setEphemerisRefractionEnabled(true);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 3);
+    QCOMPARE(
+        controller->ephemerisEngine()->options().correctionFlags(),
+        skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric()
+    );
+
+    controller->setEphemerisCorrectionPresetIndex(2);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 2);
+    QCOMPARE(
+        controller->ephemerisEngine()->options().correctionFlags(),
+        skygate::ephemeris::EphemerisCorrectionFlags::apparent()
+            | skygate::ephemeris::EphemerisCorrectionFlags::atmosphericRefraction()
+    );
+
+    controller->setEphemerisRefractionEnabled(false);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 2);
+    QCOMPARE(
+        controller->ephemerisEngine()->options().correctionFlags(),
+        skygate::ephemeris::EphemerisCorrectionFlags::apparent()
+    );
+}
+
+void SkyContextControllerEphemerisSettingsTests::invalidCorrectionPresetKeepsOptionsAndNotifies()
+{
+    const auto controller = createController(false);
+    controller->setEphemerisEngineKindIndex(1);
+    controller->setEphemerisCorrectionPresetIndex(1);
+    const std::uint64_t revision = controller->ephemerisRequestContext().engineOptionsRevision;
+    const skygate::ephemeris::EphemerisCorrectionFlags flags =
+        controller->ephemerisEngine()->options().correctionFlags();
+    QSignalSpy ephemerisSettingsSpy(controller.get(), &SkyContextController::ephemerisSettingsChanged);
+    QSignalSpy skyContextSpy(controller.get(), &SkyContextController::skyContextChanged);
+
+    controller->setEphemerisCorrectionPresetIndex(-1);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 1);
+    QCOMPARE(controller->ephemerisEngine()->options().correctionFlags(), flags);
+    QCOMPARE(controller->ephemerisRequestContext().engineOptionsRevision, revision);
+    QCOMPARE(ephemerisSettingsSpy.count(), 1);
+    QCOMPARE(skyContextSpy.count(), 0);
+
+    controller->setEphemerisCorrectionPresetIndex(4);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 1);
+    QCOMPARE(controller->ephemerisEngine()->options().correctionFlags(), flags);
+    QCOMPARE(controller->ephemerisRequestContext().engineOptionsRevision, revision);
+    QCOMPARE(ephemerisSettingsSpy.count(), 2);
+    QCOMPARE(skyContextSpy.count(), 0);
+}
+
+void SkyContextControllerEphemerisSettingsTests::invalidEngineKindKeepsOptionsAndNotifies()
+{
+    const auto controller = createController(false);
+    controller->setEphemerisAtmosphericPressureText(QStringLiteral("900"));
+    const std::uint64_t revision = controller->ephemerisRequestContext().engineOptionsRevision;
+    QSignalSpy ephemerisSettingsSpy(controller.get(), &SkyContextController::ephemerisSettingsChanged);
+    QSignalSpy skyContextSpy(controller.get(), &SkyContextController::skyContextChanged);
+
+    controller->setEphemerisEngineKindIndex(-1);
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 0);
+    QCOMPARE(controller->ephemerisAtmosphericPressureText(), QString("900.00"));
+    QCOMPARE(controller->ephemerisRequestContext().engineOptionsRevision, revision);
+    QCOMPARE(ephemerisSettingsSpy.count(), 1);
+    QCOMPARE(skyContextSpy.count(), 0);
+
+    controller->setEphemerisEngineKindIndex(99);
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 0);
+    QCOMPARE(controller->ephemerisAtmosphericPressureText(), QString("900.00"));
+    QCOMPARE(controller->ephemerisRequestContext().engineOptionsRevision, revision);
+    QCOMPARE(ephemerisSettingsSpy.count(), 2);
+    QCOMPARE(skyContextSpy.count(), 0);
+}
+
+void SkyContextControllerEphemerisSettingsTests::atmosphereTextBoundsAcceptEdges()
+{
+    const auto controller = createController(false);
+    const std::uint64_t revision = controller->ephemerisRequestContext().engineOptionsRevision;
+    QSignalSpy ephemerisSettingsSpy(controller.get(), &SkyContextController::ephemerisSettingsChanged);
+    QSignalSpy skyContextSpy(controller.get(), &SkyContextController::skyContextChanged);
+
+    controller->setEphemerisAtmosphericPressureText(QStringLiteral("0"));
+    QCOMPARE(controller->ephemerisAtmosphericPressureText(), QString("0.00"));
+    controller->setEphemerisAtmosphericPressureText(QStringLiteral("2000"));
+    QCOMPARE(controller->ephemerisAtmosphericPressureText(), QString("2000.00"));
+
+    controller->setEphemerisAtmosphericTemperatureText(QStringLiteral("-100"));
+    QCOMPARE(controller->ephemerisAtmosphericTemperatureText(), QString("-100.0"));
+    controller->setEphemerisAtmosphericTemperatureText(QStringLiteral("80"));
+    QCOMPARE(controller->ephemerisAtmosphericTemperatureText(), QString("80.0"));
+
+    controller->setEphemerisRelativeHumidityText(QStringLiteral("100"));
+    QCOMPARE(controller->ephemerisRelativeHumidityText(), QString("100.0"));
+    controller->setEphemerisRelativeHumidityText(QStringLiteral("0"));
+    QCOMPARE(controller->ephemerisRelativeHumidityText(), QString("0.0"));
+
+    controller->setEphemerisWavelengthText(QStringLiteral("0.1"));
+    QCOMPARE(controller->ephemerisWavelengthText(), QString("0.10"));
+    controller->setEphemerisWavelengthText(QStringLiteral("100"));
+    QCOMPARE(controller->ephemerisWavelengthText(), QString("100.00"));
+
+    controller->setEphemerisAtmosphericPressureText(QStringLiteral(" 900.50 "));
+    QCOMPARE(controller->ephemerisAtmosphericPressureText(), QString("900.50"));
+
+    QCOMPARE(controller->ephemerisRequestContext().engineOptionsRevision, revision + 9);
+    QCOMPARE(ephemerisSettingsSpy.count(), 9);
+    QCOMPARE(skyContextSpy.count(), 9);
+}
+
+void SkyContextControllerEphemerisSettingsTests::invalidAtmosphereTextKeepsOptionsAndNotifies()
+{
+    const auto controller = createController(false);
+    controller->setEphemerisAtmosphericPressureText(QStringLiteral("900"));
+    controller->setEphemerisAtmosphericTemperatureText(QStringLiteral("5"));
+    controller->setEphemerisRelativeHumidityText(QStringLiteral("40"));
+    controller->setEphemerisWavelengthText(QStringLiteral("0.62"));
+    const std::uint64_t revision = controller->ephemerisRequestContext().engineOptionsRevision;
+    QSignalSpy ephemerisSettingsSpy(controller.get(), &SkyContextController::ephemerisSettingsChanged);
+    QSignalSpy skyContextSpy(controller.get(), &SkyContextController::skyContextChanged);
+
+    const auto pressureSetter = &SkyContextController::setEphemerisAtmosphericPressureText;
+    const auto pressureGetter = &SkyContextController::ephemerisAtmosphericPressureText;
+    const auto temperatureSetter = &SkyContextController::setEphemerisAtmosphericTemperatureText;
+    const auto temperatureGetter = &SkyContextController::ephemerisAtmosphericTemperatureText;
+    const auto humiditySetter = &SkyContextController::setEphemerisRelativeHumidityText;
+    const auto humidityGetter = &SkyContextController::ephemerisRelativeHumidityText;
+    const auto wavelengthSetter = &SkyContextController::setEphemerisWavelengthText;
+    const auto wavelengthGetter = &SkyContextController::ephemerisWavelengthText;
+
+    for (const QString& text : {
+             QStringLiteral("-0.01"),
+             QStringLiteral("2000.01"),
+             QStringLiteral("not a number"),
+             QString(),
+         }) {
+        expectRejectedAtmosphereText(
+            *controller, ephemerisSettingsSpy, skyContextSpy, revision, pressureSetter, pressureGetter, text
+        );
+    }
+    for (const QString& text : {
+             QStringLiteral("-100.01"),
+             QStringLiteral("80.01"),
+             QStringLiteral("not a number"),
+             QString(),
+         }) {
+        expectRejectedAtmosphereText(
+            *controller, ephemerisSettingsSpy, skyContextSpy, revision, temperatureSetter, temperatureGetter, text
+        );
+    }
+    for (const QString& text : {
+             QStringLiteral("-0.01"),
+             QStringLiteral("100.01"),
+             QStringLiteral("not a number"),
+             QString(),
+         }) {
+        expectRejectedAtmosphereText(
+            *controller, ephemerisSettingsSpy, skyContextSpy, revision, humiditySetter, humidityGetter, text
+        );
+    }
+    for (const QString& text : {
+             QStringLiteral("0.09"),
+             QStringLiteral("100.01"),
+             QStringLiteral("not a number"),
+             QString(),
+         }) {
+        expectRejectedAtmosphereText(
+            *controller, ephemerisSettingsSpy, skyContextSpy, revision, wavelengthSetter, wavelengthGetter, text
+        );
+    }
+
+    QCOMPARE(ephemerisSettingsSpy.count(), 16);
+    QCOMPARE(skyContextSpy.count(), 0);
+}
+
+void SkyContextControllerEphemerisSettingsTests::acceptedSettingsNotifyAndBumpRevisionOnce()
+{
+    const auto controller = createController(false);
+    const std::uint64_t revision = controller->ephemerisRequestContext().engineOptionsRevision;
+    QSignalSpy ephemerisSettingsSpy(controller.get(), &SkyContextController::ephemerisSettingsChanged);
+    QSignalSpy skyContextSpy(controller.get(), &SkyContextController::skyContextChanged);
+    QStringList notifications;
+    connect(controller.get(), &SkyContextController::ephemerisSettingsChanged, controller.get(), [&notifications] {
+        notifications.append(QStringLiteral("settings"));
+    });
+    connect(controller.get(), &SkyContextController::skyContextChanged, controller.get(), [&notifications] {
+        notifications.append(QStringLiteral("skyContext"));
+    });
+
+    controller->setEphemerisAtmosphericPressureText(QStringLiteral("900"));
+
+    QCOMPARE(controller->ephemerisRequestContext().engineOptionsRevision, revision + 1);
+    QCOMPARE(ephemerisSettingsSpy.count(), 1);
+    QCOMPARE(skyContextSpy.count(), 1);
+    QCOMPARE(notifications, QStringList({QStringLiteral("settings"), QStringLiteral("skyContext")}));
+
+    notifications.clear();
+    controller->setEphemerisAtmosphericPressureText(QStringLiteral("2000.01"));
+
+    QCOMPARE(controller->ephemerisRequestContext().engineOptionsRevision, revision + 1);
+    QCOMPARE(ephemerisSettingsSpy.count(), 2);
+    QCOMPARE(skyContextSpy.count(), 1);
+    QCOMPARE(notifications, QStringList({QStringLiteral("settings")}));
+}
+
+void SkyContextControllerEphemerisSettingsTests::unchangedOptionSettersKeepRevision()
+{
+    const auto controller = createController(false);
+    controller->setEphemerisEngineKindIndex(1);
+    controller->setEphemerisCorrectionPresetIndex(1);
+    controller->setEphemerisRefractionEnabled(true);
+    controller->setEphemerisAtmosphericPressureText(QStringLiteral("900.00"));
+    controller->setEphemerisAtmosphericTemperatureText(QStringLiteral("5.0"));
+    controller->setEphemerisRelativeHumidityText(QStringLiteral("42.0"));
+    controller->setEphemerisWavelengthText(QStringLiteral("0.62"));
+    const std::uint64_t revision = controller->ephemerisRequestContext().engineOptionsRevision;
+    QSignalSpy ephemerisSettingsSpy(controller.get(), &SkyContextController::ephemerisSettingsChanged);
+    QSignalSpy skyContextSpy(controller.get(), &SkyContextController::skyContextChanged);
+
+    controller->setEphemerisEngineKindIndex(controller->ephemerisEngineKindIndex());
+    controller->setEphemerisCorrectionPresetIndex(controller->ephemerisCorrectionPresetIndex());
+    controller->setEphemerisRefractionEnabled(controller->ephemerisRefractionEnabled());
+    controller->setEphemerisAtmosphericPressureText(controller->ephemerisAtmosphericPressureText());
+    controller->setEphemerisAtmosphericTemperatureText(controller->ephemerisAtmosphericTemperatureText());
+    controller->setEphemerisRelativeHumidityText(controller->ephemerisRelativeHumidityText());
+    controller->setEphemerisWavelengthText(controller->ephemerisWavelengthText());
+
+    QCOMPARE(controller->ephemerisRequestContext().engineOptionsRevision, revision);
+    QCOMPARE(ephemerisSettingsSpy.count(), 0);
+    QCOMPARE(skyContextSpy.count(), 0);
+}
+
+void SkyContextControllerEphemerisSettingsTests::engineSwitchKeepsUnrelatedSettings()
+{
+    SkySettingsStore store;
+    SkyPersistedStateSnapshot snapshot;
+    snapshot.ephemeris = customEphemerisUserSettings();
+    snapshot.ephemeris.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::astrometric();
+    snapshot.ephemerisSettingsPresent = true;
+    QVERIFY(store.saveState(snapshot));
+
+    const auto controller = createController(true);
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 0);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 1);
+    QVERIFY(!controller->ephemerisRefractionEnabled());
+
+    controller->setEphemerisEngineKindIndex(1);
+
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 1);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 3);
+    QVERIFY(controller->ephemerisRefractionEnabled());
+    QCOMPARE(controller->ephemerisAtmosphericPressureText(), QString("802.50"));
+    QCOMPARE(controller->ephemerisAtmosphericTemperatureText(), QString("-6.0"));
+    QCOMPARE(controller->ephemerisRelativeHumidityText(), QString("42.0"));
+    QCOMPARE(controller->ephemerisWavelengthText(), QString("0.68"));
+    QVERIFY(controller->saveSettings());
+    auto savedSnapshot = store.loadState();
+    QVERIFY(savedSnapshot.has_value());
+    QVERIFY(!savedSnapshot->ephemeris.fallbackToSimpleEngine);
+    QCOMPARE(savedSnapshot->ephemeris.correctionPresetId, QString("apparent-topocentric"));
+    QCOMPARE(
+        savedSnapshot->ephemeris.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric()
+    );
+
+    controller->setEphemerisCorrectionPresetIndex(1);
+    controller->setEphemerisRefractionEnabled(false);
+    controller->setEphemerisEngineKindIndex(0);
+
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 0);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 0);
+    QVERIFY(!controller->ephemerisRefractionEnabled());
+    QCOMPARE(controller->ephemerisAtmosphericPressureText(), QString("802.50"));
+    QCOMPARE(controller->ephemerisAtmosphericTemperatureText(), QString("-6.0"));
+    QCOMPARE(controller->ephemerisRelativeHumidityText(), QString("42.0"));
+    QCOMPARE(controller->ephemerisWavelengthText(), QString("0.68"));
+    QVERIFY(controller->saveSettings());
+    savedSnapshot = store.loadState();
+    QVERIFY(savedSnapshot.has_value());
+    QVERIFY(!savedSnapshot->ephemeris.fallbackToSimpleEngine);
+    QCOMPARE(savedSnapshot->ephemeris.correctionPresetId, QString("geometric"));
+    QCOMPARE(savedSnapshot->ephemeris.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
+
+    controller->setEphemerisEngineKindIndex(1);
+
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 1);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 3);
+    QVERIFY(controller->ephemerisRefractionEnabled());
+    QCOMPARE(controller->ephemerisAtmosphericPressureText(), QString("802.50"));
+    QCOMPARE(controller->ephemerisAtmosphericTemperatureText(), QString("-6.0"));
+    QCOMPARE(controller->ephemerisRelativeHumidityText(), QString("42.0"));
+    QCOMPARE(controller->ephemerisWavelengthText(), QString("0.68"));
+}
+
+void SkyContextControllerEphemerisSettingsTests::savedSnapshotMirrorsAppliedEngineOptions()
+{
+    const auto controller = createController(false);
+    controller->setEphemerisEngineKindIndex(1);
+    controller->setEphemerisCorrectionPresetIndex(2);
+    controller->setEphemerisRefractionEnabled(false);
+    controller->setEphemerisAtmosphericPressureText(QStringLiteral("802.50"));
+    controller->setEphemerisAtmosphericTemperatureText(QStringLiteral("-6.0"));
+    controller->setEphemerisRelativeHumidityText(QStringLiteral("42.0"));
+    controller->setEphemerisWavelengthText(QStringLiteral("0.68"));
+    QVERIFY(controller->saveSettings());
+
+    SkySettingsStore store;
+    const auto savedSnapshot = store.loadState();
+    QVERIFY(savedSnapshot.has_value());
+    QVERIFY(savedSnapshot->ephemerisSettingsPresent);
+
+    SkyEphemerisUserSettingsSnapshot expectedSettings;
+    expectedSettings.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    expectedSettings.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::apparent();
+    expectedSettings.correctionPresetId = QStringLiteral("apparent");
+    expectedSettings.refractionEnabled = false;
+    expectedSettings.atmosphericPressureHpa = 802.5;
+    expectedSettings.atmosphericTemperatureC = -6.0;
+    expectedSettings.relativeHumidity = 0.42;
+    expectedSettings.observingWavelengthMicrometers = 0.68;
+    verifyEphemerisUserSettings(savedSnapshot->ephemeris, expectedSettings);
 }
 
 QTEST_GUILESS_MAIN(SkyContextControllerEphemerisSettingsTests)
