@@ -18,6 +18,7 @@
 #include "catalog/SkyCatalogImportWorkflow.hpp"
 #include "catalog/SkyCatalogPresets.hpp"
 #include "catalog/SkyCatalogRuntime.hpp"
+#include "catalog/SkyCatalogSourceIds.hpp"
 #include "catalog/SkyCatalogText.hpp"
 
 #include <QNetworkAccessManager>
@@ -27,22 +28,6 @@
 #include <vector>
 
 using namespace skygate::ui::internal;
-
-namespace {
-
-constexpr const char* kPrimarySlotId = "primary";
-constexpr const char* kDeepSkySlotId = "deep-sky";
-
-// Source-row status text for a rejected runtime transition: the row reports the
-// operation error without the statusText's own "Catalog: " prefix, matching
-// the other per-source failure rows.
-QString operationErrorText(const QString& statusText)
-{
-    const QString prefix = QStringLiteral("Catalog: ");
-    return statusText.startsWith(prefix) ? statusText.mid(prefix.size()) : statusText;
-}
-
-}  // namespace
 
 SkyCatalogManager::SkyCatalogManager(
     SkySettingsStore* settingsStore,
@@ -285,7 +270,7 @@ void SkyCatalogManager::loadCatalogPreset(const QString& presetId)
 
     setCatalogPresetIndex(descriptor->legacyPresetIndex);
     auto source = SkyCatalogSourceInstance::fromDescriptor(*descriptor);
-    source.instanceId = QString::fromLatin1(kPrimarySlotId);
+    source.instanceId = QString::fromLatin1(SkyCatalogSourceIds::kPrimarySlot);
     if (!descriptor->bundled) {
         setCatalogUrlText(descriptor->defaultUrl());
     }
@@ -310,7 +295,7 @@ void SkyCatalogManager::loadDeepSkyCatalogPreset(const QString& presetId)
 
     setDeepSkyCatalogPresetIndex(descriptor->legacyPresetIndex);
     auto source = SkyCatalogSourceInstance::fromDescriptor(*descriptor);
-    source.instanceId = QString::fromLatin1(kDeepSkySlotId);
+    source.instanceId = QString::fromLatin1(SkyCatalogSourceIds::kDeepSkySlot);
     if (!descriptor->bundled) {
         setDeepSkyCatalogUrlText(descriptor->defaultUrl());
     }
@@ -322,10 +307,10 @@ void SkyCatalogManager::loadDeepSkyCatalogPreset(const QString& presetId)
 // addSourceUrl.
 void SkyCatalogManager::downloadCatalogFromUrl(const QString& urlText)
 {
-    setCatalogPresetIndex(2);
+    setCatalogPresetIndex(SkyCatalogPresets::kCustomLegacyPresetIndex);
     setCatalogUrlText(urlText);
     auto source = SkyCatalogSourceInstance::createCustom(urlText);
-    source.instanceId = QString::fromLatin1(kPrimarySlotId);
+    source.instanceId = QString::fromLatin1(SkyCatalogSourceIds::kPrimarySlot);
     loadSourceInstance(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
 }
 
@@ -334,10 +319,10 @@ void SkyCatalogManager::downloadCatalogFromUrl(const QString& urlText)
 // addSourceUrl.
 void SkyCatalogManager::downloadDeepSkyCatalogFromUrl(const QString& urlText)
 {
-    setDeepSkyCatalogPresetIndex(2);
+    setDeepSkyCatalogPresetIndex(SkyCatalogPresets::kCustomLegacyPresetIndex);
     setDeepSkyCatalogUrlText(urlText);
     auto source = SkyCatalogSourceInstance::createCustom(urlText);
-    source.instanceId = QString::fromLatin1(kDeepSkySlotId);
+    source.instanceId = QString::fromLatin1(SkyCatalogSourceIds::kDeepSkySlot);
     loadSourceInstance(source, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
 }
 
@@ -378,10 +363,7 @@ void SkyCatalogManager::addSourceUrl(const QString& urlText, const QString& cate
         return;
     }
 
-    const auto policy = category == SkyCatalogPresets::deepSkyCategory()
-                            ? skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly
-                            : skygate::ephemeris::CatalogCompositionPolicy::Merge;
-    loadSourceInstance(SkyCatalogSourceInstance::createCustom(urlText), policy);
+    loadSourceInstance(SkyCatalogSourceInstance::createCustom(urlText), SkyCatalogPresets::policyForCategory(category));
 }
 
 void SkyCatalogManager::enableSource(const QString& instanceId)
@@ -461,7 +443,7 @@ void SkyCatalogManager::cancelCatalogDownload()
 
     setDownloadingCatalog(false);
     setCatalogProcessing(false);
-    setStatusText(QStringLiteral("Catalog: Download canceled."));
+    setStatusText(SkyCatalogText::downloadCanceled());
     if (SkyCatalogSourceOperation* operation = findOperation(activeInstanceId)) {
         operation->markCanceled(QStringLiteral("Canceled"));
     }
@@ -715,9 +697,10 @@ void SkyCatalogManager::loadSourceInstance(
     }
 
     if (m_importWorkflow == nullptr || !m_importWorkflow->isAvailable()) {
+        const QString networkUnavailableText = SkyCatalogText::networkUnavailable();
         m_activeDownloadInstanceId.clear();
-        operation->fail(QStringLiteral("Network unavailable"));
-        setStatusText(QStringLiteral("Catalog: Network unavailable"));
+        operation->fail(SkyCatalogText::withoutStatusPrefix(networkUnavailableText));
+        setStatusText(networkUnavailableText);
         emit sourcesChanged();
         return;
     }
@@ -764,8 +747,9 @@ void SkyCatalogManager::applyBundledSource(
 {
     auto bundledCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     if (bundledCatalog == nullptr) {
-        operation.fail(QStringLiteral("Failed to load"));
-        setStatusText(QStringLiteral("Catalog: Failed to load"));
+        const QString loadFailedText = SkyCatalogText::loadFailed();
+        operation.fail(SkyCatalogText::withoutStatusPrefix(loadFailedText));
+        setStatusText(loadFailedText);
         emit sourcesChanged();
         return;
     }
@@ -784,7 +768,7 @@ void SkyCatalogManager::applyBundledSource(
     if (!result.succeeded) {
         // The runtime refused the transition: the row reports the operation
         // error and the committed collection stays active.
-        operation.fail(operationErrorText(result.statusText));
+        operation.fail(SkyCatalogText::withoutStatusPrefix(result.statusText));
         applyRuntimeResult(result);
         return;
     }
@@ -875,7 +859,7 @@ void SkyCatalogManager::handleSourceImportFinished(
         // operation reports the error instead of proceeding as if the source
         // were active. Nothing was accepted, so the previously accepted
         // descriptor and payload stay in place together.
-        operation->fail(operationErrorText(runtimeResult.statusText));
+        operation->fail(SkyCatalogText::withoutStatusPrefix(runtimeResult.statusText));
         setDownloadingCatalog(false);
         applyRuntimeResult(runtimeResult);
         return;

@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -132,6 +133,9 @@ private:
     // error without publishing or discarding any state.
     [[nodiscard]] SkyCatalogRuntimeResult activationFailureResult(const QString& statusText);
     [[nodiscard]] QString buildStatusText() const;
+    // Index of the configured source with this instance ID, or nothing when
+    // the collection does not hold it.
+    [[nodiscard]] std::optional<std::size_t> sourceIndex(const QString& instanceId) const;
     [[nodiscard]] SkyCatalogSourceRecord* findSource(const QString& instanceId);
     [[nodiscard]] const SkyCatalogSourceRecord* findSource(const QString& instanceId) const;
     // Composes the active related view from the owned datasets of the enabled

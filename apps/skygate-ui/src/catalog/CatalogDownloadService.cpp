@@ -1,5 +1,6 @@
 #include "CatalogDownloadService.hpp"
 #include "CatalogDownloadCancellation.hpp"
+#include "catalog/SkyCatalogText.hpp"
 
 #include <QLoggingCategory>
 #include <QNetworkAccessManager>
@@ -13,6 +14,8 @@
 #include <functional>
 #include <memory>
 #include <optional>
+
+using skygate::ui::internal::SkyCatalogText;
 
 namespace {
 
@@ -122,7 +125,7 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
     const QStringList candidateUrls = normalizedCandidateUrls(urlTexts);
     if (candidateUrls.isEmpty()) {
         DownloadResult result;
-        result.errorText = "Catalog: Invalid URL";
+        result.errorText = SkyCatalogText::invalidUrl();
         qCWarning(skygateCatalogDownloadLog) << "Catalog download aborted: no valid source URLs";
         completionHandler(std::move(result));
         return;
@@ -130,14 +133,14 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
 
     if (m_networkAccessManager == nullptr) {
         DownloadResult result;
-        result.errorText = "Catalog: Network unavailable";
+        result.errorText = SkyCatalogText::networkUnavailable();
         qCWarning(skygateCatalogDownloadLog) << "Catalog download aborted: network unavailable";
         completionHandler(std::move(result));
         return;
     }
 
     qCInfo(skygateCatalogDownloadLog).noquote() << "Catalog download started: sources" << candidateUrls.size();
-    const auto lastErrorText = std::make_shared<QString>("Catalog: Download failed");
+    const auto lastErrorText = std::make_shared<QString>(SkyCatalogText::downloadFailed());
     const auto tryDownloadNextUrl = std::make_shared<std::function<void(int)>>();
     const std::weak_ptr<std::function<void(int)>> weakTryDownloadNextUrl = tryDownloadNextUrl;
     *tryDownloadNextUrl = [this,
@@ -165,7 +168,7 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
 
         const QUrl url = QUrl::fromUserInput(candidateUrls[index]);
         if (!url.isValid() || url.scheme().isEmpty()) {
-            *lastErrorText = QString("Catalog: Invalid source URL %1").arg(candidateUrls[index]);
+            *lastErrorText = SkyCatalogText::invalidSourceUrl(candidateUrls[index]);
             qCWarning(skygateCatalogDownloadLog).noquote()
                 << "Skipping invalid catalog source URL" << candidateUrls[index];
             (*downloadNextUrl)(index + 1);
@@ -173,7 +176,7 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
         }
 
         if (statusHandler) {
-            statusHandler(QString("Catalog: Downloading %1...").arg(url.toString()));
+            statusHandler(SkyCatalogText::sourceDownloadStarted(url.toString()));
             // The status handler is user code; a synchronous cancellation
             // must stop the candidate before its request is issued.
             if (cancellation->isCanceled()) {
@@ -249,7 +252,7 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
                 }
 
                 const auto reportSizeRejection = [&]() {
-                    *lastErrorText = QString("Catalog: Source %1 file too large (max 128 MiB)").arg(urlText);
+                    *lastErrorText = SkyCatalogText::sourceTooLarge(urlText, kMaxDownloadedCatalogBytes);
                     if (statusHandler) {
                         statusHandler(*lastErrorText);
                     }
@@ -263,8 +266,8 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
 
                 if (reply->error() != QNetworkReply::NoError) {
                     const int httpStatusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-                    *lastErrorText = QString("Catalog: Source %1 failed (%2, HTTP %3)")
-                                         .arg(urlText, reply->errorString(), QString::number(httpStatusCode));
+                    *lastErrorText =
+                        SkyCatalogText::sourceDownloadFailed(urlText, reply->errorString(), httpStatusCode);
                     qCWarning(skygateCatalogDownloadLog).noquote()
                         << "Catalog source failed" << urlText << reply->errorString() << "HTTP" << httpStatusCode;
                     if (statusHandler) {
@@ -288,7 +291,7 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
                 }
 
                 if (attempt->payload.isEmpty()) {
-                    *lastErrorText = QString("Catalog: Source %1 returned empty data").arg(urlText);
+                    *lastErrorText = SkyCatalogText::sourceEmptyPayload(urlText);
                     qCWarning(skygateCatalogDownloadLog).noquote() << "Catalog source returned empty data" << urlText;
                     if (statusHandler) {
                         statusHandler(*lastErrorText);
