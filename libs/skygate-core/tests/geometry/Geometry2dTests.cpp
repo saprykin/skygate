@@ -32,6 +32,7 @@ private slots:
     void gridHelpersHandleInvalidInputs();
     void areaScaleUsesSquareRootOfAreaRatio();
     void areaScaleFallsBackForInvalidInputs();
+    void pointWithinMarginComparesAgainstShrunkViewport();
     void rectFitIncludesExactMargins();
 };
 
@@ -192,6 +193,19 @@ void Geometry2dTests::areaScaleFallsBackForInvalidInputs()
     QCOMPARE(skygate::core::Geometry2d::areaScale(2200.0, -1520.0, 1100.0, 760.0), 1.0);
     QCOMPARE(skygate::core::Geometry2d::areaScale(2200.0, 1520.0, 0.0, 760.0), 1.0);
     QCOMPARE(skygate::core::Geometry2d::areaScale(2200.0, 1520.0, 1100.0, -760.0), 1.0);
+}
+
+void Geometry2dTests::pointWithinMarginComparesAgainstShrunkViewport()
+{
+    QVERIFY(skygate::core::Geometry2d::pointWithinMargin(50.0, 50.0, 100.0, 80.0, 10.0));
+    QVERIFY(skygate::core::Geometry2d::pointWithinMargin(10.0, 10.0, 100.0, 80.0, 10.0));
+    QVERIFY(skygate::core::Geometry2d::pointWithinMargin(90.0, 70.0, 100.0, 80.0, 10.0));
+    QVERIFY(!skygate::core::Geometry2d::pointWithinMargin(9.9, 50.0, 100.0, 80.0, 10.0));
+    QVERIFY(!skygate::core::Geometry2d::pointWithinMargin(50.0, 9.9, 100.0, 80.0, 10.0));
+    QVERIFY(!skygate::core::Geometry2d::pointWithinMargin(90.1, 50.0, 100.0, 80.0, 10.0));
+    QVERIFY(!skygate::core::Geometry2d::pointWithinMargin(50.0, 70.1, 100.0, 80.0, 10.0));
+    QVERIFY(skygate::core::Geometry2d::pointWithinMargin(5.0, 5.0, 100.0, 80.0, 0.0));
+    QVERIFY(!skygate::core::Geometry2d::pointWithinMargin(-0.1, 5.0, 100.0, 80.0, 0.0));
 }
 
 void Geometry2dTests::rectFitIncludesExactMargins()

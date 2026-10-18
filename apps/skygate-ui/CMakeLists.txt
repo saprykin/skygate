@@ -248,6 +248,10 @@ qt_add_library(skygate-ui-lib STATIC
     src/render/SkyRenderHorizontalLookup.hpp
     src/render/SkyRenderLabelBuilder.cpp
     src/render/SkyRenderLabelBuilder.hpp
+    src/render/SkyRenderGlyphTessellator.cpp
+    src/render/SkyRenderGlyphTessellator.hpp
+    src/render/SkyReferenceOverlayLabelBuilder.cpp
+    src/render/SkyReferenceOverlayLabelBuilder.hpp
     src/settings/SkySettingsSnapshotCodecs.cpp
     src/settings/SkySettingsSnapshotCodecs.hpp
     src/settings/SkyCatalogSourceSettingsSnapshot.hpp
@@ -273,6 +277,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/render/SkyViewportGeometry.hpp
     src/render/SkyViewportGeometryInput.hpp
     src/render/SkyViewportLineSegment.hpp
+    src/render/SkyViewportSegmentSink.hpp
     src/render/SkyViewportItem.cpp
     src/render/SkyViewportItem.hpp
     src/render/SkyViewportSceneGraph.cpp

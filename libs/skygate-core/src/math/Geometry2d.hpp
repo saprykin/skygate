@@ -36,6 +36,8 @@ public:
     areaScale(double width, double height, double referenceWidth, double referenceHeight) noexcept;
 
     [[nodiscard]] static bool intersects(const Rect2d& lhs, const Rect2d& rhs) noexcept;
+    [[nodiscard]] static bool
+    pointWithinMargin(double x, double y, double width, double height, double margin) noexcept;
     [[nodiscard]] static bool fitsWithin(const Rect2d& rect, double width, double height, double margin) noexcept;
 };
 
