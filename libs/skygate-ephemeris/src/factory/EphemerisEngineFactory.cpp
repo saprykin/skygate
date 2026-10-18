@@ -5,12 +5,12 @@
 #include "engine/EphemerisLogging.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
-#include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
+#include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "engine/IEarthOrientationProvider.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
 #include "engine/ITimeScaleService.hpp"
@@ -162,19 +162,23 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
     if (request.activeDataSnapshot == nullptr) {
         return;
     }
-    if (request.timeScaleService != nullptr && request.earthOrientationProvider != nullptr) {
-        return;
-    }
 
-    std::shared_ptr<const IEarthOrientationProvider> earthOrientationProvider = request.earthOrientationProvider;
-    if (earthOrientationProvider == nullptr) {
-        earthOrientationProvider = TimeScaleProviderLoader::loadEarthOrientationProvider(*request.activeDataSnapshot);
-    }
-    if (request.timeScaleService == nullptr) {
-        request.timeScaleService =
-            TimeScaleProviderLoader::loadTimeScaleService(*request.activeDataSnapshot, earthOrientationProvider);
-    }
-    request.earthOrientationProvider = earthOrientationProvider;
+    // A factory request is a one-shot creation, so kernel providers composed
+    // here verify their checksum. The backend resource cache, which reuses one
+    // provider across engine rebuilds, opts out of the re-read explicitly.
+    const TimeScaleProviderLoader::Providers resolved = TimeScaleProviderLoader::resolveMissing(
+        *request.activeDataSnapshot,
+        request.dataManifest,
+        TimeScaleProviderLoader::Providers{
+            .timeScaleService = request.timeScaleService,
+            .earthOrientationProvider = request.earthOrientationProvider,
+            .calcephKernelProvider = request.calcephKernelProvider,
+        },
+        TimeScaleProviderLoader::KernelOptions{.verifyChecksum = true}
+    );
+    request.timeScaleService = resolved.timeScaleService;
+    request.earthOrientationProvider = resolved.earthOrientationProvider;
+    request.calcephKernelProvider = resolved.calcephKernelProvider;
 }
 
 [[nodiscard]] EphemerisEngineFactoryResult createHighPrecisionEngine(const EphemerisEngineFactoryRequest& request)
@@ -219,20 +223,10 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
     }
 
     if (diagnostics.empty()) {
-        std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelProvider> kernelProvider =
+        const std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelProvider> kernelProvider =
             request.calcephKernelProvider;
-        if (kernelProvider == nullptr) {
-            skygate::ephemeris::highprecision::CalcephKernelProvider::Options kernelSelectionOptions;
-            kernelProvider = std::make_shared<skygate::ephemeris::highprecision::CalcephKernelProvider>(
-                *request.activeDataSnapshot,
-                *request.dataManifest,
-                std::move(kernelSelectionOptions),
-                request.timeScaleService
-            );
-        }
-
         const std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernel> kernel =
-            kernelProvider->openKernel();
+            kernelProvider != nullptr ? kernelProvider->openKernel() : nullptr;
         if (kernel == nullptr) {
             diagnostics.push_back(makeDiagnostic(
                 EphemerisFactoryCreationDiagnostic::Code::EngineCreationFailed,

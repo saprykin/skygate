@@ -6,8 +6,10 @@
 #include "engine/TimeScaleConversionResult.hpp"
 #include "engine/TimeScaleProviderLoader.hpp"
 
+#include <QRegularExpression>
 #include <QtTest/QtTest>
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -107,7 +109,15 @@ epochForDate(const int year, const int month, const int day)
     );
 }
 
+template <typename Status>
+[[nodiscard]] std::uint8_t statusCode(const Status status)
+{
+    return static_cast<std::uint8_t>(status);
+}
+
 }  // namespace
+
+using skygate::ephemeris::TimeScaleProviderLoader;
 
 class TimeScaleProviderLoaderTests final : public QObject {
     Q_OBJECT
@@ -118,6 +128,7 @@ private slots:
     void rejectsInvalidEarthOrientationData();
     void usesProvidedEarthOrientationProvider();
     void toleratesMissingDeltaTData();
+    void resolveMissingReusesProvidedProviders();
 };
 
 void TimeScaleProviderLoaderTests::loadsProvidersFromValidSnapshot()
@@ -125,18 +136,22 @@ void TimeScaleProviderLoaderTests::loadsProvidersFromValidSnapshot()
     TestEphemerisDataSnapshot snapshot(
         makeValidLeapSecondTable(), makeValidEarthOrientationData(), makeValidDeltaTData()
     );
-    const auto earthOrientationProvider =
-        skygate::ephemeris::TimeScaleProviderLoader::loadEarthOrientationProvider(snapshot);
-    QVERIFY(earthOrientationProvider != nullptr);
+    const auto earthOrientation = TimeScaleProviderLoader::loadEarthOrientationProvider(snapshot);
+    QVERIFY(earthOrientation.isSuccess());
+    QCOMPARE(statusCode(earthOrientation.status), statusCode(TimeScaleProviderLoader::Status::Loaded));
+    QVERIFY(earthOrientation.diagnosticText.empty());
+    QVERIFY(earthOrientation.provider != nullptr);
 
-    const auto timeScaleService =
-        skygate::ephemeris::TimeScaleProviderLoader::loadTimeScaleService(snapshot, earthOrientationProvider);
-    QVERIFY(timeScaleService != nullptr);
+    const auto timeScaleService = TimeScaleProviderLoader::loadTimeScaleService(snapshot, earthOrientation.provider);
+    QVERIFY(timeScaleService.isSuccess());
+    QCOMPARE(statusCode(timeScaleService.status), statusCode(TimeScaleProviderLoader::Status::Loaded));
+    QVERIFY(timeScaleService.diagnosticText.empty());
+    QVERIFY(timeScaleService.provider != nullptr);
 
     const auto epoch = epochForDate(2026, 5, 1);
     QVERIFY(epoch.has_value());
     const skygate::ephemeris::TimeScaleConversionResult conversion =
-        timeScaleService->convert(*epoch, skygate::core::TimeScale::Tt);
+        timeScaleService.provider->convert(*epoch, skygate::core::TimeScale::Tt);
     QVERIFY(conversion.isSuccess());
     QCOMPARE(conversion.epoch.timeScale, skygate::core::TimeScale::Tt);
 }
@@ -144,13 +159,27 @@ void TimeScaleProviderLoaderTests::loadsProvidersFromValidSnapshot()
 void TimeScaleProviderLoaderTests::rejectsMissingLeapSecondTable()
 {
     TestEphemerisDataSnapshot snapshot(std::nullopt, makeValidEarthOrientationData(), makeValidDeltaTData());
-    const auto earthOrientationProvider =
-        skygate::ephemeris::TimeScaleProviderLoader::loadEarthOrientationProvider(snapshot);
-    QVERIFY(earthOrientationProvider != nullptr);
+    const auto earthOrientation = TimeScaleProviderLoader::loadEarthOrientationProvider(snapshot);
+    QVERIFY(earthOrientation.isSuccess());
 
-    const auto timeScaleService =
-        skygate::ephemeris::TimeScaleProviderLoader::loadTimeScaleService(snapshot, earthOrientationProvider);
-    QVERIFY(timeScaleService == nullptr);
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        QRegularExpression(
+            QRegularExpression::escape(QStringLiteral(
+                "The ephemeris bootstrap could not compose the time-scale service: "
+                "Leap-second table asset is missing from the data snapshot."
+            ))
+        )
+    );
+    const auto timeScaleService = TimeScaleProviderLoader::loadTimeScaleService(snapshot, earthOrientation.provider);
+
+    QVERIFY(!timeScaleService.isSuccess());
+    QVERIFY(timeScaleService.provider == nullptr);
+    QCOMPARE(statusCode(timeScaleService.status), statusCode(TimeScaleProviderLoader::Status::MissingData));
+    QCOMPARE(
+        QString::fromStdString(timeScaleService.diagnosticText),
+        QStringLiteral("Leap-second table asset is missing from the data snapshot.")
+    );
 }
 
 void TimeScaleProviderLoaderTests::rejectsInvalidEarthOrientationData()
@@ -158,13 +187,29 @@ void TimeScaleProviderLoaderTests::rejectsInvalidEarthOrientationData()
     TestEphemerisDataSnapshot snapshot(
         makeValidLeapSecondTable(), makeAsset("earth-orientation", "not an EOP product\n"), makeValidDeltaTData()
     );
-    const auto earthOrientationProvider =
-        skygate::ephemeris::TimeScaleProviderLoader::loadEarthOrientationProvider(snapshot);
-    QVERIFY(earthOrientationProvider == nullptr);
 
-    const auto timeScaleService =
-        skygate::ephemeris::TimeScaleProviderLoader::loadTimeScaleService(snapshot, earthOrientationProvider);
-    QVERIFY(timeScaleService != nullptr);
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        QRegularExpression(
+            QRegularExpression::escape(QStringLiteral(
+                "The ephemeris bootstrap could not compose the Earth-orientation provider: "
+                "Earth-orientation data contains no rows."
+            ))
+        )
+    );
+    const auto earthOrientation = TimeScaleProviderLoader::loadEarthOrientationProvider(snapshot);
+
+    QVERIFY(!earthOrientation.isSuccess());
+    QVERIFY(earthOrientation.provider == nullptr);
+    QCOMPARE(statusCode(earthOrientation.status), statusCode(TimeScaleProviderLoader::Status::UnusableData));
+    QCOMPARE(
+        QString::fromStdString(earthOrientation.diagnosticText),
+        QStringLiteral("Earth-orientation data contains no rows.")
+    );
+
+    const auto timeScaleService = TimeScaleProviderLoader::loadTimeScaleService(snapshot, earthOrientation.provider);
+    QVERIFY(timeScaleService.isSuccess());
+    QVERIFY(timeScaleService.provider != nullptr);
 }
 
 void TimeScaleProviderLoaderTests::usesProvidedEarthOrientationProvider()
@@ -172,18 +217,17 @@ void TimeScaleProviderLoaderTests::usesProvidedEarthOrientationProvider()
     TestEphemerisDataSnapshot snapshot(
         makeValidLeapSecondTable(), makeValidEarthOrientationData(), makeValidDeltaTData()
     );
-    const auto providedEarthOrientationProvider =
-        skygate::ephemeris::TimeScaleProviderLoader::loadEarthOrientationProvider(snapshot);
-    QVERIFY(providedEarthOrientationProvider != nullptr);
+    const auto providedEarthOrientation = TimeScaleProviderLoader::loadEarthOrientationProvider(snapshot);
+    QVERIFY(providedEarthOrientation.isSuccess());
 
     const auto timeScaleService =
-        skygate::ephemeris::TimeScaleProviderLoader::loadTimeScaleService(snapshot, providedEarthOrientationProvider);
-    QVERIFY(timeScaleService != nullptr);
+        TimeScaleProviderLoader::loadTimeScaleService(snapshot, providedEarthOrientation.provider);
+    QVERIFY(timeScaleService.isSuccess());
 
     const auto epoch = epochForDate(2026, 5, 1);
     QVERIFY(epoch.has_value());
     const skygate::ephemeris::TimeScaleConversionResult conversion =
-        timeScaleService->convert(*epoch, skygate::core::TimeScale::Ut1);
+        timeScaleService.provider->convert(*epoch, skygate::core::TimeScale::Ut1);
     QVERIFY(conversion.isSuccess());
     QCOMPARE(conversion.epoch.timeScale, skygate::core::TimeScale::Ut1);
 }
@@ -191,20 +235,36 @@ void TimeScaleProviderLoaderTests::usesProvidedEarthOrientationProvider()
 void TimeScaleProviderLoaderTests::toleratesMissingDeltaTData()
 {
     TestEphemerisDataSnapshot snapshot(makeValidLeapSecondTable(), makeValidEarthOrientationData(), std::nullopt);
-    const auto earthOrientationProvider =
-        skygate::ephemeris::TimeScaleProviderLoader::loadEarthOrientationProvider(snapshot);
-    QVERIFY(earthOrientationProvider != nullptr);
+    const auto earthOrientation = TimeScaleProviderLoader::loadEarthOrientationProvider(snapshot);
+    QVERIFY(earthOrientation.isSuccess());
 
-    const auto timeScaleService =
-        skygate::ephemeris::TimeScaleProviderLoader::loadTimeScaleService(snapshot, earthOrientationProvider);
-    QVERIFY(timeScaleService != nullptr);
+    const auto timeScaleService = TimeScaleProviderLoader::loadTimeScaleService(snapshot, earthOrientation.provider);
+    QVERIFY(timeScaleService.isSuccess());
 
     const auto epoch = epochForDate(2026, 5, 1);
     QVERIFY(epoch.has_value());
     const skygate::ephemeris::TimeScaleConversionResult conversion =
-        timeScaleService->convert(*epoch, skygate::core::TimeScale::Tt);
+        timeScaleService.provider->convert(*epoch, skygate::core::TimeScale::Tt);
     QVERIFY(conversion.isSuccess());
     QCOMPARE(conversion.epoch.timeScale, skygate::core::TimeScale::Tt);
+}
+
+void TimeScaleProviderLoaderTests::resolveMissingReusesProvidedProviders()
+{
+    TestEphemerisDataSnapshot snapshot(
+        makeValidLeapSecondTable(), makeValidEarthOrientationData(), makeValidDeltaTData()
+    );
+    const TimeScaleProviderLoader::Providers composed = TimeScaleProviderLoader::resolveMissing(
+        snapshot, nullptr, TimeScaleProviderLoader::Providers{}, TimeScaleProviderLoader::KernelOptions{}
+    );
+    QVERIFY(composed.timeScaleService != nullptr);
+    QVERIFY(composed.earthOrientationProvider != nullptr);
+    QVERIFY(composed.calcephKernelProvider == nullptr);
+
+    const TimeScaleProviderLoader::Providers reused =
+        TimeScaleProviderLoader::resolveMissing(snapshot, nullptr, composed, TimeScaleProviderLoader::KernelOptions{});
+    QVERIFY(reused.timeScaleService == composed.timeScaleService);
+    QVERIFY(reused.earthOrientationProvider == composed.earthOrientationProvider);
 }
 
 QTEST_APPLESS_MAIN(TimeScaleProviderLoaderTests)

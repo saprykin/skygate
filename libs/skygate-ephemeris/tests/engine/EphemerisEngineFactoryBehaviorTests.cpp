@@ -294,6 +294,7 @@ private slots:
     void highPrecisionRequestRequiresDatasetInfoSource();
     void highPrecisionRequestHandlesNullKernelProvider();
     void highPrecisionRequestSkipsKernelRehash();
+    void highPrecisionRequestVerifiesChecksum();
     void highPrecisionDE441AvoidsBarycenterFallback();
     void highPrecisionRequestWiresTopocentricPath();
     void defaultProviderReportsUnavailableBuildFirst();
@@ -509,6 +510,61 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestSkipsKernelRehash(
     QVERIFY(result.engine != nullptr);
     QVERIFY(!result.hasDiagnostics());
     QCOMPARE(kernelProvider->openCount(), 1);
+}
+
+void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestVerifiesChecksum()
+{
+    const QByteArray activatedKernelPayload("active kernel bytes");
+    const QByteArray manifestChecksumPayload("other kernel bytes ");
+    QCOMPARE(activatedKernelPayload.size(), manifestChecksumPayload.size());
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const std::string kernelPath = writeKernelFixture(directory, activatedKernelPayload);
+    QVERIFY(!kernelPath.empty());
+
+    const std::array bodies{makeFactoryBehaviorSun()};
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    request.catalog = makeCatalogHandle(bodies);
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
+    request.options.setFallbackToSimpleEngine(false);
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
+    const skygate::ephemeris::EphemerisDataManifest manifest =
+        makeFactoryManifest(manifestChecksumPayload, static_cast<std::uint64_t>(activatedKernelPayload.size()));
+    request.dataManifest = &manifest;
+    request.activeDataSnapshot =
+        std::make_shared<TestEphemerisDataSnapshot>(skygate::ephemeris::EphemerisKernelDataAsset{
+            .id = "kernel",
+            .profileId = "modern",
+            .version = "snapshot-version",
+            .provenance = "snapshot provenance",
+            .activePath = kernelPath,
+        });
+    request.timeScaleService = std::make_shared<TestTimeScaleService>();
+    request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
+
+    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
+
+    QVERIFY(!result.isSuccess());
+    QVERIFY(result.hasErrors());
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.diagnostics.front().code),
+        static_cast<std::uint8_t>(
+            skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable
+        )
+    );
+    QVERIFY(result.diagnostics.front().displayText().find("checksum") != std::string_view::npos);
+#else
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.diagnostics.front().code),
+        static_cast<std::uint8_t>(
+            skygate::ephemeris::EphemerisFactoryCreationDiagnostic::Code::HighPrecisionUnavailable
+        )
+    );
+#endif
 }
 
 void EphemerisEngineFactoryBehaviorTests::highPrecisionDE441AvoidsBarycenterFallback()

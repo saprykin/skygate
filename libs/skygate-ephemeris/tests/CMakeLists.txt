@@ -123,6 +123,9 @@ set(SKYGATE_ENGINE_HEADER_ISOLATION_ALLOWLIST
     "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/simple/"
     "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/highprecision/"
     "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/EphemerisEngineDescriptorRegistry.cpp"
+    # The provider bootstrap loader composes the CALCEPH kernel provider for
+    # both the engine factory and the backend resource cache.
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/TimeScaleProviderLoader.cpp"
     "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/TdbTtConverter.cpp"
     "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/tests/support/"
     "${CMAKE_SOURCE_DIR}/apps/skygate-ui/tests/support/"

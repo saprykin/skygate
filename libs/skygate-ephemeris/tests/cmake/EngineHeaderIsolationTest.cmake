@@ -11,6 +11,9 @@
 #     src/engine/highprecision)
 #   - the engine descriptor registry (src/engine), which shares the simple
 #     engine's default options and kind display names
+#   - the provider bootstrap loader (src/engine/TimeScaleProviderLoader.cpp),
+#     which composes the CALCEPH kernel provider for the factory and the
+#     backend resource cache
 #   - test support
 #   - the documented, build-gated TdbTtConverter ERFA adapter crossing
 #

@@ -3,9 +3,6 @@
 #include "engine/IEphemerisDataSnapshot.hpp"
 #include "engine/TimeScaleProviderLoader.hpp"
 #include "factory/EphemerisEngineFactoryRequest.hpp"
-#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-#include "engine/highprecision/CalcephKernelProvider.hpp"
-#endif
 
 #include <utility>
 
@@ -39,28 +36,32 @@ void EphemerisBackendResourceCache::refresh(
         return;
     }
 
-    if (m_earthOrientationProvider == nullptr) {
-        m_earthOrientationProvider = TimeScaleProviderLoader::loadEarthOrientationProvider(*activeDataSnapshot);
+    // Installed ephemeris data is checksum-verified when it is activated.
+    // Re-hashing the (potentially multi-gigabyte) kernel on every engine
+    // rebuild would dominate startup time, so the cached kernel provider
+    // skips per-open checksum verification.
+    const TimeScaleProviderLoader::Providers resolved = TimeScaleProviderLoader::resolveMissing(
+        *activeDataSnapshot,
+        dataManifest,
+        TimeScaleProviderLoader::Providers{
+            .timeScaleService = m_timeScaleService,
+            .earthOrientationProvider = m_earthOrientationProvider,
+            .calcephKernelProvider = m_calcephKernelProvider,
+        },
+        TimeScaleProviderLoader::KernelOptions{.verifyChecksum = false}
+    );
+
+    if (resolved.timeScaleService != m_timeScaleService) {
+        m_timeScaleService = resolved.timeScaleService;
         m_cacheManaged = true;
     }
-    if (m_timeScaleService == nullptr) {
-        m_timeScaleService =
-            TimeScaleProviderLoader::loadTimeScaleService(*activeDataSnapshot, m_earthOrientationProvider);
+    if (resolved.earthOrientationProvider != m_earthOrientationProvider) {
+        m_earthOrientationProvider = resolved.earthOrientationProvider;
         m_cacheManaged = true;
     }
-    if (m_calcephKernelProvider == nullptr && dataManifest != nullptr) {
-#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-        // Installed ephemeris data is checksum-verified when it is activated.
-        // Re-hashing the (potentially multi-gigabyte) kernel on every engine
-        // rebuild would dominate startup time, so the cached kernel provider
-        // skips per-open checksum verification.
-        highprecision::CalcephKernelProvider::Options kernelOptions;
-        kernelOptions.verifyChecksum = false;
-        m_calcephKernelProvider = std::make_shared<highprecision::CalcephKernelProvider>(
-            *activeDataSnapshot, *dataManifest, std::move(kernelOptions), m_timeScaleService
-        );
+    if (resolved.calcephKernelProvider != m_calcephKernelProvider) {
+        m_calcephKernelProvider = resolved.calcephKernelProvider;
         m_cacheManaged = true;
-#endif
     }
 }
 
