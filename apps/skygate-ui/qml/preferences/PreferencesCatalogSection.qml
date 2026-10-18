@@ -6,6 +6,7 @@ import com.skygate.app 1.0
 Item {
     id: catalogSection
     required property var skyContextController
+    readonly property var theme: skyContextController.theme
     readonly property bool catalogBusy: skyContextController.downloadingCatalog
                                         || skyContextController.catalogProcessing
 
@@ -24,6 +25,7 @@ Item {
                 spacing: 6
 
                 PreferencesGroupTitle {
+                    theme: catalogSection.theme
                     text: "Active Catalog Sources"
                 }
 
@@ -31,7 +33,7 @@ Item {
                     objectName: "catalogParticipationSummaryLabel"
                     Layout.fillWidth: true
                     text: skyContextController.catalogParticipationSummary
-                    color: skyContext.theme.listItemPrimaryText
+                    color: theme.listItemPrimaryText
                     font.pixelSize: 11
                     font.family: "Avenir Next"
                     elide: Text.ElideRight
@@ -41,7 +43,7 @@ Item {
                 Label {
                     Layout.fillWidth: true
                     text: skyContextController.catalogDatasetInfoText
-                    color: skyContext.theme.listItemPrimaryText
+                    color: theme.listItemPrimaryText
                     font.pixelSize: 11
                     font.family: "Avenir Next"
                     elide: Text.ElideRight
@@ -69,9 +71,9 @@ Item {
                         Layout.fillWidth: true
                         Layout.preferredHeight: sourceRowColumn.implicitHeight + 16
                         radius: 6
-                        color: skyContext.theme.cardBackground
+                        color: theme.cardBackground
                         border.width: 1
-                        border.color: skyContext.theme.cardBorder
+                        border.color: theme.cardBorder
 
                         ColumnLayout {
                             id: sourceRowColumn
@@ -84,6 +86,7 @@ Item {
                                 spacing: 6
 
                                 PreferencesCheckBox {
+                                    theme: catalogSection.theme
                                     objectName: "catalogSourceEnableCheckBox_" + index
                                     visible: !bundled
                                     checked: sourceEnabled
@@ -100,7 +103,7 @@ Item {
                                 Label {
                                     Layout.fillWidth: true
                                     text: version.length > 0 ? title + " " + version : title
-                                    color: skyContext.theme.listItemPrimaryText
+                                    color: theme.listItemPrimaryText
                                     font.family: "Avenir Next"
                                     font.pixelSize: 11
                                     font.weight: Font.DemiBold
@@ -109,7 +112,7 @@ Item {
 
                                 Label {
                                     text: category
-                                    color: skyContext.theme.textMuted
+                                    color: theme.textMuted
                                     font.family: "Avenir Next"
                                     font.pixelSize: 9
                                 }
@@ -118,7 +121,7 @@ Item {
                             Label {
                                 Layout.fillWidth: true
                                 text: objectCount > 0 ? status + " | " + objectCount + " objects" : status
-                                color: hasError ? skyContext.theme.errorText : skyContext.theme.listItemPrimaryText
+                                color: hasError ? theme.errorText : theme.listItemPrimaryText
                                 font.family: "Avenir Next"
                                 font.pixelSize: 9
                                 elide: Text.ElideRight
@@ -129,6 +132,7 @@ Item {
                                 spacing: 4
 
                                 PreferencesCompactActionButton {
+                                    theme: catalogSection.theme
                                     objectName: "catalogSourceUpButton_" + index
                                     text: "Up"
                                     enabled: !catalogBusy && index > 0
@@ -136,6 +140,7 @@ Item {
                                 }
 
                                 PreferencesCompactActionButton {
+                                    theme: catalogSection.theme
                                     objectName: "catalogSourceDownButton_" + index
                                     text: "Down"
                                     enabled: !catalogBusy && index < sourceRepeater.count - 1
@@ -143,6 +148,7 @@ Item {
                                 }
 
                                 PreferencesCompactActionButton {
+                                    theme: catalogSection.theme
                                     objectName: "catalogSourceRetryButton_" + index
                                     text: "Retry"
                                     visible: hasError
@@ -151,6 +157,7 @@ Item {
                                 }
 
                                 PreferencesCompactActionButton {
+                                    theme: catalogSection.theme
                                     objectName: "catalogSourceCancelButton_" + index
                                     text: "Cancel"
                                     visible: busy
@@ -159,6 +166,7 @@ Item {
                                 }
 
                                 PreferencesCompactActionButton {
+                                    theme: catalogSection.theme
                                     objectName: "catalogSourceClearCacheButton_" + index
                                     text: "Clear cache"
                                     visible: !bundled
@@ -167,6 +175,7 @@ Item {
                                 }
 
                                 PreferencesCompactActionButton {
+                                    theme: catalogSection.theme
                                     objectName: "catalogSourceRemoveButton_" + index
                                     text: "Remove"
                                     visible: !bundled
@@ -179,6 +188,7 @@ Item {
                 }
 
                 PreferencesGroupTitle {
+                    theme: catalogSection.theme
                     Layout.topMargin: 8
                     text: "Add Catalog Source"
                 }
@@ -188,6 +198,7 @@ Item {
                     spacing: 6
 
                     PreferencesComboBox {
+                        theme: catalogSection.theme
                         id: sourcePresetCombo
                         objectName: "catalogSourcePresetCombo"
                         Layout.fillWidth: true
@@ -196,6 +207,7 @@ Item {
                     }
 
                     PreferencesTextField {
+                        theme: catalogSection.theme
                         id: sourceUrlInput
                         objectName: "catalogSourceUrlInput"
                         Layout.fillWidth: true
@@ -206,6 +218,7 @@ Item {
                 }
 
                 PreferencesActionButton {
+                    theme: catalogSection.theme
                     id: addSourceButton
                     objectName: "catalogAddSourceButton"
                     Layout.preferredWidth: 116

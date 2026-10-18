@@ -113,6 +113,7 @@ void QmlPreferenceControlTests::preferencesTextFieldEditsAndTracksEnabledState()
             property int acceptedCount: 0
             property string lastText: ""
             PreferencesTextField {
+                theme: skyContext.theme
                 id: field
                 anchors.fill: parent
                 placeholderText: "Type here"
@@ -166,6 +167,7 @@ void QmlPreferenceControlTests::preferencesComboBoxActivatesAndShowsPopup()
             height: 80
             property int activatedIndex: -1
             PreferencesComboBox {
+                theme: skyContext.theme
                 id: combo
                 width: 220
                 model: ["One", "Two", "Three"]
@@ -218,16 +220,19 @@ void QmlPreferenceControlTests::preferencesComboBoxPopupRowsShowModelText()
             width: 260
             height: 240
             PreferencesComboBox {
+                theme: skyContext.theme
                 id: arrayCombo
                 width: 220
                 model: ["One", "Two", "Three"]
             }
             PreferencesComboBox {
+                theme: skyContext.theme
                 id: engineLabelsCombo
                 width: 220
                 model: skyContext.ephemerisEngineLabels
             }
             PreferencesComboBox {
+                theme: skyContext.theme
                 id: titledCombo
                 width: 220
                 textRole: "title"
@@ -305,6 +310,7 @@ void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClears()
             property real chosenLatitude: 0
             property real chosenLongitude: 0
             PreferencesCityPicker {
+                theme: skyContext.theme
                 id: picker
                 width: 320
                 height: 32
@@ -372,6 +378,7 @@ void QmlPreferenceControlTests::preferencesButtonCheckboxSectionControlsWork()
             property int actionClicks: 0
             property int sectionClicks: 0
             PreferencesActionButton {
+                theme: skyContext.theme
                 id: actionButton
                 x: 10
                 y: 10
@@ -380,11 +387,13 @@ void QmlPreferenceControlTests::preferencesButtonCheckboxSectionControlsWork()
                 onClicked: ++root.actionClicks
             }
             PreferencesCheckBox {
+                theme: skyContext.theme
                 id: checkBox
                 x: 10
                 y: 56
             }
             PreferencesSectionButton {
+                theme: skyContext.theme
                 id: sectionButton
                 x: 10
                 y: 94

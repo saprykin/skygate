@@ -3,7 +3,7 @@ import QtQuick.Controls
 
 Rectangle {
     id: actionButton
-    readonly property var theme: skyContext.theme
+    required property var theme
     property string text: ""
     signal clicked()
 

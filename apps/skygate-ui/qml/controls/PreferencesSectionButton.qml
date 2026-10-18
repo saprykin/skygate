@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
-    readonly property var theme: skyContext.theme
+    required property var theme
     property string label: ""
     property bool active: false
     signal clicked()

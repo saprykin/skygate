@@ -49,6 +49,7 @@ void QmlPreferencesLocationTimeTests::locationCoordinateChangesPropagateToSkyVie
                 Component.onCompleted: resetFromContext()
             }
             PreferencesSkySection {
+                theme: skyContext.theme
                 anchors.fill: parent
                 preferencesDraft: draft
             }
@@ -110,6 +111,7 @@ void QmlPreferencesLocationTimeTests::timeZonePickerFiltersSelectsAndApplies()
                 Component.onCompleted: resetFromContext()
             }
             PreferencesSkySection {
+                theme: skyContext.theme
                 anchors.fill: parent
                 preferencesDraft: draft
             }

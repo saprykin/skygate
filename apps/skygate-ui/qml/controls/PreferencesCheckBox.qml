@@ -3,7 +3,7 @@ import QtQuick.Controls
 
 CheckBox {
     id: checkControl
-    readonly property var theme: skyContext.theme
+    required property var theme
     implicitWidth: 18
     implicitHeight: 18
     leftPadding: 0

@@ -131,6 +131,7 @@ FocusScope {
             }
 
             PreferencesTextField {
+                theme: dateTimePopup.theme
                 id: dateField
                 objectName: "dateTimePopupDateField"
                 Layout.fillWidth: true
@@ -159,6 +160,7 @@ FocusScope {
             }
 
             PreferencesTextField {
+                theme: dateTimePopup.theme
                 id: timeField
                 objectName: "dateTimePopupTimeField"
                 Layout.fillWidth: true
@@ -195,6 +197,7 @@ FocusScope {
                 spacing: 6
 
                 PreferencesActionButton {
+                    theme: dateTimePopup.theme
                     objectName: "dateTimePopupCancelButton"
                     width: 72
                     text: "Cancel"
@@ -202,6 +205,7 @@ FocusScope {
                 }
 
                 PreferencesActionButton {
+                    theme: dateTimePopup.theme
                     objectName: "dateTimePopupNowButton"
                     width: 64
                     text: "Now"
@@ -213,6 +217,7 @@ FocusScope {
                 }
 
                 PreferencesActionButton {
+                    theme: dateTimePopup.theme
                     objectName: "dateTimePopupApplyButton"
                     width: 86
                     primary: true

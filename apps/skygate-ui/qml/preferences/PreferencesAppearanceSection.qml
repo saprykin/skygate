@@ -6,6 +6,7 @@ import com.skygate.app 1.0
 Item {
     id: root
     required property var preferencesDraft
+    required property var theme
     readonly property var themeOptions: preferencesDraft.skyContextController.themeOptions
 
     function themeIndexForId(themeId) {
@@ -38,19 +39,21 @@ Item {
             columnSpacing: 6
 
             PreferencesGroupTitle {
+                theme: root.theme
                 columnSpan: 4
                 text: "Appearance"
             }
 
             Label {
                 text: "Theme"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 10
                 Layout.alignment: Qt.AlignVCenter
             }
 
             PreferencesComboBox {
+                theme: root.theme
                 id: themeCombo
                 objectName: "themeCombo"
                 Layout.fillWidth: true
@@ -76,130 +79,141 @@ Item {
             columnSpacing: 8
 
             PreferencesGroupTitle {
+                theme: root.theme
                 columnSpan: 4
                 text: "Overlay Layers"
             }
 
             PreferencesCheckBox {
+                theme: root.theme
                 objectName: "overlayHorizonCheckBox"
                 checked: root.preferencesDraft.overlayHorizon
                 onToggled: root.preferencesDraft.overlayHorizon = checked
             }
             Label {
                 text: "Horizon"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 11
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
+                theme: root.theme
                 objectName: "overlayAltAzGridCheckBox"
                 checked: root.preferencesDraft.overlayAltAzGrid
                 onToggled: root.preferencesDraft.overlayAltAzGrid = checked
             }
             Label {
                 text: "Alt/Az grid"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 11
                 Layout.alignment: Qt.AlignVCenter
             }
 
             PreferencesCheckBox {
+                theme: root.theme
                 objectName: "overlayConstellationLinesCheckBox"
                 checked: root.preferencesDraft.overlayConstellationLines
                 onToggled: root.preferencesDraft.overlayConstellationLines = checked
             }
             Label {
                 text: "Constellation lines"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 11
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
+                theme: root.theme
                 objectName: "overlayConstellationLabelsCheckBox"
                 checked: root.preferencesDraft.overlayConstellationLabels
                 onToggled: root.preferencesDraft.overlayConstellationLabels = checked
             }
             Label {
                 text: "Constellation labels"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 11
                 Layout.alignment: Qt.AlignVCenter
             }
 
             PreferencesCheckBox {
+                theme: root.theme
                 objectName: "overlaySolarSystemLabelsCheckBox"
                 checked: root.preferencesDraft.overlaySolarSystemLabels
                 onToggled: root.preferencesDraft.overlaySolarSystemLabels = checked
             }
             Label {
                 text: "Solar system labels"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 11
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
+                theme: root.theme
                 objectName: "overlayDeepSkyObjectsCheckBox"
                 checked: root.preferencesDraft.overlayDeepSkyObjects
                 onToggled: root.preferencesDraft.overlayDeepSkyObjects = checked
             }
             Label {
                 text: "Deep sky objects"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 11
                 Layout.alignment: Qt.AlignVCenter
             }
 
             PreferencesCheckBox {
+                theme: root.theme
                 objectName: "overlayDeepSkyLabelsCheckBox"
                 checked: root.preferencesDraft.overlayDeepSkyLabels
                 onToggled: root.preferencesDraft.overlayDeepSkyLabels = checked
             }
             Label {
                 text: "Deep sky labels"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 11
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
+                theme: root.theme
                 objectName: "overlayEclipticCheckBox"
                 checked: root.preferencesDraft.overlayEcliptic
                 onToggled: root.preferencesDraft.overlayEcliptic = checked
             }
             Label {
                 text: "Ecliptic"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 11
                 Layout.alignment: Qt.AlignVCenter
             }
 
             PreferencesCheckBox {
+                theme: root.theme
                 objectName: "overlayCelestialEquatorCheckBox"
                 checked: root.preferencesDraft.overlayCelestialEquator
                 onToggled: root.preferencesDraft.overlayCelestialEquator = checked
             }
             Label {
                 text: "Celestial equator"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 11
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
+                theme: root.theme
                 objectName: "overlayCircumpolarBoundaryCheckBox"
                 checked: root.preferencesDraft.overlayCircumpolarBoundary
                 onToggled: root.preferencesDraft.overlayCircumpolarBoundary = checked
             }
             Label {
                 text: "Circumpolar boundary"
-                color: skyContext.theme.formLabelText
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 11
                 Layout.alignment: Qt.AlignVCenter

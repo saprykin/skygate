@@ -13,21 +13,22 @@ Window {
     minimumWidth: 502
     minimumHeight: 400
     visible: false
-    color: skyContext.theme.windowBackground
+    color: theme.windowBackground
     required property var skyContextController
+    readonly property var theme: skyContextController.theme
     property Window transientParentWindow
     readonly property bool useAttachedDialog: Qt.platform.os !== "linux"
     transientParent: useAttachedDialog ? transientParentWindow : null
     flags: (useAttachedDialog ? Qt.Dialog : Qt.Window) | Qt.FramelessWindowHint
     modality: useAttachedDialog ? Qt.WindowModal : Qt.NonModal
 
-    property color cardBackground: skyContext.theme.cardBackground
-    property color cardBackgroundBottom: skyContext.theme.cardBackgroundBottom
-    property color cardBorder: skyContext.theme.cardBorder
-    property color dividerColor: skyContext.theme.dividerColor
-    property color textPrimary: skyContext.theme.textPrimary
-    property color textSecondary: skyContext.theme.textSecondary
-    property color textMuted: skyContext.theme.textMuted
+    property color cardBackground: theme.cardBackground
+    property color cardBackgroundBottom: theme.cardBackgroundBottom
+    property color cardBorder: theme.cardBorder
+    property color dividerColor: theme.dividerColor
+    property color textPrimary: theme.textPrimary
+    property color textSecondary: theme.textSecondary
+    property color textMuted: theme.textMuted
     property int selectedPage: 0
     readonly property bool catalogBusy: skyContextController !== null
                                         && (skyContextController.downloadingCatalog
@@ -128,8 +129,8 @@ Window {
             height: 82
             color: "transparent"
             gradient: Gradient {
-                GradientStop { position: 0.0; color: skyContext.theme.headerGradientStart }
-                GradientStop { position: 1.0; color: skyContext.theme.headerGradientEnd }
+                GradientStop { position: 0.0; color: theme.headerGradientStart }
+                GradientStop { position: 1.0; color: theme.headerGradientEnd }
             }
         }
 
@@ -189,7 +190,7 @@ Window {
 
                     contentItem: Text {
                         text: closeIconButton.text
-                        color: skyContext.theme.closeButtonText
+                        color: theme.closeButtonText
                         font: closeIconButton.font
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -198,12 +199,12 @@ Window {
                     background: Rectangle {
                         radius: 15
                         color: closeIconButton.down
-                            ? skyContext.theme.closeButtonBackgroundPressed
+                            ? theme.closeButtonBackgroundPressed
                             : (closeIconButton.hovered
-                                   ? skyContext.theme.closeButtonBackgroundHover
-                                   : skyContext.theme.closeButtonBackground)
+                                   ? theme.closeButtonBackgroundHover
+                                   : theme.closeButtonBackground)
                         border.width: 1
-                        border.color: skyContext.theme.closeButtonBorder
+                        border.color: theme.closeButtonBorder
                     }
                 }
             }
@@ -233,13 +234,14 @@ Window {
 
                         Label {
                             text: "Sections"
-                            color: skyContext.theme.sectionTitleText
+                            color: theme.sectionTitleText
                             font.family: "Avenir Next"
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
                         }
 
                         PreferencesSectionButton {
+                            theme: preferencesWindow.theme
                             objectName: "preferencesGeneralSectionButton"
                             label: "General"
                             active: preferencesWindow.selectedPage === 0
@@ -247,6 +249,7 @@ Window {
                         }
 
                         PreferencesSectionButton {
+                            theme: preferencesWindow.theme
                             objectName: "preferencesSkySectionButton"
                             label: "Sky"
                             active: preferencesWindow.selectedPage === 1
@@ -254,6 +257,7 @@ Window {
                         }
 
                         PreferencesSectionButton {
+                            theme: preferencesWindow.theme
                             objectName: "preferencesEngineSectionButton"
                             label: "Engine"
                             active: preferencesWindow.selectedPage === 2
@@ -261,6 +265,7 @@ Window {
                         }
 
                         PreferencesSectionButton {
+                            theme: preferencesWindow.theme
                             objectName: "preferencesAppearanceSectionButton"
                             label: "Appearance"
                             active: preferencesWindow.selectedPage === 3
@@ -268,6 +273,7 @@ Window {
                         }
 
                         PreferencesSectionButton {
+                            theme: preferencesWindow.theme
                             objectName: "preferencesCatalogSectionButton"
                             label: "Catalog"
                             active: preferencesWindow.selectedPage === 4
@@ -305,12 +311,14 @@ Window {
                             Layout.fillHeight: true
 
                             PreferencesGeneralSection {
+                                theme: preferencesWindow.theme
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 preferencesDraft: preferencesDraft
                             }
 
                             PreferencesSkySection {
+                                theme: preferencesWindow.theme
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 preferencesDraft: preferencesDraft
@@ -324,6 +332,7 @@ Window {
                             }
 
                             PreferencesAppearanceSection {
+                                theme: preferencesWindow.theme
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 preferencesDraft: preferencesDraft
@@ -398,9 +407,9 @@ Window {
 
                                 background: Rectangle {
                                     radius: 3
-                                    color: skyContext.theme.progressBarTrack
+                                    color: theme.progressBarTrack
                                     border.width: 1
-                                    border.color: skyContext.theme.progressBarTrackBorder
+                                    border.color: theme.progressBarTrackBorder
                                 }
 
                                 contentItem: Item {
@@ -412,7 +421,7 @@ Window {
                                         width: footerProgressContent.width * footerCatalogProgressBar.visualPosition
                                         height: footerProgressContent.height
                                         radius: height * 0.5
-                                        color: skyContext.theme.progressBarSweepMid
+                                        color: theme.progressBarSweepMid
                                     }
 
                                     Rectangle {
@@ -423,9 +432,9 @@ Window {
                                         radius: height * 0.5
                                         x: -width
                                         gradient: Gradient {
-                                            GradientStop { position: 0.0; color: skyContext.theme.progressBarSweepStart }
-                                            GradientStop { position: 0.5; color: skyContext.theme.progressBarSweepMid }
-                                            GradientStop { position: 1.0; color: skyContext.theme.progressBarSweepEnd }
+                                            GradientStop { position: 0.0; color: theme.progressBarSweepStart }
+                                            GradientStop { position: 0.5; color: theme.progressBarSweepMid }
+                                            GradientStop { position: 1.0; color: theme.progressBarSweepEnd }
                                         }
 
                                         SequentialAnimation on x {
@@ -452,12 +461,12 @@ Window {
                                 Layout.alignment: Qt.AlignVCenter
                                 radius: width * 0.5
                                 color: footerCancelMouse.pressed
-                                       ? skyContext.theme.actionButtonSecondaryBottomPressed
+                                       ? theme.actionButtonSecondaryBottomPressed
                                        : (footerCancelMouse.containsMouse
-                                          ? skyContext.theme.actionButtonSecondaryTopHover
-                                          : skyContext.theme.actionButtonSecondaryTop)
+                                          ? theme.actionButtonSecondaryTopHover
+                                          : theme.actionButtonSecondaryTop)
                                 border.width: 1
-                                border.color: skyContext.theme.actionButtonSecondaryBorder
+                                border.color: theme.actionButtonSecondaryBorder
                                 ToolTip.visible: footerCancelMouse.containsMouse
                                 ToolTip.text: "Cancel download"
                                 ToolTip.delay: 450
@@ -465,7 +474,7 @@ Window {
                                 Label {
                                     anchors.centerIn: parent
                                     text: "x"
-                                    color: skyContext.theme.actionButtonText
+                                    color: theme.actionButtonText
                                     font.family: "Avenir Next"
                                     font.pixelSize: 9
                                     font.weight: Font.DemiBold
@@ -488,6 +497,7 @@ Window {
                     }
 
                     PreferencesActionButton {
+                        theme: preferencesWindow.theme
                         objectName: "preferencesApplyButton"
                         Layout.preferredWidth: 116
                         Layout.preferredHeight: 32
