@@ -1,8 +1,8 @@
 #include "CatalogParsingUtilities.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "NumericParsingUtilities.hpp"
-#include "catalog/normalize/CatalogSnapshotValidator.hpp"
 #include "math/MathConstants.hpp"
+#include "catalog/normalize/CatalogSnapshotValidator.hpp"
 
 #include <QByteArray>
 #include <QStringList>
