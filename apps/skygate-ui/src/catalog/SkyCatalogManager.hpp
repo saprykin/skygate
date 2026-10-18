@@ -5,6 +5,7 @@
 #include "SkyCatalogRuntimeResult.hpp"
 #include "SkyCatalogSourceImportResult.hpp"
 #include "SkyCatalogSourceInstance.hpp"
+#include "SkyCatalogSourceOperation.hpp"
 #include "SkyCatalogSourceRecord.hpp"
 #include "SkyConstellationLineImportResult.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
@@ -12,7 +13,6 @@
 #include "settings/SkySettingsStore.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
-#include <QByteArray>
 #include <QHash>
 #include <QObject>
 #include <QString>
@@ -25,7 +25,6 @@
 #include <span>
 #include <vector>
 
-class CatalogDownloadCancellation;
 class QNetworkAccessManager;
 
 namespace skygate::ui::internal {
@@ -180,42 +179,13 @@ signals:
     void sourcesChanged();
 
 private:
-    struct SourceOperation final {
-        // The configuration most recently requested for the instance,
-        // including an attempt the runtime rejected. A retry repeats it, and
-        // it is never serialized while it is only an attempt.
-        skygate::ui::internal::SkyCatalogSourceInstance instance;
-        skygate::ephemeris::CatalogCompositionPolicy policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
-        // The source facts committed together when the runtime accepted the
-        // requested configuration: the descriptor and the bytes its catalog
-        // was built from. Ordinary persistence serializes these instead of the
-        // attempted configuration.
-        skygate::ui::internal::SkyCatalogSourceInstance acceptedInstance;
-        QByteArray acceptedPayload;
-        bool hasAcceptedInstance = false;
-        // A payload eviction dropped this instance's disposable payload files
-        // from its configured record. The accepted runtime snapshot stays
-        // active for the session, but ordinary persistence must not write the
-        // retained bytes back; only a later accepted load repopulates them.
-        bool payloadEvicted = false;
-        std::uint64_t revision = 0;
-        bool constellationPending = false;
-        bool busy = false;
-        bool hasError = false;
-        QString statusText;
-        // The transfers this instance started, retained so cancellation aborts
-        // exactly them instead of every request on the network manager. A new
-        // transfer of the same kind replaces its handle; a completed transfer
-        // drops it.
-        std::shared_ptr<CatalogDownloadCancellation> catalogCancellation;
-        std::shared_ptr<CatalogDownloadCancellation> relatedCancellation;
-    };
-
     void loadSourceInstance(
         const skygate::ui::internal::SkyCatalogSourceInstance& source,
         skygate::ephemeris::CatalogCompositionPolicy policy
     );
-    void applyBundledSource(SourceOperation& operation, skygate::ephemeris::CatalogCompositionPolicy policy);
+    void applyBundledSource(
+        skygate::ui::internal::SkyCatalogSourceOperation& operation, skygate::ephemeris::CatalogCompositionPolicy policy
+    );
     // Applies the accepted related-declaration transition of an activation to
     // the instance's owned dataset and folds the published changes into the
     // activation result. A declaration that still selects related data
@@ -228,7 +198,7 @@ private:
     // only after the activation was accepted and before it is persisted or
     // published, so a rejected update keeps the previously accepted dataset.
     void applyRelatedDeclarationTransition(
-        const SourceOperation& operation,
+        const skygate::ui::internal::SkyCatalogSourceOperation& operation,
         const QStringList& acceptedRelatedDatasetUrls,
         skygate::ui::internal::SkyCatalogRuntimeResult& activationResult
     );
@@ -242,27 +212,23 @@ private:
         skygate::ephemeris::CatalogCompositionPolicy policy,
         const QStringList& relatedDatasetUrls
     );
-    [[nodiscard]] SourceOperation* upsertOperation(
+    [[nodiscard]] skygate::ui::internal::SkyCatalogSourceOperation* upsertOperation(
         const skygate::ui::internal::SkyCatalogSourceInstance& source,
         skygate::ephemeris::CatalogCompositionPolicy policy
     );
-    [[nodiscard]] SourceOperation* findOperation(const QString& instanceId);
-    [[nodiscard]] const SourceOperation* findOperation(const QString& instanceId) const;
+    [[nodiscard]] skygate::ui::internal::SkyCatalogSourceOperation* findOperation(const QString& instanceId);
+    [[nodiscard]] const skygate::ui::internal::SkyCatalogSourceOperation*
+    findOperation(const QString& instanceId) const;
     void removeOperation(const QString& instanceId);
     // Marks the instance's retained in-memory payload as evicted so ordinary
     // persistence keeps its configured record without writing its bytes back.
     void markSourcePayloadEvicted(const QString& instanceId);
     [[nodiscard]] bool isOperationCurrent(const QString& instanceId, std::uint64_t revision) const;
-    // Commits the operation's requested configuration and the payload that was
-    // activated with it as the instance's accepted facts. Only a successful
-    // runtime transition may call this, so persistence never pairs attempted
-    // options with previously accepted bytes.
-    static void commitAcceptedSourceFacts(SourceOperation& operation, QByteArray payload);
     // Marks one instance's pending work terminal: the revision advances first
     // so a completion that runs during the abort is already stale, then both
     // owned transfers are canceled and released, and pending related state is
     // reset. Other instances keep their revisions and their in-flight work.
-    void retireSourceOperation(SourceOperation& operation);
+    void retireSourceOperation(skygate::ui::internal::SkyCatalogSourceOperation& operation);
     // Retires the instance's pending work before its record is replaced or
     // erased.
     void invalidatePendingSourceWork(const QString& instanceId);
@@ -304,7 +270,7 @@ private:
     bool m_downloadingCatalog = false;
     bool m_catalogProcessing = false;
     QString m_activeDownloadInstanceId;
-    QVector<SourceOperation> m_sourceOperations;
+    QVector<skygate::ui::internal::SkyCatalogSourceOperation> m_sourceOperations;
     // Monotonic source of operation revisions. A revision is never reused, so
     // a callback captured for one incarnation of an instance can never match
     // the operation that supersedes it, not even when the same instance ID is
