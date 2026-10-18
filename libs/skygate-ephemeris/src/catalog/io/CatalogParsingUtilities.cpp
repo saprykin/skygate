@@ -1,6 +1,7 @@
 #include "CatalogParsingUtilities.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "NumericParsingUtilities.hpp"
+#include "math/MathConstants.hpp"
 
 #include <QByteArray>
 #include <QStringList>
@@ -38,7 +39,8 @@ std::optional<double> parseSexagesimal(const QString& text, const bool allowsNeg
         return std::nullopt;
     }
 
-    return sign * (*degrees + (*arcminutes / 60.0) + (*arcseconds / 3600.0));
+    return sign
+           * (*degrees + (*arcminutes / skygate::core::MathConstants::kArcminutesPerDegree) + (*arcseconds / 3600.0));
 }
 
 }  // namespace

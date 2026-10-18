@@ -17,9 +17,9 @@ double AngleMath::toDegrees(const double radians) noexcept
 
 double AngleMath::normalizeDegrees(double degrees) noexcept
 {
-    degrees = std::fmod(degrees, 360.0);
+    degrees = std::fmod(degrees, MathConstants::kDegreesPerTurn);
     if (degrees < 0.0) {
-        degrees += 360.0;
+        degrees += MathConstants::kDegreesPerTurn;
     }
     return degrees;
 }
@@ -27,17 +27,17 @@ double AngleMath::normalizeDegrees(double degrees) noexcept
 double AngleMath::normalizeDegreesSigned(const double degrees) noexcept
 {
     double normalized = normalizeDegrees(degrees);
-    if (normalized > 180.0) {
-        normalized -= 360.0;
+    if (normalized > MathConstants::kDegreesPerTurn / 2.0) {
+        normalized -= MathConstants::kDegreesPerTurn;
     }
     return normalized;
 }
 
 double AngleMath::normalizeHours(double hours) noexcept
 {
-    hours = std::fmod(hours, 24.0);
+    hours = std::fmod(hours, MathConstants::kHoursPerTurn);
     if (hours < 0.0) {
-        hours += 24.0;
+        hours += MathConstants::kHoursPerTurn;
     }
     return hours;
 }
