@@ -1,12 +1,17 @@
 #pragma once
 
+#include "EquatorialCoordinate.hpp"
+
 #include <QByteArray>
+#include <QDataStream>
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 namespace skygate::ephemeris {
 
+class BaseCelestialBody;
 class CelestialBodyCatalog;
 class IStarCatalog;
 
@@ -28,6 +33,18 @@ public:
 
     [[nodiscard]] static QByteArray serialize(const CelestialBodyCatalog& catalog);
     [[nodiscard]] static std::unique_ptr<IStarCatalog> deserialize(const QByteArray& payload);
+
+private:
+    static void writeBodyHeader(
+        QDataStream& stream,
+        const BaseCelestialBody& body,
+        const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial
+    );
+    [[nodiscard]] static bool readBodyHeader(
+        QDataStream& stream,
+        BaseCelestialBody& body,
+        std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial
+    );
 };
 
 }  // namespace skygate::ephemeris

@@ -1,6 +1,7 @@
 #include "CatalogPayloadParser.hpp"
 #include "CatalogLoader.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
+#include "catalog/io/CatalogContainerSignature.hpp"
 #include "catalog/io/CatalogPayloadFormatDetector.hpp"
 #include "catalog/io/CatalogZipEntrySelector.hpp"
 #include "catalog/io/CompressedDataInflater.hpp"
@@ -17,32 +18,6 @@ namespace skygate::ephemeris {
 namespace {
 
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
-
-bool hasGzipSignature(const std::string_view payload) noexcept
-{
-    if (payload.size() < 2U) {
-        return false;
-    }
-
-    const auto firstByte = static_cast<unsigned char>(payload[0]);
-    const auto secondByte = static_cast<unsigned char>(payload[1]);
-    return firstByte == 0x1fU && secondByte == 0x8bU;
-}
-
-bool hasZipSignature(const std::string_view payload) noexcept
-{
-    if (payload.size() < 4U) {
-        return false;
-    }
-
-    const auto firstByte = static_cast<unsigned char>(payload[0]);
-    const auto secondByte = static_cast<unsigned char>(payload[1]);
-    const auto thirdByte = static_cast<unsigned char>(payload[2]);
-    const auto fourthByte = static_cast<unsigned char>(payload[3]);
-    return firstByte == 0x50U && secondByte == 0x4bU
-           && ((thirdByte == 0x03U && fourthByte == 0x04U) || (thirdByte == 0x05U && fourthByte == 0x06U)
-               || (thirdByte == 0x07U && fourthByte == 0x08U));
-}
 
 CatalogLoadResult logSuccessfulParse(CatalogLoadResult result)
 {
@@ -84,7 +59,7 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
     std::string_view schemaPayload = request.payload;
     bool decodedContainer = false;
 
-    if (hasGzipSignature(request.payload)) {
+    if (CatalogContainerSignature::isGzip(request.payload)) {
         unwrappedData = CompressedDataInflater::inflate(request.payload, CompressedDataInflater::Format::Gzip);
         if (!unwrappedData.has_value()) {
             result.errorCode = CatalogLoadResult::ErrorCode::InvalidGzipData;
@@ -95,7 +70,7 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
         }
         schemaPayload = *unwrappedData;
         decodedContainer = true;
-    } else if (hasZipSignature(request.payload)) {
+    } else if (CatalogContainerSignature::isZip(request.payload)) {
         CatalogZipEntrySelection selection = CatalogZipEntrySelector::select(request.payload, request.memberSelector);
         if (selection.status == CatalogZipEntrySelection::Status::Selected) {
             unwrappedData = std::move(selection.payload);

@@ -290,6 +290,60 @@ void writeDeepSkyInfo(QDataStream& stream, const DeepSkyObjectInfo& info)
 
 }  // namespace
 
+void CatalogBinaryCodec::writeBodyHeader(
+    QDataStream& stream,
+    const BaseCelestialBody& body,
+    const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial
+)
+{
+    writeString(stream, body.id);
+    writeString(stream, body.displayName);
+    stream << static_cast<std::uint8_t>(body.kind) << body.visualMagnitude;
+    writeObjectIdentity(stream, body.identity);
+    stream << fixedEquatorial.has_value();
+    if (fixedEquatorial.has_value()) {
+        writeEquatorial(stream, *fixedEquatorial);
+    }
+}
+
+bool CatalogBinaryCodec::readBodyHeader(
+    QDataStream& stream, BaseCelestialBody& body, std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial
+)
+{
+    if (!readString(stream, body.id) || !readString(stream, body.displayName)) {
+        return false;
+    }
+
+    std::uint8_t kind = 0U;
+    stream >> kind >> body.visualMagnitude;
+    if (stream.status() != QDataStream::Ok
+        || !CatalogSnapshotValidator::isKnownBodyKind(static_cast<BaseCelestialBody::Kind>(kind))) {
+        return false;
+    }
+    body.kind = static_cast<BaseCelestialBody::Kind>(kind);
+
+    if (!readObjectIdentity(stream, body.identity)) {
+        return false;
+    }
+
+    bool hasFixedEquatorial = false;
+    stream >> hasFixedEquatorial;
+    if (stream.status() != QDataStream::Ok) {
+        return false;
+    }
+    if (!hasFixedEquatorial) {
+        fixedEquatorial = std::nullopt;
+        return true;
+    }
+
+    skygate::core::EquatorialCoordinate coordinate;
+    if (!readEquatorial(stream, coordinate)) {
+        return false;
+    }
+    fixedEquatorial = coordinate;
+    return true;
+}
+
 QByteArray CatalogBinaryCodec::serialize(const CelestialBodyCatalog& catalog)
 {
     QByteArray buffer;
@@ -302,14 +356,7 @@ QByteArray CatalogBinaryCodec::serialize(const CelestialBodyCatalog& catalog)
     const auto ownGalaxyBodies = catalog.ownGalaxyBodies();
     stream << static_cast<std::uint64_t>(ownGalaxyBodies.size());
     for (const OwnGalaxyCelestialBody& body : ownGalaxyBodies) {
-        writeString(stream, body.id);
-        writeString(stream, body.displayName);
-        stream << static_cast<std::uint8_t>(body.kind) << body.visualMagnitude;
-        writeObjectIdentity(stream, body.identity);
-        stream << body.fixedEquatorial.has_value();
-        if (body.fixedEquatorial.has_value()) {
-            writeEquatorial(stream, *body.fixedEquatorial);
-        }
+        writeBodyHeader(stream, body, body.fixedEquatorial);
         stream << body.starAstrometry.has_value();
         if (body.starAstrometry.has_value()) {
             writeStarAstrometry(stream, *body.starAstrometry);
@@ -319,14 +366,7 @@ QByteArray CatalogBinaryCodec::serialize(const CelestialBodyCatalog& catalog)
     const auto distantBodies = catalog.distantBodies();
     stream << static_cast<std::uint64_t>(distantBodies.size());
     for (const DistantCelestialBody& body : distantBodies) {
-        writeString(stream, body.id);
-        writeString(stream, body.displayName);
-        stream << static_cast<std::uint8_t>(body.kind) << body.visualMagnitude;
-        writeObjectIdentity(stream, body.identity);
-        stream << body.fixedEquatorial.has_value();
-        if (body.fixedEquatorial.has_value()) {
-            writeEquatorial(stream, *body.fixedEquatorial);
-        }
+        writeBodyHeader(stream, body, body.fixedEquatorial);
         stream << body.deepSkyObject.has_value();
         if (body.deepSkyObject.has_value()) {
             writeDeepSkyInfo(stream, *body.deepSkyObject);
@@ -363,27 +403,8 @@ std::unique_ptr<IStarCatalog> CatalogBinaryCodec::deserialize(const QByteArray& 
     ownGalaxyBodies.reserve(static_cast<std::size_t>(ownGalaxyCount));
     for (std::uint64_t index = 0; index < ownGalaxyCount; ++index) {
         OwnGalaxyCelestialBody body;
-        if (!readString(stream, body.id) || !readString(stream, body.displayName)) {
+        if (!readBodyHeader(stream, body, body.fixedEquatorial)) {
             return nullptr;
-        }
-        std::uint8_t kind = 0U;
-        stream >> kind >> body.visualMagnitude;
-        if (stream.status() != QDataStream::Ok
-            || !CatalogSnapshotValidator::isKnownBodyKind(static_cast<BaseCelestialBody::Kind>(kind))) {
-            return nullptr;
-        }
-        body.kind = static_cast<BaseCelestialBody::Kind>(kind);
-        if (!readObjectIdentity(stream, body.identity)) {
-            return nullptr;
-        }
-        bool hasFixedEquatorial = false;
-        stream >> hasFixedEquatorial;
-        if (hasFixedEquatorial) {
-            skygate::core::EquatorialCoordinate coordinate;
-            if (!readEquatorial(stream, coordinate)) {
-                return nullptr;
-            }
-            body.fixedEquatorial = coordinate;
         }
         bool hasStarAstrometry = false;
         stream >> hasStarAstrometry;
@@ -408,27 +429,8 @@ std::unique_ptr<IStarCatalog> CatalogBinaryCodec::deserialize(const QByteArray& 
     distantBodies.reserve(static_cast<std::size_t>(distantCount));
     for (std::uint64_t index = 0; index < distantCount; ++index) {
         DistantCelestialBody body;
-        if (!readString(stream, body.id) || !readString(stream, body.displayName)) {
+        if (!readBodyHeader(stream, body, body.fixedEquatorial)) {
             return nullptr;
-        }
-        std::uint8_t kind = 0U;
-        stream >> kind >> body.visualMagnitude;
-        if (stream.status() != QDataStream::Ok
-            || !CatalogSnapshotValidator::isKnownBodyKind(static_cast<BaseCelestialBody::Kind>(kind))) {
-            return nullptr;
-        }
-        body.kind = static_cast<BaseCelestialBody::Kind>(kind);
-        if (!readObjectIdentity(stream, body.identity)) {
-            return nullptr;
-        }
-        bool hasFixedEquatorial = false;
-        stream >> hasFixedEquatorial;
-        if (hasFixedEquatorial) {
-            skygate::core::EquatorialCoordinate coordinate;
-            if (!readEquatorial(stream, coordinate)) {
-                return nullptr;
-            }
-            body.fixedEquatorial = coordinate;
         }
         bool hasDeepSkyInfo = false;
         stream >> hasDeepSkyInfo;
