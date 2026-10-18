@@ -210,6 +210,35 @@ skygate::ephemeris::EphemerisDataManifest emptySingleAssetStagedManifest()
     return manifest;
 }
 
+// A short-range profile whose id, asset id, and version name no kernel model,
+// so only the recorded range can decide the displayed kernel text.
+skygate::ephemeris::EphemerisDataManifest customMetadataStagedManifest()
+{
+    skygate::ephemeris::EphemerisDataManifest manifest;
+    manifest.dataSetInfo.id = "test-data";
+    manifest.dataSetInfo.displayName = "Test data";
+    manifest.dataSetInfo.version = "2026a";
+    manifest.dataSetInfo.provenance = "test";
+    manifest.profiles.push_back(
+        skygate::ephemeris::EphemerisDataManifest::Profile{
+            .id = "custom-profile",
+            .displayName = "Custom profile",
+            .bundled = false,
+            .longRange = false,
+            .assetIds = {"custom-kernel"},
+        }
+    );
+    manifest.assets.push_back(
+        StagedEphemerisAssetFixture::stagedAsset(
+            "custom-kernel",
+            skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel,
+            "kernels/custom.bsp",
+            "custom-profile"
+        )
+    );
+    return manifest;
+}
+
 void writeStagedAssets(const QTemporaryDir& root, const skygate::ephemeris::EphemerisDataManifest& manifest)
 {
     const QByteArray payload(kPayload.data(), static_cast<qsizetype>(kPayload.size()));
@@ -340,6 +369,7 @@ private slots:
     void init();
     void activatesVerifiedStagedUpdateSetAtomically();
     void activatesFullLongRangeProfileUpdateSet();
+    void activatedCustomProfileRendersDe440s();
     void supportDataActivationPreservesInstalledKernel();
     void activatesLiveSupportDataUpdateWithDriftedPayload();
     void clearPlanetaryKernelCachePreservesSupportData();
@@ -483,6 +513,28 @@ void SkyEphemerisActivationTests::activatesFullLongRangeProfileUpdateSet()
     QVERIFY(snapshot->leapSecondTableAsset().has_value());
     QVERIFY(snapshot->earthOrientationDataAsset().has_value());
     QVERIFY(snapshot->deltaTDataAsset().has_value());
+}
+
+void SkyEphemerisActivationTests::activatedCustomProfileRendersDe440s()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    const skygate::ephemeris::EphemerisDataManifest manifest = customMetadataStagedManifest();
+    writeStagedAssets(stagedRoot, manifest);
+
+    SkySettingsStore store;
+    SkyEphemerisDataManager manager(&store);
+    const SkyEphemerisDataManager::StagedUpdateActivationResult result = manager.activateVerifiedStagedUpdateSet(
+        stagedActivationRequest(manifest, stagedRoot, m_settings.path(), QStringLiteral("custom-profile"))
+    );
+
+    const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
+    QVERIFY2(result.isSuccess(), failureMessage.constData());
+    QVERIFY(manager.usingInstalledData());
+    QVERIFY(manager.activeCacheSnapshot().installedKernelLongRange.has_value());
+    QCOMPARE(manager.activeCacheSnapshot().installedKernelLongRange.value(), false);
+    QCOMPARE(manager.kernelDisplayText(), QString("DE440s"));
+    QCOMPARE(manager.longRangeKernelStatusText(), QString("Not installed"));
 }
 
 void SkyEphemerisActivationTests::supportDataActivationPreservesInstalledKernel()
