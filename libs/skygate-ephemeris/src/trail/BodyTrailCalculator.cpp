@@ -18,33 +18,40 @@ namespace {
     return options.pastHours >= 0 && options.futureHours >= 0 && options.sampleStepMinutes > 0;
 }
 
-[[nodiscard]] std::vector<BodyTrailSample> makeEmptySampleSet(const BodyTrailOptions& options)
-{
-    std::vector<BodyTrailSample> samples;
-    if (!validateOptions(options)) {
-        return samples;
+struct SampleWindow final {
+    int startOffsetMinutes = 0;
+    int endOffsetMinutes = 0;
+    int stepMinutes = 0;
+
+    [[nodiscard]] static SampleWindow fromOptions(const BodyTrailOptions& options) noexcept
+    {
+        return SampleWindow{
+            .startOffsetMinutes = -options.pastHours * static_cast<int>(TimeConstants::kMinutesPerHour),
+            .endOffsetMinutes = options.futureHours * static_cast<int>(TimeConstants::kMinutesPerHour),
+            .stepMinutes = options.sampleStepMinutes
+        };
     }
 
-    const int startOffsetMinutes = -options.pastHours * static_cast<int>(TimeConstants::kMinutesPerHour);
-    const int endOffsetMinutes = options.futureHours * static_cast<int>(TimeConstants::kMinutesPerHour);
-    samples.reserve(static_cast<std::size_t>((endOffsetMinutes - startOffsetMinutes) / options.sampleStepMinutes) + 1U);
-    return samples;
-}
+    [[nodiscard]] std::size_t sampleCapacity() const noexcept
+    {
+        return static_cast<std::size_t>((endOffsetMinutes - startOffsetMinutes) / stepMinutes) + 1U;
+    }
+};
 
 template <typename SampleBuilder>
 [[nodiscard]] std::vector<BodyTrailSample>
 collectSamples(const BodyTrailOptions& options, SampleBuilder&& sampleBuilder)
 {
-    std::vector<BodyTrailSample> samples = makeEmptySampleSet(options);
     if (!validateOptions(options)) {
-        return samples;
+        return {};
     }
 
-    const int startOffsetMinutes = -options.pastHours * static_cast<int>(TimeConstants::kMinutesPerHour);
-    const int endOffsetMinutes = options.futureHours * static_cast<int>(TimeConstants::kMinutesPerHour);
+    const SampleWindow window = SampleWindow::fromOptions(options);
+    std::vector<BodyTrailSample> samples;
+    samples.reserve(window.sampleCapacity());
 
-    for (int offsetMinutes = startOffsetMinutes; offsetMinutes <= endOffsetMinutes;
-         offsetMinutes += options.sampleStepMinutes) {
+    for (int offsetMinutes = window.startOffsetMinutes; offsetMinutes <= window.endOffsetMinutes;
+         offsetMinutes += window.stepMinutes) {
         samples.push_back(BodyTrailSample{.offsetMinutes = offsetMinutes, .horizontal = sampleBuilder(offsetMinutes)});
     }
 

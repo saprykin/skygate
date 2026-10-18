@@ -21,7 +21,7 @@
 namespace skygate::ephemeris {
 namespace {
 
-constexpr int kSampleStepSeconds = 10 * 60;
+constexpr int kSampleStepSeconds = static_cast<int>(10.0 * skygate::core::TimeConstants::kSecondsPerMinute);
 constexpr auto kRefinementTolerance = std::chrono::seconds(1);
 constexpr auto kGuidedRefinementTolerance = std::chrono::seconds(60);
 constexpr double kAltitudeClassificationToleranceDeg = 1e-9;
@@ -72,7 +72,7 @@ isSetBracket(const AltitudeSample& previous, const AltitudeSample& next, double 
     return previous.utcTime + std::chrono::duration_cast<skygate::core::UtcTimePoint::duration>(spanSeconds * fraction);
 }
 
-[[nodiscard]] ObservationEventStatus::Type unavailableCrossingStatus(
+[[nodiscard]] ObservationEventStatus::Type unavailableEventStatus(
     const std::vector<AltitudeSample>& samples, std::optional<ObservationEventStatus::Type> provenFixedStatus
 ) noexcept
 {
@@ -302,7 +302,7 @@ ObservationEvent EventSearch::findCrossing(
         return ObservationEvent{.status = ObservationEventStatus::Type::Unresolved};
     }
 
-    return ObservationEvent{.status = unavailableCrossingStatus(samples, provenFixedStatus)};
+    return ObservationEvent{.status = unavailableEventStatus(samples, provenFixedStatus)};
 }
 
 AltitudeSample
@@ -366,12 +366,7 @@ ObservationEvent EventSearch::findCulmination(const std::vector<AltitudeSample>&
         };
     }
 
-    return ObservationEvent{
-        .status = samples.empty() ? ObservationEventStatus::Type::Unresolved
-                                  : ObservationEventStatus::Type::NoEventInSearchWindow,
-        .utcTime = std::nullopt,
-        .altitudeDeg = std::nullopt
-    };
+    return ObservationEvent{.status = unavailableEventStatus(samples, std::nullopt)};
 }
 
 [[nodiscard]] bool

@@ -12,7 +12,7 @@ namespace skygate::ephemeris {
 namespace {
 
 struct PlanetApproximateOrbit {
-    const char* id;
+    PlanetIdentity::Key key;
     double meanLongitudeDegAtJ2000;
     double meanMotionDegPerDay;
     double latitudeAmplitudeDeg;
@@ -20,37 +20,37 @@ struct PlanetApproximateOrbit {
 };
 
 constexpr std::array<PlanetApproximateOrbit, 7> kPlanetApproximateOrbits = {{
-    {.id = "mercury",
+    {.key = PlanetIdentity::Key::Mercury,
      .meanLongitudeDegAtJ2000 = 252.25084,
      .meanMotionDegPerDay = 4.09233445,
      .latitudeAmplitudeDeg = 2.2,
      .latitudePhaseDeg = 20.0},
-    {.id = "venus",
+    {.key = PlanetIdentity::Key::Venus,
      .meanLongitudeDegAtJ2000 = 181.97973,
      .meanMotionDegPerDay = 1.60213034,
      .latitudeAmplitudeDeg = 1.6,
      .latitudePhaseDeg = 60.0},
-    {.id = "mars",
+    {.key = PlanetIdentity::Key::Mars,
      .meanLongitudeDegAtJ2000 = 355.43300,
      .meanMotionDegPerDay = 0.52402068,
      .latitudeAmplitudeDeg = 1.8,
      .latitudePhaseDeg = 140.0},
-    {.id = "jupiter",
+    {.key = PlanetIdentity::Key::Jupiter,
      .meanLongitudeDegAtJ2000 = 34.35152,
      .meanMotionDegPerDay = 0.08308529,
      .latitudeAmplitudeDeg = 1.1,
      .latitudePhaseDeg = 210.0},
-    {.id = "saturn",
+    {.key = PlanetIdentity::Key::Saturn,
      .meanLongitudeDegAtJ2000 = 50.07744,
      .meanMotionDegPerDay = 0.03344414,
      .latitudeAmplitudeDeg = 1.0,
      .latitudePhaseDeg = 280.0},
-    {.id = "uranus",
+    {.key = PlanetIdentity::Key::Uranus,
      .meanLongitudeDegAtJ2000 = 314.05501,
      .meanMotionDegPerDay = 0.01172834,
      .latitudeAmplitudeDeg = 0.8,
      .latitudePhaseDeg = 325.0},
-    {.id = "neptune",
+    {.key = PlanetIdentity::Key::Neptune,
      .meanLongitudeDegAtJ2000 = 304.34866,
      .meanMotionDegPerDay = 0.00598103,
      .latitudeAmplitudeDeg = 0.7,
@@ -72,7 +72,7 @@ std::optional<skygate::core::EquatorialCoordinate> PlanetEquatorialCalculator::c
     const double obliquityDeg = skygate::core::AstronomicalTime::meanObliquityDeg(daysSinceJ2000);
 
     for (const PlanetApproximateOrbit& orbit : kPlanetApproximateOrbits) {
-        if (planet->canonicalId() != orbit.id) {
+        if (planet->key() != orbit.key) {
             continue;
         }
 
