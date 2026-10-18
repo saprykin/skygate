@@ -29,6 +29,7 @@ private slots:
     void mergeRespectsDegradedAndFailedOnlyStatusPolicy();
     void mergeCombinesCorrectionsWarningsAndMetadata();
     void mergeHonorsMetadataOptionToggles();
+    void mergeOptionsFactoriesScopeMergedMetadata();
 };
 
 void EphemerisMetadataMergeTests::degradedTimeScaleConversionMapsWarningCodes()
@@ -433,6 +434,47 @@ void EphemerisMetadataMergeTests::mergeHonorsMetadataOptionToggles()
     QCOMPARE(target.dataSourceProvenance, std::string{"target-provenance"});
     QCOMPARE(target.effectiveDataValidityRange->id, std::string{"target-range"});
     QCOMPARE(*target.estimatedAngularUncertaintyArcsec, 1.0);
+}
+
+void EphemerisMetadataMergeTests::mergeOptionsFactoriesScopeMergedMetadata()
+{
+    EphemerisEngineQueryResult source;
+    source.status = EphemerisEngineQueryStatus::Type::Degraded;
+    source.appliedCorrections = EphemerisCorrectionFlags::precessionNutation();
+    source.dataSourceProvenance = "source-provenance";
+    source.effectiveDataValidityRange = EphemerisDateRange{
+        .id = "source-range",
+        .displayName = "Source range",
+        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+    };
+    source.estimatedAngularUncertaintyArcsec = 0.25;
+
+    EphemerisEngineQueryResult fullResultMetadata;
+    EphemerisMetadataMerger::merge(fullResultMetadata, source, EphemerisMetadataMergeOptions::withoutCorrections());
+    QCOMPARE(
+        static_cast<std::uint8_t>(fullResultMetadata.status),
+        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Degraded)
+    );
+    QVERIFY(!EphemerisCorrectionFlags::has(
+        fullResultMetadata.appliedCorrections, EphemerisCorrectionFlags::precessionNutation()
+    ));
+    QCOMPARE(fullResultMetadata.dataSourceProvenance, std::string{"source-provenance"});
+    QCOMPARE(fullResultMetadata.effectiveDataValidityRange->id, std::string{"source-range"});
+    QCOMPARE(*fullResultMetadata.estimatedAngularUncertaintyArcsec, 0.25);
+
+    EphemerisEngineQueryResult transportMetadata;
+    EphemerisMetadataMerger::merge(transportMetadata, source, EphemerisMetadataMergeOptions::statusAndWarningsOnly());
+    QCOMPARE(
+        static_cast<std::uint8_t>(transportMetadata.status),
+        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Degraded)
+    );
+    QVERIFY(!EphemerisCorrectionFlags::has(
+        transportMetadata.appliedCorrections, EphemerisCorrectionFlags::precessionNutation()
+    ));
+    QVERIFY(transportMetadata.dataSourceProvenance.empty());
+    QVERIFY(!transportMetadata.effectiveDataValidityRange.has_value());
+    QVERIFY(!transportMetadata.estimatedAngularUncertaintyArcsec.has_value());
 }
 
 void EphemerisMetadataMergeTests::mergeAppendsUnreportedKernelDiagnostics()
