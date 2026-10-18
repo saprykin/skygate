@@ -365,6 +365,12 @@ add_skygate_ui_qtest(
     LABELS integration
     TIMEOUT 60
 )
+add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-manager-transition-tests
+    catalog/SkyCatalogManagerTransitionTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
 add_skygate_ui_qtest(skygate-ui-sky-ephemeris-data-status-tests ephemeris/SkyEphemerisDataStatusTests.cpp)
 target_compile_definitions(skygate-ui-sky-ephemeris-data-status-tests
     PRIVATE
