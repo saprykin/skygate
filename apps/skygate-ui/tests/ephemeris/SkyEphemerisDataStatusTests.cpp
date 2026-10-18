@@ -103,6 +103,7 @@ private slots:
     void kernelDisplayTextForBundledData();
     void kernelDisplayTextForMissingInstalledData();
     void kernelDisplayTextForInstalledKernels();
+    void kernelDisplayTextForRecordedKernelRange();
     void kernelDisplayTextForLegacyProfile();
     void kernelDisplayTextForUnexpectedMetadata();
     void normalizedSnapshotTrimsAndDefaults();
@@ -326,6 +327,45 @@ void SkyEphemerisDataStatusTests::kernelDisplayTextForInstalledKernels()
 
     QVERIFY(manager.usingInstalledData());
     QCOMPARE(manager.kernelDisplayText(), QString("DE441"));
+}
+
+void SkyEphemerisDataStatusTests::kernelDisplayTextForRecordedKernelRange()
+{
+    const QString kernelPath = m_settings.filePath(QStringLiteral("display-recorded-range.bsp"));
+    QVERIFY(writeFile(kernelPath, QByteArrayLiteral("kernel")));
+
+    SkyEphemerisDataCacheSnapshot snapshot =
+        EphemerisDataCacheSnapshotFixture::installedSnapshot(kernelPath, QString());
+    // No id or version names a kernel model here, so only the recorded range
+    // can decide the display text.
+    snapshot.installedKernelAssetId = QStringLiteral("custom-kernel");
+    snapshot.installedKernelProfileId = QStringLiteral("custom-profile");
+    snapshot.installedKernelVersion = QStringLiteral("custom-version");
+    snapshot.installedKernelLongRange = true;
+
+    SkySettingsStore store;
+    QVERIFY(store.saveEphemerisDataCache(snapshot));
+    {
+        const SkyEphemerisDataCacheSnapshot restored = store.loadEphemerisDataCache();
+        QVERIFY(restored.installedKernelLongRange.has_value());
+        QCOMPARE(restored.installedKernelLongRange.value(), true);
+
+        SkyEphemerisDataManager manager(&store);
+        QVERIFY(manager.usingInstalledData());
+        QCOMPARE(manager.kernelDisplayText(), QString("DE441"));
+    }
+
+    snapshot.installedKernelLongRange = false;
+    QVERIFY(store.saveEphemerisDataCache(snapshot));
+    {
+        const SkyEphemerisDataCacheSnapshot restored = store.loadEphemerisDataCache();
+        QVERIFY(restored.installedKernelLongRange.has_value());
+        QCOMPARE(restored.installedKernelLongRange.value(), false);
+
+        SkyEphemerisDataManager manager(&store);
+        QVERIFY(manager.usingInstalledData());
+        QCOMPARE(manager.kernelDisplayText(), QString("DE440s"));
+    }
 }
 
 void SkyEphemerisDataStatusTests::kernelDisplayTextForLegacyProfile()
