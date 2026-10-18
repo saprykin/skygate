@@ -1,17 +1,18 @@
 #include "HygCatalogParser.hpp"
+#include "NumericParsingUtilities.hpp"
 #include "StringUtilities.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogObjectIdentity.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
 #include "catalog/io/CatalogParsingUtilities.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
-#include "math/MathConstants.hpp"
 #include "math/TimeConstants.hpp"
 
 #include <QString>
 #include <QStringView>
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -55,7 +56,7 @@ constexpr double kHygMissingDistanceParsecs = 100'000.0;
     }
     if (const std::optional<double> distanceParsecs = optionalFiniteDoubleColumn(row, QStringLiteral("dist"));
         distanceParsecs.has_value() && *distanceParsecs > 0.0 && *distanceParsecs < kHygMissingDistanceParsecs) {
-        return skygate::core::MathConstants::kMilliarcsecondsPerArcsecond / *distanceParsecs;
+        return CatalogStarAstrometry::parallaxMasFromDistanceParsecs(*distanceParsecs);
     }
 
     return std::nullopt;
@@ -127,6 +128,16 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
             const QString properName = row.decodeColumn(QStringLiteral("proper"));
             const QString bayerFlamsteed = row.decodeColumn(QStringLiteral("bf"));
             const QString hip = row.decodeColumn(QStringLiteral("hip"));
+            const std::optional<std::uint64_t> hipNumber =
+                hip.isEmpty() ? std::nullopt
+                              : NumericParsingUtilities::parseUint64(CatalogParsingUtilities::toUtf8String(hip));
+            if (!hip.isEmpty() && !hipNumber.has_value()) {
+                return RowParseOutcome{
+                    .invalidCategoryIndex = 0,
+                    .invalidSample = QStringLiteral("row %1 hip='%2'")
+                                         .arg(QString::number(static_cast<qulonglong>(rowNumber + 1U)), hip),
+                };
+            }
 
             OwnGalaxyCelestialBody body;
             body.kind = BaseCelestialBody::Kind::Star;
@@ -147,10 +158,12 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
                 body.starAstrometry = astrometry;
             }
 
-            if (!hip.isEmpty()) {
-                body.id = CatalogIdentifier::bodyId("hip", CatalogParsingUtilities::toUtf8String(hip));
+            if (hipNumber.has_value()) {
+                body.id = CatalogIdentifier::hipBodyId(*hipNumber);
             } else if (!idField.isEmpty()) {
-                body.id = CatalogIdentifier::bodyId("hyg", CatalogParsingUtilities::toUtf8String(idField));
+                body.id = CatalogIdentifier::bodyId(
+                    CatalogIdentifier::kHygNamespace, CatalogParsingUtilities::toUtf8String(idField)
+                );
             } else {
                 // The counter restarts for every payload, so this id is a
                 // record key of this parse only; composition qualifies it
@@ -160,14 +173,16 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
             }
 
             body.identity.sourceRecordId = CatalogParsingUtilities::toUtf8String(idField);
-            if (!hip.isEmpty()) {
+            if (hipNumber.has_value()) {
                 body.identity.externalIdentifiers.push_back(
-                    CatalogIdentifier::make("hip", CatalogParsingUtilities::toUtf8String(hip))
+                    CatalogIdentifier::make(CatalogIdentifier::kHipNamespace, std::to_string(*hipNumber))
                 );
             }
             if (!idField.isEmpty()) {
                 body.identity.externalIdentifiers.push_back(
-                    CatalogIdentifier::make("hyg", CatalogParsingUtilities::toUtf8String(idField))
+                    CatalogIdentifier::make(
+                        CatalogIdentifier::kHygNamespace, CatalogParsingUtilities::toUtf8String(idField)
+                    )
                 );
             }
             appendNonEmptyAlias(body.identity.aliases, properName);

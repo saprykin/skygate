@@ -2,11 +2,11 @@
 #include "StellariumHipParser.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 
-#include <QJsonObject>
 #include <QJsonValue>
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <unordered_set>
 
@@ -30,8 +30,8 @@ std::vector<ConstellationLineRef> StellariumLineRefExtractor::extract(const QJso
         }
 
         lineRefs.emplace_back(
-            CatalogIdentifier::bodyId("hip", std::to_string(startHip)),
-            CatalogIdentifier::bodyId("hip", std::to_string(endHip))
+            CatalogIdentifier::hipBodyId(static_cast<std::uint64_t>(startHip)),
+            CatalogIdentifier::hipBodyId(static_cast<std::uint64_t>(endHip))
         );
     };
 
@@ -43,21 +43,11 @@ std::vector<ConstellationLineRef> StellariumLineRefExtractor::extract(const QJso
         }
     };
 
+    // An object entry may keep its polylines under `lines`/`line` or inside a
+    // nested payload; the shared collector walks either shape.
     const auto collectFromEntry = [&appendPolylines](const QJsonValue& entry) {
         std::vector<std::vector<int>> polylines;
-        if (entry.isObject()) {
-            const QJsonObject object = entry.toObject();
-            const QJsonValue linesValue = object.value("lines");
-            const QJsonValue lineValue = object.value("line");
-            if (!linesValue.isUndefined()) {
-                StellariumHipParser::collectHipPolylines(linesValue, polylines);
-            }
-            if (!lineValue.isUndefined()) {
-                StellariumHipParser::collectHipPolylines(lineValue, polylines);
-            }
-        } else if (entry.isArray()) {
-            StellariumHipParser::collectHipPolylines(entry, polylines);
-        }
+        StellariumHipParser::collectHipPolylines(entry, polylines);
         appendPolylines(polylines);
     };
 

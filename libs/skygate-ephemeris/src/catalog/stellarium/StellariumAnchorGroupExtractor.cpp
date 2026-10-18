@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -132,7 +133,7 @@ std::vector<ConstellationAnchorGroup> StellariumAnchorGroupExtractor::extract(co
             std::vector<std::string> hipIds;
             hipIds.reserve(uniqueHips.size());
             for (const int hip : uniqueHips) {
-                hipIds.push_back(CatalogIdentifier::bodyId("hip", std::to_string(hip)));
+                hipIds.push_back(CatalogIdentifier::hipBodyId(static_cast<std::uint64_t>(hip)));
             }
             const std::size_t newIndex = anchorGroups.size();
             anchorGroups.emplace_back(CatalogParsingUtilities::toUtf8String(labelText), std::move(hipIds));
@@ -144,7 +145,7 @@ std::vector<ConstellationAnchorGroup> StellariumAnchorGroupExtractor::extract(co
             anchorGroups[indexIt->second].second.begin(), anchorGroups[indexIt->second].second.end()
         );
         for (const int hip : uniqueHips) {
-            const std::string hipId = CatalogIdentifier::bodyId("hip", std::to_string(hip));
+            const std::string hipId = CatalogIdentifier::hipBodyId(static_cast<std::uint64_t>(hip));
             if (existingIds.insert(hipId).second) {
                 anchorGroups[indexIt->second].second.push_back(hipId);
             }
@@ -155,19 +156,10 @@ std::vector<ConstellationAnchorGroup> StellariumAnchorGroupExtractor::extract(co
         std::vector<std::vector<int>> polylines;
         QString labelText;
 
+        StellariumHipParser::collectHipPolylines(entry, polylines);
         if (entry.isObject()) {
-            const QJsonObject object = entry.toObject();
-            const QJsonValue linesValue = object.value("lines");
-            const QJsonValue lineValue = object.value("line");
-            if (!linesValue.isUndefined()) {
-                StellariumHipParser::collectHipPolylines(linesValue, polylines);
-            }
-            if (!lineValue.isUndefined()) {
-                StellariumHipParser::collectHipPolylines(lineValue, polylines);
-            }
-            labelText = constellationLabelFromEntry(fallbackId, object);
+            labelText = constellationLabelFromEntry(fallbackId, entry.toObject());
         } else if (entry.isArray()) {
-            StellariumHipParser::collectHipPolylines(entry, polylines);
             labelText = prettifyConstellationId(fallbackId);
         }
 

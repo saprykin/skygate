@@ -1,6 +1,7 @@
 #include "catalog/bundled/BundledCatalogParser.hpp"
 #include "StringUtilities.hpp"
 #include "catalog/CatalogIdentifier.hpp"
+#include "catalog/CelestialBodyIds.hpp"
 
 #include <QObject>
 
@@ -34,15 +35,15 @@ struct BundledDeepSkyObjectEntry final {
 };
 
 constexpr std::array<BundledCatalogEntry, 9> kBundledCatalogEntries{{
-    {"sun", "Sun", BaseCelestialBody::Kind::Sun, -26.74},
-    {"moon", "Moon", BaseCelestialBody::Kind::Moon, -12.74},
-    {"mercury", "Mercury", BaseCelestialBody::Kind::Planet, -1.90},
-    {"venus", "Venus", BaseCelestialBody::Kind::Planet, -4.92},
-    {"mars", "Mars", BaseCelestialBody::Kind::Planet, -2.94},
-    {"jupiter", "Jupiter", BaseCelestialBody::Kind::Planet, -2.94},
-    {"saturn", "Saturn", BaseCelestialBody::Kind::Planet, -0.55},
-    {"uranus", "Uranus", BaseCelestialBody::Kind::Planet, 5.68},
-    {"neptune", "Neptune", BaseCelestialBody::Kind::Planet, 7.78},
+    {CelestialBodyIds::kSun, "Sun", BaseCelestialBody::Kind::Sun, -26.74},
+    {CelestialBodyIds::kMoon, "Moon", BaseCelestialBody::Kind::Moon, -12.74},
+    {CelestialBodyIds::kMercury, "Mercury", BaseCelestialBody::Kind::Planet, -1.90},
+    {CelestialBodyIds::kVenus, "Venus", BaseCelestialBody::Kind::Planet, -4.92},
+    {CelestialBodyIds::kMars, "Mars", BaseCelestialBody::Kind::Planet, -2.94},
+    {CelestialBodyIds::kJupiter, "Jupiter", BaseCelestialBody::Kind::Planet, -2.94},
+    {CelestialBodyIds::kSaturn, "Saturn", BaseCelestialBody::Kind::Planet, -0.55},
+    {CelestialBodyIds::kUranus, "Uranus", BaseCelestialBody::Kind::Planet, 5.68},
+    {CelestialBodyIds::kNeptune, "Neptune", BaseCelestialBody::Kind::Planet, 7.78},
 }};
 
 // Messier subset derived from OpenNGC v20260307. See README attribution.
@@ -1148,25 +1149,13 @@ std::optional<double> positiveOptional(const double value)
     return value;
 }
 
-bool isAsciiDigit(const char character)
-{
-    return character >= '0' && character <= '9';
-}
-
 std::vector<CatalogIdentifier> bundledMessierExternalIdentifiers(const std::string_view aliases)
 {
     std::vector<CatalogIdentifier> identifiers;
     for (const std::string_view alias : StringUtilities::splitView(aliases, '|')) {
-        if (alias.size() >= 2U && alias[0] == 'M' && isAsciiDigit(alias[1])) {
-            identifiers.push_back(CatalogIdentifier::make("messier", std::string(alias.substr(1U))));
-            continue;
-        }
-        if (alias.starts_with("NGC ")) {
-            identifiers.push_back(CatalogIdentifier::make("ngc", std::string(alias.substr(4U))));
-            continue;
-        }
-        if (alias.starts_with("IC ")) {
-            identifiers.push_back(CatalogIdentifier::make("ic", std::string(alias.substr(3U))));
+        if (const std::optional<CatalogIdentifier> designation = CatalogIdentifier::designationFromText(alias);
+            designation.has_value()) {
+            CatalogIdentifier::appendUnique(identifiers, *designation);
         }
     }
     return identifiers;
