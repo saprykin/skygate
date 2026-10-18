@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <optional>
 
+using namespace skygate::ui::internal;
+
 namespace {
 
 std::optional<double> parseAtmosphereText(const QString& field, const QString& text)

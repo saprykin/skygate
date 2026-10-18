@@ -9,6 +9,8 @@
 
 #include <optional>
 
+namespace skygate::ui::internal {
+
 // Converts between the persisted user settings and engine options. Owns the
 // correction-preset mapping, the engine-switch defaults, and the atmosphere
 // text bounds used by the preferences surface.
@@ -45,3 +47,5 @@ public:
 private:
     [[nodiscard]] static std::optional<double> boundedDouble(const QString& text, double minimum, double maximum);
 };
+
+}  // namespace skygate::ui::internal

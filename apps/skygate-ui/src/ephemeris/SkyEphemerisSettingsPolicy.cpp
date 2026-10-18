@@ -18,6 +18,8 @@ constexpr double kMaximumWavelengthMicrometers = 100.0;
 
 }  // namespace
 
+namespace skygate::ui::internal {
+
 skygate::ephemeris::EphemerisCorrectionFlags
 SkyEphemerisSettingsPolicy::correctionFlagsForPreset(const int presetIndex) noexcept
 {
@@ -163,3 +165,5 @@ SkyEphemerisSettingsPolicy::boundedDouble(const QString& text, const double mini
     }
     return value;
 }
+
+}  // namespace skygate::ui::internal
