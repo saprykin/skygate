@@ -1,5 +1,7 @@
 #pragma once
 
+#include "StringUtilities.hpp"
+
 #include <QString>
 
 #include <string>
@@ -10,12 +12,12 @@ class SkySceneLookupKey final {
 public:
     [[nodiscard]] static QString normalized(const QString& value)
     {
-        return value.trimmed().toCaseFolded();
+        return QString::fromStdString(skygate::ephemeris::StringUtilities::normalizedLookupKey(value.toStdString()));
     }
 
     [[nodiscard]] static QString normalized(const std::string& value)
     {
-        return normalized(QString::fromStdString(value));
+        return QString::fromStdString(skygate::ephemeris::StringUtilities::normalizedLookupKey(value));
     }
 };
 
