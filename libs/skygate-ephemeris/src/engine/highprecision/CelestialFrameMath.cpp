@@ -2,6 +2,7 @@
 #include "math/AngleMath.hpp"
 #include "math/MathConstants.hpp"
 #include "math/SphericalGeometry.hpp"
+#include "math/Wgs84Geodesy.hpp"
 
 #include <cmath>
 #include <limits>
@@ -11,14 +12,7 @@ namespace skygate::ephemeris::highprecision {
 skygate::core::Vector3d
 CelestialFrameMath::fromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
 {
-    const double rightAscensionRad = coordinate.rightAscensionHours * skygate::core::MathConstants::kRadiansPerHour;
-    const double declinationRad = skygate::core::AngleMath::toRadians(coordinate.declinationDeg);
-    const double cosDeclination = std::cos(declinationRad);
-    return {
-        .x = cosDeclination * std::cos(rightAscensionRad),
-        .y = cosDeclination * std::sin(rightAscensionRad),
-        .z = std::sin(declinationRad),
-    };
+    return skygate::core::SphericalGeometry::equatorialToUnitVector(coordinate);
 }
 
 skygate::core::Vector3d
@@ -51,18 +45,11 @@ CelestialFrameMath::toEquatorial(const skygate::core::Vector3d& vector) noexcept
         return std::nullopt;
     }
 
-    const double xyDistance = std::hypot(vector.x, vector.y);
-    const double distance = vector.length();
-    if (distance <= std::numeric_limits<double>::min()) {
+    if (vector.length() <= std::numeric_limits<double>::min()) {
         return std::nullopt;
     }
 
-    return skygate::core::EquatorialCoordinate{
-        .rightAscensionHours = skygate::core::AngleMath::normalizeHours(
-            std::atan2(vector.y, vector.x) * skygate::core::MathConstants::kHoursPerRadian
-        ),
-        .declinationDeg = skygate::core::AngleMath::toDegrees(std::atan2(vector.z, xyDistance)),
-    };
+    return skygate::core::SphericalGeometry::equatorialFromUnitVector(vector);
 }
 
 std::optional<skygate::core::HorizontalCoordinate> CelestialFrameMath::horizontalFromItrsVector(
@@ -77,20 +64,8 @@ std::optional<skygate::core::HorizontalCoordinate> CelestialFrameMath::horizonta
         return std::nullopt;
     }
 
-    const double latitudeRad = skygate::core::AngleMath::toRadians(observer.latitudeDeg);
-    const double longitudeRad = skygate::core::AngleMath::toRadians(observer.longitudeDeg);
-    const double sinLatitude = std::sin(latitudeRad);
-    const double cosLatitude = std::cos(latitudeRad);
-    const double sinLongitude = std::sin(longitudeRad);
-    const double cosLongitude = std::cos(longitudeRad);
-
-    const double east = -sinLongitude * vector.x + cosLongitude * vector.y;
-    const double north =
-        -sinLatitude * cosLongitude * vector.x - sinLatitude * sinLongitude * vector.y + cosLatitude * vector.z;
-    const double up =
-        cosLatitude * cosLongitude * vector.x + cosLatitude * sinLongitude * vector.y + sinLatitude * vector.z;
     const std::optional<skygate::core::Vector3d> localUnit =
-        skygate::core::Vector3d{.x = east, .y = north, .z = up}.normalized();
+        skygate::core::Wgs84Geodesy::eastNorthUpMeters(observer, vector).normalized();
     if (!localUnit.has_value()) {
         return std::nullopt;
     }

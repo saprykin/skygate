@@ -5,6 +5,7 @@
 #include "HighPrecisionComputationInput.hpp"
 #include "ICalcephKernel.hpp"
 #include "NaifBodyIds.hpp"
+#include "catalog/CatalogStarAstrometry.hpp"
 #include "engine/ITimeScaleService.hpp"
 #include "PreparedEphemerisRequestState.hpp"
 #include "StarAstrometryBatchResult.hpp"
@@ -97,7 +98,7 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
     }
 
     const double distanceAu = PhysicalConstants::kAuPerParsec
-                              * (MathConstants::kMilliarcsecondsPerArcsecond / *astrometry.stellarParallaxMas);
+                              * CatalogStarAstrometry::distanceParsecsFromParallaxMas(*astrometry.stellarParallaxMas);
     const double radialVelocityAuPerYear = hasEnabledPositiveParallax(astrometry, flags)
                                                ? radialVelocityKmPerSecond * TimeConstants::kSecondsPerJulianYear
                                                      / PhysicalConstants::kAstronomicalUnitKilometers

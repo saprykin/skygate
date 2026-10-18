@@ -2,7 +2,9 @@
 #include "EphemerisMetadataMerger.hpp"
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
+#include "HorizontalCoordinate.hpp"
 #include "math/AngleMath.hpp"
+#include "math/MathConstants.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -51,7 +53,8 @@ constexpr double kCelsiusToKelvinOffset = 273.0;
 
 [[nodiscard]] bool hasModelAltitude(const double altitudeDeg) noexcept
 {
-    return std::isfinite(altitudeDeg) && altitudeDeg >= kMinimumModelAltitudeDeg && altitudeDeg < 90.0;
+    return std::isfinite(altitudeDeg) && altitudeDeg >= kMinimumModelAltitudeDeg
+           && altitudeDeg < skygate::core::HorizontalCoordinate::kAltitudeMaxDeg;
 }
 
 [[nodiscard]] bool isBelowModelAltitude(const double altitudeDeg) noexcept
@@ -77,7 +80,7 @@ refractionCorrectionDegrees(const double altitudeDeg, const EphemerisEngineOptio
         modelAltitudeDeg + kRefractionArgumentNumeratorDeg / (modelAltitudeDeg + kRefractionArgumentOffsetDeg);
     const double refractionArcminutes = pressureScale(options) * temperatureScale(options) * kRefractionScale
                                         / std::tan(skygate::core::AngleMath::toRadians(refractionArgumentDeg));
-    return refractionArcminutes / 60.0;
+    return refractionArcminutes / skygate::core::MathConstants::kArcminutesPerDegree;
 }
 
 }  // namespace
@@ -109,7 +112,7 @@ HighPrecisionCalculatorResult AtmosphericRefractionCalculator::apply(
     }
 
     result.horizontal->altitudeDeg = std::min(
-        90.0,
+        skygate::core::HorizontalCoordinate::kAltitudeMaxDeg,
         result.horizontal->altitudeDeg
             + refractionCorrectionDegrees(result.horizontal->altitudeDeg, input.request.options)
     );
