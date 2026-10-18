@@ -27,6 +27,7 @@
 #include "theme/SkyThemePalette.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
 #include "theme/SkyThemeRepository.hpp"
+#include "time/SkyQtTimeCodec.hpp"
 #include "time/SkyTimeController.hpp"
 
 #include <QDateTime>
@@ -105,11 +106,6 @@ using skygate::ephemeris::EphemerisEngineKind;
 
     constexpr double kBytesPerMegabyte = 1024.0 * 1024.0;
     return QStringLiteral("%1 MB").arg(static_cast<double>(bytes) / kBytesPerMegabyte, 0, 'f', 1);
-}
-
-[[nodiscard]] QString decimalText(const double value, const int precision)
-{
-    return QString::number(value, 'f', precision);
 }
 
 }  // namespace
@@ -418,7 +414,7 @@ const SkyThemeRenderPalette& SkyContextController::renderTheme() const noexcept
 
 QString SkyContextController::utcTimeText() const
 {
-    return SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()).toString("HH:mm:ss");
+    return SkyQtTimeCodec::formatTimeText(SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()));
 }
 
 QString SkyContextController::utcDateText() const
@@ -575,22 +571,24 @@ bool SkyContextController::ephemerisRefractionEnabled() const noexcept
 
 QString SkyContextController::ephemerisAtmosphericPressureText() const
 {
-    return decimalText(m_ephemerisSession->engineOptions().atmosphericPressureHpa(), 2);
+    return SkyContextTextFormatter::formatFixed(m_ephemerisSession->engineOptions().atmosphericPressureHpa(), 2);
 }
 
 QString SkyContextController::ephemerisAtmosphericTemperatureText() const
 {
-    return decimalText(m_ephemerisSession->engineOptions().atmosphericTemperatureC(), 1);
+    return SkyContextTextFormatter::formatFixed(m_ephemerisSession->engineOptions().atmosphericTemperatureC(), 1);
 }
 
 QString SkyContextController::ephemerisRelativeHumidityText() const
 {
-    return decimalText(m_ephemerisSession->engineOptions().relativeHumidity() * 100.0, 1);
+    return SkyContextTextFormatter::formatFixed(m_ephemerisSession->engineOptions().relativeHumidity() * 100.0, 1);
 }
 
 QString SkyContextController::ephemerisWavelengthText() const
 {
-    return decimalText(m_ephemerisSession->engineOptions().observingWavelengthMicrometers(), 2);
+    return SkyContextTextFormatter::formatFixed(
+        m_ephemerisSession->engineOptions().observingWavelengthMicrometers(), 2
+    );
 }
 
 const SkyOverlayLayerVisibility& SkyContextController::overlayLayerVisibility() const noexcept

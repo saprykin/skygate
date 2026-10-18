@@ -1,9 +1,12 @@
 #include "SkyQtTimeCodec.hpp"
 
 #include "UtcTimeCodec.hpp"
+#include "time/CalendarTime.hpp"
 
 #include <QTime>
 #include <QTimeZone>
+
+#include <cstdlib>
 
 namespace {
 
@@ -18,6 +21,11 @@ qint64 floorDiv(const qint64 numerator, const qint64 denominator) noexcept
 }
 
 }  // namespace
+
+QDateTime SkyQtTimeCodec::ParseResult::toQDateTime(const QTimeZone& timeZone) const
+{
+    return QDateTime(QDate(year, month, day), QTime(hour, minute, second), timeZone);
+}
 
 QDateTime SkyQtTimeCodec::toQDateTimeUtc(const skygate::core::UtcTimePoint& utcTime)
 {
@@ -54,8 +62,86 @@ QString SkyQtTimeCodec::formatDateTimeText(const QDateTime& dateTime, const bool
         return {};
     }
 
-    const QString timeFormat = includeSeconds ? QStringLiteral("HH:mm:ss") : QStringLiteral("HH:mm");
-    return QString("%1 %2").arg(formatDateText(dateTime.date()), dateTime.toString(timeFormat));
+    return QString("%1 %2").arg(formatDateText(dateTime.date()), formatTimeText(dateTime, includeSeconds));
+}
+
+QString SkyQtTimeCodec::formatTimeText(const QDateTime& dateTime, const bool includeSeconds)
+{
+    return dateTime.toString(includeSeconds ? QStringLiteral("HH:mm:ss") : QStringLiteral("HH:mm"));
+}
+
+QString SkyQtTimeCodec::formatAstronomicalEpochDate(const skygate::core::AstronomicalEpoch& epoch)
+{
+    const auto dateTime = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
+    if (!dateTime.has_value()) {
+        return QStringLiteral("--");
+    }
+
+    const int historicalYear =
+        skygate::core::CalendarTime::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
+    return formatDateText(QDate(historicalYear, dateTime->month, dateTime->day));
+}
+
+QString SkyQtTimeCodec::formatDateRangeText(const skygate::ephemeris::EphemerisDateRange& range)
+{
+    const QString rangeText =
+        QString("%1 to %2").arg(formatAstronomicalEpochDate(range.start), formatAstronomicalEpochDate(range.end));
+    if (range.displayName.empty()) {
+        return rangeText;
+    }
+
+    return QString("%1: %2").arg(QString::fromStdString(range.displayName), rangeText);
+}
+
+QString SkyQtTimeCodec::formatUtcOffsetText(const int offsetSeconds)
+{
+    const QChar sign = offsetSeconds < 0 ? QLatin1Char('-') : QLatin1Char('+');
+    const int absoluteSeconds = std::abs(offsetSeconds);
+    return QString("%1%2:%3")
+        .arg(sign)
+        .arg(absoluteSeconds / 3600, 2, 10, QLatin1Char('0'))
+        .arg((absoluteSeconds % 3600) / 60, 2, 10, QLatin1Char('0'));
+}
+
+QString SkyQtTimeCodec::formatUtcOffsetLabel(const int offsetSeconds)
+{
+    return QString("UTC%1").arg(formatUtcOffsetText(offsetSeconds));
+}
+
+QString SkyQtTimeCodec::timeZoneLabel(const QDateTime& zonedDateTime)
+{
+    const QTimeZone timeZone = zonedDateTime.timeZone();
+    QString label = timeZone.abbreviation(zonedDateTime).trimmed();
+    if (label.isEmpty()) {
+        label = timeZone.displayName(zonedDateTime, QTimeZone::ShortName).trimmed();
+    }
+
+    const QString offsetLabel = formatUtcOffsetLabel(timeZone.offsetFromUtc(zonedDateTime));
+    if (label.isEmpty() || label.startsWith(QLatin1String("GMT")) || label.startsWith(QLatin1Char('+'))
+        || label.startsWith(QLatin1Char('-'))) {
+        return offsetLabel;
+    }
+    return label;
+}
+
+QString SkyQtTimeCodec::errorText(const ParseError error, const ErrorScope scope)
+{
+    const bool isUtc = scope == ErrorScope::Utc;
+    switch (error) {
+    case ParseError::None:
+        return isUtc ? QStringLiteral("Enter a valid UTC date and time.")
+                     : QStringLiteral("Enter a valid date and time.");
+    case ParseError::InvalidDateSyntax:
+        return QStringLiteral("Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates.");
+    case ParseError::InvalidYearMagnitude:
+        return QStringLiteral("Year 0000 is invalid. Use 0001 BCE for the year before 0001 CE.");
+    case ParseError::InvalidCalendarDate:
+        return isUtc ? QStringLiteral("Enter a valid UTC date.") : QStringLiteral("Enter a valid date.");
+    case ParseError::InvalidTimeSyntax:
+        return isUtc ? QStringLiteral("Use HH:mm:ss for the UTC time.") : QStringLiteral("Use HH:mm:ss for the time.");
+    }
+
+    return {};
 }
 
 QRegularExpression SkyQtTimeCodec::dateInputPattern()
