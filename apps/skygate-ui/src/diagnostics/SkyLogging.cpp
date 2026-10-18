@@ -70,6 +70,36 @@ QString severityLabel(const QtMsgType type)
     return QStringLiteral("INFO");
 }
 
+QString outputText(const SkyLogging::Output output)
+{
+    switch (output) {
+    case SkyLogging::Output::Terminal:
+        return QStringLiteral("terminal");
+    case SkyLogging::Output::File:
+        return QStringLiteral("file");
+    case SkyLogging::Output::Both:
+        return QStringLiteral("both");
+    case SkyLogging::Output::None:
+        return QStringLiteral("none");
+    }
+
+    return QStringLiteral("none");
+}
+
+SkyLogging::Output outputFor(const SkyLoggingConfiguration& configuration) noexcept
+{
+    if (configuration.logToTerminal && configuration.logToFile) {
+        return SkyLogging::Output::Both;
+    }
+    if (configuration.logToTerminal) {
+        return SkyLogging::Output::Terminal;
+    }
+    if (configuration.logToFile) {
+        return SkyLogging::Output::File;
+    }
+    return SkyLogging::Output::None;
+}
+
 QString normalizedMessage(QString message)
 {
     message.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
@@ -274,6 +304,24 @@ std::optional<QtMsgType> SkyLogging::messageTypeFromLevelText(const QString& lev
     return std::nullopt;
 }
 
+std::optional<SkyLogging::Output> SkyLogging::outputFromText(const QString& text)
+{
+    const QString normalizedText = text.trimmed().toLower();
+    if (normalizedText == outputText(Output::Terminal)) {
+        return Output::Terminal;
+    }
+    if (normalizedText == outputText(Output::File)) {
+        return Output::File;
+    }
+    if (normalizedText == outputText(Output::Both)) {
+        return Output::Both;
+    }
+    if (normalizedText == outputText(Output::None)) {
+        return Output::None;
+    }
+    return std::nullopt;
+}
+
 QString SkyLogging::levelSummary(const QtMsgType type)
 {
     switch (type) {
@@ -294,16 +342,7 @@ QString SkyLogging::levelSummary(const QtMsgType type)
 
 QString SkyLogging::outputSummary(const SkyLoggingConfiguration& configuration)
 {
-    if (configuration.logToTerminal && configuration.logToFile) {
-        return QStringLiteral("both");
-    }
-    if (configuration.logToTerminal) {
-        return QStringLiteral("terminal");
-    }
-    if (configuration.logToFile) {
-        return QStringLiteral("file");
-    }
-    return QStringLiteral("none");
+    return outputText(outputFor(configuration));
 }
 
 QString SkyLogging::configurationSummary(const SkyLoggingConfiguration& configuration)
@@ -360,6 +399,12 @@ void SkyLogging::configure(const SkyLoggingConfiguration& configuration)
         s_fileOpenFailed = false;
         s_fileFailureReported = false;
     }
+}
+
+void SkyLogging::applyOutput(SkyLoggingConfiguration& configuration, const Output output)
+{
+    configuration.logToTerminal = output == Output::Terminal || output == Output::Both;
+    configuration.logToFile = output == Output::File || output == Output::Both;
 }
 
 void SkyLogging::uninstall()
