@@ -15,6 +15,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFile>
 #include <QNetworkReply>
 #include <QPointer>
 #include <QRegularExpression>
@@ -123,6 +124,7 @@ private slots:
     void failedLoadKeepsOtherPendingRelatedReply();
     void retryAfterFailureKeepsAttemptedDescriptors();
     void clearStarCacheEvictsOnlyMergeSources();
+    void failedClearAttemptsRemainingSources();
     void completedLoadPublishesStatusThenRelatedData();
 
 private:
@@ -540,6 +542,125 @@ void SkyCatalogManagerTransitionTests::clearStarCacheEvictsOnlyMergeSources()
     QVERIFY(!evictedEntry->busy);
     QCOMPARE(evictedEntry->statusText, QStringLiteral("Payload unavailable"));
     QVERIFY(!restoredEntry->hasError);
+}
+
+void SkyCatalogManagerTransitionTests::failedClearAttemptsRemainingSources()
+{
+    const QString firstStarPath = m_settings.filePath(QStringLiteral("clear-failure-star-a.csv"));
+    const QString secondStarPath = m_settings.filePath(QStringLiteral("clear-failure-star-b.csv"));
+    const QString deepSkyPath = m_settings.filePath(QStringLiteral("clear-failure-deep-sky.csv"));
+    QVERIFY(
+        CatalogTestPayloadFile::write(
+            firstStarPath,
+            skygate::ui::tests::sampleHygCsvPayload(
+                {.id = 911400, .hip = 911400, .properName = "Clear Failure Star A", .mag = "1.0"}
+            )
+        )
+    );
+    QVERIFY(
+        CatalogTestPayloadFile::write(
+            secondStarPath,
+            skygate::ui::tests::sampleHygCsvPayload(
+                {.id = 911401, .hip = 911401, .properName = "Clear Failure Star B", .mag = "1.0"}
+            )
+        )
+    );
+    QVERIFY(
+        CatalogTestPayloadFile::write(
+            deepSkyPath,
+            skygate::ui::tests::sampleOpenNgcCsvPayload(
+                {.name = "NGC0703",
+                 .type = "G",
+                 .messier = "",
+                 .ngc = "0703",
+                 .identifiers = "PGC 7003",
+                 .commonName = "Clear Failure Galaxy"}
+            )
+        )
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store);
+
+    skygate::ui::internal::SkyCatalogSourceInstance firstStar =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(QUrl::fromLocalFile(firstStarPath).toString());
+    firstStar.title = QStringLiteral("Clear Failure A");
+    const QString firstStarId = firstStar.instanceId;
+    skygate::ui::internal::SkyCatalogSourceInstance secondStar =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(QUrl::fromLocalFile(secondStarPath).toString());
+    secondStar.title = QStringLiteral("Clear Failure B");
+    const QString secondStarId = secondStar.instanceId;
+    skygate::ui::internal::SkyCatalogSourceInstance deepSky =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(QUrl::fromLocalFile(deepSkyPath).toString());
+    deepSky.title = QStringLiteral("Clear Failure Deep Sky");
+    const QString deepSkyId = deepSky.instanceId;
+
+    manager.loadSource(firstStar, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    manager.loadSource(secondStar, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    manager.loadSource(deepSky, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    const QString cacheDirectory = m_settings.filePath(QStringLiteral("catalog-collection-cache"));
+    const QString blockedSidecarPath =
+        CatalogSourceFactsQuery::sidecarPath(cacheDirectory, firstStarId, QStringLiteral(".txt"));
+    const QString clearedSidecarPath =
+        CatalogSourceFactsQuery::sidecarPath(cacheDirectory, secondStarId, QStringLiteral(".txt"));
+    const QString deepSkySidecarPath =
+        CatalogSourceFactsQuery::sidecarPath(cacheDirectory, deepSkyId, QStringLiteral(".txt"));
+    QVERIFY(!blockedSidecarPath.isEmpty());
+    QVERIFY(!clearedSidecarPath.isEmpty());
+    QVERIFY(!deepSkySidecarPath.isEmpty());
+
+    const SkyCatalogCollectionCacheLoadResult beforeClear = store.loadCatalogCollectionCache();
+    QVERIFY(beforeClear.isLoaded());
+    const SkyCatalogSourceCacheRecord* firstBeforeClear =
+        CatalogSourceFactsQuery::findRecord(beforeClear.snapshot, firstStarId);
+    const SkyCatalogSourceCacheRecord* deepSkyBeforeClear =
+        CatalogSourceFactsQuery::findRecord(beforeClear.snapshot, deepSkyId);
+    QVERIFY(firstBeforeClear != nullptr);
+    QVERIFY(deepSkyBeforeClear != nullptr);
+    QVERIFY(!firstBeforeClear->payload.isEmpty());
+    QVERIFY(!deepSkyBeforeClear->payload.isEmpty());
+
+    // A non-empty directory where the source's payload sidecar is expected
+    // cannot be removed as a file, so that source's eviction fails while the
+    // other selected sources stay clearable.
+    QVERIFY(QFile::remove(blockedSidecarPath));
+    QVERIFY(QDir().mkpath(blockedSidecarPath));
+    QFile blocker(QDir(blockedSidecarPath).filePath(QStringLiteral("keep")));
+    QVERIFY(blocker.open(QIODevice::WriteOnly));
+    blocker.close();
+
+    QVERIFY(!manager.clearCatalogCache());
+    QCOMPARE(manager.statusText(), QStringLiteral("Catalog: Star catalog cache clear failed"));
+
+    const SkyCatalogCollectionCacheLoadResult afterClear = store.loadCatalogCollectionCache();
+    QVERIFY(afterClear.isLoaded());
+
+    // The failed source keeps its configured record, and the merge-policy
+    // source after it was still cleared.
+    const SkyCatalogSourceCacheRecord* firstAfterClear =
+        CatalogSourceFactsQuery::findRecord(afterClear.snapshot, firstStarId);
+    const SkyCatalogSourceCacheRecord* secondAfterClear =
+        CatalogSourceFactsQuery::findRecord(afterClear.snapshot, secondStarId);
+    QVERIFY(firstAfterClear != nullptr);
+    QVERIFY(secondAfterClear != nullptr);
+    QCOMPARE(firstAfterClear->title, QStringLiteral("Clear Failure A"));
+    QCOMPARE(secondAfterClear->title, QStringLiteral("Clear Failure B"));
+    QVERIFY(secondAfterClear->payload.isEmpty());
+    QVERIFY(secondAfterClear->binaryPayload.isEmpty());
+    QVERIFY(!QFile::exists(clearedSidecarPath));
+
+    // The deep-sky source is outside the star-clear policy and keeps both its
+    // payload record and its sidecar file.
+    const SkyCatalogSourceCacheRecord* deepSkyAfterClear =
+        CatalogSourceFactsQuery::findRecord(afterClear.snapshot, deepSkyId);
+    QVERIFY(deepSkyAfterClear != nullptr);
+    QVERIFY(!deepSkyAfterClear->payload.isEmpty());
+    QCOMPARE(deepSkyAfterClear->payload, deepSkyBeforeClear->payload);
+    QVERIFY(QFile::exists(deepSkySidecarPath));
 }
 
 void SkyCatalogManagerTransitionTests::completedLoadPublishesStatusThenRelatedData()

@@ -220,6 +220,10 @@ private:
     [[nodiscard]] const skygate::ui::internal::SkyCatalogSourceOperation*
     findOperation(const QString& instanceId) const;
     void removeOperation(const QString& instanceId);
+    // Clears the payload cache of every source selected by policy and keeps
+    // attempting the remaining selected sources after a failure. Reports
+    // whether every selected source was cleared.
+    [[nodiscard]] bool clearSourceCachesForPolicy(skygate::ephemeris::CatalogCompositionPolicy policy);
     // Marks the instance's retained in-memory payload as evicted so ordinary
     // persistence keeps its configured record without writing its bytes back.
     void markSourcePayloadEvicted(const QString& instanceId);
