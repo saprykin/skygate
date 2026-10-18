@@ -320,7 +320,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
             EphemerisMetadataMerger::markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::lightTime());
         } else {
             EphemerisMetadataMerger::merge(
-                result.metadata, earthState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
+                result.metadata, earthState.metadata, EphemerisMetadataMergeOptions::withoutCorrections()
             );
             double lightTimeDays = outputVector.length() / PhysicalConstants::kSpeedOfLightAuPerDay;
             std::optional<skygate::core::Vector3d> correctedVector;
@@ -342,7 +342,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
                 }
 
                 EphemerisMetadataMerger::merge(
-                    result.metadata, targetState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
+                    result.metadata, targetState.metadata, EphemerisMetadataMergeOptions::withoutCorrections()
                 );
                 markBarycenterFallback(
                     result.metadata,
@@ -378,7 +378,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
             );
         } else {
             EphemerisMetadataMerger::merge(
-                result.metadata, sunState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
+                result.metadata, sunState.metadata, EphemerisMetadataMergeOptions::withoutCorrections()
             );
             if (const std::optional<skygate::core::Vector3d> deflectedVector =
                     applySolarGravitationalDeflection(outputVector, *sunState.positionAu);
@@ -404,7 +404,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
             );
         } else {
             EphemerisMetadataMerger::merge(
-                result.metadata, earthState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
+                result.metadata, earthState.metadata, EphemerisMetadataMergeOptions::withoutCorrections()
             );
             if (const std::optional<skygate::core::Vector3d> aberratedVector =
                     applyStellarAberration(outputVector, *earthState.velocityAuPerDay);

@@ -96,24 +96,14 @@ public:
 private:
     [[nodiscard]] static constexpr EphemerisMetadataMergeOptions cachedMetadataMergeOptions() noexcept
     {
-        return EphemerisMetadataMergeOptions{
-            .statusPolicy = EphemerisMetadataStatusMergePolicy::DegradedAndFailedOnly,
-            .mergeCorrections = false,
-            .mergeProvenance = false,
-            .mergeValidityRange = false,
-            .mergeAngularUncertainty = false,
-        };
+        return EphemerisMetadataMergeOptions::statusAndWarningsOnly();
     }
 
     [[nodiscard]] static constexpr EphemerisMetadataMergeOptions stageMetadataMergeOptions() noexcept
     {
-        return EphemerisMetadataMergeOptions{
-            .statusPolicy = EphemerisMetadataStatusMergePolicy::DegradedAndFailedOnly,
-            .mergeCorrections = true,
-            .mergeProvenance = false,
-            .mergeValidityRange = false,
-            .mergeAngularUncertainty = false,
-        };
+        EphemerisMetadataMergeOptions options = EphemerisMetadataMergeOptions::statusAndWarningsOnly();
+        options.mergeCorrections = true;
+        return options;
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags

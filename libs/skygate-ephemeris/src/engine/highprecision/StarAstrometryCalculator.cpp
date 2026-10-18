@@ -148,7 +148,7 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
     }
 
     EphemerisMetadataMerger::merge(
-        metadata, preparedState->tdbKernelEpochMetadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
+        metadata, preparedState->tdbKernelEpochMetadata, EphemerisMetadataMergeOptions::withoutCorrections()
     );
     return preparedState->tdbKernelEpoch;
 }
@@ -278,7 +278,7 @@ void recordAppliedCorrections(
                 const ICalcephKernel::StateResult earthState =
                     earthStateForAnnualParallax(*kernelEpoch, kernel, preparedState);
                 EphemerisMetadataMerger::merge(
-                    result.metadata, earthState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
+                    result.metadata, earthState.metadata, EphemerisMetadataMergeOptions::withoutCorrections()
                 );
                 if (earthState.positionAu.has_value()) {
                     const skygate::core::Vector3d geocentricVector = *propagatedVector - *earthState.positionAu;
