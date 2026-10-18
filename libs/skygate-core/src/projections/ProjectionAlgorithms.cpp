@@ -1,6 +1,7 @@
 #include "ProjectionAlgorithms.hpp"
 #include "ProjectionPipeline.hpp"
 #include "math/AngleMath.hpp"
+#include "math/Geometry2d.hpp"
 #include "math/MathConstants.hpp"
 #include "math/SphericalGeometry.hpp"
 
@@ -17,13 +18,9 @@ namespace {
 
 void applyRoll(double& x, double& y, const double rollDeg) noexcept
 {
-    const double rollRad = AngleMath::toRadians(rollDeg);
-    const double cosRoll = std::cos(rollRad);
-    const double sinRoll = std::sin(rollRad);
-    const double rotatedX = (x * cosRoll) - (y * sinRoll);
-    const double rotatedY = (x * sinRoll) + (y * cosRoll);
-    x = rotatedX;
-    y = rotatedY;
+    const Vector2d rotated = Geometry2d::rotatePoint2d(x, y, rollDeg);
+    x = rotated.x;
+    y = rotated.y;
 }
 
 }  // namespace
@@ -89,7 +86,7 @@ ScreenPoint ProjectionAlgorithms::project(
 ) noexcept
 {
     if (!coordinate.isValid()) {
-        return ProjectionPipeline::invalidCoordinatePoint();
+        return ScreenPoint::invalidCoordinate();
     }
 
     const Vector3d target = SphericalGeometry::horizontalToUnitVector(coordinate.normalizedAzimuth());
@@ -99,7 +96,7 @@ ScreenPoint ProjectionAlgorithms::project(
         const double centerDotTarget = std::clamp(target.dot(frame.center), -1.0, 1.0);
         const double denominator = 1.0 + centerDotTarget;
         if (denominator <= 0.0) {
-            return ProjectionPipeline::culledPoint();
+            return ScreenPoint::culled();
         }
 
         double projectedX = 2.0 * target.dot(frame.right) / denominator;
@@ -112,7 +109,7 @@ ScreenPoint ProjectionAlgorithms::project(
     case ProjectionType::AzimuthalEquidistant: {
         const double angularDistance = SphericalGeometry::angularSeparationRad(target, frame.center);
         if (!isFinite(angularDistance)) {
-            return ProjectionPipeline::invalidParametersPoint();
+            return ScreenPoint::invalidParameters();
         }
 
         double projectedX = 0.0;
@@ -120,7 +117,7 @@ ScreenPoint ProjectionAlgorithms::project(
         if (angularDistance > MathConstants::kEpsilon) {
             const double sinAngularDistance = std::sin(angularDistance);
             if (std::abs(sinAngularDistance) <= MathConstants::kEpsilon) {
-                return ProjectionPipeline::culledPoint();
+                return ScreenPoint::culled();
             }
 
             const double scale = angularDistance / sinAngularDistance;
@@ -136,7 +133,7 @@ ScreenPoint ProjectionAlgorithms::project(
     case ProjectionType::Perspective: {
         const double forward = target.dot(frame.center);
         if (forward <= MathConstants::kEpsilon) {
-            return ProjectionPipeline::culledPoint();
+            return ScreenPoint::culled();
         }
 
         double projectedX = target.dot(frame.right) / forward;
@@ -148,7 +145,7 @@ ScreenPoint ProjectionAlgorithms::project(
     }
     }
 
-    return ProjectionPipeline::invalidParametersPoint();
+    return ScreenPoint::invalidParameters();
 }
 
 ScreenPoint ProjectionAlgorithms::project(
@@ -160,7 +157,7 @@ ScreenPoint ProjectionAlgorithms::project(
 {
     ProjectionFrame frame;
     if (!prepareFrame(projectionType, params, frame)) {
-        return ProjectionPipeline::invalidParametersPoint();
+        return ScreenPoint::invalidParameters();
     }
 
     return project(frame, coordinate, marginPx);

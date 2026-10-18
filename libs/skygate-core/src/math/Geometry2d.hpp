@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GridCellRange.hpp"
 #include "Rect2d.hpp"
 #include "Vector2d.hpp"
 
@@ -16,6 +17,8 @@ public:
     squaredDistance2d(double firstX, double firstY, double secondX, double secondY) noexcept;
 
     [[nodiscard]] static double length2d(double x, double y) noexcept;
+    // Counter-clockwise turn of a point about the origin.
+    [[nodiscard]] static Vector2d rotatePoint2d(double x, double y, double rotationDeg) noexcept;
     [[nodiscard]] static Vector2d
     rotatedOffsetPoint2d(double originX, double originY, double offsetX, double offsetY, double rotationDeg) noexcept;
     [[nodiscard]] static Vector2d
@@ -25,6 +28,7 @@ public:
     perpendicularOffset2d(double startX, double startY, double endX, double endY, double halfWidth) noexcept;
 
     [[nodiscard]] static std::int32_t gridCellIndex(double coordinate, double cellSize) noexcept;
+    [[nodiscard]] static GridCellRange gridCellRange(const Rect2d& rect, double cellSize) noexcept;
     [[nodiscard]] static std::uint64_t packedGridCellKey(std::int32_t cellX, std::int32_t cellY) noexcept;
     [[nodiscard]] static std::uint64_t packedGridCellKey(double x, double y, double cellSize) noexcept;
     [[nodiscard]] static Vector2d gridCellCenter(double x, double y, double cellSize) noexcept;

@@ -7,10 +7,6 @@ namespace skygate::core {
 
 class ProjectionPipeline final {
 public:
-    [[nodiscard]] static ScreenPoint culledPoint() noexcept;
-    [[nodiscard]] static ScreenPoint invalidCoordinatePoint() noexcept;
-    [[nodiscard]] static ScreenPoint invalidParametersPoint() noexcept;
-
     [[nodiscard]] static ScreenPoint finishCircular(
         double projectedX, double projectedY, const ProjectionParams& params, double maxRadius, double marginPx = 0.0
     ) noexcept;

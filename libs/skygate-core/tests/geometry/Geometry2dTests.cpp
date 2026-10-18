@@ -21,11 +21,14 @@ class Geometry2dTests final : public QObject {
 private slots:
     void squaredDistance2dUsesCartesianDelta();
     void length2dUsesHypotenuse();
+    void rotatePoint2dAppliesQuarterTurns();
     void rotatedOffsetPoint2dAppliesDegreeRotation();
     void ellipseOffsetPoint2dUsesParametricSamples();
     void ellipseOffsetPoint2dHandlesInvalidSampleCounts();
     void perpendicularOffset2dBuildsNormalOffset();
     void gridHelpersUseFlooredCells();
+    void gridCellRangeCoversRectCells();
+    void gridCellRangeFallsBackForInvalidInputs();
     void gridHelpersHandleInvalidInputs();
     void areaScaleUsesSquareRootOfAreaRatio();
     void areaScaleFallsBackForInvalidInputs();
@@ -43,6 +46,25 @@ void Geometry2dTests::length2dUsesHypotenuse()
 {
     QCOMPARE(skygate::core::Geometry2d::length2d(3.0, 4.0), 5.0);
     QCOMPARE(skygate::core::Geometry2d::length2d(0.0, 0.0), 0.0);
+}
+
+void Geometry2dTests::rotatePoint2dAppliesQuarterTurns()
+{
+    const auto unrotated = skygate::core::Geometry2d::rotatePoint2d(3.0, 4.0, 0.0);
+    QVERIFY(isNear(unrotated.x, 3.0));
+    QVERIFY(isNear(unrotated.y, 4.0));
+
+    const auto counterClockwiseTurn = skygate::core::Geometry2d::rotatePoint2d(3.0, 4.0, 90.0);
+    QVERIFY(isNear(counterClockwiseTurn.x, -4.0));
+    QVERIFY(isNear(counterClockwiseTurn.y, 3.0));
+
+    const auto clockwiseTurn = skygate::core::Geometry2d::rotatePoint2d(3.0, 4.0, -90.0);
+    QVERIFY(isNear(clockwiseTurn.x, 4.0));
+    QVERIFY(isNear(clockwiseTurn.y, -3.0));
+
+    const auto halfTurn = skygate::core::Geometry2d::rotatePoint2d(3.0, 4.0, 180.0);
+    QVERIFY(isNear(halfTurn.x, -3.0));
+    QVERIFY(isNear(halfTurn.y, -4.0));
 }
 
 void Geometry2dTests::rotatedOffsetPoint2dAppliesDegreeRotation()
@@ -96,6 +118,48 @@ void Geometry2dTests::gridHelpersUseFlooredCells()
     const auto center = skygate::core::Geometry2d::gridCellCenter(24.0, 36.0, 10.0);
     QCOMPARE(center.x, 25.0);
     QCOMPARE(center.y, 35.0);
+}
+
+void Geometry2dTests::gridCellRangeCoversRectCells()
+{
+    const skygate::core::Rect2d negativeRect{.left = -25.0, .top = -15.0, .right = -5.0, .bottom = -5.0};
+    const auto negativeRange = skygate::core::Geometry2d::gridCellRange(negativeRect, 10.0);
+    QCOMPARE(negativeRange.minX, -3);
+    QCOMPARE(negativeRange.maxX, -1);
+    QCOMPARE(negativeRange.minY, -2);
+    QCOMPARE(negativeRange.maxY, -1);
+
+    const skygate::core::Rect2d singleCellRect{.left = 1.0, .top = 2.0, .right = 9.0, .bottom = 9.0};
+    const auto singleCellRange = skygate::core::Geometry2d::gridCellRange(singleCellRect, 10.0);
+    QCOMPARE(singleCellRange.minX, 0);
+    QCOMPARE(singleCellRange.maxX, 0);
+    QCOMPARE(singleCellRange.minY, 0);
+    QCOMPARE(singleCellRange.maxY, 0);
+}
+
+void Geometry2dTests::gridCellRangeFallsBackForInvalidInputs()
+{
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+
+    const skygate::core::Rect2d partlyInvalidRect{.left = nan, .top = 0.0, .right = 15.0, .bottom = 5.0};
+    const auto partlyInvalidRange = skygate::core::Geometry2d::gridCellRange(partlyInvalidRect, 10.0);
+    QCOMPARE(partlyInvalidRange.minX, 0);
+    QCOMPARE(partlyInvalidRange.maxX, 1);
+    QCOMPARE(partlyInvalidRange.minY, 0);
+    QCOMPARE(partlyInvalidRange.maxY, 0);
+
+    const skygate::core::Rect2d rect{.left = 0.0, .top = 0.0, .right = 25.0, .bottom = 25.0};
+    const auto zeroCellSizeRange = skygate::core::Geometry2d::gridCellRange(rect, 0.0);
+    QCOMPARE(zeroCellSizeRange.minX, 0);
+    QCOMPARE(zeroCellSizeRange.maxX, 0);
+    QCOMPARE(zeroCellSizeRange.minY, 0);
+    QCOMPARE(zeroCellSizeRange.maxY, 0);
+
+    const auto nanCellSizeRange = skygate::core::Geometry2d::gridCellRange(rect, nan);
+    QCOMPARE(nanCellSizeRange.minX, 0);
+    QCOMPARE(nanCellSizeRange.maxX, 0);
+    QCOMPARE(nanCellSizeRange.minY, 0);
+    QCOMPARE(nanCellSizeRange.maxY, 0);
 }
 
 void Geometry2dTests::gridHelpersHandleInvalidInputs()

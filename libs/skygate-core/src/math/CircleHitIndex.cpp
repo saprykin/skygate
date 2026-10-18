@@ -1,5 +1,7 @@
 #include "CircleHitIndex.hpp"
 #include "Geometry2d.hpp"
+#include "GridCellRange.hpp"
+#include "Rect2d.hpp"
 
 #include <cmath>
 #include <limits>
@@ -24,13 +26,16 @@ void CircleHitIndex::rebuild(const std::span<const CircleHitTarget> targets)
         const std::size_t targetIndex = m_targets.size();
         m_targets.push_back(target);
 
-        const auto minCellX = Geometry2d::gridCellIndex(target.x - target.radius, m_cellSize);
-        const auto maxCellX = Geometry2d::gridCellIndex(target.x + target.radius, m_cellSize);
-        const auto minCellY = Geometry2d::gridCellIndex(target.y - target.radius, m_cellSize);
-        const auto maxCellY = Geometry2d::gridCellIndex(target.y + target.radius, m_cellSize);
+        const Rect2d bounds{
+            .left = target.x - target.radius,
+            .top = target.y - target.radius,
+            .right = target.x + target.radius,
+            .bottom = target.y + target.radius,
+        };
+        const GridCellRange cellRange = Geometry2d::gridCellRange(bounds, m_cellSize);
 
-        for (std::int32_t cellY = minCellY; cellY <= maxCellY; ++cellY) {
-            for (std::int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
+        for (std::int32_t cellY = cellRange.minY; cellY <= cellRange.maxY; ++cellY) {
+            for (std::int32_t cellX = cellRange.minX; cellX <= cellRange.maxX; ++cellX) {
                 m_targetIndicesByCell[Geometry2d::packedGridCellKey(cellX, cellY)].push_back(targetIndex);
             }
         }

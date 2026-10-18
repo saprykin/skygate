@@ -4,6 +4,25 @@
 
 namespace skygate::core {
 
+ScreenPoint ScreenPoint::culled() noexcept
+{
+    return {};
+}
+
+ScreenPoint ScreenPoint::invalidCoordinate() noexcept
+{
+    ScreenPoint point;
+    point.status = ProjectionStatus::InvalidCoordinate;
+    return point;
+}
+
+ScreenPoint ScreenPoint::invalidParameters() noexcept
+{
+    ScreenPoint point;
+    point.status = ProjectionStatus::InvalidParameters;
+    return point;
+}
+
 bool ScreenPoint::isVisible() const noexcept
 {
     return status == ProjectionStatus::Visible;
