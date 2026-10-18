@@ -1,5 +1,6 @@
 #include "SkyObjectSearchModel.hpp"
 #include "StringUtilities.hpp"
+#include "math/NumericTolerance.hpp"
 #include "selection/SkySelectionTargetKind.hpp"
 
 #include <algorithm>
@@ -157,10 +158,12 @@ void SkyObjectSearchModel::setCatalogData(
             return candidate.isBody;
         }
 
-        if (candidate.brightnessMagnitude < existing.brightnessMagnitude - 1e-9) {
+        if (candidate.brightnessMagnitude
+            < existing.brightnessMagnitude - skygate::core::NumericTolerance::kDisplayChange) {
             return true;
         }
-        if (candidate.brightnessMagnitude > existing.brightnessMagnitude + 1e-9) {
+        if (candidate.brightnessMagnitude
+            > existing.brightnessMagnitude + skygate::core::NumericTolerance::kDisplayChange) {
             return false;
         }
 
@@ -361,7 +364,8 @@ void SkyObjectSearchModel::rebuildRows()
 
         const SourceEntry& lhsEntry = m_sourceEntries.at(lhs.sourceIndex);
         const SourceEntry& rhsEntry = m_sourceEntries.at(rhs.sourceIndex);
-        if (std::abs(lhsEntry.brightnessMagnitude - rhsEntry.brightnessMagnitude) > 1e-9) {
+        if (std::abs(lhsEntry.brightnessMagnitude - rhsEntry.brightnessMagnitude)
+            > skygate::core::NumericTolerance::kDisplayChange) {
             return lhsEntry.brightnessMagnitude < rhsEntry.brightnessMagnitude;
         }
 

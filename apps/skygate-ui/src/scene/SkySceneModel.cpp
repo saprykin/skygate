@@ -9,6 +9,7 @@
 #include "diagnostics/SkyPerformanceStageTimer.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "math/NumericTolerance.hpp"
 #include "render/SkyRenderGlyph.hpp"
 #include "render/SkyRenderLine.hpp"
 #include "render/SkyRenderPoint.hpp"
@@ -178,7 +179,8 @@ std::shared_ptr<const SkyViewportSnapshot> SkySceneModel::viewportSnapshot() con
 
 void SkySceneModel::setViewportSize(const double viewportWidth, const double viewportHeight)
 {
-    if (std::abs(m_viewportWidth - viewportWidth) < 1e-9 && std::abs(m_viewportHeight - viewportHeight) < 1e-9) {
+    if (std::abs(m_viewportWidth - viewportWidth) < skygate::core::NumericTolerance::kDisplayChange
+        && std::abs(m_viewportHeight - viewportHeight) < skygate::core::NumericTolerance::kDisplayChange) {
         return;
     }
 

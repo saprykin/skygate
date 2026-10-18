@@ -1,4 +1,5 @@
 #include "SkyTimelineController.hpp"
+#include "math/NumericTolerance.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -90,7 +91,7 @@ bool SkyTimelineController::setToolbarCollapsed(const bool toolbarCollapsed) noe
 
 bool SkyTimelineController::setSpeedMultiplier(const double speedMultiplier) noexcept
 {
-    if (std::abs(m_state.speedMultiplier - speedMultiplier) < 1e-9) {
+    if (std::abs(m_state.speedMultiplier - speedMultiplier) < skygate::core::NumericTolerance::kDisplayChange) {
         return false;
     }
 
