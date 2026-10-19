@@ -1,4 +1,5 @@
 #include "TdbTtConverter.hpp"
+#include "EphemerisTimePolicy.hpp"
 #include "TimeScaleConversionWarningCode.hpp"
 #include "math/AngleMath.hpp"
 #include "math/PhysicalConstants.hpp"
@@ -92,7 +93,7 @@ TimeScaleConversionResult TdbTtConverter::tdbToTt(const skygate::core::Astronomi
 {
     skygate::core::AstronomicalEpoch tt = tdbEpoch;
     tt.timeScale = skygate::core::TimeScale::Tt;
-    for (int iteration = 0; iteration < 3; ++iteration) {
+    for (int iteration = 0; iteration < EphemerisTimePolicy::kTdbInverseIterations; ++iteration) {
         const std::optional<double> tdbMinusTt = tdbMinusTtSeconds(tt);
         if (!tdbMinusTt.has_value()) {
             TimeScaleConversionResult result = TimeScaleConversionResult::failure(

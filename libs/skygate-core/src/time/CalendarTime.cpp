@@ -29,9 +29,14 @@ std::optional<CivilDateTime> CalendarTime::leapSecondPredecessor(const CivilDate
     return precedingSecond;
 }
 
+bool CalendarTime::isValidGregorianMonth(const int month) noexcept
+{
+    return month >= 1 && month <= 12;
+}
+
 bool CalendarTime::isValidCivilDateTime(const CivilDateTime& dateTime) noexcept
 {
-    if (dateTime.month < 1 || dateTime.month > 12) {
+    if (!isValidGregorianMonth(dateTime.month)) {
         return false;
     }
     if (dateTime.day < 1

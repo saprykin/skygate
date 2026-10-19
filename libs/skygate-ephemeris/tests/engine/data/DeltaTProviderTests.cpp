@@ -92,6 +92,7 @@ private slots:
     void rejectsAncientFallbackWithoutEstimate();
     void rejectsPartialAncientFallbackRanges();
     void reportsStaleData();
+    void neverReadsThirteenthMonthAsCalendarDate();
     void preservesParsingDiagnostics_data();
     void preservesParsingDiagnostics();
 };
@@ -377,6 +378,28 @@ void DeltaTProviderTests::reportsStaleData()
         static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Stale)
     );
     QVERIFY(!result.dataInfo.diagnosticText.empty());
+}
+
+void DeltaTProviderTests::neverReadsThirteenthMonthAsCalendarDate()
+{
+    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
+    asset.content = "#@ version thirteenth-month\n"
+                    "#@ source unit test\n"
+                    "2000 13 1 999.5\n";
+
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(asset);
+
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.provider != nullptr);
+    QCOMPARE(result.provider->entries().size(), std::size_t{1});
+
+    // A thirteenth month cannot name a civil date, so the row is read as a
+    // decimal year with the seconds in the second column instead of being
+    // turned into a calendar date.
+    const skygate::ephemeris::IDeltaTProvider::TableEntry& entry = result.provider->entries().front();
+    QCOMPARE(entry.deltaTSeconds, 13.0);
+    QCOMPARE(dateFromEpoch(entry.effectiveUtcEpoch).month, 1);
 }
 
 void DeltaTProviderTests::preservesParsingDiagnostics_data()

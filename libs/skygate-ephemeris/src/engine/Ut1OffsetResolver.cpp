@@ -1,5 +1,6 @@
 #include "Ut1OffsetResolver.hpp"
 #include "EarthOrientationSampler.hpp"
+#include "EphemerisTimePolicy.hpp"
 #include "TimeScaleConversionWarningCode.hpp"
 #include "math/TimeConstants.hpp"
 
@@ -221,7 +222,7 @@ TimeScaleConversionResult Ut1OffsetResolver::lookupUtcFromUt1(const skygate::cor
     skygate::core::AstronomicalEpoch utcEpoch = ut1Epoch;
     utcEpoch.timeScale = skygate::core::TimeScale::Utc;
     Result lookup;
-    for (int iteration = 0; iteration < 4; ++iteration) {
+    for (int iteration = 0; iteration < EphemerisTimePolicy::kUt1InverseIterations; ++iteration) {
         lookup = eopUt1Offset(m_earthOrientationProvider, m_options, utcEpoch);
         if (!lookup.ut1MinusUtcSeconds.has_value()) {
             return utcFromUt1WithDeltaT(
