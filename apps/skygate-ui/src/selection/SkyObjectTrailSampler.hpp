@@ -16,8 +16,8 @@ class IEphemerisEngine;
 class IEphemerisGuidanceStrategy;
 }  // namespace skygate::ephemeris
 
-// Samples object trails through the ephemeris engine and caches the result.
-// The sample window covers the whole past/future range, so projection,
+// Chooses how a trail is sampled through the ephemeris engine and caches the
+// result. The sample window covers the whole past/future range, so projection,
 // theme, and viewport changes reuse the cache.
 class SkyObjectTrailSampler final {
 public:

@@ -1,5 +1,7 @@
 #include "CelestialBodyCatalog.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
+#include "catalog/CatalogObjectIdentity.hpp"
+#include "catalog/CatalogStarAstrometry.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "engine/SimpleEphemerisGuidanceStrategy.hpp"
@@ -7,9 +9,12 @@
 #include "math/ViewportMath.hpp"
 #include "render/SkyRenderLine.hpp"
 #include "selection/SkyObjectTrailBuilder.hpp"
+#include "selection/SkyObjectTrailInterpolator.hpp"
 #include "support/TrailBuilderTestEngine.hpp"
 #include "support/TrailBuilderTestScenario.hpp"
 #include "support/TrailRenderQuery.hpp"
+#include "trail/BodyTrailCalculator.hpp"
+#include "trail/BodyTrailOptions.hpp"
 
 #include <QtTest/QtTest>
 
@@ -181,6 +186,34 @@ public:
     std::shared_ptr<int> m_sampleCount = std::make_shared<int>(0);
 };
 
+// Records the catalog the trail hands to the guidance engine, which is the
+// only place the guidance body copy is observable.
+class CatalogCapturingGuidanceStrategy final : public skygate::ephemeris::IEphemerisGuidanceStrategy {
+public:
+    [[nodiscard]] std::unique_ptr<skygate::ephemeris::IEphemerisEngine>
+    createGuidanceEngine(const skygate::ephemeris::CelestialBodyCatalog& catalog) const override
+    {
+        ++createCount;
+        if (!catalog.bodies().empty()) {
+            const skygate::ephemeris::BaseCelestialBody& body = *catalog.bodies().front();
+            capturedBodyId = body.id;
+            capturedIdentity = body.identity;
+            if (const skygate::ephemeris::CatalogStarAstrometry* starAstrometry = body.catalogStarAstrometry();
+                starAstrometry != nullptr) {
+                capturedStarAstrometry = *starAstrometry;
+            }
+        }
+
+        return std::make_unique<MarkerTrailGuidanceEngine>(m_sampleCount);
+    }
+
+    mutable int createCount = 0;
+    mutable std::string capturedBodyId;
+    mutable skygate::ephemeris::CatalogObjectIdentity capturedIdentity;
+    mutable std::optional<skygate::ephemeris::CatalogStarAstrometry> capturedStarAstrometry;
+    std::shared_ptr<int> m_sampleCount = std::make_shared<int>(0);
+};
+
 skygate::ephemeris::EphemerisEngineTraits adaptiveTrailWithoutGuidanceApprovalTraits()
 {
     skygate::ephemeris::EphemerisEngineTraits traits = skygate::ephemeris::EphemerisEngineTraits::noTraits();
@@ -206,6 +239,7 @@ private slots:
     void adaptiveTrailWithoutApprovalUsesDirectSampling();
     void adaptiveTrailWithoutApprovalSkipsFixedShortcut();
     void guidanceStrategyInjectionIsHonored();
+    void guidanceCatalogKeepsTargetAstrometry();
     void highPrecisionTrailRefinesCurvedInterpolation();
 };
 
@@ -528,6 +562,8 @@ void SkyObjectTrailGuidanceTests::guidanceStrategyInjectionIsHonored()
     body.id = "moon";
     body.displayName = "Moon";
     body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Moon;
+    body.identity.sourceRecordId = "moon-record";
+    body.identity.externalIdentifiers.push_back(skygate::ephemeris::CatalogIdentifier::make("hip", "4"));
     const skygate::ephemeris::CelestialBodyCatalog bodyCatalog(
         std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{std::move(body)}
     );
@@ -539,7 +575,7 @@ void SkyObjectTrailGuidanceTests::guidanceStrategyInjectionIsHonored()
     input.targetBody = &bodyCatalog.bodyAt(0U);
     input.targetState = &state;
 
-    const auto strategy = std::make_shared<MarkerTrailGuidanceStrategy>();
+    const auto strategy = std::make_shared<CatalogCapturingGuidanceStrategy>();
     input.guidanceStrategy = strategy;
 
     builder.appendTrail(frame, input);
@@ -549,6 +585,67 @@ void SkyObjectTrailGuidanceTests::guidanceStrategyInjectionIsHonored()
     QCOMPARE(engine.requestBodyStateCalls(), 0);
     QCOMPARE(engine.contextBodyStateCalls(), 0);
     QVERIFY(!frame.lines.empty());
+    QCOMPARE(strategy->capturedBodyId, std::string{"moon"});
+    QCOMPARE(strategy->capturedIdentity.sourceRecordId, std::string{"moon-record"});
+    QCOMPARE(strategy->capturedIdentity.externalIdentifiers.size(), std::size_t{1U});
+}
+
+void SkyObjectTrailGuidanceTests::guidanceCatalogKeepsTargetAstrometry()
+{
+    // The guidance engine resolves the target through a catalog, so a body
+    // handed to guidance must keep its catalog facts. A star never reaches
+    // guidance through the trail dispatch, which is why this calls the
+    // interpolator directly.
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "hip_91262";
+    body.displayName = "Vega";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 18.615, .declinationDeg = 38.78};
+    body.identity.sourceRecordId = "91262";
+    body.identity.externalIdentifiers.push_back(skygate::ephemeris::CatalogIdentifier::make("hip", "91262"));
+    body.starAstrometry = skygate::ephemeris::CatalogStarAstrometry{
+        .referenceEquatorial = *body.fixedEquatorial,
+        .referenceEpoch =
+            skygate::core::AstronomicalEpoch{
+                .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tt
+            },
+        .properMotionRightAscensionMasPerYear = 200.0,
+        .properMotionDeclinationMasPerYear = 286.0,
+    };
+    const skygate::ephemeris::CelestialBodyCatalog bodyCatalog(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{std::move(body)}
+    );
+
+    SkyObjectTrailSamplingInput input;
+    input.targetBody = &bodyCatalog.bodyAt(0U);
+    input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{};
+    input.ephemerisRequest->context.observer =
+        skygate::core::GeoLocation{.latitudeDeg = 47.0, .longitudeDeg = 8.0, .elevationMeters = 400.0};
+    input.ephemerisRequest->epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::core::TimeScale::Utc
+    };
+    const auto strategy = std::make_shared<CatalogCapturingGuidanceStrategy>();
+    input.guidanceStrategy = strategy.get();
+
+    const skygate::ephemeris::BodyTrailCalculator trailCalculator;
+    const std::optional<std::vector<skygate::ephemeris::BodyTrailSample>> samples =
+        SkyObjectTrailInterpolator::sampleGuidanceTrail(
+            input,
+            trailCalculator,
+            skygate::ephemeris::BodyTrailOptions{.pastHours = 1, .futureHours = 1, .sampleStepMinutes = 30}
+        );
+
+    QVERIFY(samples.has_value());
+    QVERIFY(!samples->empty());
+    QCOMPARE(strategy->createCount, 1);
+    QCOMPARE(strategy->capturedBodyId, std::string{"hip_91262"});
+    QCOMPARE(strategy->capturedIdentity.sourceRecordId, std::string{"91262"});
+    QCOMPARE(strategy->capturedIdentity.externalIdentifiers.size(), std::size_t{1U});
+    QVERIFY(strategy->capturedStarAstrometry.has_value());
+    QCOMPARE(strategy->capturedStarAstrometry->referenceEquatorial.rightAscensionHours, 18.615);
+    QCOMPARE(strategy->capturedStarAstrometry->referenceEquatorial.declinationDeg, 38.78);
+    QCOMPARE(strategy->capturedStarAstrometry->properMotionRightAscensionMasPerYear.value_or(0.0), 200.0);
+    QCOMPARE(strategy->capturedStarAstrometry->properMotionDeclinationMasPerYear.value_or(0.0), 286.0);
 }
 
 void SkyObjectTrailGuidanceTests::highPrecisionTrailRefinesCurvedInterpolation()

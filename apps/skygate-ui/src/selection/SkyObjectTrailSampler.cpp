@@ -1,16 +1,13 @@
 #include "SkyObjectTrailSampler.hpp"
-#include "CelestialBodyCatalog.hpp"
+#include "CelestialBodyState.hpp"
+#include "SkyObjectTrailAlignment.hpp"
+#include "SkyObjectTrailInterpolator.hpp"
 #include "engine/EphemerisComputationPolicy.hpp"
 #include "engine/IEphemerisEngine.hpp"
-#include "engine/IEphemerisGuidanceStrategy.hpp"
-#include "math/SphericalGeometry.hpp"
-#include "math/Vector3d.hpp"
 #include "trail/BodyTrailCalculator.hpp"
 
-#include <algorithm>
-#include <chrono>
-#include <memory>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -19,40 +16,6 @@ constexpr int kObjectTrailPastHours = 6;
 constexpr int kObjectTrailFutureHours = 18;
 constexpr int kObjectTrailSampleStepMinutes = 30;
 constexpr int kObjectTrailAdaptiveRenderStepMinutes = 10;
-constexpr int kObjectTrailAdaptiveSampleStepMinutes = 120;
-constexpr double kObjectTrailAdaptiveMaxInterpolationErrorDeg = 0.05;
-
-void copyCommonBodyFields(
-    skygate::ephemeris::BaseCelestialBody& target, const skygate::ephemeris::BaseCelestialBody& source
-)
-{
-    target.id = source.id;
-    target.displayName = source.displayName;
-    target.kind = source.kind;
-    target.visualMagnitude = source.visualMagnitude;
-}
-
-[[nodiscard]] skygate::ephemeris::CelestialBodyCatalog
-makeSingleBodyCatalog(const skygate::ephemeris::BaseCelestialBody& body)
-{
-    if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject) {
-        skygate::ephemeris::DistantCelestialBody distantBody;
-        copyCommonBodyFields(distantBody, body);
-        distantBody.fixedEquatorial = body.fixedEquatorialValue();
-        distantBody.deepSkyObject = body.deepSkyObjectValue();
-        return skygate::ephemeris::CelestialBodyCatalog(
-            {},
-            {std::move(distantBody)},
-            {{.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = 0U}}
-        );
-    }
-
-    skygate::ephemeris::OwnGalaxyCelestialBody ownGalaxyBody;
-    copyCommonBodyFields(ownGalaxyBody, body);
-    ownGalaxyBody.fixedEquatorial = body.fixedEquatorialValue();
-    ownGalaxyBody.starAstrometry = body.starAstrometryValue();
-    return skygate::ephemeris::CelestialBodyCatalog({std::move(ownGalaxyBody)});
-}
 
 [[nodiscard]] bool optionalEquatorialsEqual(
     const std::optional<skygate::core::EquatorialCoordinate>& lhs,
@@ -64,271 +27,6 @@ makeSingleBodyCatalog(const skygate::ephemeris::BaseCelestialBody& body)
     }
 
     return !lhs.has_value() || lhs->equals(*rhs);
-}
-
-struct TrailOffsetWindow final {
-    int startOffsetMinutes = 0;
-    int endOffsetMinutes = 0;
-};
-
-[[nodiscard]] TrailOffsetWindow trailOffsetsMinutes(const skygate::ephemeris::BodyTrailOptions& renderOptions) noexcept
-{
-    return TrailOffsetWindow{
-        .startOffsetMinutes = -renderOptions.pastHours * 60, .endOffsetMinutes = renderOptions.futureHours * 60
-    };
-}
-
-[[nodiscard]] std::optional<skygate::core::HorizontalCoordinate> interpolateSampleAtOffset(
-    const std::vector<skygate::ephemeris::BodyTrailSample>& anchors,
-    const int offsetMinutes,
-    std::size_t& nextAnchorIndex
-)
-{
-    while (nextAnchorIndex < anchors.size() && anchors[nextAnchorIndex].offsetMinutes < offsetMinutes) {
-        ++nextAnchorIndex;
-    }
-    if (nextAnchorIndex >= anchors.size()) {
-        return std::nullopt;
-    }
-
-    const skygate::ephemeris::BodyTrailSample& next = anchors[nextAnchorIndex];
-    if (next.offsetMinutes == offsetMinutes) {
-        return next.horizontal;
-    }
-    if (nextAnchorIndex == 0U) {
-        return std::nullopt;
-    }
-
-    const skygate::ephemeris::BodyTrailSample& previous = anchors[nextAnchorIndex - 1U];
-    if (!previous.horizontal.has_value() || !next.horizontal.has_value()) {
-        return std::nullopt;
-    }
-
-    const int spanMinutes = next.offsetMinutes - previous.offsetMinutes;
-    if (spanMinutes <= 0) {
-        return std::nullopt;
-    }
-
-    return skygate::core::SphericalGeometry::interpolateHorizontalCoordinate(
-        *previous.horizontal,
-        *next.horizontal,
-        static_cast<double>(offsetMinutes - previous.offsetMinutes) / static_cast<double>(spanMinutes)
-    );
-}
-
-[[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample> interpolateTrailSamples(
-    const std::vector<skygate::ephemeris::BodyTrailSample>& anchors,
-    const skygate::ephemeris::BodyTrailOptions& renderOptions
-)
-{
-    const TrailOffsetWindow offsetWindow = trailOffsetsMinutes(renderOptions);
-    std::vector<skygate::ephemeris::BodyTrailSample> samples;
-    samples.reserve(
-        static_cast<std::size_t>(
-            (offsetWindow.endOffsetMinutes - offsetWindow.startOffsetMinutes) / renderOptions.sampleStepMinutes
-        )
-        + 1U
-    );
-
-    std::size_t nextAnchorIndex = 0U;
-    for (int offsetMinutes = offsetWindow.startOffsetMinutes; offsetMinutes <= offsetWindow.endOffsetMinutes;
-         offsetMinutes += renderOptions.sampleStepMinutes) {
-        samples.push_back(
-            skygate::ephemeris::BodyTrailSample{
-                .offsetMinutes = offsetMinutes,
-                .horizontal = interpolateSampleAtOffset(anchors, offsetMinutes, nextAnchorIndex)
-            }
-        );
-    }
-
-    return samples;
-}
-
-void alignTrailToSelectedState(
-    std::vector<skygate::ephemeris::BodyTrailSample>& samples, const SkyObjectTrailSamplingInput& input
-)
-{
-    if (input.targetState == nullptr || !input.targetState->horizontal.isFinite()) {
-        return;
-    }
-
-    auto presentSample =
-        std::find_if(samples.begin(), samples.end(), [](const skygate::ephemeris::BodyTrailSample& sample) {
-            return sample.offsetMinutes == 0 && sample.horizontal.has_value() && sample.horizontal->isFinite();
-        });
-    if (presentSample == samples.end()) {
-        return;
-    }
-
-    const skygate::core::HorizontalCoordinate selectedHorizontal = input.targetState->horizontal;
-    const skygate::core::Vector3d guidanceNow =
-        skygate::core::SphericalGeometry::horizontalToUnitVector(*presentSample->horizontal);
-    const skygate::core::Vector3d selectedNow =
-        skygate::core::SphericalGeometry::horizontalToUnitVector(selectedHorizontal);
-    const skygate::core::Vector3d axis =
-        skygate::core::SphericalGeometry::rotationAxisBetween(guidanceNow, selectedNow);
-    const double angleRad = skygate::core::SphericalGeometry::rotationAngleBetween(guidanceNow, selectedNow, axis);
-    if (angleRad <= 0.0) {
-        // Nothing to rotate, so the sampled directions keep their exact values.
-        presentSample->horizontal = selectedHorizontal;
-        return;
-    }
-
-    for (skygate::ephemeris::BodyTrailSample& sample : samples) {
-        if (sample.horizontal.has_value() && sample.horizontal->isFinite()) {
-            sample.horizontal = skygate::core::SphericalGeometry::horizontalFromUnitVector(
-                skygate::core::SphericalGeometry::rotatedAroundAxis(
-                    skygate::core::SphericalGeometry::horizontalToUnitVector(*sample.horizontal), axis, angleRad
-                )
-            );
-        }
-    }
-    presentSample->horizontal = selectedHorizontal;
-}
-
-[[nodiscard]] skygate::ephemeris::BodyTrailSample
-sampleEngineTrailAtOffset(const SkyObjectTrailSamplingInput& input, const int offsetMinutes)
-{
-    skygate::ephemeris::EphemerisRequest sampleRequest = *input.ephemerisRequest;
-    sampleRequest.context.utcTime += std::chrono::minutes(offsetMinutes);
-    sampleRequest.epoch = input.ephemerisRequest->epoch.addMinutes(offsetMinutes);
-
-    skygate::ephemeris::BodyTrailSample sample{.offsetMinutes = offsetMinutes, .horizontal = std::nullopt};
-    const auto bodyState = input.ephemerisEngine->computeBodyState(sampleRequest, std::size_t{input.targetBodyIndex});
-    if (bodyState.has_value() && bodyState->horizontal.isFinite()) {
-        sample.horizontal = bodyState->horizontal;
-    }
-    return sample;
-}
-
-[[nodiscard]] bool interpolationErrorWithinBounds(
-    const skygate::ephemeris::BodyTrailSample& previous,
-    const skygate::ephemeris::BodyTrailSample& midpoint,
-    const skygate::ephemeris::BodyTrailSample& next
-) noexcept
-{
-    if (!previous.horizontal.has_value() || !midpoint.horizontal.has_value() || !next.horizontal.has_value()) {
-        return true;
-    }
-
-    const int spanMinutes = next.offsetMinutes - previous.offsetMinutes;
-    if (spanMinutes <= 0) {
-        return true;
-    }
-
-    const skygate::core::HorizontalCoordinate interpolated =
-        skygate::core::SphericalGeometry::interpolateHorizontalCoordinate(
-            *previous.horizontal,
-            *next.horizontal,
-            static_cast<double>(midpoint.offsetMinutes - previous.offsetMinutes) / static_cast<double>(spanMinutes)
-        );
-    return skygate::core::SphericalGeometry::angularSeparationDegrees(interpolated, *midpoint.horizontal)
-           <= kObjectTrailAdaptiveMaxInterpolationErrorDeg;
-}
-
-void appendAdaptiveTrailAnchors(
-    std::vector<skygate::ephemeris::BodyTrailSample>& anchors,
-    const SkyObjectTrailSamplingInput& input,
-    const skygate::ephemeris::BodyTrailSample& previous,
-    const skygate::ephemeris::BodyTrailSample& next
-)
-{
-    const int spanMinutes = next.offsetMinutes - previous.offsetMinutes;
-    if (spanMinutes <= kObjectTrailAdaptiveRenderStepMinutes) {
-        anchors.push_back(next);
-        return;
-    }
-
-    const int midpointOffsetMinutes = previous.offsetMinutes + (spanMinutes / 2);
-    if (midpointOffsetMinutes <= previous.offsetMinutes || midpointOffsetMinutes >= next.offsetMinutes) {
-        anchors.push_back(next);
-        return;
-    }
-
-    const skygate::ephemeris::BodyTrailSample midpoint = sampleEngineTrailAtOffset(input, midpointOffsetMinutes);
-    if (interpolationErrorWithinBounds(previous, midpoint, next)) {
-        anchors.push_back(next);
-        return;
-    }
-
-    appendAdaptiveTrailAnchors(anchors, input, previous, midpoint);
-    appendAdaptiveTrailAnchors(anchors, input, midpoint, next);
-}
-
-[[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample> sampleAdaptiveTrail(
-    const SkyObjectTrailSamplingInput& input,
-    const skygate::ephemeris::BodyTrailCalculator& trailCalculator,
-    const skygate::ephemeris::BodyTrailOptions& renderOptions
-)
-{
-    const skygate::ephemeris::BodyTrailOptions anchorOptions{
-        .pastHours = renderOptions.pastHours,
-        .futureHours = renderOptions.futureHours,
-        .sampleStepMinutes = kObjectTrailAdaptiveSampleStepMinutes
-    };
-    const std::vector<skygate::ephemeris::BodyTrailSample> coarseAnchors =
-        trailCalculator.sample(*input.ephemerisEngine, *input.ephemerisRequest, input.targetBodyIndex, anchorOptions);
-    if (coarseAnchors.size() < 2U) {
-        return interpolateTrailSamples(coarseAnchors, renderOptions);
-    }
-
-    std::vector<skygate::ephemeris::BodyTrailSample> adaptiveAnchors;
-    adaptiveAnchors.reserve(coarseAnchors.size());
-    adaptiveAnchors.push_back(coarseAnchors.front());
-    for (std::size_t index = 1U; index < coarseAnchors.size(); ++index) {
-        appendAdaptiveTrailAnchors(adaptiveAnchors, input, coarseAnchors[index - 1U], coarseAnchors[index]);
-    }
-
-    return interpolateTrailSamples(adaptiveAnchors, renderOptions);
-}
-
-[[nodiscard]] std::optional<std::vector<skygate::ephemeris::BodyTrailSample>> sampleGuidanceTrail(
-    const SkyObjectTrailSamplingInput& input,
-    const skygate::ephemeris::BodyTrailCalculator& trailCalculator,
-    const skygate::ephemeris::BodyTrailOptions& renderOptions
-)
-{
-    const skygate::ephemeris::CelestialBodyCatalog catalog = makeSingleBodyCatalog(*input.targetBody);
-    if (input.guidanceStrategy == nullptr) {
-        return std::nullopt;
-    }
-
-    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> guidanceEngine =
-        input.guidanceStrategy->createGuidanceEngine(catalog);
-    if (guidanceEngine == nullptr) {
-        return std::nullopt;
-    }
-
-    skygate::ephemeris::EphemerisRequest guidanceRequest = *input.ephemerisRequest;
-    guidanceRequest.options = guidanceEngine->options();
-    guidanceRequest.options.setEngineKind(guidanceEngine->kind());
-    std::vector<skygate::ephemeris::BodyTrailSample> samples =
-        trailCalculator.sample(*guidanceEngine, guidanceRequest, 0U, renderOptions);
-    alignTrailToSelectedState(samples, input);
-    return samples;
-}
-
-[[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample> sampleFixedEquatorialTrail(
-    const SkyObjectTrailSamplingInput& input, const skygate::ephemeris::BodyTrailOptions& renderOptions
-)
-{
-    const TrailOffsetWindow offsetWindow = trailOffsetsMinutes(renderOptions);
-
-    std::vector<skygate::ephemeris::BodyTrailSample> samples;
-    samples.reserve(
-        static_cast<std::size_t>(
-            (offsetWindow.endOffsetMinutes - offsetWindow.startOffsetMinutes) / renderOptions.sampleStepMinutes
-        )
-        + 1U
-    );
-
-    for (int offsetMinutes = offsetWindow.startOffsetMinutes; offsetMinutes <= offsetWindow.endOffsetMinutes;
-         offsetMinutes += renderOptions.sampleStepMinutes) {
-        samples.push_back(sampleEngineTrailAtOffset(input, offsetMinutes));
-    }
-
-    alignTrailToSelectedState(samples, input);
-    return samples;
 }
 
 [[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample>
@@ -343,19 +41,23 @@ sampleTrail(const SkyObjectTrailSamplingInput& input, const skygate::ephemeris::
     };
 
     if (SkyObjectTrailSampler::isFixedEquatorialTrailTarget(input)) {
-        return sampleFixedEquatorialTrail(input, renderOptions);
+        std::vector<skygate::ephemeris::BodyTrailSample> samples =
+            SkyObjectTrailInterpolator::sampleEngineWindow(input, renderOptions);
+        SkyObjectTrailAlignment::alignToSelectedState(samples, input);
+        return samples;
     }
 
     if (SkyObjectTrailSampler::shouldUseGuidanceTrail(input)) {
-        if (std::optional<std::vector<skygate::ephemeris::BodyTrailSample>> guidanceSamples =
-                sampleGuidanceTrail(input, trailCalculator, renderOptions);
-            guidanceSamples.has_value()) {
+        std::optional<std::vector<skygate::ephemeris::BodyTrailSample>> guidanceSamples =
+            SkyObjectTrailInterpolator::sampleGuidanceTrail(input, trailCalculator, renderOptions);
+        if (guidanceSamples.has_value()) {
+            SkyObjectTrailAlignment::alignToSelectedState(*guidanceSamples, input);
             return std::move(*guidanceSamples);
         }
     }
 
     if (SkyObjectTrailSampler::usesAdaptiveTrailSampling(input)) {
-        return sampleAdaptiveTrail(input, trailCalculator, renderOptions);
+        return SkyObjectTrailInterpolator::sampleAdaptiveTrail(input, trailCalculator, renderOptions);
     }
 
     return input.ephemerisRequest.has_value()
