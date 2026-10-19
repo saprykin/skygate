@@ -4,6 +4,7 @@
 #include "NumericParsingUtilities.hpp"
 #include "TextParsingUtilities.hpp"
 #include "time/CalendarTime.hpp"
+#include "time/GregorianCalendar.hpp"
 
 #include <cstddef>
 #include <string>
@@ -170,7 +171,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
             return false;
         }
         deltaTSeconds = *seconds;
-        effectiveDate = skygate::core::CalendarTime::civilDateFromDecimalYear(*decimalYear);
+        effectiveDate = skygate::core::GregorianCalendar::civilDateFromDecimalYear(*decimalYear);
     }
 
     if (!effectiveDate.has_value()) {

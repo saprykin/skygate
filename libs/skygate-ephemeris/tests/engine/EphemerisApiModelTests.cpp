@@ -6,6 +6,7 @@
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/CalendarTime.hpp"
+#include "time/GregorianCalendar.hpp"
 #include "engine/highprecision/CelestialFrameTransformResult.hpp"
 #include "engine/highprecision/CelestialReferenceFrame.hpp"
 
@@ -412,16 +413,16 @@ void EphemerisApiModelTests::convertsCivilDatesAndDefinesNoYearZeroPolicy()
     QCOMPARE(yearZeroRoundTrip->month, 1);
     QCOMPARE(yearZeroRoundTrip->day, 1);
 
-    const auto astronomicalFromOneBce = skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(-1);
+    const auto astronomicalFromOneBce = skygate::core::GregorianCalendar::astronomicalYearFromHistoricalYear(-1);
     QVERIFY(astronomicalFromOneBce.has_value());
     QCOMPARE(*astronomicalFromOneBce, 0);
-    const auto astronomicalFromFortyFourBce = skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(-44);
+    const auto astronomicalFromFortyFourBce = skygate::core::GregorianCalendar::astronomicalYearFromHistoricalYear(-44);
     QVERIFY(astronomicalFromFortyFourBce.has_value());
     QCOMPARE(*astronomicalFromFortyFourBce, -43);
-    QVERIFY(!skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(0).has_value());
-    QCOMPARE(skygate::core::CalendarTime::historicalYearFromAstronomicalYear(0), -1);
-    QCOMPARE(skygate::core::CalendarTime::historicalYearFromAstronomicalYear(-43), -44);
-    QCOMPARE(skygate::core::CalendarTime::historicalYearFromAstronomicalYear(2026), 2026);
+    QVERIFY(!skygate::core::GregorianCalendar::astronomicalYearFromHistoricalYear(0).has_value());
+    QCOMPARE(skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(0), -1);
+    QCOMPARE(skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(-43), -44);
+    QCOMPARE(skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(2026), 2026);
 
     const skygate::core::CivilDateTime invalidLeapDay{
         .astronomicalYear = 2023,
