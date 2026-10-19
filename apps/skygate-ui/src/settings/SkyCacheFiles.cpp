@@ -1,4 +1,5 @@
 #include "SkyCacheFiles.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -8,11 +9,6 @@
 #include <QStandardPaths>
 
 namespace skygate::ui::internal {
-namespace {
-
-Q_LOGGING_CATEGORY(skygateCacheFilesLog, "skygate.catalog.cache")
-
-}  // namespace
 
 QString SkyCacheFiles::appDataFilePath(const QString& fileName)
 {
@@ -37,7 +33,7 @@ bool SkyCacheFiles::removeFiles(const QStringList& paths, const QString& logNoun
     for (const QString& path : paths) {
         QFile file(path);
         if (file.exists() && !file.remove()) {
-            qCWarning(skygateCacheFilesLog).noquote()
+            qCWarning(skygateCatalogCacheLog).noquote()
                 << "Failed to remove" << logNoun << "file" << path << file.errorString();
             removedAllFiles = false;
         }
@@ -54,28 +50,28 @@ bool SkyCacheFiles::writeFileAtomically(const QString& path, const QByteArray& p
     const QFileInfo targetInfo(path);
     QDir targetDir(targetInfo.absolutePath());
     if (!targetDir.mkpath(".")) {
-        qCWarning(skygateCacheFilesLog).noquote()
+        qCWarning(skygateCatalogCacheLog).noquote()
             << "Failed to create" << logNoun << "directory" << targetDir.absolutePath();
         return false;
     }
 
     QSaveFile cacheFile(path);
     if (!cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        qCWarning(skygateCacheFilesLog).noquote()
+        qCWarning(skygateCatalogCacheLog).noquote()
             << "Failed to open" << logNoun << "for writing" << path << cacheFile.errorString();
         return false;
     }
 
     const qint64 writtenBytes = cacheFile.write(payload);
     if (writtenBytes != payload.size()) {
-        qCWarning(skygateCacheFilesLog).noquote() << "Failed to write complete" << logNoun << path << "written"
-                                                  << writtenBytes << "expected" << payload.size();
+        qCWarning(skygateCatalogCacheLog).noquote() << "Failed to write complete" << logNoun << path << "written"
+                                                    << writtenBytes << "expected" << payload.size();
         cacheFile.cancelWriting();
         return false;
     }
 
     if (!cacheFile.commit()) {
-        qCWarning(skygateCacheFilesLog).noquote() << "Failed to commit" << logNoun << path << cacheFile.errorString();
+        qCWarning(skygateCatalogCacheLog).noquote() << "Failed to commit" << logNoun << path << cacheFile.errorString();
         return false;
     }
     return true;

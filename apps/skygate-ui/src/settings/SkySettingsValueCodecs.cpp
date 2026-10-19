@@ -1,4 +1,5 @@
 #include "SkySettingsValueCodecs.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 
 #include <QLoggingCategory>
 #include <QSettings>
@@ -7,11 +8,6 @@
 #include <cmath>
 
 namespace skygate::ui::internal {
-namespace {
-
-Q_LOGGING_CATEGORY(skygateSettingsLog, "skygate.settings")
-
-}  // namespace
 
 std::optional<bool> SkySettingsValueCodecs::boolFromSettingValue(const QVariant& value)
 {

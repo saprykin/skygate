@@ -4,6 +4,7 @@
 #include "catalog/CatalogDownloadService.hpp"
 #include "catalog/CatalogPayloadParseService.hpp"
 #include "catalog/SkyCatalogText.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 
 #include <QLoggingCategory>
 #include <QNetworkAccessManager>
@@ -15,12 +16,11 @@
 #include <utility>
 
 using skygate::ephemeris::CatalogLoadResult;
+using skygate::ui::skygateCatalogParseLog;
 using skygate::ui::internal::SkyCatalogImportStatus;
 using skygate::ui::internal::SkyCatalogText;
 
 namespace {
-
-Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
 QString catalogLoadErrorDescription(const CatalogLoadResult::ErrorCode errorCode)
 {

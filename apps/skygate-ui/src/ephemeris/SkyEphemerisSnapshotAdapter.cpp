@@ -1,4 +1,5 @@
 #include "SkyEphemerisSnapshotAdapter.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 #include "engine/EphemerisDataFileUtilities.hpp"
 
 #include <QFile>
@@ -14,13 +15,12 @@
 
 namespace {
 
-Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
-
 using EphemerisDataCacheSnapshot = SkyEphemerisDataCacheSnapshot;
 using skygate::ephemeris::EphemerisDataFileUtilities;
 using skygate::ephemeris::EphemerisDataManifest;
 using skygate::ephemeris::EphemerisKernelDataAsset;
 using skygate::ephemeris::EphemerisTextDataAsset;
+using skygate::ui::skygateEphemerisDataLog;
 
 const EphemerisDataManifest::Profile*
 bundledFallbackProfile(const EphemerisDataManifest* manifest, const QString& profileId)

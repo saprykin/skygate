@@ -4,6 +4,7 @@
 #include "SkySettingsSnapshotCodecs.hpp"
 #include "SkyWindowSizeSettings.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 
 #include <QLoggingCategory>
 #include <QSettings>
@@ -11,12 +12,7 @@
 #include <optional>
 
 using namespace skygate::ui::internal;
-
-namespace {
-
-Q_LOGGING_CATEGORY(skygateSettingsLog, "skygate.settings")
-
-}  // namespace
+using skygate::ui::skygateSettingsLog;
 
 bool SkySettingsStore::saveState(const SkyPersistedStateSnapshot& snapshot) const
 {

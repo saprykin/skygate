@@ -1,5 +1,6 @@
 #include "SkyWindowSizeSettings.hpp"
 #include "SkySettingsValueCodecs.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 
 #include <QLoggingCategory>
 #include <QSettings>
@@ -7,8 +8,6 @@
 
 namespace skygate::ui::internal {
 namespace {
-
-Q_LOGGING_CATEGORY(skygateSettingsLog, "skygate.settings")
 
 QString appSettingsKey(const char* name)
 {

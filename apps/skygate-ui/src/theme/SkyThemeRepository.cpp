@@ -4,6 +4,7 @@
 #include "SkyThemeJsonCodec.hpp"
 #include "SkyThemeOption.hpp"
 #include "SkyThemeOptionsAdapter.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 
 #include <QFile>
 #include <QJsonArray>
@@ -20,8 +21,6 @@ void initSkygateThemeResources()
 
 namespace skygate::ui::internal {
 namespace {
-
-Q_LOGGING_CATEGORY(skygateThemeLog, "skygate.theme")
 
 [[nodiscard]] std::optional<QByteArray> readResourceBytes(const QString& resourcePath, const QString& description)
 {

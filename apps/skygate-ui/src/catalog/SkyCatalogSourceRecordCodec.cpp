@@ -2,6 +2,7 @@
 #include "SkyCatalogSourceCachePaths.hpp"
 #include "catalog/CatalogCompositionPolicyRules.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 #include "settings/SkyCacheFiles.hpp"
 #include "settings/SkySettingsValueCodecs.hpp"
 
@@ -12,9 +13,6 @@
 
 namespace skygate::ui::internal {
 namespace {
-
-Q_LOGGING_CATEGORY(skygateCatalogCacheLog, "skygate.catalog.cache")
-Q_LOGGING_CATEGORY(skygateSettingsLog, "skygate.settings")
 
 // A stored policy only means something when it names a policy this build knows.
 // An unknown value falls back to the merge policy instead of handing

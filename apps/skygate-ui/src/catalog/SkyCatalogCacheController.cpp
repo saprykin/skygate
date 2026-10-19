@@ -15,6 +15,7 @@
 #include "catalog/CatalogIdentity.hpp"
 #include "catalog/CatalogParseRequest.hpp"
 #include "catalog/CatalogPayloadParser.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 #include "settings/SkySettingsStore.hpp"
 
 #include <QLoggingCategory>
@@ -24,8 +25,6 @@
 
 namespace skygate::ui::internal {
 namespace {
-
-Q_LOGGING_CATEGORY(skygateCatalogCacheLog, "skygate.catalog.cache")
 
 QString stripSavedSuffixes(const QString& sourceLabel)
 {

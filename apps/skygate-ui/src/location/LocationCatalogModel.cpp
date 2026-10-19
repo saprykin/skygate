@@ -1,6 +1,7 @@
 #include "LocationCatalogModel.hpp"
 #include "TextParsingUtilities.hpp"
 #include "catalog/io/CatalogParsingUtilities.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 
 #include <QFile>
 #include <QIODevice>
@@ -17,7 +18,7 @@
 
 namespace {
 
-Q_LOGGING_CATEGORY(skygateLocationCatalogLog, "skygate.location.catalog")
+using skygate::ui::skygateLocationCatalogLog;
 
 constexpr auto kLocationCatalogResourcePath = ":/locations/major-cities.csv";
 
