@@ -3,8 +3,7 @@
 #include "StringUtilities.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
-#include "math/TimeConstants.hpp"
-#include "time/AstronomicalEpoch.hpp"
+#include "time/EpochCodec.hpp"
 #include "time/TimeScale.hpp"
 #include "catalog/io/CatalogParsingUtilities.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
@@ -30,15 +29,6 @@ constexpr std::string_view kInvalidCategoryLabels[] = {
 
 constexpr std::size_t kRowCountLimitFloor = 2000000;
 constexpr std::size_t kMinExpectedBytesPerDataRow = 8;
-
-[[nodiscard]] skygate::core::AstronomicalEpoch j2000CatalogEpoch() noexcept
-{
-    return {
-        .julianDatePart1 = skygate::core::TimeConstants::kJulianDateJ2000,
-        .julianDatePart2 = 0.0,
-        .timeScale = skygate::core::TimeScale::Tt,
-    };
-}
 
 [[nodiscard]] std::optional<double> optionalFiniteDoubleColumn(const DelimitedCatalogRow& row, const QString& name)
 {
@@ -185,7 +175,7 @@ public:
 
                     CatalogStarAstrometry astrometry;
                     astrometry.referenceEquatorial = equatorial;
-                    astrometry.referenceEpoch = j2000CatalogEpoch();
+                    astrometry.referenceEpoch = skygate::core::EpochCodec::j2000Epoch(skygate::core::TimeScale::Tt);
                     astrometry.properMotionRightAscensionMasPerYear =
                         optionalFiniteDoubleColumn(row, QStringLiteral("proper_motion_ra_mas"));
                     astrometry.properMotionDeclinationMasPerYear =

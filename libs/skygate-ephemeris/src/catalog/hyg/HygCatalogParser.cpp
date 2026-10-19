@@ -6,7 +6,8 @@
 #include "catalog/CatalogSchemaRegistry.hpp"
 #include "catalog/io/CatalogParsingUtilities.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
-#include "math/TimeConstants.hpp"
+#include "time/EpochCodec.hpp"
+#include "time/TimeScale.hpp"
 
 #include <QString>
 #include <QStringView>
@@ -24,15 +25,6 @@ namespace {
 constexpr std::size_t kHygRowCountLimitFloor = 2000000;
 constexpr std::size_t kHygMinExpectedBytesPerDataRow = 6;
 constexpr double kHygMissingDistanceParsecs = 100'000.0;
-
-[[nodiscard]] skygate::core::AstronomicalEpoch j2000CatalogEpoch() noexcept
-{
-    return {
-        .julianDatePart1 = skygate::core::TimeConstants::kJulianDateJ2000,
-        .julianDatePart2 = 0.0,
-        .timeScale = skygate::core::TimeScale::Tt,
-    };
-}
 
 [[nodiscard]] std::optional<double> optionalFiniteDoubleColumn(const DelimitedCatalogRow& row, const QString& name)
 {
@@ -147,7 +139,7 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
 
             CatalogStarAstrometry astrometry;
             astrometry.referenceEquatorial = *body.fixedEquatorial;
-            astrometry.referenceEpoch = j2000CatalogEpoch();
+            astrometry.referenceEpoch = skygate::core::EpochCodec::j2000Epoch(skygate::core::TimeScale::Tt);
             astrometry.properMotionRightAscensionMasPerYear = optionalFiniteDoubleColumn(row, QStringLiteral("pmra"));
             astrometry.properMotionDeclinationMasPerYear = optionalFiniteDoubleColumn(row, QStringLiteral("pmdec"));
             astrometry.stellarParallaxMas = parallaxMasFromHygRow(row);

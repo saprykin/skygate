@@ -66,6 +66,15 @@ AstronomicalEpoch EpochCodec::epochFromNtpTimestamp(const std::uint64_t ntpTimes
         .normalized();
 }
 
+AstronomicalEpoch EpochCodec::j2000Epoch(const TimeScale scale) noexcept
+{
+    return AstronomicalEpoch{
+        .julianDatePart1 = TimeConstants::kJulianDateJ2000,
+        .julianDatePart2 = 0.0,
+        .timeScale = scale,
+    };
+}
+
 double EpochCodec::julianDayFromUtc(const UtcTimePoint& utcTime) noexcept
 {
     return julianDateFromDaysSinceUnixEpoch(
