@@ -2,12 +2,15 @@
 
 #include "ObservationContext.hpp"
 #include "PreparedProjection.hpp"
+#include "SkyInspectorPlacement.hpp"
 #include "SkySceneComposer.hpp"
 #include "SkySceneCompositionInput.hpp"
+#include "SkySceneDegradationReporter.hpp"
 #include "SkySceneFrameData.hpp"
 #include "SkySceneFramePipeline.hpp"
 #include "SkySceneOverlayAdapter.hpp"
 #include "SkyViewportSnapshot.hpp"
+#include "SkyViewportSnapshotPublisher.hpp"
 #include "render/SkyRenderGlyph.hpp"
 #include "render/SkyRenderLine.hpp"
 #include "render/SkyRenderPoint.hpp"
@@ -83,7 +86,6 @@ private:
     void publishViewportSnapshot(
         std::uint64_t renderFrameGeneration, const std::optional<std::uint32_t>& trailTargetBodyIndex
     );
-    void clearViewportSnapshot();
 
 private:
     QPointer<SkyContextController> m_skyContextController;
@@ -99,17 +101,11 @@ private:
     SkySceneComposer m_sceneComposer;
     SkySceneOverlayAdapter m_sceneOverlayAdapter;
     SkySceneFrameData m_sceneFrame;
-    std::shared_ptr<const SkyViewportSnapshot> m_viewportSnapshot;
-    std::uint64_t m_viewportSnapshotGeneration = 0;
-    std::uint64_t m_viewportRenderFrameGeneration = 0;
-    std::optional<std::uint32_t> m_viewportTrailTargetBodyIndex;
+    SkySceneDegradationReporter m_degradationReporter;
+    SkyViewportSnapshotPublisher m_viewportSnapshotPublisher;
+    SkyInspectorPlacement m_inspectorPlacement;
     QVariantList m_overlayItems;
-    QVariantList m_ephemerisDegradationReasons;
     QVariantMap m_selectionMarker;
     QVariantMap m_selectedObjectInspector;
-    QString m_selectedObjectTargetId;
-    double m_selectedObjectInspectorPinnedX = 0.0;
-    double m_selectedObjectInspectorPinnedY = 0.0;
-    bool m_selectedObjectInspectorPinned = false;
     bool m_ignoringSearchTargetChange = false;
 };
