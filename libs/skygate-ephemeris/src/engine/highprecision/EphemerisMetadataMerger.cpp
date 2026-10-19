@@ -221,7 +221,7 @@ void EphemerisMetadataMerger::mergeWarnings(
     EphemerisEngineQueryResult& target, const EphemerisEngineQueryResult& source
 ) noexcept
 {
-    target.warningCodeMask |= source.warningCodeMask;
+    target.warningCodeMask.merge(source.warningCodeMask);
     target.warningDetails.insert(
         target.warningDetails.end(), source.warningDetails.begin(), source.warningDetails.end()
     );
