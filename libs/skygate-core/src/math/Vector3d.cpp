@@ -27,6 +27,18 @@ std::optional<Vector3d> Vector3d::normalized() const noexcept
     return scaled(1.0 / vectorLength);
 }
 
+std::optional<Vector3d> Vector3d::withLength(const double targetLength) const noexcept
+{
+    const std::optional<Vector3d> direction = normalized();
+    // Same bound as normalized(): a non-finite or subnormal target length
+    // carries no usable magnitude.
+    if (!std::isfinite(targetLength) || targetLength <= std::numeric_limits<double>::min() || !direction.has_value()) {
+        return std::nullopt;
+    }
+
+    return direction->scaled(targetLength);
+}
+
 Vector3d Vector3d::scaled(const double scale) const noexcept
 {
     return {
