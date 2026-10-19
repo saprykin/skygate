@@ -3,12 +3,13 @@
 #include "BaseCelestialBody.hpp"
 #include "DistantCelestialBody.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
-#include "catalog/CatalogCompositionMerger.hpp"
 #include "catalog/CatalogCoordinateMerge.hpp"
 #include "catalog/CatalogFieldOrigins.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogIdentityIndex.hpp"
+#include "catalog/CatalogMergeAccumulator.hpp"
 #include "catalog/CatalogObjectIdentity.hpp"
+#include "catalog/CatalogSourcePrecedence.hpp"
 
 #include <cstddef>
 #include <string>
@@ -163,13 +164,13 @@ public:
 
     // Appends an incoming record as the survivor of every absorbed position.
     [[nodiscard]] static std::size_t absorbSurvivorsAndAppend(
-        CatalogCompositionMerger::MergeAccumulator& accumulator,
+        CatalogMergeAccumulator& accumulator,
         CatalogIdentityIndex& index,
         const BaseCelestialBody& incoming,
         CatalogFieldOrigins incomingOrigins,
         const std::vector<std::size_t>& absorbedPositions,
         std::string sourceId,
-        const CatalogCompositionMerger::SourcePrecedence& sourcePrecedence
+        const CatalogSourcePrecedence& sourcePrecedence
     );
 
 private:
@@ -201,27 +202,27 @@ private:
     );
 
     [[nodiscard]] static std::vector<std::string> collectContributors(
-        const CatalogCompositionMerger::MergeAccumulator& accumulator,
+        const CatalogMergeAccumulator& accumulator,
         const std::vector<std::size_t>& positions,
-        const CatalogCompositionMerger::SourcePrecedence& sourcePrecedence
+        const CatalogSourcePrecedence& sourcePrecedence
     );
     static void absorbSurvivors(
         BaseCelestialBody& winner,
         CatalogFieldOrigins& winnerOrigins,
-        const CatalogCompositionMerger::MergeAccumulator& accumulator,
+        const CatalogMergeAccumulator& accumulator,
         std::vector<std::size_t> positions,
-        const CatalogCompositionMerger::SourcePrecedence& sourcePrecedence
+        const CatalogSourcePrecedence& sourcePrecedence
     );
     template <typename WinnerBody>
     static std::size_t appendAbsorbedSurvivor(
-        CatalogCompositionMerger::MergeAccumulator& accumulator,
+        CatalogMergeAccumulator& accumulator,
         CatalogIdentityIndex& index,
         WinnerBody winner,
         CatalogFieldOrigins winnerOrigins,
         const std::vector<std::size_t>& absorbedPositions,
         std::string sourceId,
         std::vector<std::string> priorContributors,
-        const CatalogCompositionMerger::SourcePrecedence& sourcePrecedence
+        const CatalogSourcePrecedence& sourcePrecedence
     );
 };
 

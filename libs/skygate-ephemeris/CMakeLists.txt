@@ -191,10 +191,12 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogIdentityAbsorption.hpp
     src/catalog/CatalogLoadDiagnostics.hpp
     src/catalog/CatalogLoadResult.hpp
+    src/catalog/CatalogMergeAccumulator.hpp
     src/catalog/CatalogSchemaDescriptor.hpp
     src/catalog/CatalogSchemaRegistry.hpp
     src/catalog/CatalogSelectionMode.hpp
     src/catalog/CatalogSelectionOptions.hpp
+    src/catalog/CatalogSourcePrecedence.hpp
     src/catalog/CatalogSourceRequest.hpp
     src/catalog/CatalogSourceType.hpp
     src/trail/BodyTrailCalculator.hpp
