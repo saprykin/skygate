@@ -27,6 +27,8 @@ class Vector3dTests final : public QObject {
 private slots:
     void reportsFiniteComponents();
     void computesLengthAndNormalization();
+    void rescalesVectorToTargetLength();
+    void rejectsDegenerateTargetLengths();
     void rejectsZeroAndNonFiniteNormalization();
     void computesDotAndCrossProducts();
     void supportsArithmeticOperators();
@@ -52,6 +54,39 @@ void Vector3dTests::computesLengthAndNormalization()
     const std::optional<skygate::core::Vector3d> normalized = vector.normalized();
     QVERIFY(normalized.has_value());
     compareVector(*normalized, {.x = 2.0 / 7.0, .y = 3.0 / 7.0, .z = 6.0 / 7.0});
+}
+
+void Vector3dTests::rescalesVectorToTargetLength()
+{
+    const skygate::core::Vector3d vector{.x = 2.0, .y = 3.0, .z = 6.0};
+
+    const std::optional<skygate::core::Vector3d> grown = vector.withLength(14.0);
+    QVERIFY(grown.has_value());
+    compareVector(*grown, {.x = 4.0, .y = 6.0, .z = 12.0});
+    QVERIFY(isNear(grown->length(), 14.0));
+
+    const std::optional<skygate::core::Vector3d> shrunk = vector.withLength(3.5);
+    QVERIFY(shrunk.has_value());
+    compareVector(*shrunk, {.x = 1.0, .y = 1.5, .z = 3.0});
+}
+
+void Vector3dTests::rejectsDegenerateTargetLengths()
+{
+    const skygate::core::Vector3d vector{.x = 2.0, .y = 3.0, .z = 6.0};
+    const skygate::core::Vector3d nonFiniteVector{
+        .x = std::numeric_limits<double>::quiet_NaN(),
+        .y = 0.0,
+        .z = 0.0,
+    };
+
+    QVERIFY(!vector.withLength(0.0).has_value());
+    QVERIFY(!vector.withLength(-1.0).has_value());
+    QVERIFY(!vector.withLength(std::numeric_limits<double>::min()).has_value());
+    QVERIFY(!vector.withLength(std::numeric_limits<double>::denorm_min()).has_value());
+    QVERIFY(!vector.withLength(std::numeric_limits<double>::infinity()).has_value());
+    QVERIFY(!vector.withLength(std::numeric_limits<double>::quiet_NaN()).has_value());
+    QVERIFY(!skygate::core::Vector3d{}.withLength(1.0).has_value());
+    QVERIFY(!nonFiniteVector.withLength(1.0).has_value());
 }
 
 void Vector3dTests::rejectsZeroAndNonFiniteNormalization()

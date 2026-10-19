@@ -12,6 +12,7 @@ struct Vector3d final {
     [[nodiscard]] bool isFinite() const noexcept;
     [[nodiscard]] double length() const noexcept;
     [[nodiscard]] std::optional<Vector3d> normalized() const noexcept;
+    [[nodiscard]] std::optional<Vector3d> withLength(double targetLength) const noexcept;
     [[nodiscard]] Vector3d scaled(double scale) const noexcept;
     [[nodiscard]] double dot(const Vector3d& other) const noexcept;
     [[nodiscard]] Vector3d cross(const Vector3d& other) const noexcept;
