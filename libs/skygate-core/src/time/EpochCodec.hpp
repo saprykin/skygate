@@ -13,6 +13,7 @@ public:
     [[nodiscard]] static AstronomicalEpoch epochFromUtcTimeExact(const UtcTimePoint& utcTime) noexcept;
     [[nodiscard]] static UtcTimePoint utcTimeFromEpoch(const AstronomicalEpoch& epoch) noexcept;
     [[nodiscard]] static AstronomicalEpoch epochFromNtpTimestamp(std::uint64_t ntpTimestamp) noexcept;
+    [[nodiscard]] static AstronomicalEpoch j2000Epoch(TimeScale scale) noexcept;
     [[nodiscard]] static double julianDayFromUtc(const UtcTimePoint& utcTime) noexcept;
     [[nodiscard]] static double julianDayFromEpoch(const AstronomicalEpoch& epoch) noexcept;
     [[nodiscard]] static double julianDateFromDaysSinceUnixEpoch(double daysSinceUnix) noexcept;

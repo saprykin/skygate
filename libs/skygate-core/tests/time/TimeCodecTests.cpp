@@ -59,6 +59,7 @@ private slots:
     void epochCodecMapsJ2000UtcToJulianDate();
     void epochCodecRoundTripsUtcAndEpoch();
     void epochCodecDaysSinceJ2000FromEpoch();
+    void epochCodecBuildsJ2000EpochAtRequestedScale();
     void epochCodecRoundTripKeepsOriginalGrouping();
     void epochCodecMapsNtpTimestamps();
     void astronomicalEpochAddsSecondsAndNormalizes();
@@ -173,6 +174,24 @@ void TimeCodecTests::epochCodecDaysSinceJ2000FromEpoch()
         .timeScale = skygate::core::TimeScale::Tt,
     };
     QCOMPARE(skygate::core::EpochCodec::daysSinceJ2000(offsetEpoch), 1.25);
+}
+
+void TimeCodecTests::epochCodecBuildsJ2000EpochAtRequestedScale()
+{
+    const skygate::core::AstronomicalEpoch terrestrialTime =
+        skygate::core::EpochCodec::j2000Epoch(skygate::core::TimeScale::Tt);
+    QCOMPARE(terrestrialTime.sortKey(), skygate::core::TimeConstants::kJulianDateJ2000);
+    QCOMPARE(terrestrialTime.julianDatePart2, 0.0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(terrestrialTime.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tt)
+    );
+
+    const skygate::core::AstronomicalEpoch universalTime =
+        skygate::core::EpochCodec::j2000Epoch(skygate::core::TimeScale::Utc);
+    QCOMPARE(universalTime.sortKey(), skygate::core::TimeConstants::kJulianDateJ2000);
+    QCOMPARE(
+        static_cast<std::uint8_t>(universalTime.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Utc)
+    );
 }
 
 void TimeCodecTests::epochCodecRoundTripKeepsOriginalGrouping()

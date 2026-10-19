@@ -10,6 +10,7 @@
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogStarAstrometry.hpp"
 #include "catalog/IStarCatalog.hpp"
+#include "time/EpochCodec.hpp"
 #include "time/TimeScale.hpp"
 
 #include <algorithm>
@@ -163,11 +164,7 @@ CatalogCompositionResult CatalogMergeTestSupport::composeAll(const std::vector<c
 
 skygate::core::AstronomicalEpoch CatalogMergeTestSupport::j2000Epoch()
 {
-    return {
-        .julianDatePart1 = 2'451'545.0,
-        .julianDatePart2 = 0.0,
-        .timeScale = TimeScale::Tt,
-    };
+    return skygate::core::EpochCodec::j2000Epoch(TimeScale::Tt);
 }
 
 // Gives a star row a reference position and reference epoch that agree with
