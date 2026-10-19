@@ -9,6 +9,11 @@
 
 #include <cstddef>
 
+namespace skygate::ui::internal {
+struct SkyCatalogSourceDescriptor;
+struct SkyCatalogSourcePersistEntry;
+}  // namespace skygate::ui::internal
+
 // One persisted catalog source. instanceId is the durable identity; the
 // remaining fields reconstruct the configured source without re-downloading
 // it. payload/binaryPayload are written to sidecar cache files rather than
@@ -39,4 +44,20 @@ struct SkyCatalogSourceCacheRecord final {
     QByteArray constellationAnchorGroupRows;
     int constellationLineSchemaVersion = 0;
     std::size_t constellationCount = 0;
+
+    // The stored record for a source configured from a preset descriptor. The
+    // descriptor supplies the configuration; the identity is the one a source
+    // adopted from the legacy two-slot cache, because a descriptor carries no
+    // durable ID of its own.
+    [[nodiscard]] static SkyCatalogSourceCacheRecord fromDescriptor(
+        const skygate::ui::internal::SkyCatalogSourceDescriptor& descriptor,
+        skygate::ephemeris::CatalogCompositionPolicy policy
+    );
+
+    // The stored record for one persist entry. A bundled source keeps its
+    // configuration only; every other source stores the entry's payload and
+    // the binary sidecar serialized from the catalog it borrows, which stays
+    // owned by the caller.
+    [[nodiscard]] static SkyCatalogSourceCacheRecord
+    fromPersistEntry(const skygate::ui::internal::SkyCatalogSourcePersistEntry& entry);
 };

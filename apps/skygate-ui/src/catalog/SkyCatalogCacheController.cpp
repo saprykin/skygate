@@ -352,18 +352,11 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
         const std::optional<SkyCatalogSourceDescriptor> descriptor =
             SkyCatalogPresets::starSourceDescriptor(QStringLiteral("bundled"));
         if (descriptor.has_value()) {
-            SkyCatalogSourceCacheRecord record;
-            record.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
-            record.enabled = true;
-            record.bundled = true;
-            const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::fromDescriptor(*descriptor);
-            record.instanceId = SkyCatalogSourceInstance::migratedLegacyInstanceId(instance);
-            record.descriptorId = descriptor->sourceId;
-            record.title = descriptor->title;
-            record.version = descriptor->version;
-            record.schemaHint = descriptor->schemaHint;
-            record.attribution = descriptor->attribution;
-            appendRecord(std::move(record));
+            appendRecord(
+                SkyCatalogSourceCacheRecord::fromDescriptor(
+                    *descriptor, skygate::ephemeris::CatalogCompositionPolicy::Merge
+                )
+            );
         }
     } else {
         SkyCatalogSourceCacheRecord record;
@@ -373,16 +366,9 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
             const std::optional<SkyCatalogSourceDescriptor> descriptor =
                 SkyCatalogPresets::starSourceDescriptor(QStringLiteral("hyg_v42"));
             if (descriptor.has_value()) {
-                const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::fromDescriptor(*descriptor);
-                record.instanceId = SkyCatalogSourceInstance::migratedLegacyInstanceId(instance);
-                record.descriptorId = descriptor->sourceId;
-                record.title = descriptor->title;
-                record.version = descriptor->version;
-                record.urls = descriptor->urls;
-                record.relatedDatasetUrls = descriptor->relatedDatasetUrls;
-                record.archiveSelector = descriptor->archiveSelector;
-                record.schemaHint = descriptor->schemaHint;
-                record.attribution = descriptor->attribution;
+                record = SkyCatalogSourceCacheRecord::fromDescriptor(
+                    *descriptor, skygate::ephemeris::CatalogCompositionPolicy::Merge
+                );
             }
         } else {
             const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::createCustom(catalogUrlText);
@@ -411,16 +397,9 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
             const std::optional<SkyCatalogSourceDescriptor> descriptor =
                 SkyCatalogPresets::deepSkySourceDescriptor(QStringLiteral("open_ngc"));
             if (descriptor.has_value()) {
-                const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::fromDescriptor(*descriptor);
-                record.instanceId = SkyCatalogSourceInstance::migratedLegacyInstanceId(instance);
-                record.descriptorId = descriptor->sourceId;
-                record.title = descriptor->title;
-                record.version = descriptor->version;
-                record.urls = descriptor->urls;
-                record.relatedDatasetUrls = descriptor->relatedDatasetUrls;
-                record.archiveSelector = descriptor->archiveSelector;
-                record.schemaHint = descriptor->schemaHint;
-                record.attribution = descriptor->attribution;
+                record = SkyCatalogSourceCacheRecord::fromDescriptor(
+                    *descriptor, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly
+                );
             }
         } else {
             const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::createCustom(deepSkyCatalogUrlText);
@@ -491,31 +470,7 @@ void SkyCatalogCacheController::persistCollection(const SkyCatalogCollectionPers
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
 
     for (const SkyCatalogSourcePersistEntry& source : request.sources) {
-        SkyCatalogSourceCacheRecord record;
-        record.instanceId = source.instanceId;
-        record.descriptorId = source.descriptorId;
-        record.title = source.title;
-        record.version = source.version;
-        record.url = source.url;
-        record.urls = source.urls;
-        record.relatedDatasetUrls = source.relatedDatasetUrls;
-        record.archiveSelector = source.archiveSelector;
-        record.schemaHint = source.schemaHint;
-        record.attribution = source.attribution;
-        record.policy = source.policy;
-        record.enabled = source.enabled;
-        record.bundled = source.bundled;
-        if (!source.bundled) {
-            record.payload = source.payload;
-            if (source.catalog != nullptr) {
-                record.binaryPayload = skygate::ephemeris::CatalogBinaryCodec::serialize(source.catalog->catalog());
-            }
-        }
-        record.constellationLineRows = source.constellationLineRows;
-        record.constellationAnchorGroupRows = source.constellationAnchorGroupRows;
-        record.constellationLineSchemaVersion = source.constellationLineSchemaVersion;
-        record.constellationCount = source.constellationCount;
-        snapshot.sources.push_back(std::move(record));
+        snapshot.sources.push_back(SkyCatalogSourceCacheRecord::fromPersistEntry(source));
     }
 
     // An empty request is persisted as an intentionally empty collection so
