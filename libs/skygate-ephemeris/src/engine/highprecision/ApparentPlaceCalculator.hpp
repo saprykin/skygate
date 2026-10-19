@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FrameTransformBatcher.hpp"
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
 #include "IApparentPlaceCalculator.hpp"
@@ -7,6 +8,8 @@
 #include "StarAstrometryBatchResult.hpp"
 
 #include <memory>
+#include <span>
+#include <vector>
 
 namespace skygate::ephemeris {
 class ITimeScaleService;
@@ -39,6 +42,12 @@ public:
     ) const override;
 
 private:
+    [[nodiscard]] std::vector<StarAstrometryBatchResult> processItems(
+        const EphemerisRequest& request,
+        const std::shared_ptr<const PreparedEphemerisRequestState>& preparedRequestState,
+        std::span<FrameTransformBatcher::Item> items
+    ) const;
+
     std::shared_ptr<const IFrameTransformer> m_frameTransformer;
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_timeScaleService;
     std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> m_earthOrientationProvider;
