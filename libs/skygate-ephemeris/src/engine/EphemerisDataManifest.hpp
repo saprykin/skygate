@@ -78,9 +78,6 @@ public:
     [[nodiscard]] const Profile* profile(std::string_view id) const noexcept;
     [[nodiscard]] const Asset* asset(std::string_view id) const noexcept;
     [[nodiscard]] static ParseResult parse(std::string_view payload);
-
-private:
-    class Parser;
 };
 
 struct EphemerisDataManifest::ParseResult {
