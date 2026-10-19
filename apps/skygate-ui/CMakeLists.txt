@@ -148,6 +148,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/SkyCatalogCollectionStore.cpp
     src/catalog/SkyCatalogCollectionStore.hpp
     src/catalog/SkyCatalogLegacyCacheSnapshot.hpp
+    src/catalog/SkyCatalogLegacySlot.cpp
+    src/catalog/SkyCatalogLegacySlot.hpp
     src/catalog/SkyCatalogSourceCachePaths.cpp
     src/catalog/SkyCatalogSourceCachePaths.hpp
     src/catalog/SkyCatalogSourceCacheRecord.cpp
@@ -171,6 +173,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/SkyCatalogImportWorkflow.hpp
     src/catalog/SkyCatalogSourceImportResult.hpp
     src/catalog/SkyCatalogSourceOperation.hpp
+    src/catalog/SkyCatalogSourceOperationRegistry.cpp
+    src/catalog/SkyCatalogSourceOperationRegistry.hpp
     src/catalog/SkyCatalogSourcePersistEntry.hpp
     src/catalog/SkyCatalogSourceRestoreEntry.hpp
     src/catalog/SkyConstellationLineImportResult.cpp
