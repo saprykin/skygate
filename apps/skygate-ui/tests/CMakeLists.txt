@@ -457,6 +457,10 @@ add_skygate_ui_qtest(skygate-ui-sky-object-trail-guidance-tests selection/SkyObj
 add_skygate_ui_qtest(skygate-ui-sky-render-builders-tests render/SkyRenderBuildersTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-catalog-internals-tests catalog/SkyCatalogInternalsTests.cpp)
 add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-source-operation-registry-tests
+    catalog/SkyCatalogSourceOperationRegistryTests.cpp
+)
+add_skygate_ui_qtest(
     skygate-ui-sky-catalog-source-descriptor-tests
     catalog/SkyCatalogSourceDescriptorTests.cpp
 )

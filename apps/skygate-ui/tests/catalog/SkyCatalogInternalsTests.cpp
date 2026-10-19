@@ -1,7 +1,11 @@
 #include "catalog/SkyCatalogConstellationStore.hpp"
 #include "catalog/SkyCatalogImportStatus.hpp"
+#include "catalog/SkyCatalogLegacySlot.hpp"
+#include "catalog/SkyCatalogPresets.hpp"
+#include "catalog/SkyCatalogSourceIds.hpp"
 #include "catalog/SkyCatalogText.hpp"
 
+#include <QStringList>
 #include <QtTest/QtTest>
 
 #include <cstdint>
@@ -18,6 +22,8 @@ private slots:
     void catalogImportStatusKeepsPhaseIndependentOfText();
     void constellationStoreKeepsCustomRefsAndCounts();
     void constellationStoreClearDropsRefsAndCounts();
+    void legacySlotNormalizesPresetIndexAndUrl();
+    void legacySlotResolvesEntryPoints();
 };
 
 void SkyCatalogInternalsTests::catalogTextFormatsStableStatusMessages()
@@ -136,6 +142,74 @@ void SkyCatalogInternalsTests::constellationStoreClearDropsRefsAndCounts()
     // Clearing an already empty store is not a data change.
     QVERIFY(!store.clear());
     QCOMPARE(store.revision(), std::uint64_t{2});
+}
+
+void SkyCatalogInternalsTests::legacySlotNormalizesPresetIndexAndUrl()
+{
+    using skygate::ui::internal::SkyCatalogLegacySlot;
+    using skygate::ui::internal::SkyCatalogPresets;
+
+    SkyCatalogLegacySlot slot;
+    QCOMPARE(slot.catalogPresetIndex(), 0);
+    QCOMPARE(slot.deepSkyCatalogPresetIndex(), 0);
+    QCOMPARE(slot.catalogUrlText(), SkyCatalogPresets::defaultCatalogUrlText());
+    QCOMPARE(slot.deepSkyCatalogUrlText(), SkyCatalogPresets::defaultDeepSkyCatalogUrlText());
+
+    slot.setCatalogPresetIndex(3);
+    QCOMPARE(slot.catalogPresetIndex(), 1);
+    slot.setCatalogPresetIndex(-4);
+    QCOMPARE(slot.catalogPresetIndex(), 0);
+    slot.setDeepSkyCatalogPresetIndex(7);
+    QCOMPARE(slot.deepSkyCatalogPresetIndex(), SkyCatalogPresets::kCustomLegacyPresetIndex);
+
+    slot.setCatalogUrlText(QStringLiteral("  https://example.test/stars.csv  "));
+    QCOMPARE(slot.catalogUrlText(), QStringLiteral("https://example.test/stars.csv"));
+    slot.setCatalogUrlText(QString());
+    QCOMPARE(slot.catalogUrlText(), SkyCatalogPresets::defaultCatalogUrlText());
+    slot.setDeepSkyCatalogUrlText(QStringLiteral(" file:///tmp/deep.csv "));
+    QCOMPARE(slot.deepSkyCatalogUrlText(), QStringLiteral("file:///tmp/deep.csv"));
+    slot.setDeepSkyCatalogUrlText(QStringLiteral("   "));
+    QCOMPARE(slot.deepSkyCatalogUrlText(), SkyCatalogPresets::defaultDeepSkyCatalogUrlText());
+}
+
+void SkyCatalogInternalsTests::legacySlotResolvesEntryPoints()
+{
+    using skygate::ephemeris::CatalogCompositionPolicy;
+    using skygate::ui::internal::SkyCatalogLegacySlot;
+    using skygate::ui::internal::SkyCatalogPresets;
+    using skygate::ui::internal::SkyCatalogSourceIds;
+    using skygate::ui::internal::SkyCatalogText;
+
+    SkyCatalogLegacySlot slot;
+
+    // A bundled preset selects its source but keeps the slot's URL text.
+    const SkyCatalogLegacySlot::Selection bundled = slot.selectCatalogPreset(QStringLiteral("bundled"));
+    QVERIFY(bundled.source.has_value());
+    QVERIFY(bundled.statusText.isEmpty());
+    QCOMPARE(bundled.source->instanceId, QString::fromLatin1(SkyCatalogSourceIds::kPrimarySlot));
+    QCOMPARE(bundled.source->descriptorId, QStringLiteral("bundled"));
+    QCOMPARE(bundled.policy, CatalogCompositionPolicy::Merge);
+    QCOMPARE(slot.catalogPresetIndex(), 0);
+    QCOMPARE(slot.catalogUrlText(), SkyCatalogPresets::defaultCatalogUrlText());
+
+    const SkyCatalogLegacySlot::Selection unknownPreset = slot.selectCatalogPreset(QStringLiteral("missing"));
+    QVERIFY(!unknownPreset.source.has_value());
+    QCOMPARE(unknownPreset.statusText, SkyCatalogText::unknownCatalogPreset(QStringLiteral("missing")));
+
+    // A custom URL records the selection and selects a source for its slot.
+    const SkyCatalogLegacySlot::Selection customDeepSky =
+        slot.selectDeepSkyCatalogUrl(QStringLiteral(" file:///tmp/deep.csv "));
+    QVERIFY(customDeepSky.source.has_value());
+    QVERIFY(customDeepSky.statusText.isEmpty());
+    QCOMPARE(customDeepSky.source->instanceId, QString::fromLatin1(SkyCatalogSourceIds::kDeepSkySlot));
+    QCOMPARE(customDeepSky.policy, CatalogCompositionPolicy::DeepSkyOnly);
+    QCOMPARE(customDeepSky.source->urls, QStringList{QStringLiteral("file:///tmp/deep.csv")});
+    QCOMPARE(slot.deepSkyCatalogPresetIndex(), SkyCatalogPresets::kCustomLegacyPresetIndex);
+    QCOMPARE(slot.deepSkyCatalogUrlText(), QStringLiteral("file:///tmp/deep.csv"));
+
+    const SkyCatalogLegacySlot::Selection unknownDeepSky = slot.selectDeepSkyCatalogPreset(QStringLiteral("missing"));
+    QVERIFY(!unknownDeepSky.source.has_value());
+    QCOMPARE(unknownDeepSky.statusText, SkyCatalogText::unknownDeepSkyPreset(QStringLiteral("missing")));
 }
 
 QTEST_APPLESS_MAIN(SkyCatalogInternalsTests)

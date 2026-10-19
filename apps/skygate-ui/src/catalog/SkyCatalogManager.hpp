@@ -1,11 +1,13 @@
 #pragma once
 
 #include "SkyCatalogImportStatus.hpp"
+#include "SkyCatalogLegacySlot.hpp"
 #include "SkyCatalogRuntimeBuildOptions.hpp"
 #include "SkyCatalogRuntimeResult.hpp"
 #include "SkyCatalogSourceImportResult.hpp"
 #include "SkyCatalogSourceInstance.hpp"
 #include "SkyCatalogSourceOperation.hpp"
+#include "SkyCatalogSourceOperationRegistry.hpp"
 #include "SkyCatalogSourceRecord.hpp"
 #include "SkyConstellationLineImportResult.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
@@ -43,9 +45,11 @@ struct SkyCatalogSourceInstance;
 // One operation record per source instance carries a monotonic operation
 // revision, so a response captured for a superseded incarnation can never
 // apply to its successor while unrelated instances keep their pending work.
-// Active composition and related-data ownership live in SkyCatalogRuntime;
-// persistence and legacy migration live in SkyCatalogCacheController. Only an
-// accepted transition persists state and emits catalogChanged.
+// The records and their revisions live in SkyCatalogSourceOperationRegistry;
+// the legacy two-slot controls live in SkyCatalogLegacySlot. Active composition
+// and related-data ownership live in SkyCatalogRuntime; persistence and legacy
+// migration live in SkyCatalogCacheController. Only an accepted transition
+// persists state and emits catalogChanged.
 //
 // A successful source (re)load publishes its catalog and its accepted
 // related-data state in one step: the owner's previous related dataset is
@@ -212,33 +216,10 @@ private:
         skygate::ephemeris::CatalogCompositionPolicy policy,
         const QStringList& relatedDatasetUrls
     );
-    [[nodiscard]] skygate::ui::internal::SkyCatalogSourceOperation* upsertOperation(
-        const skygate::ui::internal::SkyCatalogSourceInstance& source,
-        skygate::ephemeris::CatalogCompositionPolicy policy
-    );
-    [[nodiscard]] skygate::ui::internal::SkyCatalogSourceOperation* findOperation(const QString& instanceId);
-    [[nodiscard]] const skygate::ui::internal::SkyCatalogSourceOperation*
-    findOperation(const QString& instanceId) const;
-    void removeOperation(const QString& instanceId);
     // Clears the payload cache of every source selected by policy and keeps
     // attempting the remaining selected sources after a failure. Reports
     // whether every selected source was cleared.
     [[nodiscard]] bool clearSourceCachesForPolicy(skygate::ephemeris::CatalogCompositionPolicy policy);
-    // Marks the instance's retained in-memory payload as evicted so ordinary
-    // persistence keeps its configured record without writing its bytes back.
-    void markSourcePayloadEvicted(const QString& instanceId);
-    [[nodiscard]] bool isOperationCurrent(const QString& instanceId, std::uint64_t revision) const;
-    // Marks one instance's pending work terminal: the revision advances first
-    // so a completion that runs during the abort is already stale, then both
-    // owned transfers are canceled and released, and pending related state is
-    // reset. Other instances keep their revisions and their in-flight work.
-    void retireSourceOperation(skygate::ui::internal::SkyCatalogSourceOperation& operation);
-    // Retires the instance's pending work before its record is replaced or
-    // erased.
-    void invalidatePendingSourceWork(const QString& instanceId);
-    // Retires every instance's pending work; only the global cancel does.
-    void invalidateAllPendingSourceWork();
-    [[nodiscard]] bool hasPendingConstellationWork() const;
     void setSourceEnabled(const QString& instanceId, bool enabled);
     void setStatusText(const QString& statusText);
     void setDownloadingCatalog(bool downloadingCatalog);
@@ -258,6 +239,9 @@ private:
         const QString& catalogSummaryText,
         skygate::ui::internal::SkyConstellationLineImportResult lineResult
     );
+    // Applies a legacy slot entry point: an unknown preset reports its status
+    // text, a resolved selection is activated like any other source request.
+    void activateLegacySlotSelection(const skygate::ui::internal::SkyCatalogLegacySlot::Selection& selection);
     [[nodiscard]] skygate::ui::internal::SkyCatalogRuntimeBuildOptions runtimeBuildOptions() const;
     void applyRuntimeResult(const skygate::ui::internal::SkyCatalogRuntimeResult& result);
     void persistCatalogCache() const;
@@ -267,17 +251,8 @@ private:
     std::unique_ptr<skygate::ui::internal::SkyCatalogCacheController> m_cacheController;
     std::unique_ptr<skygate::ui::internal::SkyCatalogImportWorkflow> m_importWorkflow;
     QString m_statusText;
-    int m_catalogPresetIndex = 0;
-    int m_deepSkyCatalogPresetIndex = 0;
-    QString m_catalogUrlText;
-    QString m_deepSkyCatalogUrlText;
+    skygate::ui::internal::SkyCatalogLegacySlot m_legacySlot;
     bool m_downloadingCatalog = false;
     bool m_catalogProcessing = false;
-    QString m_activeDownloadInstanceId;
-    QVector<skygate::ui::internal::SkyCatalogSourceOperation> m_sourceOperations;
-    // Monotonic source of operation revisions. A revision is never reused, so
-    // a callback captured for one incarnation of an instance can never match
-    // the operation that supersedes it, not even when the same instance ID is
-    // removed and added again.
-    std::uint64_t m_nextOperationRevision = 0;
+    skygate::ui::internal::SkyCatalogSourceOperationRegistry m_operations;
 };
