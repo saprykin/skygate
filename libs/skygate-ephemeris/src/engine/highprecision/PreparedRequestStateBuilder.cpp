@@ -1,15 +1,15 @@
 #include "PreparedRequestStateBuilder.hpp"
-#include "EphemerisTimeScaleMetadataMerger.hpp"
 #include "engine/EarthOrientationSampler.hpp"
+#include "EpochScaleResolver.hpp"
 #include "EphemerisMetadataFailurePolicy.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "ICalcephKernel.hpp"
 #include "NaifBodyIds.hpp"
-#include "engine/IEarthOrientationProvider.hpp"
-#include "engine/ITimeScaleService.hpp"
 #include "ObserverGeodesy.hpp"
 #include "PreparedEphemerisRequestState.hpp"
 #include "engine/EphemerisCorrectionFlags.hpp"
+#include "engine/IEarthOrientationProvider.hpp"
+#include "engine/ITimeScaleService.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -45,29 +45,18 @@ std::shared_ptr<const PreparedEphemerisRequestState>
 PreparedRequestStateBuilder::build(const EphemerisRequest& request) const
 {
     auto preparedState = std::make_shared<PreparedEphemerisRequestState>();
-    {
-        if (request.epoch.timeScale == skygate::core::TimeScale::Tdb) {
-            preparedState->tdbKernelEpoch = request.epoch.normalized();
-        } else if (m_dependencies.timeScaleService == nullptr) {
-            preparedState->tdbKernelEpochMetadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-            preparedState->tdbKernelEpochMetadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
-        } else {
-            const TimeScaleConversionResult conversion =
-                m_dependencies.timeScaleService->convert(request.epoch, skygate::core::TimeScale::Tdb);
-            EphemerisTimeScaleMetadataMerger::mergeKernelEpochTimeScaleMetadata(
-                preparedState->tdbKernelEpochMetadata, conversion
-            );
-            if (conversion.isSuccess()) {
-                preparedState->tdbKernelEpoch = conversion.epoch.normalized();
-            }
-        }
+    preparedState->tdbKernelEpoch = EpochScaleResolver::resolve(
+        preparedState->tdbKernelEpochMetadata,
+        request.epoch,
+        m_dependencies.timeScaleService,
+        EphemerisMetadataFailurePolicy::MarkDegraded
+    );
 
-        if (requestsAnnualParallaxState(request) && preparedState->tdbKernelEpoch.has_value()
-            && m_dependencies.calcephKernel != nullptr) {
-            preparedState->annualParallaxEarthState = m_dependencies.calcephKernel->compute(
-                *preparedState->tdbKernelEpoch, NaifBodyIds::kEarth, NaifBodyIds::kSolarSystemBarycenter
-            );
-        }
+    if (requestsAnnualParallaxState(request) && preparedState->tdbKernelEpoch.has_value()
+        && m_dependencies.calcephKernel != nullptr) {
+        preparedState->annualParallaxEarthState = m_dependencies.calcephKernel->compute(
+            *preparedState->tdbKernelEpoch, NaifBodyIds::kEarth, NaifBodyIds::kSolarSystemBarycenter
+        );
     }
 
     if (requestsTopocentricState(request) && m_dependencies.timeScaleService != nullptr) {

@@ -20,6 +20,19 @@ namespace {
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 
+[[nodiscard]] EphemerisRequest makeKernelEpochRequest()
+{
+    EphemerisRequest request;
+    request.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'460'310.5,
+        .julianDatePart2 = 0.25,
+        .timeScale = skygate::core::TimeScale::Tt,
+    };
+    request.options.setEngineKind(EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::noCorrections());
+    return request;
+}
+
 [[nodiscard]] EphemerisRequest makeTopocentricRequest()
 {
     EphemerisRequest request;
@@ -67,6 +80,38 @@ private:
     mutable int m_convertCallCount = 0;
 };
 
+class TdbApproximationTimeScaleService final : public ITimeScaleService {
+public:
+    [[nodiscard]] TimeScaleConversionResult
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
+    {
+        ++m_convertCallCount;
+        TimeScaleConversionResult result;
+        result.epoch = epoch;
+        result.epoch.timeScale = targetScale;
+        result.status = TimeScaleConversionStatus::Type::Degraded;
+        result.addWarning(TimeScaleConversionWarningCode::Type::TdbApproximationApplied);
+        return result;
+    }
+
+    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
+    ) const override
+    {
+        static_cast<void>(dateTime);
+        static_cast<void>(targetScale);
+        return {};
+    }
+
+    [[nodiscard]] int convertCallCount() const noexcept
+    {
+        return m_convertCallCount;
+    }
+
+private:
+    mutable int m_convertCallCount = 0;
+};
+
 }  // namespace
 
 class PreparedRequestStateBuilderTests final : public QObject {
@@ -74,6 +119,9 @@ class PreparedRequestStateBuilderTests final : public QObject {
 
 private slots:
     void marksTopocentricConversionFailureAsFailed();
+    void degradesKernelEpochWithoutTimeScaleService();
+    void keepsTdbApproximationConversionSilent();
+    void reportsFailedKernelEpochConversion();
 };
 
 void PreparedRequestStateBuilderTests::marksTopocentricConversionFailureAsFailed()
@@ -104,6 +152,79 @@ void PreparedRequestStateBuilderTests::marksTopocentricConversionFailureAsFailed
         )
     );
     QCOMPARE(timeScaleService->convertCallCount(), 2);
+}
+
+void PreparedRequestStateBuilderTests::degradesKernelEpochWithoutTimeScaleService()
+{
+    const PreparedRequestStateBuilder builder(
+        PreparedRequestStateBuilder::Dependencies{
+            .calcephKernel = nullptr,
+            .timeScaleService = nullptr,
+            .earthOrientationProvider = nullptr,
+        }
+    );
+
+    const std::shared_ptr<const PreparedEphemerisRequestState> preparedState = builder.build(makeKernelEpochRequest());
+
+    QVERIFY(preparedState != nullptr);
+    QVERIFY(!preparedState->tdbKernelEpoch.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(preparedState->tdbKernelEpochMetadata.status),
+        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Degraded)
+    );
+    QVERIFY(preparedState->tdbKernelEpochMetadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
+}
+
+void PreparedRequestStateBuilderTests::keepsTdbApproximationConversionSilent()
+{
+    auto timeScaleService = std::make_shared<TdbApproximationTimeScaleService>();
+    const PreparedRequestStateBuilder builder(
+        PreparedRequestStateBuilder::Dependencies{
+            .calcephKernel = nullptr,
+            .timeScaleService = timeScaleService,
+            .earthOrientationProvider = nullptr,
+        }
+    );
+
+    const std::shared_ptr<const PreparedEphemerisRequestState> preparedState = builder.build(makeKernelEpochRequest());
+
+    QVERIFY(preparedState != nullptr);
+    QCOMPARE(timeScaleService->convertCallCount(), 1);
+    QVERIFY(preparedState->tdbKernelEpoch.has_value());
+    const skygate::core::AstronomicalEpoch expectedTdbEpoch{
+        .julianDatePart1 = 2'460'310.0,
+        .julianDatePart2 = 0.75,
+        .timeScale = skygate::core::TimeScale::Tdb,
+    };
+    QCOMPARE(*preparedState->tdbKernelEpoch, expectedTdbEpoch);
+    QCOMPARE(
+        static_cast<std::uint8_t>(preparedState->tdbKernelEpochMetadata.status),
+        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Valid)
+    );
+    QVERIFY(!preparedState->tdbKernelEpochMetadata.warningCodeMask.hasAny());
+}
+
+void PreparedRequestStateBuilderTests::reportsFailedKernelEpochConversion()
+{
+    auto timeScaleService = std::make_shared<FailingTimeScaleService>();
+    const PreparedRequestStateBuilder builder(
+        PreparedRequestStateBuilder::Dependencies{
+            .calcephKernel = nullptr,
+            .timeScaleService = timeScaleService,
+            .earthOrientationProvider = nullptr,
+        }
+    );
+
+    const std::shared_ptr<const PreparedEphemerisRequestState> preparedState = builder.build(makeKernelEpochRequest());
+
+    QVERIFY(preparedState != nullptr);
+    QCOMPARE(timeScaleService->convertCallCount(), 1);
+    QVERIFY(!preparedState->tdbKernelEpoch.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(preparedState->tdbKernelEpochMetadata.status),
+        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Degraded)
+    );
+    QVERIFY(preparedState->tdbKernelEpochMetadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
 }
 
 QTEST_APPLESS_MAIN(PreparedRequestStateBuilderTests)

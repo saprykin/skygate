@@ -1,9 +1,11 @@
 #include "HighPrecisionEphemerisEngine.hpp"
 #include "EphemerisCacheGateway.hpp"
+#include "EphemerisMetadataFailurePolicy.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "EphemerisResultBuilder.hpp"
 #include "EphemerisTimeScaleMetadataMerger.hpp"
+#include "EpochScaleResolver.hpp"
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
 #include "IApparentPlaceCalculator.hpp"
@@ -88,7 +90,7 @@ constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris 
     }
 
     fallbackState->metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-    fallbackState->metadata.warningCodeMask |= originalResult.metadata.warningCodeMask;
+    fallbackState->metadata.warningCodeMask.merge(originalResult.metadata.warningCodeMask);
     fallbackState->metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
     fallbackState->metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
     EphemerisTimeScaleMetadataMerger::mergeKernelEpochTimeScaleMetadata(fallbackState->metadata, conversion);
@@ -143,27 +145,14 @@ resultBuilder(const HighPrecisionEphemerisEngine::Dependencies& dependencies)
     const std::shared_ptr<const ITimeScaleService>& timeScaleService
 )
 {
-    if (request.epoch.timeScale == skygate::core::TimeScale::Tdb) {
-        return request.epoch.normalized();
-    }
     if (preparedState != nullptr && preparedState->tdbKernelEpoch.has_value()) {
         EphemerisMetadataMerger::merge(metadata, preparedState->tdbKernelEpochMetadata);
         return preparedState->tdbKernelEpoch;
     }
-    if (timeScaleService == nullptr) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
-        return std::nullopt;
-    }
 
-    const TimeScaleConversionResult conversion =
-        timeScaleService->convert(request.epoch, skygate::core::TimeScale::Tdb);
-    EphemerisTimeScaleMetadataMerger::mergeKernelEpochTimeScaleMetadata(metadata, conversion);
-    if (!conversion.isSuccess()) {
-        return std::nullopt;
-    }
-
-    return conversion.epoch.normalized();
+    return EpochScaleResolver::resolve(
+        metadata, request.epoch, timeScaleService, EphemerisMetadataFailurePolicy::MarkFailed
+    );
 }
 
 [[nodiscard]] std::vector<StarAstrometryBatchResult> applyApparentPlaceBatchIfRequested(
