@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace skygate::ephemeris {
 
@@ -25,6 +26,10 @@ struct CatalogLoadResult {
         AmbiguousArchiveMember,
         SchemaHintMismatch
     };
+
+    // Wording of an error code for the status texts and the parse log. Codes
+    // outside the enumeration carry the same text as NoError.
+    [[nodiscard]] static std::string_view describeErrorCode(ErrorCode errorCode) noexcept;
 
     std::unique_ptr<IStarCatalog> catalog;
     CatalogSourceType detectedFormat = CatalogSourceType::Unknown;

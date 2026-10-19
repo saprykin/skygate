@@ -11,8 +11,10 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <utility>
 
+using skygate::ephemeris::CatalogLoadResult;
 using skygate::ui::internal::SkyCatalogImportStatus;
 using skygate::ui::internal::SkyCatalogText;
 
@@ -20,39 +22,13 @@ namespace {
 
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
-QString catalogLoadErrorDescription(const skygate::ephemeris::CatalogLoadResult::ErrorCode errorCode)
+QString catalogLoadErrorDescription(const CatalogLoadResult::ErrorCode errorCode)
 {
-    switch (errorCode) {
-    case skygate::ephemeris::CatalogLoadResult::ErrorCode::NoError:
-        return "Unknown parse failure";
-    case skygate::ephemeris::CatalogLoadResult::ErrorCode::EmptyInput:
-        return "empty payload";
-    case skygate::ephemeris::CatalogLoadResult::ErrorCode::UnsupportedFormat:
-        return "unsupported format";
-    case skygate::ephemeris::CatalogLoadResult::ErrorCode::MissingRequiredColumns:
-        return "missing required columns";
-    case skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidHygCsv:
-        return "invalid HYG CSV payload";
-    case skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv:
-        return "invalid OpenNGC CSV payload";
-    case skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidGzipData:
-        return "invalid gzip payload";
-    case skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidZipData:
-        return "invalid ZIP payload";
-    case skygate::ephemeris::CatalogLoadResult::ErrorCode::NoBodies:
-        return "catalog contains no usable bodies";
-    case skygate::ephemeris::CatalogLoadResult::ErrorCode::ArchiveMemberNotFound:
-        return "requested archive member not found";
-    case skygate::ephemeris::CatalogLoadResult::ErrorCode::AmbiguousArchiveMember:
-        return "multiple supported archive members";
-    case skygate::ephemeris::CatalogLoadResult::ErrorCode::SchemaHintMismatch:
-        return "schema hint mismatch";
-    }
-
-    return "unknown parse failure";
+    const std::string_view description = CatalogLoadResult::describeErrorCode(errorCode);
+    return QString::fromLatin1(description.data(), static_cast<qsizetype>(description.size()));
 }
 
-QString catalogLoadErrorText(const skygate::ephemeris::CatalogLoadResult& loadResult, const QString& sourceUrl)
+QString catalogLoadErrorText(const CatalogLoadResult& loadResult, const QString& sourceUrl)
 {
     QString description = catalogLoadErrorDescription(loadResult.errorCode);
     if (!loadResult.errorDetail.empty()) {
@@ -156,7 +132,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                     );
                 },
                 [sourceUrl, payload, statusHandler, completionHandler = std::move(completionHandler)](
-                    skygate::ephemeris::CatalogLoadResult loadResult
+                    CatalogLoadResult loadResult
                 ) mutable {
                     if (!loadResult.isSuccess()) {
                         DownloadResult result;

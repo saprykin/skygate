@@ -76,35 +76,55 @@ using PaletteAssigner = void (*)(Palette&, const QColor&);
 
 }  // namespace
 
-std::optional<SkyThemeDefinition>
-SkyThemeJsonCodec::parseTheme(const QByteArray& jsonBytes, const QString& sourceDescription)
+std::optional<QJsonObject> SkyThemeJsonCodec::parseObject(const QByteArray& jsonBytes, const QString& description)
 {
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(jsonBytes, &parseError);
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-        qCWarning(skygateThemeLog).noquote()
-            << "Failed to parse theme" << sourceDescription << parseError.errorString();
+        qCWarning(skygateThemeLog).noquote() << "Failed to parse" << description << parseError.errorString();
         return std::nullopt;
     }
 
-    const QJsonObject rootObject = document.object();
-    const QString id = rootObject.value("id").toString().trimmed();
-    const QString displayName = rootObject.value("displayName").toString().trimmed();
-    if (id.isEmpty() || displayName.isEmpty()) {
-        qCWarning(skygateThemeLog).noquote() << "Theme" << sourceDescription << "is missing id or displayName";
+    return document.object();
+}
+
+std::optional<QString>
+SkyThemeJsonCodec::requiredString(const QJsonObject& object, const char* key, const QString& description)
+{
+    const QString text = object.value(QString::fromUtf8(key)).toString().trimmed();
+    if (text.isEmpty()) {
+        qCWarning(skygateThemeLog).noquote() << description << "is missing a value for key" << key;
         return std::nullopt;
     }
 
-    const QJsonValue uiValue = rootObject.value("ui");
-    const QJsonValue renderValue = rootObject.value("render");
+    return text;
+}
+
+std::optional<SkyThemeDefinition>
+SkyThemeJsonCodec::parseTheme(const QByteArray& jsonBytes, const QString& sourceDescription)
+{
+    const QString documentDescription = QStringLiteral("theme %1").arg(sourceDescription);
+    const std::optional<QJsonObject> rootObject = parseObject(jsonBytes, documentDescription);
+    if (!rootObject.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::optional<QString> id = requiredString(rootObject.value(), "id", documentDescription);
+    const std::optional<QString> displayName = requiredString(rootObject.value(), "displayName", documentDescription);
+    if (!id.has_value() || !displayName.has_value()) {
+        return std::nullopt;
+    }
+
+    const QJsonValue uiValue = rootObject->value("ui");
+    const QJsonValue renderValue = rootObject->value("render");
     if (!uiValue.isObject() || !renderValue.isObject()) {
         qCWarning(skygateThemeLog).noquote() << "Theme" << sourceDescription << "is missing ui/render sections";
         return std::nullopt;
     }
 
     SkyThemeDefinition theme;
-    theme.id = id;
-    theme.displayName = displayName;
+    theme.id = id.value();
+    theme.displayName = displayName.value();
     if (!parsePalette(theme.ui, uiValue.toObject(), sourceDescription, uiAssigners())) {
         return std::nullopt;
     }

@@ -366,6 +366,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogCoordinateMerge.cpp
     src/catalog/CatalogFieldOrigins.cpp
     src/catalog/CatalogIdentityAbsorption.cpp
+    src/catalog/CatalogLoadResult.cpp
     src/catalog/CatalogSelectionOptions.cpp
     src/catalog/CatalogSchemaRegistry.cpp
     src/catalog/io/CatalogParsingUtilities.cpp

@@ -7,7 +7,6 @@
 
 #include <QFile>
 #include <QJsonArray>
-#include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QLoggingCategory>
@@ -110,30 +109,33 @@ void SkyThemeRepository::loadManifest(const QString& manifestResourcePath)
         return;
     }
 
-    QJsonParseError parseError;
-    const QJsonDocument manifestDocument = QJsonDocument::fromJson(manifestBytes.value(), &parseError);
-    if (parseError.error != QJsonParseError::NoError || !manifestDocument.isObject()) {
-        qCWarning(skygateThemeLog).noquote()
-            << "Failed to parse theme manifest" << manifestResourcePath << parseError.errorString();
+    const std::optional<QJsonObject> manifestObject = SkyThemeJsonCodec::parseObject(
+        manifestBytes.value(), QStringLiteral("theme manifest %1").arg(manifestResourcePath)
+    );
+    if (!manifestObject.has_value()) {
         return;
     }
 
-    const QJsonObject manifestObject = manifestDocument.object();
-    const QString defaultThemeId = manifestObject.value("defaultThemeId").toString().trimmed();
-    const QJsonArray themeArray = manifestObject.value("themes").toArray();
+    const QString defaultThemeId = manifestObject->value("defaultThemeId").toString().trimmed();
+    const QJsonArray themeArray = manifestObject->value("themes").toArray();
     for (const QJsonValue& themeValue : themeArray) {
         if (!themeValue.isObject()) {
             continue;
         }
 
         const QJsonObject themeObject = themeValue.toObject();
-        const QString id = themeObject.value("id").toString().trimmed();
-        const QString resourcePath = themeObject.value("resourcePath").toString().trimmed();
-        if (id.isEmpty() || resourcePath.isEmpty()) {
-            qCWarning(skygateThemeLog).noquote()
-                << "Skipping invalid theme descriptor in manifest" << manifestResourcePath;
+        const QString descriptorDescription =
+            QStringLiteral("theme descriptor in manifest %1").arg(manifestResourcePath);
+        const std::optional<QString> descriptorId =
+            SkyThemeJsonCodec::requiredString(themeObject, "id", descriptorDescription);
+        const std::optional<QString> descriptorResourcePath =
+            SkyThemeJsonCodec::requiredString(themeObject, "resourcePath", descriptorDescription);
+        if (!descriptorId.has_value() || !descriptorResourcePath.has_value()) {
             continue;
         }
+
+        const QString id = descriptorId.value();
+        const QString resourcePath = descriptorResourcePath.value();
 
         const std::optional<QByteArray> themeBytes = readResourceBytes(resourcePath, "theme");
         if (!themeBytes.has_value()) {
