@@ -12,7 +12,7 @@ namespace skygate::ephemeris::highprecision {
 
 struct PreparedEphemerisRequestState;
 
-// Turns the vectors the frame transform passes left on a batch into batch
+// Turns the vectors the frame-transform pass leaves on the batch into batch
 // results and applies atmospheric refraction behind the same gate the request
 // uses for it.
 class ApparentPlaceOutputFinalizer final {
