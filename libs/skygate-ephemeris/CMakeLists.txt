@@ -104,6 +104,7 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/EphemerisStagedUpdateVerification.cpp
     src/engine/EphemerisStagedUpdateVerificationResult.cpp
     src/engine/EphemerisDataManifest.cpp
+    src/engine/EphemerisManifestJsonReader.cpp
     src/engine/highprecision/EphemerisCacheGateway.hpp
     src/engine/highprecision/EphemerisCacheGateway.cpp
     src/engine/highprecision/EphemerisComputationCache.hpp
@@ -234,6 +235,7 @@ add_library(skygate-ephemeris STATIC
     src/engine/EphemerisStagedUpdateVerificationResult.hpp
     src/engine/EphemerisStagedUpdateVerificationStatus.hpp
     src/engine/EphemerisDataManifest.hpp
+    src/engine/EphemerisManifestJsonReader.hpp
     src/engine/IDeltaTProvider.hpp
     src/factory/EphemerisEngineFactory.hpp
     src/factory/EphemerisFactoryCreationDiagnosticSeverity.hpp

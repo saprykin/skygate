@@ -54,6 +54,10 @@ public:
     [[nodiscard]] static QString pathToQString(const std::filesystem::path& path);
     [[nodiscard]] static std::filesystem::path pathFromQString(const QString& path);
     [[nodiscard]] static QString stringToQString(const std::string& value);
+    [[nodiscard]] static std::string stringFromQString(const QString& value)
+    {
+        return value.toStdString();
+    }
     [[nodiscard]] static bool hasUnsafePathComponent(const std::filesystem::path& path);
     [[nodiscard]] static bool
     sourceSizeMatchesMetadata(const QFileInfo& sourceInfo, const EphemerisDataManifest::Asset& asset);

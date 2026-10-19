@@ -25,6 +25,7 @@ private slots:
     void rejectsDuplicateIds();
     void rejectsInvalidBooleanFields();
     void rejectsUnsafeCompressionSizes();
+    void pinsFieldDiagnosticWording();
     void assetAndCompressionKindTextRoundTrips();
 };
 
@@ -211,6 +212,14 @@ namespace {
 {
     return std::ranges::any_of(result.diagnostics, [text](const std::string& diagnostic) {
         return diagnostic.find(text) != std::string::npos;
+    });
+}
+
+[[nodiscard]] bool
+hasExactDiagnostic(const skygate::ephemeris::EphemerisDataManifest::ParseResult& result, const std::string_view text)
+{
+    return std::ranges::any_of(result.diagnostics, [text](const std::string& diagnostic) {
+        return std::string_view{diagnostic} == text;
     });
 }
 
@@ -475,6 +484,82 @@ void EphemerisDataManifestTests::rejectsUnsafeCompressionSizes()
         QVERIFY(!result.isSuccess());
         QVERIFY(hasDiagnosticContaining(result, "integer range"));
     }
+}
+
+void EphemerisDataManifestTests::pinsFieldDiagnosticWording()
+{
+    struct FieldCase {
+        std::string_view from;
+        std::string_view to;
+        std::string_view diagnostic;
+    };
+
+    constexpr std::array fieldCases{
+        FieldCase{
+            R"("provenance": "SkyGate bundled data manifest")",
+            R"("provenance": "  ")",
+            "Manifest requires non-empty string field 'provenance'.",
+        },
+        FieldCase{
+            R"("bundled": true)",
+            R"("bundled": "true")",
+            "Profile field 'bundled' must be a boolean.",
+        },
+        FieldCase{
+            R"("optional": true)",
+            R"("optional": null)",
+            "Asset field 'optional' must be a boolean.",
+        },
+        FieldCase{
+            R"("compressedSizeBytes": 4096)",
+            R"("compressedSizeBytes": "4096")",
+            "Asset field 'compressedSizeBytes' must be an integer.",
+        },
+        FieldCase{
+            R"("compressedSizeBytes": 4096)",
+            R"("compressedSizeBytes": -4096)",
+            "Asset field 'compressedSizeBytes' must be a non-negative integer.",
+        },
+        FieldCase{
+            R"("compressedSizeBytes": 4096)",
+            R"("compressedSizeBytes": 1e20)",
+            "Asset field 'compressedSizeBytes' exceeds the uint64 range.",
+        },
+        FieldCase{
+            R"("compressedSizeBytes": 4096)",
+            R"("compressedSizeBytes": 9007199254740993)",
+            "Asset field 'compressedSizeBytes' exceeds the exact JSON integer range.",
+        },
+        FieldCase{
+            R"("start": "1849-12-26")",
+            R"("start": "")",
+            "Asset requires non-empty 'start' and 'end' UTC date fields.",
+        },
+    };
+
+    for (const FieldCase& fieldCase : fieldCases) {
+        const skygate::ephemeris::EphemerisDataManifest::ParseResult result =
+            skygate::ephemeris::EphemerisDataManifest::parse(manifestWithReplacement(fieldCase.from, fieldCase.to));
+
+        QVERIFY2(!result.isSuccess(), fieldCase.diagnostic.data());
+        QVERIFY2(hasExactDiagnostic(result, fieldCase.diagnostic), fieldCase.diagnostic.data());
+    }
+
+    const skygate::ephemeris::EphemerisDataManifest::ParseResult schemaResult =
+        skygate::ephemeris::EphemerisDataManifest::parse(
+            manifestWithReplacement(R"("schemaVersion": 1)", R"("schemaVersion": 2)")
+        );
+    QVERIFY(hasExactDiagnostic(schemaResult, "Manifest schemaVersion must be 1."));
+
+    const skygate::ephemeris::EphemerisDataManifest::ParseResult optionalStringResult =
+        skygate::ephemeris::EphemerisDataManifest::parse(
+            manifestWithReplacement(R"("relativePath": "kernels/de440s.bsp.zst")", R"("relativePath": 42)")
+        );
+    QVERIFY(optionalStringResult.isSuccess());
+    const skygate::ephemeris::EphemerisDataManifest::Asset* kernel =
+        optionalStringResult.manifest.asset("de440s-kernel");
+    QVERIFY(kernel != nullptr);
+    QVERIFY(kernel->relativePath.empty());
 }
 
 void EphemerisDataManifestTests::assetAndCompressionKindTextRoundTrips()
