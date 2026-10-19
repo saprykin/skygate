@@ -1,14 +1,17 @@
 #include "StarAstrometryCalculator.hpp"
 #include "CelestialFrameMath.hpp"
+#include "EphemerisMetadataFailurePolicy.hpp"
 #include "EphemerisMetadataMerger.hpp"
+#include "EpochScaleResolver.hpp"
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
 #include "ICalcephKernel.hpp"
 #include "NaifBodyIds.hpp"
+#include "PreparedEphemerisRequestState.hpp"
+#include "PreparedRequestStateBuilder.hpp"
+#include "StarAstrometryBatchResult.hpp"
 #include "catalog/CatalogStarAstrometry.hpp"
 #include "engine/ITimeScaleService.hpp"
-#include "PreparedEphemerisRequestState.hpp"
-#include "StarAstrometryBatchResult.hpp"
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
 #include "math/TimeConstants.hpp"
@@ -110,33 +113,7 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
     return referencePosition + (velocity * years);
 }
 
-[[nodiscard]] std::optional<skygate::core::AstronomicalEpoch> tdbEpochForKernel(
-    EphemerisEngineQueryResult& metadata,
-    const skygate::core::AstronomicalEpoch& epoch,
-    const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService
-) noexcept
-{
-    if (epoch.timeScale == skygate::core::TimeScale::Tdb) {
-        return epoch;
-    }
-    if (timeScaleService == nullptr) {
-        if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
-            metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-        }
-        metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
-        return std::nullopt;
-    }
-
-    const TimeScaleConversionResult conversion = timeScaleService->convert(epoch, skygate::core::TimeScale::Tdb);
-    EphemerisMetadataMerger::mergeTimeScale(metadata, conversion);
-    if (!conversion.isSuccess()) {
-        return std::nullopt;
-    }
-
-    return conversion.epoch;
-}
-
-[[nodiscard]] std::optional<skygate::core::AstronomicalEpoch> tdbEpochForKernel(
+[[nodiscard]] std::optional<skygate::core::AstronomicalEpoch> kernelEpochForAnnualParallax(
     EphemerisEngineQueryResult& metadata,
     const skygate::core::AstronomicalEpoch& epoch,
     const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService,
@@ -144,7 +121,9 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
 ) noexcept
 {
     if (preparedState == nullptr) {
-        return tdbEpochForKernel(metadata, epoch, timeScaleService);
+        return EpochScaleResolver::resolve(
+            metadata, epoch, timeScaleService, EphemerisMetadataFailurePolicy::MarkDegraded
+        );
     }
 
     EphemerisMetadataMerger::merge(
@@ -268,7 +247,7 @@ void recordAppliedCorrections(
             result.equatorial = CelestialFrameMath::toEquatorial(*propagatedVector);
         } else {
             const std::optional<skygate::core::AstronomicalEpoch> kernelEpoch =
-                tdbEpochForKernel(result.metadata, request.epoch, timeScaleService, preparedState);
+                kernelEpochForAnnualParallax(result.metadata, request.epoch, timeScaleService, preparedState);
             if (!kernelEpoch.has_value()) {
                 EphemerisMetadataMerger::markCorrectionUnavailable(
                     result.metadata, EphemerisCorrectionFlags::annualParallax()
@@ -354,20 +333,18 @@ std::vector<StarAstrometryBatchResult> StarAstrometryCalculator::calculateBatch(
 {
     std::vector<StarAstrometryBatchResult> results;
     results.reserve(arrays.size());
-    std::shared_ptr<PreparedEphemerisRequestState> localPreparedState;
     if (preparedRequestState == nullptr
         && skygate::ephemeris::EphemerisCorrectionFlags::has(
             request.options.correctionFlags(), EphemerisCorrectionFlags::annualParallax()
         )) {
-        localPreparedState = std::make_shared<PreparedEphemerisRequestState>();
-        localPreparedState->tdbKernelEpoch =
-            tdbEpochForKernel(localPreparedState->tdbKernelEpochMetadata, request.epoch, m_timeScaleService);
-        if (localPreparedState->tdbKernelEpoch.has_value() && m_kernel != nullptr) {
-            localPreparedState->annualParallaxEarthState = m_kernel->compute(
-                *localPreparedState->tdbKernelEpoch, NaifBodyIds::kEarth, NaifBodyIds::kSolarSystemBarycenter
-            );
-        }
-        preparedRequestState = localPreparedState;
+        const PreparedRequestStateBuilder builder(
+            PreparedRequestStateBuilder::Dependencies{
+                .calcephKernel = m_kernel,
+                .timeScaleService = m_timeScaleService,
+                .earthOrientationProvider = nullptr,
+            }
+        );
+        preparedRequestState = builder.build(request);
     }
 
     for (std::size_t arrayIndex = 0U; arrayIndex < arrays.size(); ++arrayIndex) {
