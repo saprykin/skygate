@@ -1115,14 +1115,7 @@ void SkyCatalogManager::persistCatalogCache() const
 
     SkyCatalogCollectionPersistRequest request;
     for (const SkyCatalogSourceRecord& source : m_runtime->sources()) {
-        SkyCatalogSourcePersistEntry entry;
-        entry.instanceId = source.instanceId;
-        entry.title = source.title;
-        entry.version = source.version;
-        entry.url = source.url;
-        entry.policy = source.policy;
-        entry.enabled = source.enabled;
-        entry.bundled = source.bundled;
+        SkyCatalogSourcePersistEntry entry = SkyCatalogSourcePersistEntry::fromRuntimeRecord(source);
 
         // A source with its own download keeps its accepted descriptor and the
         // payload that was activated with it, so an attempted update that never
