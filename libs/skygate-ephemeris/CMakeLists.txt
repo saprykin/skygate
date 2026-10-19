@@ -40,6 +40,9 @@ set(SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES)
 list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ApparentPlaceCalculator.hpp
     src/engine/highprecision/ApparentPlaceCalculator.cpp
+    src/engine/highprecision/ApparentPlaceOutputFinalizer.hpp
+    src/engine/highprecision/ApparentPlaceOutputFinalizer.cpp
+    src/engine/highprecision/ApparentPlaceRequestPolicy.hpp
     src/engine/highprecision/AtmosphericRefractionCalculator.hpp
     src/engine/highprecision/AtmosphericRefractionCalculator.cpp
     src/engine/highprecision/CatalogStarAstrometryArrays.hpp
@@ -117,6 +120,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ErfaFrameTransformer.cpp
     src/engine/highprecision/ErfaAstrometry.hpp
     src/engine/highprecision/ErfaAstrometry.cpp
+    src/engine/highprecision/FrameTransformBatcher.hpp
+    src/engine/highprecision/FrameTransformBatcher.cpp
     src/engine/highprecision/FrameTransformMatrixCache.hpp
     src/engine/highprecision/FrameTransformMatrixCache.cpp
     src/engine/highprecision/FrameTransformStageCatalog.hpp
