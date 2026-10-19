@@ -1,5 +1,6 @@
 #include "math/TimeConstants.hpp"
 #include "time/CalendarTime.hpp"
+#include "time/GregorianCalendar.hpp"
 #include "engine/DeltaTDataLoader.hpp"
 #include "engine/EarthOrientationDataLoader.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
@@ -183,12 +184,12 @@ private slots:
 void LeapSecondTimeScaleServiceTests::roundTripsBceCivilDatesWithHistoricalYearHelpers()
 {
     const std::optional<int> oneBceAstronomicalYear =
-        skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(-1);
+        skygate::core::GregorianCalendar::astronomicalYearFromHistoricalYear(-1);
     QVERIFY(oneBceAstronomicalYear.has_value());
     QCOMPARE(*oneBceAstronomicalYear, 0);
-    QCOMPARE(skygate::core::CalendarTime::historicalYearFromAstronomicalYear(*oneBceAstronomicalYear), -1);
-    QCOMPARE(skygate::core::CalendarTime::historicalYearFromAstronomicalYear(-1), -2);
-    QVERIFY(!skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(0).has_value());
+    QCOMPARE(skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(*oneBceAstronomicalYear), -1);
+    QCOMPARE(skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(-1), -2);
+    QVERIFY(!skygate::core::GregorianCalendar::astronomicalYearFromHistoricalYear(0).has_value());
 
     const skygate::core::AstronomicalEpoch oneBce =
         makeEpoch(skygate::core::TimeScale::Tt, *oneBceAstronomicalYear, 12, 31, 12, 0, 0);
@@ -197,7 +198,7 @@ void LeapSecondTimeScaleServiceTests::roundTripsBceCivilDatesWithHistoricalYearH
 
     QVERIFY(roundTrip.has_value());
     QCOMPARE(roundTrip->astronomicalYear, 0);
-    QCOMPARE(skygate::core::CalendarTime::historicalYearFromAstronomicalYear(roundTrip->astronomicalYear), -1);
+    QCOMPARE(skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(roundTrip->astronomicalYear), -1);
     QCOMPARE(roundTrip->month, 12);
     QCOMPARE(roundTrip->day, 31);
     QCOMPARE(roundTrip->hour, 12);

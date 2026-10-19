@@ -19,6 +19,7 @@ add_library(skygate-core STATIC
     src/time/CalendarTime.hpp
     src/time/CivilDateTime.hpp
     src/time/EpochCodec.hpp
+    src/time/GregorianCalendar.hpp
     src/time/TimeScale.hpp
     src/time/TimeScaleCodec.hpp
     src/math/AngleMath.hpp
@@ -55,6 +56,7 @@ add_library(skygate-core STATIC
     src/time/AstronomicalTime.cpp
     src/time/CalendarTime.cpp
     src/time/EpochCodec.cpp
+    src/time/GregorianCalendar.cpp
     src/time/TimeScaleCodec.cpp
     src/hash/Fnv1a64Hasher.cpp
     src/hash/Fnv1a64Hasher.hpp

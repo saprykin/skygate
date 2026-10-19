@@ -2,6 +2,7 @@
 
 #include "UtcTimeCodec.hpp"
 #include "time/CalendarTime.hpp"
+#include "time/GregorianCalendar.hpp"
 
 #include <QTime>
 #include <QTimeZone>
@@ -78,7 +79,7 @@ QString SkyQtTimeCodec::formatAstronomicalEpochDate(const skygate::core::Astrono
     }
 
     const int historicalYear =
-        skygate::core::CalendarTime::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
+        skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
     return formatDateText(QDate(historicalYear, dateTime->month, dateTime->day));
 }
 

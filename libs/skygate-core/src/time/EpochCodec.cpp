@@ -1,5 +1,6 @@
 #include "EpochCodec.hpp"
 #include "CalendarTime.hpp"
+#include "GregorianCalendar.hpp"
 #include "UtcTimeCodec.hpp"
 #include "math/TimeConstants.hpp"
 
@@ -32,7 +33,7 @@ AstronomicalEpoch EpochCodec::epochFromUtcTimeExact(const UtcTimePoint& utcTime)
         std::chrono::floor<std::chrono::days>(std::chrono::seconds(epochSeconds)).count();
     const std::int64_t secondsOfDay = epochSeconds - daysSinceUnix * secondsPerDay;
 
-    CivilDateTime dateTime = CalendarTime::civilDateFromDays(daysSinceUnix);
+    CivilDateTime dateTime = GregorianCalendar::civilDateFromDays(daysSinceUnix);
     dateTime.hour = static_cast<int>(secondsOfDay / static_cast<std::int64_t>(TimeConstants::kSecondsPerHour));
     dateTime.minute = static_cast<int>(
         secondsOfDay % static_cast<std::int64_t>(TimeConstants::kSecondsPerHour)
