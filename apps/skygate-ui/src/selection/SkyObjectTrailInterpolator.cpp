@@ -14,6 +14,8 @@
 namespace {
 
 constexpr int kAdaptiveSampleStepMinutes = 120;
+// Refinement stops at a fixed span; the render grid step may differ.
+constexpr int kObjectTrailAdaptiveRefinementSpanMinutes = 10;
 constexpr double kMaxInterpolationErrorDegrees = 0.05;
 
 }  // namespace
@@ -163,7 +165,7 @@ void SkyObjectTrailInterpolator::appendAdaptiveTrailAnchors(
 )
 {
     const int spanMinutes = next.offsetMinutes - previous.offsetMinutes;
-    if (spanMinutes <= renderOptions.sampleStepMinutes) {
+    if (spanMinutes <= kObjectTrailAdaptiveRefinementSpanMinutes) {
         anchors.push_back(next);
         return;
     }
