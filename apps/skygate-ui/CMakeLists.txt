@@ -203,6 +203,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/SkyCatalogRelatedDataCodec.cpp
     src/catalog/SkyCatalogRelatedDataCodec.hpp
     src/app/SkyContextControllerCatalog.cpp
+    src/app/SkyContextControllerEphemeris.cpp
     src/app/SkyContextControllerLocation.cpp
     src/app/SkyContextControllerNightConditions.cpp
     src/app/SkyContextControllerSearch.cpp
