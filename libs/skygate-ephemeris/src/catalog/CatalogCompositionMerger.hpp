@@ -2,8 +2,6 @@
 
 #include "catalog/CatalogCompositionMergeResult.hpp"
 #include "catalog/CatalogCompositionRequest.hpp"
-#include "catalog/CatalogMergeAccumulator.hpp"
-#include "catalog/CatalogSourcePrecedence.hpp"
 
 namespace skygate::ephemeris {
 

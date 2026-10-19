@@ -1,10 +1,10 @@
 #include "CatalogCoordinateMerge.hpp"
 
+#include "EquatorialCoordinate.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "catalog/CatalogCompositionLogging.hpp"
 #include "catalog/CatalogCoordinateModel.hpp"
 #include "catalog/CatalogStarAstrometry.hpp"
-#include "EquatorialCoordinate.hpp"
-#include "OwnGalaxyCelestialBody.hpp"
 
 #include <QString>
 #include <QtGlobal>
