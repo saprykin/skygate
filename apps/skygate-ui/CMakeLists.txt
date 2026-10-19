@@ -81,11 +81,14 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/SkyCatalogManager.cpp
     src/catalog/SkyCatalogManager.hpp
     src/scene/SkyInspectorField.hpp
+    src/scene/SkyInspectorPlacement.hpp
     src/scene/SkyOverlayItem.hpp
     src/scene/SkySceneComposer.cpp
     src/scene/SkySceneComposer.hpp
     src/scene/SkySceneCompositionInput.hpp
     src/scene/SkySceneCompositionResult.hpp
+    src/scene/SkySceneDegradationReporter.cpp
+    src/scene/SkySceneDegradationReporter.hpp
     src/scene/SkySceneFrameData.hpp
     src/scene/SkySceneFramePipeline.cpp
     src/scene/SkySceneFramePipeline.hpp
@@ -99,6 +102,9 @@ qt_add_library(skygate-ui-lib STATIC
     src/scene/SkySelectedObjectInspector.hpp
     src/scene/SkySelectionMarker.hpp
     src/scene/SkyViewportSnapshot.hpp
+    src/scene/SkyViewportSnapshotInput.hpp
+    src/scene/SkyViewportSnapshotPublisher.cpp
+    src/scene/SkyViewportSnapshotPublisher.hpp
     src/app/SkyNightConditionsAdapter.hpp
     src/app/SkyNightConditionsData.hpp
     src/app/SkyNightConditionSunRow.hpp

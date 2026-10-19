@@ -4,6 +4,7 @@
 #include "SkySceneCompositionInput.hpp"
 #include "SkySceneCompositionResult.hpp"
 #include "SkySceneFramePipelineInput.hpp"
+#include "SkyViewportSnapshotInput.hpp"
 #include "app/SkyContextController.hpp"
 #include "diagnostics/SkyPerformanceLogging.hpp"
 #include "diagnostics/SkyPerformanceStageTimer.hpp"
@@ -13,82 +14,11 @@
 #include "render/SkyRenderGlyph.hpp"
 #include "render/SkyRenderLine.hpp"
 #include "render/SkyRenderPoint.hpp"
-#include "time/SkyQtTimeCodec.hpp"
 #include "time/SkyTimeController.hpp"
-
-#include <QStringList>
 
 #include <cmath>
 #include <memory>
 #include <optional>
-
-namespace {
-
-void appendUniqueReason(QStringList& reasons, const QString& reason)
-{
-    if (!reasons.contains(reason)) {
-        reasons.push_back(reason);
-    }
-}
-
-[[nodiscard]] bool isKernelRange(const skygate::ephemeris::EphemerisDateRange& range)
-{
-    const QString id = QString::fromStdString(range.id).toLower();
-    const QString displayName = QString::fromStdString(range.displayName).toLower();
-    return id.contains(QStringLiteral("kernel")) || displayName.contains(QStringLiteral("kernel"));
-}
-
-void appendRangeWarning(
-    QStringList& reasons,
-    const skygate::core::AstronomicalEpoch& epoch,
-    const std::optional<skygate::ephemeris::EphemerisDateRange>& range,
-    const QString& label
-)
-{
-    if (!range.has_value() || range->contains(epoch)) {
-        return;
-    }
-
-    appendUniqueReason(
-        reasons,
-        QStringLiteral("%1 out of range. Supported range: %2.").arg(label, SkyQtTimeCodec::formatDateRangeText(*range))
-    );
-}
-
-[[nodiscard]] QVariantList degradationReasonsForContext(
-    const SkyContextController::EphemerisRequestContext& context, const skygate::ephemeris::IEphemerisEngine* engine
-)
-{
-    QStringList reasons;
-    if (engine != nullptr) {
-        for (const skygate::ephemeris::EphemerisDateRange& range : engine->supportedDateRanges()) {
-            if (isKernelRange(range) && !range.contains(context.request.epoch)) {
-                appendUniqueReason(
-                    reasons,
-                    QStringLiteral("Planetary kernel out of range. Supported range: %1.")
-                        .arg(SkyQtTimeCodec::formatDateRangeText(range))
-                );
-            }
-        }
-    }
-
-    appendRangeWarning(
-        reasons, context.request.epoch, context.earthOrientationDataRange, QStringLiteral("Earth orientation data")
-    );
-    appendRangeWarning(
-        reasons, context.request.epoch, context.leapSecondTableRange, QStringLiteral("Leap-second table")
-    );
-    appendRangeWarning(reasons, context.request.epoch, context.deltaTDataRange, QStringLiteral("Delta T data"));
-
-    QVariantList result;
-    result.reserve(reasons.size());
-    for (const QString& reason : reasons) {
-        result.push_back(reason);
-    }
-    return result;
-}
-
-}  // namespace
 
 SkySceneModel::SkySceneModel(QObject* parent) : QObject(parent) {}
 
@@ -110,10 +40,8 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
     m_hitTargetIndex.clear();
     m_sceneComposer.reset();
     m_sceneFrame = {};
-    m_viewportRenderFrameGeneration = 0;
-    m_viewportTrailTargetBodyIndex.reset();
-    m_selectedObjectTargetId.clear();
-    m_selectedObjectInspectorPinned = false;
+    m_viewportSnapshotPublisher.invalidatePublishedFrame();
+    m_inspectorPlacement.clear();
     if (m_skyContextController != nullptr) {
         m_skyContextChangedConnection = connect(
             m_skyContextController, &SkyContextController::skyContextChanged, this, &SkySceneModel::rebuildSceneFrame
@@ -123,8 +51,7 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
                 if (m_ignoringSearchTargetChange) {
                     return;
                 }
-                m_selectedObjectTargetId.clear();
-                m_selectedObjectInspectorPinned = false;
+                m_inspectorPlacement.clear();
                 m_sceneComposer.reset();
                 rebuildSceneFrame();
             });
@@ -154,7 +81,7 @@ QVariantList SkySceneModel::overlayItems() const
 
 QVariantList SkySceneModel::ephemerisDegradationReasons() const
 {
-    return m_ephemerisDegradationReasons;
+    return m_degradationReporter.reasons();
 }
 
 QVariantMap SkySceneModel::selectionMarker() const
@@ -174,7 +101,7 @@ std::uint64_t SkySceneModel::snapshotGeneration() const noexcept
 
 std::shared_ptr<const SkyViewportSnapshot> SkySceneModel::viewportSnapshot() const noexcept
 {
-    return m_viewportSnapshot;
+    return m_viewportSnapshotPublisher.snapshot();
 }
 
 void SkySceneModel::setViewportSize(const double viewportWidth, const double viewportHeight)
@@ -230,8 +157,7 @@ bool SkySceneModel::selectObjectAt(const double x, const double y)
         m_skyContextController->clearSelectedSearchTarget();
         m_ignoringSearchTargetChange = false;
     }
-    m_selectedObjectTargetId = QString::fromStdString(body.id);
-    m_selectedObjectInspectorPinned = false;
+    m_inspectorPlacement.selectTarget(QString::fromStdString(body.id));
     m_sceneComposer.reset();
     rebuildSceneFrame();
     return true;
@@ -239,10 +165,8 @@ bool SkySceneModel::selectObjectAt(const double x, const double y)
 
 void SkySceneModel::clearSelectedObjectInspector()
 {
-    const bool hadSelection = !m_selectedObjectTargetId.isEmpty() || m_selectedObjectInspectorPinned
-                              || m_sceneFrame.selectedObjectInspector.visible;
-    m_selectedObjectTargetId.clear();
-    m_selectedObjectInspectorPinned = false;
+    const bool hadSelection = m_inspectorPlacement.hasSelection() || m_sceneFrame.selectedObjectInspector.visible;
+    m_inspectorPlacement.clear();
     if (!hadSelection) {
         return;
     }
@@ -253,41 +177,32 @@ void SkySceneModel::clearSelectedObjectInspector()
 
 void SkySceneModel::setSelectedObjectInspectorPinned(const bool pinned)
 {
-    if (m_selectedObjectInspectorPinned == pinned) {
+    const SkyInspectorPlacement::Change change = m_inspectorPlacement.pin(pinned, m_sceneFrame.selectedObjectInspector);
+    if (change == SkyInspectorPlacement::Change::Ignored) {
         return;
     }
 
-    if (pinned) {
-        if (!m_sceneFrame.selectedObjectInspector.visible) {
-            return;
-        }
-
-        m_selectedObjectInspectorPinnedX = m_sceneFrame.selectedObjectInspector.x;
-        m_selectedObjectInspectorPinnedY = m_sceneFrame.selectedObjectInspector.y;
-        m_selectedObjectInspectorPinned = true;
-        m_sceneFrame.selectedObjectInspector.pinned = true;
+    if (change == SkyInspectorPlacement::Change::AppliedInPlace) {
+        m_sceneFrame.selectedObjectInspector.pinned = m_inspectorPlacement.pinned();
         m_selectedObjectInspector = m_sceneOverlayAdapter.selectedObjectInspector(m_sceneFrame.selectedObjectInspector);
         emit sceneFrameChanged();
         return;
     }
 
-    m_selectedObjectInspectorPinned = pinned;
     m_sceneComposer.reset();
     rebuildSceneFrame();
 }
 
 void SkySceneModel::moveSelectedObjectInspector(const double x, const double y)
 {
-    if (!std::isfinite(x) || !std::isfinite(y)) {
+    const SkyInspectorPlacement::Change change = m_inspectorPlacement.move(x, y, m_sceneFrame.selectedObjectInspector);
+    if (change == SkyInspectorPlacement::Change::Ignored) {
         return;
     }
 
-    m_selectedObjectInspectorPinnedX = x;
-    m_selectedObjectInspectorPinnedY = y;
-    m_selectedObjectInspectorPinned = true;
-    if (m_sceneFrame.selectedObjectInspector.visible) {
-        m_sceneFrame.selectedObjectInspector.x = x;
-        m_sceneFrame.selectedObjectInspector.y = y;
+    if (change == SkyInspectorPlacement::Change::AppliedInPlace) {
+        m_sceneFrame.selectedObjectInspector.x = m_inspectorPlacement.pinnedX();
+        m_sceneFrame.selectedObjectInspector.y = m_inspectorPlacement.pinnedY();
         m_sceneFrame.selectedObjectInspector.pinned = true;
         m_selectedObjectInspector = m_sceneOverlayAdapter.selectedObjectInspector(m_sceneFrame.selectedObjectInspector);
         emit sceneFrameChanged();
@@ -354,21 +269,22 @@ void SkySceneModel::disconnectFromContextController()
 
 bool SkySceneModel::clearSceneFrame()
 {
-    const bool hadSceneFrame = m_framePipeline.clear() || m_sceneFrame.preparedProjection.has_value()
-                               || m_sceneFrame.snapshot != nullptr || !m_sceneFrame.frame.points.empty()
-                               || !m_sceneFrame.frame.lines.empty() || !m_sceneFrame.frame.glyphs.empty()
-                               || !m_sceneFrame.overlayItems.empty() || m_sceneFrame.selectionMarker.visible
-                               || m_sceneFrame.selectedObjectInspector.visible || !m_overlayItems.isEmpty()
-                               || !m_ephemerisDegradationReasons.isEmpty() || !m_selectionMarker.isEmpty()
-                               || !m_selectedObjectInspector.isEmpty();
+    const bool hadSceneFrame =
+        m_framePipeline.clear() || m_sceneFrame.preparedProjection.has_value() || m_sceneFrame.snapshot != nullptr
+        || !m_sceneFrame.frame.points.empty() || !m_sceneFrame.frame.lines.empty() || !m_sceneFrame.frame.glyphs.empty()
+        || !m_sceneFrame.overlayItems.empty() || m_sceneFrame.selectionMarker.visible
+        || m_sceneFrame.selectedObjectInspector.visible || !m_overlayItems.isEmpty()
+        || m_degradationReporter.hasReasons() || !m_selectionMarker.isEmpty() || !m_selectedObjectInspector.isEmpty();
     m_hitTargetIndex.clear();
     m_sceneComposer.reset();
     m_sceneFrame = {};
     m_overlayItems = {};
-    m_ephemerisDegradationReasons = {};
+    m_degradationReporter.clear();
     m_selectionMarker = {};
     m_selectedObjectInspector = {};
-    clearViewportSnapshot();
+    if (m_viewportSnapshotPublisher.clear()) {
+        emit viewportSnapshotChanged();
+    }
     return hadSceneFrame;
 }
 
@@ -376,41 +292,24 @@ void SkySceneModel::publishViewportSnapshot(
     const std::uint64_t renderFrameGeneration, const std::optional<std::uint32_t>& trailTargetBodyIndex
 )
 {
-    if (m_viewportSnapshot != nullptr && renderFrameGeneration == m_viewportRenderFrameGeneration
-        && trailTargetBodyIndex == m_viewportTrailTargetBodyIndex) {
-        return;
-    }
-
-    m_viewportRenderFrameGeneration = renderFrameGeneration;
-    m_viewportTrailTargetBodyIndex = trailTargetBodyIndex;
-
-    auto snapshot = std::make_shared<SkyViewportSnapshot>();
-    snapshot->generation = ++m_viewportSnapshotGeneration;
-    snapshot->viewportWidth = m_viewportWidth;
-    snapshot->viewportHeight = m_viewportHeight;
-    snapshot->preparedProjection = m_sceneFrame.preparedProjection;
+    SkyViewportSnapshotInput input;
+    input.renderFrameGeneration = renderFrameGeneration;
+    input.trailTargetBodyIndex = trailTargetBodyIndex;
+    input.viewportWidth = m_viewportWidth;
+    input.viewportHeight = m_viewportHeight;
+    input.preparedProjection = m_sceneFrame.preparedProjection;
     if (m_skyContextController != nullptr) {
-        snapshot->renderTheme = m_skyContextController->renderTheme();
-        snapshot->overlayLayers = m_skyContextController->overlayLayerVisibility();
-        snapshot->observationContext = referenceOverlayContext().value_or(m_skyContextController->skyContext());
+        input.renderTheme = m_skyContextController->renderTheme();
+        input.overlayLayers = m_skyContextController->overlayLayerVisibility();
+        input.observationContext = referenceOverlayContext().value_or(m_skyContextController->skyContext());
     }
-    snapshot->points = m_sceneFrame.frame.points;
-    snapshot->lines = m_sceneFrame.frame.lines;
-    snapshot->glyphs = m_sceneFrame.frame.glyphs;
-    m_viewportSnapshot = std::move(snapshot);
-    emit viewportSnapshotChanged();
-}
+    input.points = std::span<const SkyRenderPoint>(m_sceneFrame.frame.points);
+    input.lines = std::span<const SkyRenderLine>(m_sceneFrame.frame.lines);
+    input.glyphs = std::span<const SkyRenderGlyph>(m_sceneFrame.frame.glyphs);
 
-void SkySceneModel::clearViewportSnapshot()
-{
-    if (m_viewportSnapshot == nullptr) {
-        return;
+    if (m_viewportSnapshotPublisher.publish(input)) {
+        emit viewportSnapshotChanged();
     }
-
-    m_viewportSnapshot.reset();
-    m_viewportRenderFrameGeneration = 0;
-    m_viewportTrailTargetBodyIndex.reset();
-    emit viewportSnapshotChanged();
 }
 
 std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
@@ -456,14 +355,14 @@ std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
         .catalogSourceContributors = &m_skyContextController->catalogSourceContributorIds(),
         .catalogSourceTitles = m_skyContextController->catalogSourceTitles(),
         .timeController = m_skyContextController->timeController(),
-        .selectedObjectTargetId = m_selectedObjectTargetId,
+        .selectedObjectTargetId = m_inspectorPlacement.targetId(),
         .selectedSearchTargetKind = m_skyContextController->selectedSearchTargetKind(),
         .selectedSearchTargetId = m_skyContextController->selectedSearchTargetId(),
         .trackedTargetKind = m_skyContextController->trackedTargetKind(),
         .trackedTargetId = m_skyContextController->trackedTargetId(),
-        .inspectorPinnedX = m_selectedObjectInspectorPinnedX,
-        .inspectorPinnedY = m_selectedObjectInspectorPinnedY,
-        .inspectorPinned = m_selectedObjectInspectorPinned,
+        .inspectorPinnedX = m_inspectorPlacement.pinnedX(),
+        .inspectorPinnedY = m_inspectorPlacement.pinnedY(),
+        .inspectorPinned = m_inspectorPlacement.pinned(),
         .viewportWidth = m_viewportWidth,
         .viewportHeight = m_viewportHeight,
         .guidanceStrategy = m_skyContextController->ephemerisGuidanceStrategy()
@@ -503,14 +402,12 @@ void SkySceneModel::rebuildSceneFrame()
     const auto requestContext = m_skyContextController->ephemerisRequestContext();
     m_sceneFrame.preparedProjection = *frameResult->preparedProjection;
     m_sceneFrame.snapshot = frameResult->snapshot;
-    const QVariantList ephemerisDegradationReasons =
-        degradationReasonsForContext(requestContext, input->frameInput.ephemerisEngine);
+    const bool degradationChanged = m_degradationReporter.update(requestContext, input->frameInput.ephemerisEngine);
 
     const SkySceneCompositionResult compositionResult = m_sceneComposer.rebuild(m_sceneFrame, *input, *frameResult);
     const double compositionMs = timer.stageMilliseconds();
     if (!compositionResult.changed) {
-        if (m_ephemerisDegradationReasons != ephemerisDegradationReasons) {
-            m_ephemerisDegradationReasons = ephemerisDegradationReasons;
+        if (degradationChanged) {
             emit sceneFrameChanged();
         }
         return;
@@ -521,7 +418,6 @@ void SkySceneModel::rebuildSceneFrame()
     }
     const double hitIndexMs = timer.stageMilliseconds();
     m_overlayItems = m_sceneOverlayAdapter.overlayItems(m_sceneFrame.overlayItems);
-    m_ephemerisDegradationReasons = ephemerisDegradationReasons;
     m_selectionMarker = m_sceneOverlayAdapter.selectionMarker(m_sceneFrame.selectionMarker);
     m_selectedObjectInspector = m_sceneOverlayAdapter.selectedObjectInspector(m_sceneFrame.selectedObjectInspector);
     const double adapterMs = timer.stageMilliseconds();
