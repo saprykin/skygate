@@ -539,6 +539,10 @@ add_skygate_ephemeris_qtest(
     catalog/CatalogBinaryCodecTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-load-result-tests
+    catalog/CatalogLoadResultTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-celestial-body-catalog-tests
     catalog/CelestialBodyCatalogTests.cpp
 )

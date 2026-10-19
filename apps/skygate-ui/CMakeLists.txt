@@ -275,6 +275,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/settings/SkySettingsValueCodecs.hpp
     src/settings/SkyEphemerisDataCacheSettings.cpp
     src/settings/SkyEphemerisDataCacheSettings.hpp
+    src/settings/SkyEphemerisSettingsCodec.cpp
+    src/settings/SkyEphemerisSettingsCodec.hpp
     src/settings/SkyLegacyCatalogCacheStore.cpp
     src/settings/SkyLegacyCatalogCacheStore.hpp
     src/settings/SkyWindowSizeSettings.cpp
