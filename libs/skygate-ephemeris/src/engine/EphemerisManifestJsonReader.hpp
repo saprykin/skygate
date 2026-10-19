@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EphemerisDataManifest.hpp"
+#include "EphemerisDatasetInfo.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/EphemerisDateRange.hpp"
 
