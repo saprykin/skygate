@@ -6,7 +6,9 @@
 #include "catalog/CatalogFieldOrigins.hpp"
 #include "catalog/CatalogIdentityAbsorption.hpp"
 #include "catalog/CatalogIdentityIndex.hpp"
+#include "catalog/CatalogMergeAccumulator.hpp"
 #include "catalog/CatalogObjectIdentity.hpp"
+#include "catalog/CatalogSourcePrecedence.hpp"
 #include "catalog/composition/CoreBodyCatalogAugmenter.hpp"
 
 #include <QLoggingCategory>
@@ -123,9 +125,7 @@ void logAmbiguousResolution(const CatalogIdentityIndex::Resolution& resolution, 
 // same-kind bodies. Matched bodies of an incompatible kind stay distinct and
 // are diagnosed.
 MatchDecision evaluateMatch(
-    const CatalogCompositionMerger::MergeAccumulator& accumulator,
-    const CatalogIdentityIndex& index,
-    const BaseCelestialBody& incoming
+    const CatalogMergeAccumulator& accumulator, const CatalogIdentityIndex& index, const BaseCelestialBody& incoming
 )
 {
     MatchDecision decision;
@@ -175,11 +175,11 @@ MatchDecision evaluateMatch(
 // sources never match. `rowOrdinal` is the position of the record in the
 // source, so every value it supplies keeps its true row origin.
 std::size_t appendDeduped(
-    CatalogCompositionMerger::MergeAccumulator& accumulator,
+    CatalogMergeAccumulator& accumulator,
     CatalogIdentityIndex& index,
     const BaseCelestialBody& incoming,
     const std::string_view sourceId,
-    const CatalogCompositionMerger::SourcePrecedence& sourcePrecedence,
+    const CatalogSourcePrecedence& sourcePrecedence,
     const std::size_t rowOrdinal
 )
 {
@@ -226,11 +226,11 @@ std::size_t appendDeduped(
 // the normal keep-distinct diagnostics. Only replacement-versus-preservation
 // is policy-specific, never the identity decision itself.
 void appendGapFillBody(
-    CatalogCompositionMerger::MergeAccumulator& accumulator,
+    CatalogMergeAccumulator& accumulator,
     CatalogIdentityIndex& index,
     const BaseCelestialBody& body,
     const std::string_view sourceId,
-    const CatalogCompositionMerger::SourcePrecedence& sourcePrecedence,
+    const CatalogSourcePrecedence& sourcePrecedence,
     const std::size_t rowOrdinal
 )
 {
@@ -249,9 +249,8 @@ void appendGapFillBody(
 // A shared authoritative identity across incompatible kinds is a deliberate,
 // already diagnosed conflict; the same identity across survivors of one kind
 // is an internal merge error.
-std::vector<std::size_t> sameKindDuplicates(
-    const CatalogCompositionMerger::MergeAccumulator& accumulator, const std::vector<std::size_t>& positions
-)
+std::vector<std::size_t>
+sameKindDuplicates(const CatalogMergeAccumulator& accumulator, const std::vector<std::size_t>& positions)
 {
     std::vector<std::size_t> duplicates;
     for (const std::size_t position : positions) {
@@ -270,7 +269,7 @@ std::vector<std::size_t> sameKindDuplicates(
 // survivors of the same kind. The validated index is rebuilt from the active
 // survivors rather than reused from the merge, so the check also catches an
 // index that fell out of step with the merged collection.
-void logUnexpectedDuplicateIdentities(const CatalogCompositionMerger::MergeAccumulator& accumulator)
+void logUnexpectedDuplicateIdentities(const CatalogMergeAccumulator& accumulator)
 {
     CatalogIdentityIndex validationIndex;
     validationIndex.reserve(accumulator.active.size());
@@ -338,9 +337,7 @@ void pushDistantBody(
     result.contributorSourceIds.push_back(contributorSourceIds);
 }
 
-void assembleResult(
-    CatalogCompositionMergeResult& result, const CatalogCompositionMerger::MergeAccumulator& accumulator
-)
+void assembleResult(CatalogCompositionMergeResult& result, const CatalogMergeAccumulator& accumulator)
 {
     result.ownGalaxyBodies.reserve(accumulator.ownGalaxyBodies.size());
     result.distantBodies.reserve(accumulator.distantBodies.size());
@@ -374,13 +371,13 @@ void assembleResult(
 
 CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const CatalogCompositionRequest& request)
 {
-    CatalogCompositionMerger::MergeAccumulator accumulator;
+    CatalogMergeAccumulator accumulator;
     CatalogIdentityIndex activeIndex;
     // Rank every configured source by its collection position before merging:
     // a later source has higher precedence than every earlier one. Disabled
     // sources are ranked too so a source id lookup is total, but they never
     // contribute bodies or metadata.
-    CatalogCompositionMerger::SourcePrecedence sourcePrecedence;
+    CatalogSourcePrecedence sourcePrecedence;
     for (std::size_t index = 0; index < request.sources.size(); ++index) {
         sourcePrecedence.add(request.sources[index].sourceId, index);
     }
@@ -427,7 +424,7 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
             continue;
         }
 
-        CatalogCompositionMerger::MergeAccumulator sourceBodies;
+        CatalogMergeAccumulator sourceBodies;
         CatalogIdentityIndex sourceIndex;
         for (const BaseCelestialBody* body : source.catalog->bodies()) {
             if (body == nullptr || !CatalogCompositionPolicyRules::participates(source.policy, *body)) {

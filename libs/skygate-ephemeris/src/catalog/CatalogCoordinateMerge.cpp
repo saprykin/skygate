@@ -1,8 +1,8 @@
 #include "CatalogCoordinateMerge.hpp"
 
-#include "CatalogCompositionLogging.hpp"
-#include "CatalogCoordinateModel.hpp"
-#include "CatalogStarAstrometry.hpp"
+#include "catalog/CatalogCompositionLogging.hpp"
+#include "catalog/CatalogCoordinateModel.hpp"
+#include "catalog/CatalogStarAstrometry.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 

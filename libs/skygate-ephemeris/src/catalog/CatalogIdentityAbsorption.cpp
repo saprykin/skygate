@@ -253,9 +253,9 @@ void CatalogIdentityAbsorption::mergeSurvivorInPlace(
 // position order is deliberately not used: earlier replacements leave
 // contributor lists that interleave source ranks.
 std::vector<std::string> CatalogIdentityAbsorption::collectContributors(
-    const CatalogCompositionMerger::MergeAccumulator& accumulator,
+    const CatalogMergeAccumulator& accumulator,
     const std::vector<std::size_t>& positions,
-    const CatalogCompositionMerger::SourcePrecedence& sourcePrecedence
+    const CatalogSourcePrecedence& sourcePrecedence
 )
 {
     std::vector<std::string> contributors;
@@ -292,9 +292,9 @@ std::vector<std::string> CatalogIdentityAbsorption::collectContributors(
 void CatalogIdentityAbsorption::absorbSurvivors(
     BaseCelestialBody& winner,
     CatalogFieldOrigins& winnerOrigins,
-    const CatalogCompositionMerger::MergeAccumulator& accumulator,
+    const CatalogMergeAccumulator& accumulator,
     std::vector<std::size_t> positions,
-    const CatalogCompositionMerger::SourcePrecedence& sourcePrecedence
+    const CatalogSourcePrecedence& sourcePrecedence
 )
 {
     std::stable_sort(
@@ -335,14 +335,14 @@ void CatalogIdentityAbsorption::absorbSurvivors(
 // later rows resolve to the new survivor and never to a vacated body.
 template <typename WinnerBody>
 std::size_t CatalogIdentityAbsorption::appendAbsorbedSurvivor(
-    CatalogCompositionMerger::MergeAccumulator& accumulator,
+    CatalogMergeAccumulator& accumulator,
     CatalogIdentityIndex& index,
     WinnerBody winner,
     CatalogFieldOrigins winnerOrigins,
     const std::vector<std::size_t>& absorbedPositions,
     std::string sourceId,
     std::vector<std::string> priorContributors,
-    const CatalogCompositionMerger::SourcePrecedence& sourcePrecedence
+    const CatalogSourcePrecedence& sourcePrecedence
 )
 {
     absorbSurvivors(winner, winnerOrigins, accumulator, absorbedPositions, sourcePrecedence);
@@ -369,13 +369,13 @@ std::size_t CatalogIdentityAbsorption::appendAbsorbedSurvivor(
 // follows configured source precedence rather than accumulator position
 // order.
 std::size_t CatalogIdentityAbsorption::absorbSurvivorsAndAppend(
-    CatalogCompositionMerger::MergeAccumulator& accumulator,
+    CatalogMergeAccumulator& accumulator,
     CatalogIdentityIndex& index,
     const BaseCelestialBody& incoming,
     CatalogFieldOrigins incomingOrigins,
     const std::vector<std::size_t>& absorbedPositions,
     std::string sourceId,
-    const CatalogCompositionMerger::SourcePrecedence& sourcePrecedence
+    const CatalogSourcePrecedence& sourcePrecedence
 )
 {
     std::vector<std::string> priorContributors = collectContributors(accumulator, absorbedPositions, sourcePrecedence);
