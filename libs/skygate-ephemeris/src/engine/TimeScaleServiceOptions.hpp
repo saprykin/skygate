@@ -7,7 +7,10 @@ namespace skygate::ephemeris {
 struct TimeScaleServiceOptions {
     bool allowDegradedLeapSecondFallback = false;
     int fallbackTaiMinusUtcSeconds = 0;
-    EarthOrientationSampler::Options earthOrientationSampleOptions{false, false};
+    EarthOrientationSampler::Options earthOrientationSampleOptions{
+        .allowOutOfRangeNearestSampleFallback = false,
+        .allowMissingDataZeroFallback = false,
+    };
     bool allowUt1DeltaTFallback = false;
 };
 

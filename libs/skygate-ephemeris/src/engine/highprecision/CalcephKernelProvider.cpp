@@ -3,6 +3,7 @@
 #include "CalcephKernelStatusNames.hpp"
 #include "engine/EphemerisDataFileUtilities.hpp"
 #include "engine/EphemerisDataManifest.hpp"
+#include "engine/EphemerisDataPayloadReader.hpp"
 #include "ICalcephKernel.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
 
@@ -14,7 +15,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cstddef>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -27,8 +27,6 @@ namespace skygate::ephemeris::highprecision {
 class CalcephKernelProvider::Impl final {
 public:
     using Status = ICalcephKernel::Status;
-
-    static constexpr std::size_t kIoBufferBytes = 1U << 16U;
 
     class FailedKernel final : public ICalcephKernel {
     public:
@@ -212,7 +210,7 @@ public:
         }
 
         QCryptographicHash hash(QCryptographicHash::Sha256);
-        std::array<char, kIoBufferBytes> buffer{};
+        std::array<char, EphemerisDataPayloadReader::kIoBufferBytes> buffer{};
         while (!file.atEnd()) {
             const qint64 bytesRead = file.read(buffer.data(), static_cast<qint64>(buffer.size()));
             if (bytesRead < 0) {

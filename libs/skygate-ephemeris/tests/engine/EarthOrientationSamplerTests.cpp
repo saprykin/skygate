@@ -1,7 +1,9 @@
 #include "engine/EarthOrientationSampler.hpp"
+#include "engine/EphemerisTimePolicy.hpp"
 #include "engine/LeapSecondTimeScaleService.hpp"
 #include "engine/TimeScaleServiceOptions.hpp"
 #include "engine/Ut1OffsetResolver.hpp"
+#include "math/TimeConstants.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/CalendarTime.hpp"
 #include "time/CivilDateTime.hpp"
@@ -10,6 +12,7 @@
 #include <QtTest/QtTest>
 
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
@@ -21,8 +24,10 @@ namespace {
 using skygate::core::AstronomicalEpoch;
 using skygate::core::CalendarTime;
 using skygate::core::CivilDateTime;
+using skygate::core::TimeConstants;
 using skygate::core::TimeScale;
 using skygate::ephemeris::EarthOrientationSampler;
+using skygate::ephemeris::EphemerisTimePolicy;
 using skygate::ephemeris::IEarthOrientationProvider;
 using skygate::ephemeris::LeapSecondTimeScaleService;
 using skygate::ephemeris::TimeScaleConversionResult;
@@ -114,6 +119,7 @@ private slots:
     void keepsFailureTextForRejectedRanges();
     void propagatesOriginTextToUt1Resolution();
     void propagatesOriginTextToTimeScaleConversion();
+    void convergesUt1InverseAtIterationCap();
 };
 
 void EarthOrientationSamplerTests::reportsExactRowOrigin()
@@ -338,6 +344,39 @@ void EarthOrientationSamplerTests::propagatesOriginTextToTimeScaleConversion()
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.diagnosticText, sample.diagnosticText);
+}
+
+void EarthOrientationSamplerTests::convergesUt1InverseAtIterationCap()
+{
+    // The table drifts much faster than real Earth-orientation data so that the
+    // first inversion round lands well outside the epoch-key tolerance and the
+    // solver has to keep refining until its iteration cap.
+    const std::shared_ptr<const IEarthOrientationProvider> provider = providerWith(
+        availableDataInfo(),
+        std::vector<IEarthOrientationProvider::TableEntry>{tableEntry(1, 0.0), tableEntry(11, 8640.0)}
+    );
+    const AstronomicalEpoch ut1Epoch = epochForDate(2026, 4, 1).addSeconds(43.2, TimeScale::Ut1);
+    const AstronomicalEpoch ut1ReadingAsUtc = ut1Epoch.addSeconds(0.0, TimeScale::Utc);
+
+    const EarthOrientationSampler::Sample firstRound = EarthOrientationSampler::sample(provider, ut1ReadingAsUtc);
+    QVERIFY(firstRound.isSuccess());
+    QVERIFY(
+        std::abs(firstRound.ut1MinusUtcSeconds) / TimeConstants::kSecondsPerDay
+        > EphemerisTimePolicy::kEpochKeyEqualityToleranceDays
+    );
+
+    const Ut1OffsetResolver resolver(nullptr, provider, nullptr, TimeScaleServiceOptions{});
+    const TimeScaleConversionResult result = resolver.lookupUtcFromUt1(ut1Epoch);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(static_cast<std::uint8_t>(result.epoch.timeScale), static_cast<std::uint8_t>(TimeScale::Utc));
+
+    const EarthOrientationSampler::Sample convergedRound = EarthOrientationSampler::sample(provider, result.epoch);
+    QVERIFY(convergedRound.isSuccess());
+    const AstronomicalEpoch reconstructed = result.epoch.addSeconds(convergedRound.ut1MinusUtcSeconds, TimeScale::Ut1);
+    QVERIFY(
+        std::abs(reconstructed.sortKey() - ut1Epoch.sortKey()) <= EphemerisTimePolicy::kEpochKeyEqualityToleranceDays
+    );
 }
 
 QTEST_APPLESS_MAIN(EarthOrientationSamplerTests)

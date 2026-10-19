@@ -1,5 +1,6 @@
 #include "EarthOrientationDataParser.hpp"
 #include "EphemerisTableMetadata.hpp"
+#include "EphemerisTimePolicy.hpp"
 #include "IEphemerisDataSnapshot.hpp"
 #include "NumericParsingUtilities.hpp"
 #include "TextParsingUtilities.hpp"
@@ -112,15 +113,13 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
 // FINALS dates use two-digit years, so the MJD column is needed to pick the
 // century. The calendar year, month, and day columns stay authoritative for
 // the row date; the MJD only marks which side of the pivot the row falls on.
-constexpr double kFinalsTwoDigitYearPivotMjd = 51543.0;
-
 [[nodiscard]] std::optional<int> finalsYearFromMjd(const int twoDigitYear, const double mjd) noexcept
 {
     if (twoDigitYear < 0 || twoDigitYear > 99 || !std::isfinite(mjd)) {
         return std::nullopt;
     }
 
-    return (mjd <= kFinalsTwoDigitYearPivotMjd ? 1900 : 2000) + twoDigitYear;
+    return (mjd <= EphemerisTimePolicy::kTwoDigitYearPivotMjd ? 1900 : 2000) + twoDigitYear;
 }
 
 [[nodiscard]] bool assignFinals2000AEntry(

@@ -154,13 +154,13 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
         columns.size() >= 4U ? NumericParsingUtilities::parseFiniteDouble(columns[3]) : std::nullopt;
     const std::optional<double> thirdColumnSeconds =
         columns.size() >= 3U ? NumericParsingUtilities::parseFiniteDouble(columns[2]) : std::nullopt;
-    if (columns.size() >= 4U && year.has_value() && month.has_value() && day.has_value() && *month >= 1 && *month <= 12
-        && fourthColumnSeconds.has_value()) {
+    if (columns.size() >= 4U && year.has_value() && month.has_value() && day.has_value()
+        && skygate::core::CalendarTime::isValidGregorianMonth(*month) && fourthColumnSeconds.has_value()) {
         deltaTSeconds = *fourthColumnSeconds;
         effectiveDate = skygate::core::CalendarTime::civilDateFromUtcParts(*year, *month, *day);
     } else if (
-        columns.size() >= 3U && year.has_value() && month.has_value() && *month >= 1 && *month <= 12
-        && thirdColumnSeconds.has_value()
+        columns.size() >= 3U && year.has_value() && month.has_value()
+        && skygate::core::CalendarTime::isValidGregorianMonth(*month) && thirdColumnSeconds.has_value()
     ) {
         deltaTSeconds = *thirdColumnSeconds;
         effectiveDate = skygate::core::CalendarTime::civilDateFromUtcParts(*year, *month, 1);

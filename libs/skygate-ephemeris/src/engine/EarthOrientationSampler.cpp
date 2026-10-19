@@ -1,5 +1,6 @@
 #include "EarthOrientationSampler.hpp"
 #include "EphemerisDataStaleness.hpp"
+#include "EphemerisTimePolicy.hpp"
 #include "TableInterpolation.hpp"
 
 #include <algorithm>
@@ -51,11 +52,9 @@ std::string EarthOrientationSampler::Sample::diagnosticTextFor(
 
 namespace {
 
-constexpr double kEpochKeyEqualityToleranceDays = 1.0e-9;
-
 [[nodiscard]] bool sameEpochKey(const double lhs, const double rhs) noexcept
 {
-    return std::abs(lhs - rhs) <= kEpochKeyEqualityToleranceDays;
+    return std::abs(lhs - rhs) <= EphemerisTimePolicy::kEpochKeyEqualityToleranceDays;
 }
 
 void addSampleWarning(
