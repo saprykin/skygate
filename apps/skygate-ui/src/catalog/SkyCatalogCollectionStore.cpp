@@ -2,6 +2,7 @@
 #include "SkyCatalogCollectionManifestStore.hpp"
 #include "SkyCatalogSourceCachePaths.hpp"
 #include "SkyCatalogSourceRecordCodec.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 #include "settings/SkyCacheFiles.hpp"
 #include "settings/SkySettingsKeyBuilder.hpp"
 #include "settings/SkySettingsValueCodecs.hpp"
@@ -16,8 +17,6 @@
 
 namespace skygate::ui::internal {
 namespace {
-
-Q_LOGGING_CATEGORY(skygateCatalogCacheLog, "skygate.catalog.cache")
 
 bool writeCatalogSourceFile(const QString& path, const QByteArray& payload)
 {

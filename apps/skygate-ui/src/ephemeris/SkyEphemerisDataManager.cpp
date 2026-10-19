@@ -4,6 +4,7 @@
 #include "SkyEphemerisDataCacheSnapshotPolicy.hpp"
 #include "SkyEphemerisDownloadService.hpp"
 #include "SkyEphemerisSnapshotAdapter.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 #include "settings/SkySettingsStore.hpp"
 
 #include <QFile>
@@ -16,11 +17,10 @@
 
 namespace {
 
-Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
-
 using EphemerisDataCacheSnapshot = SkyEphemerisDataCacheSnapshot;
 using StagedUpdateActivationRequest = SkyEphemerisDataManager::StagedUpdateActivationRequest;
 using StagedUpdateDownloadRequest = SkyEphemerisDataManager::StagedUpdateDownloadRequest;
+using skygate::ui::skygateEphemerisDataLog;
 using skygate::ui::internal::SkyEphemerisAssetStatusView;
 using skygate::ui::internal::SkyEphemerisDataCacheSnapshotPolicy;
 

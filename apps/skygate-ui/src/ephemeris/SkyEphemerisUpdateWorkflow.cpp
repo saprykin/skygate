@@ -6,6 +6,7 @@
 #include "SkyEphemerisSettingsPolicy.hpp"
 #include "SkyEphemerisStatusText.hpp"
 #include "SkyEphemerisUpdateOperation.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 
 #include <QDir>
 #include <QLoggingCategory>
@@ -24,9 +25,8 @@ using namespace skygate::ui::internal;
 
 namespace {
 
-Q_LOGGING_CATEGORY(skygateEphemerisUpdateLog, "skygate.ephemeris.update")
-
 using skygate::ephemeris::EphemerisDataManifest;
+using skygate::ui::skygateEphemerisUpdateLog;
 using skygate::ui::internal::SkyEphemerisAssetStatus;
 using skygate::ui::internal::SkyEphemerisManifestLoader;
 using skygate::ui::internal::SkyEphemerisUpdateOperation;

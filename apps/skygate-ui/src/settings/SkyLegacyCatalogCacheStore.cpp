@@ -3,6 +3,7 @@
 #include "SkyPersistedStateSnapshot.hpp"
 #include "SkySettingsKeyBuilder.hpp"
 #include "SkySettingsValueCodecs.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 
 #include <QByteArray>
 #include <QDir>
@@ -16,8 +17,6 @@
 
 namespace skygate::ui::internal {
 namespace {
-
-Q_LOGGING_CATEGORY(skygateCatalogCacheLog, "skygate.catalog.cache")
 
 // Legacy two-slot catalog cache files, kept under their original names so an
 // older installation still restores.

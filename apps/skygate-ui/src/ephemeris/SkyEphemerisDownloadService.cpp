@@ -1,4 +1,5 @@
 #include "SkyEphemerisDownloadService.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 #include "engine/EphemerisDataFileUtilities.hpp"
 
 #include <QByteArray>
@@ -23,10 +24,9 @@
 
 namespace {
 
-Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
-
 using skygate::ephemeris::EphemerisDataFileUtilities;
 using skygate::ephemeris::EphemerisDataManifest;
+using skygate::ui::skygateEphemerisDataLog;
 using StagedUpdateDownloadRequest = SkyEphemerisDownloadService::StagedUpdateDownloadRequest;
 using StagedUpdateDownloadResult = SkyEphemerisDownloadService::StagedUpdateDownloadResult;
 using StagedUpdateDownloadStatus = SkyEphemerisDownloadService::StagedUpdateDownloadStatus;

@@ -2,6 +2,7 @@
 #include "SkyEphemerisDataCacheSnapshotPolicy.hpp"
 #include "SkyEphemerisPathSegmentPolicy.hpp"
 
+#include "diagnostics/SkyLoggingCategories.hpp"
 #include "engine/EphemerisDataActivation.hpp"
 #include "engine/EphemerisDataFileUtilities.hpp"
 #include "engine/EphemerisStagedUpdateVerification.hpp"
@@ -21,8 +22,6 @@ using namespace skygate::ui::internal;
 
 namespace {
 
-Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
-
 using EphemerisDataCacheSnapshot = SkyEphemerisDataCacheSnapshot;
 using StagedUpdateActivationRequest = SkyEphemerisCacheController::StagedUpdateActivationRequest;
 using StagedUpdateActivationResult = SkyEphemerisCacheController::StagedUpdateActivationResult;
@@ -33,6 +32,7 @@ using skygate::ephemeris::EphemerisDataManifest;
 using skygate::ephemeris::EphemerisStagedUpdateVerificationRequest;
 using skygate::ephemeris::EphemerisStagedUpdateVerificationResult;
 using skygate::ephemeris::EphemerisStagedUpdateVerificationStatus;
+using skygate::ui::skygateEphemerisDataLog;
 using skygate::ui::internal::SkyEphemerisDataCacheSnapshotPolicy;
 
 void addDiagnostic(StagedUpdateActivationResult& result, QString diagnostic)

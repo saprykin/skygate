@@ -7,17 +7,13 @@
 #include "SkyPayloadView.hpp"
 #include "catalog/CatalogIdentity.hpp"
 #include "catalog/stellarium/StellariumConstellationParser.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 
 #include <QLoggingCategory>
 
 #include <utility>
 
 namespace skygate::ui::internal {
-namespace {
-
-Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
-
-}  // namespace
 
 SkyCatalogImportWorkflow::SkyCatalogImportWorkflow(QNetworkAccessManager* networkAccessManager)
     : m_catalogCoordinator(std::make_unique<CatalogCoordinator>(networkAccessManager))

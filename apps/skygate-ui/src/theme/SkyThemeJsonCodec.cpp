@@ -2,6 +2,7 @@
 #include "SkyThemeDefinition.hpp"
 #include "SkyThemeRenderPalette.hpp"
 #include "SkyThemeUiPalette.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -13,8 +14,6 @@
 
 namespace skygate::ui::internal {
 namespace {
-
-Q_LOGGING_CATEGORY(skygateThemeLog, "skygate.theme")
 
 [[nodiscard]] std::optional<QColor>
 parseColor(const QJsonObject& object, const char* key, const QString& sourceDescription)

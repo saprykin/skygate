@@ -1,6 +1,7 @@
 #include "SkyContextController.hpp"
 #include "SkyContextTextFormatter.hpp"
 #include "catalog/SkyCatalogManager.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "engine/EphemerisEngineDescriptorRegistry.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
@@ -22,10 +23,9 @@ using namespace skygate::ui::internal;
 
 namespace {
 
-Q_LOGGING_CATEGORY(skygateEphemerisUpdateLog, "skygate.ephemeris.update")
-
 using skygate::ephemeris::EphemerisEngineDescriptorRegistry;
 using skygate::ephemeris::EphemerisEngineKind;
+using skygate::ui::skygateEphemerisUpdateLog;
 
 [[nodiscard]] EphemerisEngineKind::Type engineKindFromIndex(const int index) noexcept
 {
