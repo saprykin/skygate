@@ -2,7 +2,7 @@
 
 Status: implementation baseline plus remaining product requirements
 
-Last updated: 2026-05-28
+Last updated: 2026-10-24
 
 ## Purpose
 
@@ -76,7 +76,7 @@ When high precision is enabled, `EphemerisEngineFactory` can create a
 `HighPrecisionEphemerisEngine` from `EphemerisEngineFactoryRequest`. The
 request wires the selected engine kind, catalog, options, data manifests,
 active data snapshot, time-scale service, Earth-orientation provider, CALCEPH
-runtime, fallback policy, and diagnostics sink.
+kernel provider, fallback policy, and diagnostics sink.
 
 The high-precision implementation lives in `src/engine/highprecision/` and is a
 facade over CALCEPH solar-system state, star astrometry, time-scale conversion,
@@ -88,7 +88,8 @@ owned by `SkyCatalogManager`; ephemeris data state is owned separately by
 `SkyEphemerisDataManager`. Scene cache invalidation includes selected engine
 identity, engine options, and ephemeris data revision.
 
-The app currently bundles the ephemeris data manifest as a Qt resource. Kernel,
+The app loads an external manifest from an ephemeris data root when a package
+provides one and otherwise uses the manifest bundled as a Qt resource. Kernel,
 Earth-orientation, leap-second, and Delta T assets are described by that
 manifest and are installed/downloaded as external cache files rather than
 embedded in the resource system.
@@ -97,7 +98,7 @@ Known limitations:
 
 - Long-range DE441-size data remains optional and cannot be bundled by default.
 - Full product validation still needs broad Horizons fixtures and
-  release-platform package smoke coverage.
+  high-precision package smoke coverage.
 - Ancient apparent positions remain limited by Delta T, Earth rotation models,
   historical calendar interpretation, and catalog quality.
 - Update UX and packaged data policies need continued release hardening.
@@ -229,15 +230,17 @@ The public API includes:
 - `EphemerisEngineQueryResult`
 - `EphemerisPrecisionPolicy`
 - `EphemerisRequest`
-- `AstronomicalEpoch`
-- `AstronomicalEpochRange`
-- `TimeScale`
+- `EphemerisEngineTraits`
+
+The request epoch and the date ranges use the `skygate-core` time types
+`AstronomicalEpoch`, `AstronomicalEpochRange`, and `TimeScale`.
 
 `IEphemerisEngine` exposes:
 
 - `kind()`
 - `name()`
 - `capabilities()`
+- `traits()`
 - `supportedDateRanges()`
 - `dataSetInfo()`
 - `options()`
@@ -259,11 +262,11 @@ Required creation inputs:
 - engine kind
 - catalog bodies
 - engine options
-- kernel/data-set manifest
+- data-set metadata and ephemeris data manifest
 - active data snapshot
 - time-scale service
 - Earth-orientation provider
-- optional CALCEPH runtime
+- optional CALCEPH kernel provider
 - optional logger/diagnostics sink
 
 The factory must return a simple engine when high-precision dependencies or data
@@ -291,6 +294,12 @@ focused calculator/provider classes:
 - `EphemerisResultBuilder`
 - `EphemerisComputationCache`
 
+Narrower helpers support those collaborators: request preparation
+(`PreparedRequestStateBuilder`), correction pipelines
+(`SolarSystemCorrectionPipeline`), frame-transform batching
+(`FrameTransformBatcher`, `FrameTransformMatrixCache`), metadata merging
+(`EphemerisMetadataMerger`), and cache gating (`EphemerisCacheGateway`).
+
 The facade owns configuration, validates requests, coordinates calculators, and
 assembles result status/provenance. Calculator classes should remain testable
 without UI.
@@ -301,21 +310,27 @@ Do not extend `ITimeSource` into a full astronomy service. The existing
 `ITimeSource` should remain a core clock interface for "what time is it now?"
 and continue to support test injection.
 
-Add ephemeris-specific time types and services:
+The calendar and epoch types live in `skygate-core`: `AstronomicalEpoch` is a
+two-part Julian date plus time scale, `CivilDateTime` is a signed astronomical
+year, month, day, time, and subsecond, and `TimeScale` names UTC, TAI, TT, TDB,
+and UT1. The ephemeris module adds the services:
 
-- `AstronomicalEpoch`: two-part Julian date plus time scale
-- `CivilDateTime`: signed astronomical year, month, day, time, subsecond
 - `LeapSecondTimeScaleService`: UTC, TAI, TT, TDB, UT1 conversion
 - `ILeapSecondProvider`: UTC/TAI data interface with nested table types
 - `TableBackedLeapSecondProvider`: table-backed UTC/TAI lookup
 - `LeapSecondTableLoader`: leap-second table parsing and validation
-- `DeltaTProvider`: historical and future Delta T estimates
+- `IDeltaTProvider`: historical and future Delta T estimates
+- `TableBackedDeltaTProvider`: table-backed Delta T storage
 - `IEarthOrientationProvider`: immutable Earth-orientation data contract
 - `TableBackedEarthOrientationProvider`: metadata and table storage
 - `EarthOrientationDataParser`: CSV, IERS C04, and finals2000A parsing
 - `EarthOrientationDataLoader`: asset access, staleness, provider creation
 - `EarthOrientationSampler`: UT1-UTC and polar motion interpolation,
   fallback policy, and sample warnings
+
+The time-scale service delegates to focused epoch, leap-second, and UT1
+offset resolvers plus a TDB-TT converter instead of growing one large
+conversion class.
 
 Reasoning:
 
@@ -346,8 +361,8 @@ operation requires packaged external data or prior installation:
 - leap-second table
 - Earth-orientation data with a recent prediction interval
 - Delta T model/table for ancient dates
-- manifest with data versions, source URLs, checksums, validity ranges, and
-  compression metadata
+- manifest with data versions, source URLs, checksums for pinned assets,
+  validity ranges, and compression metadata
 
 Make multi-gigabyte long-range kernels optional downloads:
 
@@ -359,6 +374,10 @@ Make multi-gigabyte long-range kernels optional downloads:
 - The download flow supports checksum verification, restartable staging, atomic
   activation, and safe cancellation. Resumable range downloads are not
   implemented yet.
+- Assets marked `live` in the manifest describe upstream files that change
+  without a manifest update. They may omit checksum and size metadata and are
+  verified by a readable non-empty payload and a valid validity range; pinned
+  assets, including all kernels, keep strict size and sha256 checks.
 
 Large data assets must not be placed in Qt resource files. Keep the manifest in
 resources, and install or download kernels/support data as external files. When
@@ -392,27 +411,28 @@ Required controls:
 - kernel status and update action
 - EOP/leap-second status and update action
 - clear ephemeris data cache
-- warning/status text with tooltips
+- warning and status text with tooltip and status-popup display
 
 ### Settings
 
-Current persistent settings live in
-`SkySettingsStore::EphemerisUserSettingsSnapshot`:
+Current persistent settings live in `SkyEphemerisUserSettingsSnapshot`, part
+of `SkyPersistedStateSnapshot` and saved through `SkySettingsStore`:
 
 - selected engine kind
-- high-precision correction flags
+- high-precision correction flags and correction preset id
+- simple-engine fallback preference
 - refraction enabled/disabled
 - atmosphere defaults for refraction
 - preferred kernel/data profile
 - online update enabled/disabled
 - ephemeris update URLs or preset
 
-Installed data metadata lives in `EphemerisDataCacheSnapshot`:
+Installed data metadata lives in `SkyEphemerisDataCacheSnapshot`:
 
-- installed kernel path and version
+- installed kernel asset id, profile id, path, version, and range flag
 - installed EOP path and version
-- installed leap-second table version
-- installed Delta T data version
+- installed leap-second table path and version
+- installed Delta T data path and version
 - data revision token
 - last update result
 
@@ -485,7 +505,8 @@ vcpkg-enabled presets.
 
 ## Testing Requirements
 
-Add tests under `libs/skygate-ephemeris/tests/engine/` and fixtures under
+Add tests under `libs/skygate-ephemeris/tests/engine/` and
+`libs/skygate-ephemeris/tests/highprecision/`, with fixtures under
 `libs/skygate-ephemeris/tests/fixtures/ephemeris/`.
 
 Required test groups:
@@ -559,7 +580,7 @@ UI tests must cover:
 - Complete: frame transformation, correction options, and refraction plumbing
   exist.
 - Complete: degraded-result reasons are surfaced through scene/model status.
-- Remaining: broaden apparent/topocentric Horizons fixtures and UI tooltips.
+- Remaining: broaden apparent/topocentric Horizons fixtures.
 
 ### Phase 5: High-Precision Stars and Performance
 
@@ -569,11 +590,15 @@ UI tests must cover:
 
 ### Phase 6: Update UX and Packaging
 
-- In progress: Preferences expose engine and ephemeris-data controls.
-- In progress: kernel/EOP/leap-second update flows and cache activation.
-- Add bundled compressed data installation to packaging.
-- Add checksum validation and atomic activation.
-- Validate macOS, Windows, and Linux release packaging.
+- Complete: Preferences expose engine, correction, refraction, and
+  ephemeris-data controls with status text and download cancellation.
+- Complete: kernel, EOP, leap-second, and Delta T update flows cover download,
+  info checks, staged activation, and cache clearing.
+- Complete: checksum validation and atomic activation for staged updates.
+- Remaining: bundle a compressed modern kernel and support data with the
+  packaged app so a clean install works offline without a prior download.
+- Remaining: validate macOS, Windows, and Linux package artifacts on release
+  platforms.
 
 ## Acceptance Criteria
 

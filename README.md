@@ -53,7 +53,7 @@ dominate.
   Catalog parsing, celestial coordinate calculations, and sky
   snapshot generation
 - `docs/ARCHITECTURE.md`
-  Detailed architecture notes, runtime flow, and extension points
+  Architecture hub that links the per-topic notes under `docs/arch/`
 
 ## Requirements
 
