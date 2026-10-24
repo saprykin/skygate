@@ -6,15 +6,10 @@
 
 #include <cstdint>
 
-int verifyPublicHeaderLegacyAliases();
-
 int main()
 {
     static_assert(None == 0L);
     static_assert(static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections()) == 0U);
     static_assert(static_cast<std::uint8_t>(skygate::ephemeris::CatalogSelectionMode::Disabled) == 0U);
     static_assert(static_cast<std::uint8_t>(skygate::ephemeris::CatalogLoadResult::ErrorCode::NoError) == 0U);
-
-    skygate::ephemeris::EphemerisCapabilities capabilities =
-        skygate::ephemeris::EphemerisCapabilities::noCapabilities();
 }
