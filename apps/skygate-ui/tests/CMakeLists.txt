@@ -444,6 +444,10 @@ add_skygate_ui_qtest(
     ephemeris/SkyEphemerisUpdateWorkflowTests.cpp
 )
 add_skygate_ui_qtest(
+    skygate-ui-sky-ephemeris-status-text-tests
+    ephemeris/SkyEphemerisStatusTextTests.cpp
+)
+add_skygate_ui_qtest(
     skygate-ui-sky-catalog-runtime-transition-tests
     catalog/SkyCatalogRuntimeTransitionTests.cpp
 )
