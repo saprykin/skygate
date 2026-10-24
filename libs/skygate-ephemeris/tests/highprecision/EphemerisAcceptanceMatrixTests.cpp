@@ -15,7 +15,6 @@
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryBatchResult.hpp"
 
-#include <QFile>
 #include <QtTest/QtTest>
 
 #include <array>
@@ -36,6 +35,7 @@ namespace {
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using namespace skygate::core;
+using skygate::ephemeris::tests::isLfsPointerKernel;
 
 constexpr int kNaifEarth = 399;
 constexpr int kNaifMars = 499;
@@ -366,6 +366,9 @@ private:
     mutable int m_callCount = 0;
 };
 
+// Kept local because it is the only double whose civil date/time path really
+// converts through CalendarTime; ValidUtcTimeScaleService reports civil input
+// as unsupported.
 class AcceptanceTimeScaleService final : public ITimeScaleService {
 public:
     [[nodiscard]] TimeScaleConversionResult
@@ -523,15 +526,6 @@ public:
         dependencies.dataSetInfo = makeDataSetInfo(false);
     }
     return HighPrecisionEphemerisEngine(CelestialBodyCatalog(std::move(bodies)), options, std::move(dependencies));
-}
-
-[[nodiscard]] bool isLfsPointerKernel(const std::string& path)
-{
-    QFile file(QString::fromStdString(path));
-    if (!file.open(QIODevice::ReadOnly)) {
-        return false;
-    }
-    return skygate::ephemeris::tests::isGitLfsPointerPayload(file.read(256));
 }
 
 }  // namespace

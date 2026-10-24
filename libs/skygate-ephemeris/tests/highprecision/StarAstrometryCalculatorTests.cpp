@@ -1,6 +1,7 @@
 #include "CelestialBodyCatalog.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "TestCalcephKernel.hpp"
+#include "ValidUtcTimeScaleService.hpp"
 #include "math/MathConstants.hpp"
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
@@ -23,6 +24,7 @@ namespace {
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using namespace skygate::core;
+using skygate::ephemeris::tests::ValidUtcTimeScaleService;
 
 [[nodiscard]] skygate::core::AstronomicalEpoch epochForYearOffset(const double years) noexcept
 {
@@ -210,49 +212,6 @@ makeFixedEarthKernel(std::optional<Vector3d> earthPositionAu, const bool require
     return kernel;
 }
 
-class FixedTdbTimeScaleService final : public ITimeScaleService {
-public:
-    [[nodiscard]] TimeScaleConversionResult
-    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
-    {
-        ++m_callCount;
-        m_lastTargetScale = targetScale;
-
-        TimeScaleConversionResult result;
-        result.epoch = epoch;
-        result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Type::Valid;
-        return result;
-    }
-
-    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
-        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
-    ) const override
-    {
-        static_cast<void>(dateTime);
-
-        TimeScaleConversionResult result;
-        result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Type::Failed;
-        result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
-        return result;
-    }
-
-    [[nodiscard]] int callCount() const noexcept
-    {
-        return m_callCount;
-    }
-
-    [[nodiscard]] skygate::core::TimeScale lastTargetScale() const noexcept
-    {
-        return m_lastTargetScale;
-    }
-
-private:
-    mutable int m_callCount = 0;
-    mutable skygate::core::TimeScale m_lastTargetScale = skygate::core::TimeScale::Utc;
-};
-
 class TdbApproximationTimeScaleService final : public ITimeScaleService {
 public:
     [[nodiscard]] TimeScaleConversionResult
@@ -402,7 +361,7 @@ void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricSta
     const EphemerisRequest referenceRequest = makeRequest(EphemerisCorrectionFlags::stellarParallax(), 0.0);
     const EphemerisRequest parallaxRequest = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
     auto kernel = makeFixedEarthKernel(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0}, true);
-    auto timeScaleService = std::make_shared<FixedTdbTimeScaleService>();
+    auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
 
     const StarAstrometryCalculator calculator(kernel, timeScaleService);
     const HighPrecisionCalculatorResult referenceResult = calculator.calculate(makeInput(body, referenceRequest));
@@ -425,7 +384,7 @@ void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricSta
         static_cast<std::uint8_t>(kernel->lastEpoch().timeScale),
         static_cast<std::uint8_t>(skygate::core::TimeScale::Tdb)
     );
-    QCOMPARE(timeScaleService->callCount(), 1);
+    QCOMPARE(timeScaleService->convertCallCount(), 1);
     QCOMPARE(
         static_cast<std::uint8_t>(timeScaleService->lastTargetScale()),
         static_cast<std::uint8_t>(skygate::core::TimeScale::Tdb)
@@ -542,14 +501,14 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrecti
     const CatalogStarAstrometryArrays arrays(makeCatalog(bodies).bodies());
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
     auto kernel = makeFixedEarthKernel(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0}, true);
-    auto timeScaleService = std::make_shared<FixedTdbTimeScaleService>();
+    auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
 
     const StarAstrometryCalculator calculator(kernel, timeScaleService);
     const std::vector<StarAstrometryBatchResult> batchResults = calculator.calculateBatch(request, arrays);
 
     QCOMPARE(batchResults.size(), 4U);
     QCOMPARE(kernel->callCount(), 1);
-    QCOMPARE(timeScaleService->callCount(), 1);
+    QCOMPARE(timeScaleService->convertCallCount(), 1);
     for (const StarAstrometryBatchResult& batchResult : batchResults) {
         const HighPrecisionCalculatorResult singleResult =
             calculator.calculate(makeInput(bodies[batchResult.bodyIndex], request));

@@ -30,8 +30,12 @@ TimeScaleConversionResult ValidUtcTimeScaleService::convertCivilDateTime(
 ) const
 {
     static_cast<void>(dateTime);
-    static_cast<void>(targetScale);
-    return {};
+
+    TimeScaleConversionResult result;
+    result.epoch.timeScale = targetScale;
+    result.status = TimeScaleConversionStatus::Type::Failed;
+    result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
+    return result;
 }
 
 int ValidUtcTimeScaleService::convertCallCount() const noexcept

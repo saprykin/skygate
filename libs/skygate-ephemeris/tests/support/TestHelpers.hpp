@@ -44,20 +44,6 @@ findStateById(const EphemerisSnapshot& snapshot, const std::string_view id)
     return nullptr;
 }
 
-[[nodiscard]] inline skygate::core::AstronomicalEpoch dateEpoch(const int year, const int month, const int day)
-{
-    const auto epoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::core::CivilDateTime{
-            .astronomicalYear = year,
-            .month = month,
-            .day = day,
-            .timeScale = skygate::core::TimeScale::Utc,
-        }
-    );
-    assert(epoch.has_value());
-    return *epoch;
-}
-
 [[nodiscard]] inline skygate::core::CivilDateTime dateFromEpoch(const skygate::core::AstronomicalEpoch& epoch)
 {
     const auto date = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
