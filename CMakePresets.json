@@ -20,17 +20,13 @@
         {
             "name": "windows-vcpkg-base",
             "hidden": true,
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build-ninja/${presetName}",
+            "inherits": "base",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
                 "rhs": "Windows"
             },
             "cacheVariables": {
-                "CMAKE_CXX_STANDARD": "20",
-                "CMAKE_CXX_STANDARD_REQUIRED": "ON",
-                "CMAKE_CXX_EXTENSIONS": "OFF",
                 "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
                 "VCPKG_TARGET_TRIPLET": "x64-windows"
             }
@@ -52,8 +48,6 @@
             "name": "ci-linux-base",
             "hidden": true,
             "inherits": "base",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build-ninja/${presetName}",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
@@ -78,8 +72,6 @@
             "name": "linux-vcpkg-base",
             "hidden": true,
             "inherits": "base",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build-ninja/${presetName}",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
