@@ -13,6 +13,7 @@
 #include <QtTest/QtTest>
 
 #include <cstddef>
+#include <optional>
 
 using skygate::ui::internal::SkyCatalogSourceCachePaths;
 using skygate::ui::internal::SkyCatalogSourceRecordCodec;
@@ -276,15 +277,27 @@ void SkyCatalogSourceRecordCodecTests::hasFlatRecordsDistinguishesLayouts()
 {
     QSettings settings;
     QVERIFY(!SkyCatalogSourceRecordCodec::hasFlatRecords(settings));
+    QVERIFY(SkyCatalogSourceRecordCodec::recordGroups(settings).isEmpty());
 
     // Committed generations nest their records in a numeric group.
     settings.setValue(QStringLiteral("catalogSources/4/recordsStored"), true);
     QVERIFY(!SkyCatalogSourceRecordCodec::hasFlatRecords(settings));
+    QVERIFY(SkyCatalogSourceRecordCodec::isGenerationGroup(QStringLiteral("4")));
+    const std::optional<quint64> generation = SkyCatalogSourceRecordCodec::generationOfGroup(QStringLiteral("4"));
+    QVERIFY(generation.has_value());
+    QCOMPARE(generation.value(), quint64{4});
+    QCOMPARE(SkyCatalogSourceRecordCodec::recordGroups(settings), QStringList{QStringLiteral("4")});
 
     // A sidecar-named group is a record written before generations were
     // published.
     settings.setValue(QStringLiteral("catalogSources/catalog-source-flat/instanceId"), QStringLiteral("flat:source"));
     QVERIFY(SkyCatalogSourceRecordCodec::hasFlatRecords(settings));
+    QVERIFY(!SkyCatalogSourceRecordCodec::isGenerationGroup(QStringLiteral("catalog-source-flat")));
+    QVERIFY(!SkyCatalogSourceRecordCodec::generationOfGroup(QStringLiteral("catalog-source-flat")).has_value());
+    QCOMPARE(
+        SkyCatalogSourceRecordCodec::recordGroups(settings),
+        QStringList({QStringLiteral("4"), QStringLiteral("catalog-source-flat")})
+    );
 }
 
 void SkyCatalogSourceRecordCodecTests::evictPayloadKeepsConfigurationFields()

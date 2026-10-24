@@ -48,8 +48,6 @@ public:
     [[nodiscard]] static QString emptyDeepSkyCatalog();
     [[nodiscard]] static QString missingConstellationData(const QString& reason);
 
-    [[nodiscard]] static QString unknownCatalogPreset(const QString& presetId);
-    [[nodiscard]] static QString unknownDeepSkyPreset(const QString& presetId);
     [[nodiscard]] static QString unknownSourcePreset(const QString& presetId);
     [[nodiscard]] static QString cacheClearBlocked();
     [[nodiscard]] static QString starCacheClearResult(bool cacheCleared);

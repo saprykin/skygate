@@ -108,17 +108,6 @@ bool SkyCatalogCacheController::clearSourceCache(const QString& instanceId) cons
     return m_settingsStore != nullptr && m_settingsStore->clearCatalogSourceCache(instanceId);
 }
 
-bool SkyCatalogCacheController::clearCollectionCache() const
-{
-    if (m_settingsStore == nullptr) {
-        return false;
-    }
-
-    const bool collectionCleared = m_settingsStore->clearCatalogCollectionCache();
-    const bool legacyCleared = m_settingsStore->clearCatalogCache() && m_settingsStore->clearDeepSkyCatalogCache();
-    return collectionCleared && legacyCleared;
-}
-
 SkyCatalogCacheController::DecodedCatalog SkyCatalogCacheController::decodeSourceCatalog(
     const SkyCatalogSourceCacheRecord& sourceRecord, const int binarySchemaVersion
 ) const

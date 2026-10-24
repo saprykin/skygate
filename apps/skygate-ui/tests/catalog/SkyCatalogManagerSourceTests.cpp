@@ -1,5 +1,6 @@
 #include "BaseCelestialBody.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
+#include "catalog/CatalogSourceInstanceTestSupport.hpp"
 #include "catalog/SkyCatalogManager.hpp"
 #include "catalog/SkyCatalogPresets.hpp"
 #include "catalog/SkyCatalogSourceDescriptor.hpp"
@@ -40,8 +41,8 @@ class SkyCatalogManagerSourceTests final : public QObject {
 private slots:
     void initTestCase();
     void init();
-    void unknownPresetsUpdateStatus();
-    void bundledPresetResetsCatalogAndConstellationRefs();
+    void unknownSourcePresetUpdatesStatus();
+    void bundledPresetReplacesPrimarySlot();
     void bundledReplacementDropsOwnerDataAndFreshCounts();
     void bundledDeepSkyPresetRebuildsActiveCatalog();
     void clearCacheReportsStatusAndSignals();
@@ -76,32 +77,29 @@ void SkyCatalogManagerSourceTests::init()
     QDir(m_settings.filePath(QStringLiteral("catalog-collection-cache"))).removeRecursively();
 }
 
-void SkyCatalogManagerSourceTests::unknownPresetsUpdateStatus()
+void SkyCatalogManagerSourceTests::unknownSourcePresetUpdatesStatus()
 {
     SkySettingsStore store;
     SkyCatalogManager manager(&store);
     QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
 
-    manager.loadCatalogPreset("unknown");
-    QCOMPARE(manager.statusText(), QString("Catalog: Unknown preset 'unknown'"));
+    manager.addSourcePreset("unknown");
+    QCOMPARE(manager.statusText(), QString("Catalog: Unknown source preset 'unknown'"));
     QCOMPARE(statusSpy.count(), 1);
-
-    manager.loadDeepSkyCatalogPreset("unknown_dso");
-    QCOMPARE(manager.statusText(), QString("Catalog: Unknown deep-sky preset 'unknown_dso'"));
-    QCOMPARE(statusSpy.count(), 2);
 }
 
-void SkyCatalogManagerSourceTests::bundledPresetResetsCatalogAndConstellationRefs()
+void SkyCatalogManagerSourceTests::bundledPresetReplacesPrimarySlot()
 {
     SkySettingsStore store;
     SkyCatalogManager manager(&store);
     const auto originalRevision = manager.catalogRevision();
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
 
-    manager.setCatalogPresetIndex(99);
-    manager.loadCatalogPreset("bundled");
+    manager.loadSource(
+        skygate::ui::tests::presetSourceInstance(QStringLiteral("bundled"), QStringLiteral("primary")),
+        skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
 
-    QCOMPARE(manager.catalogPresetIndex(), 0);
     QCOMPARE(manager.sourceLabel(), QString("Bundled"));
     QVERIFY(manager.catalogRevision() > originalRevision);
     QVERIFY(manager.constellationLineRefs().empty());
@@ -131,7 +129,10 @@ void SkyCatalogManagerSourceTests::bundledReplacementDropsOwnerDataAndFreshCount
     QTRY_VERIFY(!manager.constellationLineRefs().empty());
     QVERIFY(manager.constellationCount() > 0U);
 
-    manager.loadCatalogPreset("bundled");
+    manager.loadSource(
+        skygate::ui::tests::presetSourceInstance(QStringLiteral("bundled"), QStringLiteral("primary")),
+        skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
 
     // The bundled replacement drops the owned related dataset, and the status
     // text of that committed replacement reports the post-clear counts instead
@@ -151,10 +152,11 @@ void SkyCatalogManagerSourceTests::bundledDeepSkyPresetRebuildsActiveCatalog()
     const auto originalRevision = manager.catalogRevision();
     QSignalSpy infoSpy(&manager, &SkyCatalogManager::deepSkyCatalogInfoTextChanged);
 
-    manager.setDeepSkyCatalogPresetIndex(99);
-    manager.loadDeepSkyCatalogPreset("bundled_messier");
+    manager.loadSource(
+        skygate::ui::tests::presetSourceInstance(QStringLiteral("bundled_messier"), QStringLiteral("deep-sky"), true),
+        skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly
+    );
 
-    QCOMPARE(manager.deepSkyCatalogPresetIndex(), 0);
     QVERIFY(manager.catalogRevision() > originalRevision);
     QVERIFY(manager.deepSkyCatalogInfoText().contains("Objects:"));
     QVERIFY(infoSpy.count() >= 1);

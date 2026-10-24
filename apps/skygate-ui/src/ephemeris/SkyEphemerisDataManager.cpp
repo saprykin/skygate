@@ -24,16 +24,6 @@ using skygate::ui::skygateEphemerisDataLog;
 using skygate::ui::internal::SkyEphemerisAssetStatusView;
 using skygate::ui::internal::SkyEphemerisDataCacheSnapshotPolicy;
 
-bool hasInstalledMetadata(const EphemerisDataCacheSnapshot& snapshot)
-{
-    return !snapshot.installedKernelAssetId.isEmpty() || !snapshot.installedKernelProfileId.isEmpty()
-           || !snapshot.installedKernelPath.isEmpty() || !snapshot.installedKernelVersion.isEmpty()
-           || !snapshot.installedEarthOrientationPath.isEmpty() || !snapshot.installedEarthOrientationVersion.isEmpty()
-           || !snapshot.installedLeapSecondTablePath.isEmpty() || !snapshot.installedLeapSecondTableVersion.isEmpty()
-           || !snapshot.installedDeltaTDataPath.isEmpty() || !snapshot.installedDeltaTDataVersion.isEmpty()
-           || snapshot.dataRevisionToken != EphemerisDataCacheSnapshot{}.dataRevisionToken;
-}
-
 bool hasInstalledAssetMetadata(const EphemerisDataCacheSnapshot& snapshot)
 {
     return !snapshot.installedKernelAssetId.isEmpty() || !snapshot.installedKernelProfileId.isEmpty()
@@ -43,21 +33,40 @@ bool hasInstalledAssetMetadata(const EphemerisDataCacheSnapshot& snapshot)
            || !snapshot.installedDeltaTDataPath.isEmpty() || !snapshot.installedDeltaTDataVersion.isEmpty();
 }
 
+bool hasInstalledMetadata(const EphemerisDataCacheSnapshot& snapshot)
+{
+    return hasInstalledAssetMetadata(snapshot)
+           || snapshot.dataRevisionToken != EphemerisDataCacheSnapshot{}.dataRevisionToken;
+}
+
 QStringList missingInstalledPaths(const EphemerisDataCacheSnapshot& snapshot)
 {
     QStringList missingPaths;
-    const QStringList candidatePaths{
-        snapshot.installedKernelPath,
-        snapshot.installedEarthOrientationPath,
-        snapshot.installedLeapSecondTablePath,
-        snapshot.installedDeltaTDataPath,
-    };
-    for (const QString& path : candidatePaths) {
+    for (const QString& path : EphemerisDataCacheSnapshot::installedPayloadPaths(snapshot)) {
         if (!path.isEmpty() && !QFileInfo::exists(path)) {
             missingPaths.push_back(path);
         }
     }
     return missingPaths;
+}
+
+// Removes the installed payload files of one cache and reports the first file
+// that could not be removed. Empty paths are skipped: a cache never installed
+// that asset owns no file.
+bool removeInstalledFiles(const QStringList& paths, const QString& cacheLabel)
+{
+    for (const QString& path : paths) {
+        if (path.isEmpty()) {
+            continue;
+        }
+        QFile file(path);
+        if (file.exists() && !file.remove()) {
+            qCWarning(skygateEphemerisDataLog).noquote()
+                << "Unable to remove" << cacheLabel << "cache file" << path << file.errorString();
+            return false;
+        }
+    }
+    return true;
 }
 
 bool cacheSnapshotsEqual(const EphemerisDataCacheSnapshot& lhs, const EphemerisDataCacheSnapshot& rhs)
@@ -261,13 +270,8 @@ bool SkyEphemerisDataManager::clearPlanetaryKernelCache()
         return false;
     }
 
-    if (!kernelPath.isEmpty()) {
-        QFile kernelFile(kernelPath);
-        if (kernelFile.exists() && !kernelFile.remove()) {
-            qCWarning(skygateEphemerisDataLog).noquote()
-                << "Unable to remove planetary kernel cache file" << kernelPath << kernelFile.errorString();
-            return false;
-        }
+    if (!removeInstalledFiles(QStringList{kernelPath}, QStringLiteral("planetary kernel"))) {
+        return false;
     }
 
     return restoreFromSettings();
@@ -282,11 +286,7 @@ bool SkyEphemerisDataManager::clearSupportDataCache()
 
     EphemerisDataCacheSnapshot snapshot =
         SkyEphemerisDataCacheSnapshotPolicy::normalizedSnapshot(m_settingsStore->loadEphemerisDataCache());
-    const QStringList supportPaths{
-        snapshot.installedEarthOrientationPath,
-        snapshot.installedLeapSecondTablePath,
-        snapshot.installedDeltaTDataPath,
-    };
+    const QStringList supportPaths = EphemerisDataCacheSnapshot::installedSupportDataPaths(snapshot);
     snapshot.installedEarthOrientationPath.clear();
     snapshot.installedEarthOrientationVersion.clear();
     snapshot.installedLeapSecondTablePath.clear();
@@ -302,16 +302,8 @@ bool SkyEphemerisDataManager::clearSupportDataCache()
         return false;
     }
 
-    for (const QString& path : supportPaths) {
-        if (path.isEmpty()) {
-            continue;
-        }
-        QFile file(path);
-        if (file.exists() && !file.remove()) {
-            qCWarning(skygateEphemerisDataLog).noquote()
-                << "Unable to remove time and Earth data cache file" << path << file.errorString();
-            return false;
-        }
+    if (!removeInstalledFiles(supportPaths, QStringLiteral("time and Earth data"))) {
+        return false;
     }
 
     return restoreFromSettings();

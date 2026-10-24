@@ -23,6 +23,14 @@ public:
     // A non-numeric group under catalogSources is a sidecar-named flat record,
     // so its presence proves the pre-generation records are still readable.
     [[nodiscard]] static bool hasFlatRecords(QSettings& settings);
+    // A numeric group under catalogSources names one staged generation.
+    [[nodiscard]] static bool isGenerationGroup(const QString& group);
+    // Generation number a group name carries; no value for a sidecar-named
+    // record group.
+    [[nodiscard]] static std::optional<quint64> generationOfGroup(const QString& group);
+    // Every group directly under catalogSources: flat record groups and staged
+    // generation groups together.
+    [[nodiscard]] static QStringList recordGroups(QSettings& settings);
 
     [[nodiscard]] static QString sourceGroup(const QString& parentGroup, const QString& instanceId);
 
@@ -38,6 +46,10 @@ public:
     // Drops the payload references and the related dataset they carry while the
     // configuration fields of the record stay durable.
     static void evictPayload(QSettings& settings, const QString& group);
+    // Settings key of the raw/binary payload sidecar reference. Shared with the
+    // collection store, which evicts the referenced files.
+    [[nodiscard]] static QString payloadPathKey();
+    [[nodiscard]] static QString binaryPayloadPathKey();
 };
 
 }  // namespace skygate::ui::internal

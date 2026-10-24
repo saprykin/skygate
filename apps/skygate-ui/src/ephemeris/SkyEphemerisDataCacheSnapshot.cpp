@@ -32,3 +32,22 @@ std::optional<bool> SkyEphemerisDataCacheSnapshot::legacyKernelLongRange(const S
     }
     return std::nullopt;
 }
+
+QStringList SkyEphemerisDataCacheSnapshot::installedPayloadPaths(const SkyEphemerisDataCacheSnapshot& snapshot)
+{
+    return QStringList{
+        snapshot.installedKernelPath,
+        snapshot.installedEarthOrientationPath,
+        snapshot.installedLeapSecondTablePath,
+        snapshot.installedDeltaTDataPath,
+    };
+}
+
+QStringList SkyEphemerisDataCacheSnapshot::installedSupportDataPaths(const SkyEphemerisDataCacheSnapshot& snapshot)
+{
+    return QStringList{
+        snapshot.installedEarthOrientationPath,
+        snapshot.installedLeapSecondTablePath,
+        snapshot.installedDeltaTDataPath,
+    };
+}

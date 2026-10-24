@@ -768,7 +768,11 @@ void SkyContextControllerSearchTrackingTests::staleTrackedTargetClearsForViewCen
     QVERIFY(controller->trackSearchTarget("body", "demo_target"));
     QVERIFY(controller->hasTrackedTarget());
 
-    controller->loadCatalogPreset("bundled");
+    const auto sourceIds = controller->catalogSourceIds();
+    QVERIFY(!sourceIds.empty());
+    const QString catalogInstanceId = sourceIds.front();
+    controller->removeCatalogSource(catalogInstanceId);
+    controller->addCatalogSourcePreset(QStringLiteral("bundled"));
 
     QVERIFY(!controller->hasTrackedTarget());
     controller->setViewCenter(12.0, 123.0);

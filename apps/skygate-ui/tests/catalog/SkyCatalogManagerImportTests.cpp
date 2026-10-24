@@ -1,4 +1,5 @@
 #include "catalog/CatalogCompositionPolicy.hpp"
+#include "catalog/CatalogSourceInstanceTestSupport.hpp"
 #include "catalog/IStarCatalog.hpp"
 #include "catalog/SkyCatalogManager.hpp"
 #include "catalog/SkyCatalogSourceInstance.hpp"
@@ -82,11 +83,11 @@ void SkyCatalogManagerImportTests::customDeepSkyDownloadUsesGenericSourceLabel()
     SkyCatalogManager manager(&store);
     const QString catalogUrl = QUrl::fromLocalFile(catalogPath).toString();
 
-    manager.downloadDeepSkyCatalogFromUrl(catalogUrl);
+    manager.loadSource(
+        skygate::ui::tests::customSourceInstance(catalogUrl), skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly
+    );
     QTRY_VERIFY(!manager.downloadingCatalog());
 
-    QCOMPARE(manager.deepSkyCatalogPresetIndex(), 2);
-    QCOMPARE(manager.deepSkyCatalogUrlText(), catalogUrl);
     QVERIFY(manager.sourceTitles().values().contains(QStringLiteral("Downloaded")));
     QVERIFY(!manager.sourceTitles().values().contains(QStringLiteral("OpenNGC")));
     QVERIFY(manager.statusText().contains(QStringLiteral("Downloaded")));
@@ -112,7 +113,10 @@ void SkyCatalogManagerImportTests::localDownloadTogglesBusyAndAppliesCatalog()
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
     QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
 
-    manager.downloadCatalogFromUrl(QUrl::fromLocalFile(catalogPath).toString());
+    manager.loadSource(
+        skygate::ui::tests::customSourceInstance(QUrl::fromLocalFile(catalogPath).toString()),
+        skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
     QVERIFY(manager.downloadingCatalog());
     QVERIFY(!manager.clearCatalogCache());
     QCOMPARE(manager.statusText(), QString("Catalog: Cannot clear cache while download is in progress"));
@@ -120,8 +124,6 @@ void SkyCatalogManagerImportTests::localDownloadTogglesBusyAndAppliesCatalog()
     QTRY_VERIFY(!manager.downloadingCatalog());
     QTRY_VERIFY(!manager.catalogProcessing());
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QString("Manager Downloaded Star")));
-    QCOMPARE(manager.catalogPresetIndex(), 2);
-    QCOMPARE(manager.catalogUrlText(), QUrl::fromLocalFile(catalogPath).toString());
     QVERIFY(manager.statusText().contains(QStringLiteral("Downloaded")));
     QVERIFY(downloadSpy.count() >= 2);
     QVERIFY(processingSpy.count() >= 2);
@@ -148,7 +150,12 @@ void SkyCatalogManagerImportTests::cancelCatalogDownloadClearsBusyAndIgnoresResu
     QSignalSpy downloadSpy(&manager, &SkyCatalogManager::downloadingCatalogChanged);
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
 
-    manager.downloadCatalogFromUrl(QUrl::fromLocalFile(catalogPath).toString());
+    manager.loadSource(
+        skygate::ui::tests::customSourceInstance(
+            QUrl::fromLocalFile(catalogPath).toString(), QStringLiteral("primary")
+        ),
+        skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
     QVERIFY(manager.downloadingCatalog());
 
     const QVector<SkyCatalogManager::SourceViewEntry> busyView = manager.sourceViewEntries();
@@ -217,7 +224,9 @@ void SkyCatalogManagerImportTests::cancelAbortsOnlyOwnTransfers()
     update.version = QStringLiteral("v2");
     update.urls = QStringList{ownedPendingUrl, ownedFallbackUrl};
     ownedManager.loadSource(update, skygate::ephemeris::CatalogCompositionPolicy::Merge);
-    otherManager.downloadCatalogFromUrl(otherOwnerUrl);
+    otherManager.loadSource(
+        skygate::ui::tests::customSourceInstance(otherOwnerUrl), skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
 
     QVERIFY(ownedManager.downloadingCatalog());
     QVERIFY(otherManager.downloadingCatalog());
@@ -548,7 +557,9 @@ void SkyCatalogManagerImportTests::failedLocalDownloadClearsBusyAndReportsStatus
     QTest::ignoreMessage(
         QtWarningMsg, QRegularExpression("Catalog source failed file://.*/missing-stars\\.csv .* HTTP 0")
     );
-    manager.downloadCatalogFromUrl(missingCatalogUrl);
+    manager.loadSource(
+        skygate::ui::tests::customSourceInstance(missingCatalogUrl), skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
     QVERIFY(manager.downloadingCatalog());
 
     QTRY_VERIFY(!manager.downloadingCatalog());

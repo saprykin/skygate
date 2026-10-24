@@ -49,7 +49,6 @@ public:
     [[nodiscard]] Q_INVOKABLE QString sourceIdAt(int row) const;
     [[nodiscard]] Q_INVOKABLE QString titleAt(int row) const;
     [[nodiscard]] Q_INVOKABLE QString defaultUrlAt(int row) const;
-    [[nodiscard]] Q_INVOKABLE QString versionAt(int row) const;
     [[nodiscard]] Q_INVOKABLE QString categoryAt(int row) const;
     [[nodiscard]] Q_INVOKABLE int legacyPresetIndexAt(int row) const;
     [[nodiscard]] Q_INVOKABLE bool isCustomAt(int row) const;

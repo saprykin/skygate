@@ -1,3 +1,4 @@
+#include "catalog/SkyCatalogPresets.hpp"
 #include "catalog/SkyCatalogSourceCollectionModel.hpp"
 #include "support/QmlPreferencesTestSupport.hpp"
 
@@ -546,7 +547,12 @@ void QmlPreferencesCatalogTests::catalogSectionPresentsFallbackParticipation()
              .mag = "1.0"}
         )
     ));
-    controller->downloadCatalogFromUrl(QUrl::fromLocalFile(starPath).toString());
+    const QStringList initialIds = sourceModelInstanceIds(*controller);
+    QCOMPARE(initialIds.size(), 1);
+    controller->removeCatalogSource(initialIds.front());
+    controller->addCatalogSourceUrl(
+        QUrl::fromLocalFile(starPath).toString(), skygate::ui::internal::SkyCatalogPresets::starCategory()
+    );
     QTRY_VERIFY(!controller->downloadingCatalog() && !controller->catalogProcessing());
     QTRY_VERIFY(summaryLabel->property("text").toString().startsWith(QStringLiteral("Downloaded")));
     QTRY_VERIFY(summaryLabel->property("text").toString().contains(QStringLiteral("Bundled Messier")));
@@ -554,7 +560,10 @@ void QmlPreferencesCatalogTests::catalogSectionPresentsFallbackParticipation()
 
     // Reloading the bundled star source removes the fallback's participation
     // again, so the summary never keeps a stale bundled claim.
-    controller->loadCatalogPreset(QStringLiteral("bundled"));
+    const QStringList downloadedIds = sourceModelInstanceIds(*controller);
+    QCOMPARE(downloadedIds.size(), 1);
+    controller->removeCatalogSource(downloadedIds.front());
+    controller->addCatalogSourcePreset(QStringLiteral("bundled"));
     QTRY_COMPARE(summaryLabel->property("text").toString(), QStringLiteral("Bundled + Bundled core"));
     QVERIFY(!controller->catalogStatusText().contains(QStringLiteral("Bundled Messier")));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));

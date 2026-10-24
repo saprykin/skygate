@@ -2,7 +2,6 @@
 #include "catalog/SkyCatalogImportStatus.hpp"
 #include "catalog/SkyCatalogLegacySlot.hpp"
 #include "catalog/SkyCatalogPresets.hpp"
-#include "catalog/SkyCatalogSourceIds.hpp"
 #include "catalog/SkyCatalogText.hpp"
 
 #include <QStringList>
@@ -23,7 +22,6 @@ private slots:
     void constellationStoreKeepsCustomRefsAndCounts();
     void constellationStoreClearDropsRefsAndCounts();
     void legacySlotNormalizesPresetIndexAndUrl();
-    void legacySlotResolvesEntryPoints();
 };
 
 void SkyCatalogInternalsTests::catalogTextFormatsStableStatusMessages()
@@ -32,8 +30,6 @@ void SkyCatalogInternalsTests::catalogTextFormatsStableStatusMessages()
 
     QCOMPARE(SkyCatalogText::datasetInfo(12U, 3U), QString("Objects: 12 | Constellations: 3"));
     QCOMPARE(SkyCatalogText::deepSkyCatalogInfo(9U), QString("Objects: 9"));
-    QCOMPARE(SkyCatalogText::unknownCatalogPreset("demo"), QString("Catalog: Unknown preset 'demo'"));
-    QCOMPARE(SkyCatalogText::unknownDeepSkyPreset("deep"), QString("Catalog: Unknown deep-sky preset 'deep'"));
     QCOMPARE(SkyCatalogText::cacheClearBlocked(), QString("Catalog: Cannot clear cache while download is in progress"));
     QCOMPARE(SkyCatalogText::starCacheClearResult(true), QString("Catalog: Star catalog cache cleared"));
     QCOMPARE(SkyCatalogText::starCacheClearResult(false), QString("Catalog: Star catalog cache clear failed"));
@@ -170,46 +166,6 @@ void SkyCatalogInternalsTests::legacySlotNormalizesPresetIndexAndUrl()
     QCOMPARE(slot.deepSkyCatalogUrlText(), QStringLiteral("file:///tmp/deep.csv"));
     slot.setDeepSkyCatalogUrlText(QStringLiteral("   "));
     QCOMPARE(slot.deepSkyCatalogUrlText(), SkyCatalogPresets::defaultDeepSkyCatalogUrlText());
-}
-
-void SkyCatalogInternalsTests::legacySlotResolvesEntryPoints()
-{
-    using skygate::ephemeris::CatalogCompositionPolicy;
-    using skygate::ui::internal::SkyCatalogLegacySlot;
-    using skygate::ui::internal::SkyCatalogPresets;
-    using skygate::ui::internal::SkyCatalogSourceIds;
-    using skygate::ui::internal::SkyCatalogText;
-
-    SkyCatalogLegacySlot slot;
-
-    // A bundled preset selects its source but keeps the slot's URL text.
-    const SkyCatalogLegacySlot::Selection bundled = slot.selectCatalogPreset(QStringLiteral("bundled"));
-    QVERIFY(bundled.source.has_value());
-    QVERIFY(bundled.statusText.isEmpty());
-    QCOMPARE(bundled.source->instanceId, QString::fromLatin1(SkyCatalogSourceIds::kPrimarySlot));
-    QCOMPARE(bundled.source->descriptorId, QStringLiteral("bundled"));
-    QCOMPARE(bundled.policy, CatalogCompositionPolicy::Merge);
-    QCOMPARE(slot.catalogPresetIndex(), 0);
-    QCOMPARE(slot.catalogUrlText(), SkyCatalogPresets::defaultCatalogUrlText());
-
-    const SkyCatalogLegacySlot::Selection unknownPreset = slot.selectCatalogPreset(QStringLiteral("missing"));
-    QVERIFY(!unknownPreset.source.has_value());
-    QCOMPARE(unknownPreset.statusText, SkyCatalogText::unknownCatalogPreset(QStringLiteral("missing")));
-
-    // A custom URL records the selection and selects a source for its slot.
-    const SkyCatalogLegacySlot::Selection customDeepSky =
-        slot.selectDeepSkyCatalogUrl(QStringLiteral(" file:///tmp/deep.csv "));
-    QVERIFY(customDeepSky.source.has_value());
-    QVERIFY(customDeepSky.statusText.isEmpty());
-    QCOMPARE(customDeepSky.source->instanceId, QString::fromLatin1(SkyCatalogSourceIds::kDeepSkySlot));
-    QCOMPARE(customDeepSky.policy, CatalogCompositionPolicy::DeepSkyOnly);
-    QCOMPARE(customDeepSky.source->urls, QStringList{QStringLiteral("file:///tmp/deep.csv")});
-    QCOMPARE(slot.deepSkyCatalogPresetIndex(), SkyCatalogPresets::kCustomLegacyPresetIndex);
-    QCOMPARE(slot.deepSkyCatalogUrlText(), QStringLiteral("file:///tmp/deep.csv"));
-
-    const SkyCatalogLegacySlot::Selection unknownDeepSky = slot.selectDeepSkyCatalogPreset(QStringLiteral("missing"));
-    QVERIFY(!unknownDeepSky.source.has_value());
-    QCOMPARE(unknownDeepSky.statusText, SkyCatalogText::unknownDeepSkyPreset(QStringLiteral("missing")));
 }
 
 QTEST_APPLESS_MAIN(SkyCatalogInternalsTests)

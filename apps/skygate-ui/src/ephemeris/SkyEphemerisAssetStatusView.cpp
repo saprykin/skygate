@@ -121,11 +121,7 @@ std::uint64_t SkyEphemerisAssetStatusView::planetaryKernelCacheSizeBytes() const
 std::uint64_t SkyEphemerisAssetStatusView::supportDataCacheSizeBytes() const
 {
     std::uint64_t totalBytes = 0U;
-    for (const QString& path : {
-             m_snapshot.installedEarthOrientationPath,
-             m_snapshot.installedLeapSecondTablePath,
-             m_snapshot.installedDeltaTDataPath,
-         }) {
+    for (const QString& path : SkyEphemerisDataCacheSnapshot::installedSupportDataPaths(m_snapshot)) {
         const QFileInfo fileInfo(path);
         if (fileInfo.exists() && fileInfo.isFile() && fileInfo.size() > 0) {
             totalBytes += static_cast<std::uint64_t>(fileInfo.size());

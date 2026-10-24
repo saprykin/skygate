@@ -153,16 +153,6 @@ QString SkyCatalogText::missingConstellationData(const QString& reason)
     return QString("no constellation data (%1)").arg(reason);
 }
 
-QString SkyCatalogText::unknownCatalogPreset(const QString& presetId)
-{
-    return QString("Catalog: Unknown preset '%1'").arg(presetId);
-}
-
-QString SkyCatalogText::unknownDeepSkyPreset(const QString& presetId)
-{
-    return QString("Catalog: Unknown deep-sky preset '%1'").arg(presetId);
-}
-
 QString SkyCatalogText::unknownSourcePreset(const QString& presetId)
 {
     return QString("Catalog: Unknown source preset '%1'").arg(presetId);

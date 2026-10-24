@@ -39,14 +39,10 @@ quint64 highestGeneration(const QString& directory, QSettings& settings, const q
 {
     quint64 highest = committedGeneration;
 
-    settings.beginGroup(SkyCatalogSourceRecordCodec::sourcesGroup());
-    const QStringList recordGroups = settings.childGroups();
-    settings.endGroup();
-    for (const QString& group : recordGroups) {
-        bool ok = false;
-        const quint64 generation = group.toULongLong(&ok);
-        if (ok && generation > highest) {
-            highest = generation;
+    for (const QString& group : SkyCatalogSourceRecordCodec::recordGroups(settings)) {
+        const std::optional<quint64> generation = SkyCatalogSourceRecordCodec::generationOfGroup(group);
+        if (generation.has_value() && generation.value() > highest) {
+            highest = generation.value();
         }
     }
 
@@ -89,13 +85,9 @@ void removeObsoleteFiles(const QString& directory, const QStringList& referenced
 
 void removeObsoleteRecords(QSettings& settings, const quint64 committedGeneration)
 {
-    settings.beginGroup(SkyCatalogSourceRecordCodec::sourcesGroup());
-    const QStringList groups = settings.childGroups();
-    settings.endGroup();
-    for (const QString& group : groups) {
-        bool isGenerationGroup = false;
-        const quint64 generation = group.toULongLong(&isGenerationGroup);
-        if (isGenerationGroup && generation == committedGeneration) {
+    for (const QString& group : SkyCatalogSourceRecordCodec::recordGroups(settings)) {
+        const std::optional<quint64> generation = SkyCatalogSourceRecordCodec::generationOfGroup(group);
+        if (generation.has_value() && generation.value() == committedGeneration) {
             continue;
         }
         settings.remove(SkyCatalogSourceRecordCodec::sourcesGroup() + QLatin1Char('/') + group);
@@ -207,13 +199,8 @@ bool SkyCatalogCollectionManifestStore::hasRecordsStored(QSettings& settings, co
 
 bool SkyCatalogCollectionManifestStore::hasGenerationRecords(QSettings& settings)
 {
-    settings.beginGroup(SkyCatalogSourceRecordCodec::sourcesGroup());
-    const QStringList groups = settings.childGroups();
-    settings.endGroup();
-    for (const QString& group : groups) {
-        bool isGenerationGroup = false;
-        group.toULongLong(&isGenerationGroup);
-        if (isGenerationGroup) {
+    for (const QString& group : SkyCatalogSourceRecordCodec::recordGroups(settings)) {
+        if (SkyCatalogSourceRecordCodec::isGenerationGroup(group)) {
             return true;
         }
     }

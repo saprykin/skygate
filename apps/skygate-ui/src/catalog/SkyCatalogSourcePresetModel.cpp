@@ -118,12 +118,6 @@ QString SkyCatalogSourcePresetModel::defaultUrlAt(const int row) const
     return entry == nullptr || entry->custom ? QString() : entry->descriptor.defaultUrl();
 }
 
-QString SkyCatalogSourcePresetModel::versionAt(const int row) const
-{
-    const Row* entry = rowAt(row);
-    return entry == nullptr ? QString() : entry->descriptor.version;
-}
-
 QString SkyCatalogSourcePresetModel::categoryAt(const int row) const
 {
     const Row* entry = rowAt(row);
