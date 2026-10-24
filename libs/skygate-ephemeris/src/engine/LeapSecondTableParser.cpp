@@ -39,7 +39,7 @@ constexpr std::size_t kMetadataMarkerSize = EphemerisTableMetadata::kMetadataLin
     return skygate::core::CalendarTime::civilDateFromUtcParts(*year, *month, *day);
 }
 
-[[nodiscard]] bool applyMetadataLine(
+void applyMetadataLine(
     ILeapSecondProvider::TableInfo& info,
     const std::string_view line,
     const std::size_t lineNumber,
@@ -47,7 +47,7 @@ constexpr std::size_t kMetadataMarkerSize = EphemerisTableMetadata::kMetadataLin
 )
 {
     if (EphemerisTableMetadata::applyCommonLine(info, line, kDataLabel, lineNumber, diagnosticText)) {
-        return true;
+        return;
     }
 
     // The IANA list writes its expiration as a bare NTP timestamp after the
@@ -56,11 +56,10 @@ constexpr std::size_t kMetadataMarkerSize = EphemerisTableMetadata::kMetadataLin
         NumericParsingUtilities::parseUint64(line.substr(kMetadataMarkerSize));
     if (!ntpExpiration.has_value()) {
         diagnosticText = EphemerisTableMetadata::malformedMetadata(kDataLabel, "expiration", lineNumber);
-        return true;
+        return;
     }
 
     info.expiresAt = skygate::core::EpochCodec::epochFromNtpTimestamp(*ntpExpiration);
-    return true;
 }
 
 [[nodiscard]] bool parseCsvEntryLine(std::string_view line, ILeapSecondProvider::TableEntry& entry) noexcept
@@ -149,7 +148,7 @@ LeapSecondTableParser::Result LeapSecondTableParser::parse(const EphemerisTextDa
     std::optional<std::string> malformedLine = EphemerisTableMetadata::parseTableLines(
         asset.content,
         [&info](const std::string_view line, const std::size_t lineNumber, std::optional<std::string>& diagnosticText) {
-            return applyMetadataLine(info, line, lineNumber, diagnosticText);
+            applyMetadataLine(info, line, lineNumber, diagnosticText);
         },
         [](const std::string_view, const std::string_view, const bool) noexcept { return false; },
         [](const std::string_view,

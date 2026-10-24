@@ -6,7 +6,6 @@ namespace skygate::ephemeris {
 
 // Each enumerator carries its own mask value.
 enum class EphemerisCapability : std::uint8_t {
-    NoCapabilities = 0U,
     SolarSystemBodies = 1U << 0U,
     CatalogStars = 1U << 1U,
     TopocentricPositions = 1U << 2U,

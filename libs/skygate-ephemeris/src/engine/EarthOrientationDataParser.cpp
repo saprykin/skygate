@@ -84,7 +84,7 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     return std::nullopt;
 }
 
-[[nodiscard]] bool applyMetadataLine(
+void applyMetadataLine(
     IEarthOrientationProvider::DataInfo& info,
     const std::string_view line,
     const std::size_t lineNumber,
@@ -94,20 +94,18 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
 )
 {
     if (EphemerisTableMetadata::applyCommonLine(info, line, kDataLabel, lineNumber, diagnosticText)) {
-        return true;
+        return;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "prediction_start");
         value.has_value()) {
         diagnosticText = setPredictionStart(info, *value, lineNumber, hasPredictionStart);
-        return true;
+        return;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "prediction_end");
         value.has_value()) {
         diagnosticText = setPredictionEnd(info, *value, lineNumber, hasPredictionEnd);
-        return true;
+        return;
     }
-
-    return true;
 }
 
 // FINALS dates use two-digit years, so the MJD column is needed to pick the
@@ -429,7 +427,7 @@ EarthOrientationDataParser::Result EarthOrientationDataParser::parse(const Ephem
         asset.content,
         [&info, &hasPredictionStart, &hasPredictionEnd](
             const std::string_view line, const std::size_t lineNumber, std::optional<std::string>& diagnosticText
-        ) { return applyMetadataLine(info, line, lineNumber, hasPredictionStart, hasPredictionEnd, diagnosticText); },
+        ) { applyMetadataLine(info, line, lineNumber, hasPredictionStart, hasPredictionEnd, diagnosticText); },
         [](const std::string_view rawLine, const std::string_view trimmedLine, const bool entriesEmpty) noexcept {
             return isFinals2000ADateOnlyLine(rawLine) || (entriesEmpty && isIgnorableHeaderLine(trimmedLine));
         },

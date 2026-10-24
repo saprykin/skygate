@@ -26,22 +26,6 @@ EphemerisDataManifest::assetKindFromText(const std::string_view text) noexcept
     return std::nullopt;
 }
 
-std::string_view EphemerisDataManifest::assetKindToText(const AssetKind kind) noexcept
-{
-    switch (kind) {
-    case AssetKind::SolarSystemKernel:
-        return "solar-system-kernel";
-    case AssetKind::LeapSecondTable:
-        return "leap-second-table";
-    case AssetKind::EarthOrientationData:
-        return "earth-orientation-data";
-    case AssetKind::DeltaTData:
-        return "delta-t-data";
-    }
-
-    return {};
-}
-
 std::optional<EphemerisDataManifest::CompressionKind>
 EphemerisDataManifest::compressionKindFromText(const std::string_view text) noexcept
 {
@@ -53,18 +37,6 @@ EphemerisDataManifest::compressionKindFromText(const std::string_view text) noex
     }
 
     return std::nullopt;
-}
-
-std::string_view EphemerisDataManifest::compressionKindToText(const CompressionKind kind) noexcept
-{
-    switch (kind) {
-    case CompressionKind::None:
-        return "none";
-    case CompressionKind::Zstd:
-        return "zstd";
-    }
-
-    return {};
 }
 
 const EphemerisDataManifest::Profile* EphemerisDataManifest::profile(const std::string_view id) const noexcept

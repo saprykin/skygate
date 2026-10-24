@@ -125,9 +125,11 @@ public:
             }
             if (trimmedLine.starts_with("#")) {
                 std::optional<std::string> diagnosticText;
-                if (isMetadataLine(trimmedLine) && metadataLineHandler(trimmedLine, lineNumber, diagnosticText)
-                    && diagnosticText.has_value()) {
-                    return diagnosticText;
+                if (isMetadataLine(trimmedLine)) {
+                    metadataLineHandler(trimmedLine, lineNumber, diagnosticText);
+                    if (diagnosticText.has_value()) {
+                        return diagnosticText;
+                    }
                 }
                 continue;
             }
