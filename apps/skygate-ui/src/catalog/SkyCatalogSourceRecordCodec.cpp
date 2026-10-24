@@ -10,9 +10,42 @@
 #include <QSettings>
 
 #include <cstddef>
+#include <string_view>
 
 namespace skygate::ui::internal {
 namespace {
+
+// Settings keys of one durable source record. The names live in one set so the
+// save, load, and eviction paths cannot drift apart. The two payload
+// references are also read by SkyCatalogCollectionStore through
+// SkyCatalogSourceRecordCodec::payloadPathKey()/binaryPayloadPathKey().
+namespace RecordKey {
+constexpr std::string_view kInstanceId = "instanceId";
+constexpr std::string_view kDescriptorId = "descriptorId";
+constexpr std::string_view kTitle = "title";
+constexpr std::string_view kVersion = "version";
+constexpr std::string_view kUrl = "url";
+constexpr std::string_view kUrls = "urls";
+constexpr std::string_view kRelatedDatasetUrls = "relatedDatasetUrls";
+constexpr std::string_view kArchiveSelector = "archiveSelector";
+constexpr std::string_view kSchemaHint = "schemaHint";
+constexpr std::string_view kAttribution = "attribution";
+constexpr std::string_view kPolicy = "policy";
+constexpr std::string_view kEnabled = "enabled";
+constexpr std::string_view kBundled = "bundled";
+constexpr std::string_view kOrder = "order";
+constexpr std::string_view kPayloadPath = "payloadPath";
+constexpr std::string_view kBinaryPayloadPath = "binaryPayloadPath";
+constexpr std::string_view kConstellationLineRows = "constellationLineRows";
+constexpr std::string_view kConstellationAnchorGroupRows = "constellationAnchorGroupRows";
+constexpr std::string_view kConstellationLineSchemaVersion = "constellationLineSchemaVersion";
+constexpr std::string_view kConstellationCount = "constellationCount";
+}  // namespace RecordKey
+
+QString key(const std::string_view name)
+{
+    return QString::fromLatin1(name.data(), static_cast<qsizetype>(name.size()));
+}
 
 // A stored policy only means something when it names a policy this build knows.
 // An unknown value falls back to the merge policy instead of handing
@@ -77,25 +110,15 @@ CatalogSourcePayloadReadResult readCatalogSourceFile(const QString& path)
     return {.payload = result.payload};
 }
 
-QString payloadPathKey()
-{
-    return QStringLiteral("payloadPath");
-}
-
-QString binaryPayloadPathKey()
-{
-    return QStringLiteral("binaryPayloadPath");
-}
-
 QStringList evictedPayloadKeys()
 {
     return QStringList{
-        payloadPathKey(),
-        binaryPayloadPathKey(),
-        QStringLiteral("constellationLineRows"),
-        QStringLiteral("constellationAnchorGroupRows"),
-        QStringLiteral("constellationLineSchemaVersion"),
-        QStringLiteral("constellationCount"),
+        SkyCatalogSourceRecordCodec::payloadPathKey(),
+        SkyCatalogSourceRecordCodec::binaryPayloadPathKey(),
+        key(RecordKey::kConstellationLineRows),
+        key(RecordKey::kConstellationAnchorGroupRows),
+        key(RecordKey::kConstellationLineSchemaVersion),
+        key(RecordKey::kConstellationCount),
     };
 }
 
@@ -106,15 +129,43 @@ QString SkyCatalogSourceRecordCodec::sourcesGroup()
     return QStringLiteral("catalogSources");
 }
 
-bool SkyCatalogSourceRecordCodec::hasFlatRecords(QSettings& settings)
+QString SkyCatalogSourceRecordCodec::payloadPathKey()
+{
+    return key(RecordKey::kPayloadPath);
+}
+
+QString SkyCatalogSourceRecordCodec::binaryPayloadPathKey()
+{
+    return key(RecordKey::kBinaryPayloadPath);
+}
+
+bool SkyCatalogSourceRecordCodec::isGenerationGroup(const QString& group)
+{
+    return generationOfGroup(group).has_value();
+}
+
+std::optional<quint64> SkyCatalogSourceRecordCodec::generationOfGroup(const QString& group)
+{
+    bool isGeneration = false;
+    const quint64 generation = group.toULongLong(&isGeneration);
+    if (!isGeneration) {
+        return std::nullopt;
+    }
+    return generation;
+}
+
+QStringList SkyCatalogSourceRecordCodec::recordGroups(QSettings& settings)
 {
     settings.beginGroup(sourcesGroup());
     const QStringList groups = settings.childGroups();
     settings.endGroup();
-    for (const QString& group : groups) {
-        bool isGenerationGroup = false;
-        group.toULongLong(&isGenerationGroup);
-        if (!isGenerationGroup) {
+    return groups;
+}
+
+bool SkyCatalogSourceRecordCodec::hasFlatRecords(QSettings& settings)
+{
+    for (const QString& group : recordGroups(settings)) {
+        if (!isGenerationGroup(group)) {
             return true;
         }
     }
@@ -135,26 +186,26 @@ void SkyCatalogSourceRecordCodec::saveRecord(
 )
 {
     settings.beginGroup(group);
-    settings.setValue(QStringLiteral("instanceId"), record.instanceId);
-    settings.setValue(QStringLiteral("descriptorId"), record.descriptorId);
-    settings.setValue(QStringLiteral("title"), record.title);
-    settings.setValue(QStringLiteral("version"), record.version);
-    settings.setValue(QStringLiteral("url"), record.url);
-    settings.setValue(QStringLiteral("urls"), record.urls);
-    settings.setValue(QStringLiteral("relatedDatasetUrls"), record.relatedDatasetUrls);
-    settings.setValue(QStringLiteral("archiveSelector"), record.archiveSelector);
-    settings.setValue(QStringLiteral("schemaHint"), static_cast<int>(record.schemaHint));
-    settings.setValue(QStringLiteral("attribution"), record.attribution);
-    settings.setValue(QStringLiteral("policy"), static_cast<int>(record.policy));
-    settings.setValue(QStringLiteral("enabled"), record.enabled);
-    settings.setValue(QStringLiteral("bundled"), record.bundled);
-    settings.setValue(QStringLiteral("order"), record.order);
+    settings.setValue(key(RecordKey::kInstanceId), record.instanceId);
+    settings.setValue(key(RecordKey::kDescriptorId), record.descriptorId);
+    settings.setValue(key(RecordKey::kTitle), record.title);
+    settings.setValue(key(RecordKey::kVersion), record.version);
+    settings.setValue(key(RecordKey::kUrl), record.url);
+    settings.setValue(key(RecordKey::kUrls), record.urls);
+    settings.setValue(key(RecordKey::kRelatedDatasetUrls), record.relatedDatasetUrls);
+    settings.setValue(key(RecordKey::kArchiveSelector), record.archiveSelector);
+    settings.setValue(key(RecordKey::kSchemaHint), static_cast<int>(record.schemaHint));
+    settings.setValue(key(RecordKey::kAttribution), record.attribution);
+    settings.setValue(key(RecordKey::kPolicy), static_cast<int>(record.policy));
+    settings.setValue(key(RecordKey::kEnabled), record.enabled);
+    settings.setValue(key(RecordKey::kBundled), record.bundled);
+    settings.setValue(key(RecordKey::kOrder), record.order);
     settings.setValue(payloadPathKey(), record.payload.isEmpty() ? QString() : rawPayloadPath);
     settings.setValue(binaryPayloadPathKey(), record.binaryPayload.isEmpty() ? QString() : binaryPayloadPath);
-    settings.setValue(QStringLiteral("constellationLineRows"), record.constellationLineRows);
-    settings.setValue(QStringLiteral("constellationAnchorGroupRows"), record.constellationAnchorGroupRows);
-    settings.setValue(QStringLiteral("constellationLineSchemaVersion"), record.constellationLineSchemaVersion);
-    settings.setValue(QStringLiteral("constellationCount"), static_cast<qulonglong>(record.constellationCount));
+    settings.setValue(key(RecordKey::kConstellationLineRows), record.constellationLineRows);
+    settings.setValue(key(RecordKey::kConstellationAnchorGroupRows), record.constellationAnchorGroupRows);
+    settings.setValue(key(RecordKey::kConstellationLineSchemaVersion), record.constellationLineSchemaVersion);
+    settings.setValue(key(RecordKey::kConstellationCount), static_cast<qulonglong>(record.constellationCount));
     settings.endGroup();
 }
 
@@ -164,26 +215,26 @@ SkyCatalogSourceCacheRecord SkyCatalogSourceRecordCodec::loadRecord(
 {
     SkyCatalogSourceCacheRecord record;
     settings.beginGroup(group);
-    record.instanceId = settings.value(QStringLiteral("instanceId")).toString();
-    record.descriptorId = settings.value(QStringLiteral("descriptorId")).toString();
-    record.title = settings.value(QStringLiteral("title")).toString();
-    record.version = settings.value(QStringLiteral("version")).toString();
-    record.url = settings.value(QStringLiteral("url")).toString();
-    record.urls = settings.value(QStringLiteral("urls")).toStringList();
-    record.relatedDatasetUrls = settings.value(QStringLiteral("relatedDatasetUrls")).toStringList();
-    record.archiveSelector = settings.value(QStringLiteral("archiveSelector")).toString();
-    record.schemaHint = readCatalogSourceSchemaHint(settings, QStringLiteral("schemaHint"));
-    record.attribution = settings.value(QStringLiteral("attribution")).toString();
-    record.policy = readCatalogCompositionPolicy(settings, QStringLiteral("policy"));
-    record.enabled = SkySettingsValueCodecs::readBoolSetting(settings, QStringLiteral("enabled"), true);
-    record.bundled = SkySettingsValueCodecs::readBoolSetting(settings, QStringLiteral("bundled"), false);
-    record.order = SkySettingsValueCodecs::readIntSetting(settings, QStringLiteral("order"), 0);
-    record.constellationLineRows = settings.value(QStringLiteral("constellationLineRows")).toByteArray();
-    record.constellationAnchorGroupRows = settings.value(QStringLiteral("constellationAnchorGroupRows")).toByteArray();
+    record.instanceId = settings.value(key(RecordKey::kInstanceId)).toString();
+    record.descriptorId = settings.value(key(RecordKey::kDescriptorId)).toString();
+    record.title = settings.value(key(RecordKey::kTitle)).toString();
+    record.version = settings.value(key(RecordKey::kVersion)).toString();
+    record.url = settings.value(key(RecordKey::kUrl)).toString();
+    record.urls = settings.value(key(RecordKey::kUrls)).toStringList();
+    record.relatedDatasetUrls = settings.value(key(RecordKey::kRelatedDatasetUrls)).toStringList();
+    record.archiveSelector = settings.value(key(RecordKey::kArchiveSelector)).toString();
+    record.schemaHint = readCatalogSourceSchemaHint(settings, key(RecordKey::kSchemaHint));
+    record.attribution = settings.value(key(RecordKey::kAttribution)).toString();
+    record.policy = readCatalogCompositionPolicy(settings, key(RecordKey::kPolicy));
+    record.enabled = SkySettingsValueCodecs::readBoolSetting(settings, key(RecordKey::kEnabled), true);
+    record.bundled = SkySettingsValueCodecs::readBoolSetting(settings, key(RecordKey::kBundled), false);
+    record.order = SkySettingsValueCodecs::readIntSetting(settings, key(RecordKey::kOrder), 0);
+    record.constellationLineRows = settings.value(key(RecordKey::kConstellationLineRows)).toByteArray();
+    record.constellationAnchorGroupRows = settings.value(key(RecordKey::kConstellationAnchorGroupRows)).toByteArray();
     record.constellationLineSchemaVersion =
-        SkySettingsValueCodecs::readIntSetting(settings, QStringLiteral("constellationLineSchemaVersion"), 0);
+        SkySettingsValueCodecs::readIntSetting(settings, key(RecordKey::kConstellationLineSchemaVersion), 0);
     record.constellationCount = static_cast<std::size_t>(SkySettingsValueCodecs::readULongLongSetting(
-        settings, QStringLiteral("constellationCount"), static_cast<qulonglong>(0)
+        settings, key(RecordKey::kConstellationCount), static_cast<qulonglong>(0)
     ));
     const QString rawPath = settings.value(payloadPathKey()).toString();
     const QString binaryPath = settings.value(binaryPayloadPathKey()).toString();

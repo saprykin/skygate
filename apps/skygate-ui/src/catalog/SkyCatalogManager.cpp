@@ -246,44 +246,6 @@ void SkyCatalogManager::setDeepSkyCatalogUrlText(const QString& deepSkyCatalogUr
     m_legacySlot.setDeepSkyCatalogUrlText(deepSkyCatalogUrlText);
 }
 
-void SkyCatalogManager::loadCatalogPreset(const QString& presetId)
-{
-    if (m_downloadingCatalog) {
-        return;
-    }
-
-    activateLegacySlotSelection(m_legacySlot.selectCatalogPreset(presetId));
-}
-
-void SkyCatalogManager::loadDeepSkyCatalogPreset(const QString& presetId)
-{
-    if (m_downloadingCatalog) {
-        return;
-    }
-
-    activateLegacySlotSelection(m_legacySlot.selectDeepSkyCatalogPreset(presetId));
-}
-
-void SkyCatalogManager::downloadCatalogFromUrl(const QString& urlText)
-{
-    activateLegacySlotSelection(m_legacySlot.selectCatalogUrl(urlText));
-}
-
-void SkyCatalogManager::downloadDeepSkyCatalogFromUrl(const QString& urlText)
-{
-    activateLegacySlotSelection(m_legacySlot.selectDeepSkyCatalogUrl(urlText));
-}
-
-void SkyCatalogManager::activateLegacySlotSelection(const SkyCatalogLegacySlot::Selection& selection)
-{
-    if (!selection.source.has_value()) {
-        setStatusText(selection.statusText);
-        return;
-    }
-
-    loadSourceInstance(*selection.source, selection.policy);
-}
-
 // Adds the instance when its durable instance ID is not active yet and
 // reloads that instance in place when it is, so an explicit update targets the
 // stored instance ID instead of relying on preset/URL ID collisions.

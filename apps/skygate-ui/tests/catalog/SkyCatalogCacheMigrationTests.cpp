@@ -107,7 +107,7 @@ void SkyCatalogCacheMigrationTests::clearSourceCacheVersusClearCollectionCache()
     QCOMPARE(remaining.snapshot.sources[1].instanceId, QString("preset:open_ngc"));
     QCOMPARE(remaining.snapshot.sources[1].payload, skygate::ui::tests::sampleCompactOpenNgcCsvPayload());
 
-    QVERIFY(controller.clearCollectionCache());
+    QVERIFY(store.clearCatalogCollectionCache());
     QVERIFY(!store.loadCatalogCollectionCache().isLoaded());
 }
 
@@ -748,7 +748,7 @@ void SkyCatalogCacheMigrationTests::logsCollectionLifecycleSummariesAtInfoLevel(
     QVERIFY(store.saveCatalogCollectionCache(CatalogCacheFixture::makeCollectionSnapshot()));
     const auto result = controller.restoreCollection(0, 0, QString(), QString());
     QVERIFY(result.restored);
-    QVERIFY(controller.clearCollectionCache());
+    QVERIFY(store.clearCatalogCollectionCache());
 
     const QString messages = capture.joinedMessages();
     QVERIFY(messages.contains(QStringLiteral("Catalog collection cache saved: sources 2")));

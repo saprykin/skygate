@@ -419,10 +419,6 @@ public:
     Q_INVOKABLE bool checkEphemerisSupportDataUpdates();
     Q_INVOKABLE void cancelActiveDownload();
     Q_INVOKABLE void setEphemerisDataOnlineUpdatesEnabled(bool enabled);
-    Q_INVOKABLE void loadCatalogPreset(const QString& presetId);
-    Q_INVOKABLE void downloadCatalogFromUrl(const QString& urlText);
-    Q_INVOKABLE void loadDeepSkyCatalogPreset(const QString& presetId);
-    Q_INVOKABLE void downloadDeepSkyCatalogFromUrl(const QString& urlText);
     Q_INVOKABLE void addCatalogSourcePreset(const QString& presetId);
     Q_INVOKABLE void addCatalogSourceUrl(const QString& urlText, const QString& category);
     Q_INVOKABLE void enableCatalogSource(const QString& instanceId);

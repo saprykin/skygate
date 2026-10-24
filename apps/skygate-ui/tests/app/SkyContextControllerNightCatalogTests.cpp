@@ -1,5 +1,6 @@
 #include "UtcTimeCodec.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
+#include "catalog/SkyCatalogPresets.hpp"
 #include "settings/SkySettingsStore.hpp"
 #include "support/SkyContextControllerTestSupport.hpp"
 
@@ -309,7 +310,7 @@ void SkyContextControllerNightCatalogTests::failedDeepSkyCatalogDownloadKeepsCou
 
     QCOMPARE(controller->deepSkyCatalogInfoText(), QString("Objects: 110"));
     QTest::ignoreMessage(QtWarningMsg, "Catalog download aborted: no valid source URLs");
-    controller->downloadDeepSkyCatalogFromUrl(QString());
+    controller->addCatalogSourceUrl(QString(), skygate::ui::internal::SkyCatalogPresets::deepSkyCategory());
 
     QCOMPARE(infoSpy.count(), 0);
     QCOMPARE(controller->deepSkyCatalogInfoText(), QString("Objects: 110"));

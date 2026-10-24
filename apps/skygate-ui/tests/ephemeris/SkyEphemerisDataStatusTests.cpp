@@ -15,6 +15,7 @@
 #include <QFileInfo>
 #include <QSignalSpy>
 #include <QString>
+#include <QStringList>
 #include <QtTest/QtTest>
 
 #include <algorithm>
@@ -111,6 +112,7 @@ private slots:
     void kernelDisplayTextForLegacyProfile();
     void kernelDisplayTextForUnexpectedMetadata();
     void normalizedSnapshotTrimsAndDefaults();
+    void cacheSnapshotEnumeratesInstalledPaths();
     void profileIdsCanonicalizeLegacyAlias();
     void assetStatusDecodesManagerText();
     void assetStatusViewPresentsSourceAndSnapshot();
@@ -465,6 +467,51 @@ void SkyEphemerisDataStatusTests::normalizedSnapshotTrimsAndDefaults()
     QCOMPARE(normalized.installedDeltaTDataVersion, QString("2026a"));
     QCOMPARE(normalized.dataRevisionToken, QString("bundled"));
     QCOMPARE(normalized.lastUpdateResult, QString("Bundled fallback"));
+}
+
+void SkyEphemerisDataStatusTests::cacheSnapshotEnumeratesInstalledPaths()
+{
+    SkyEphemerisDataCacheSnapshot emptySnapshot;
+    const QStringList emptyPayloadPaths = SkyEphemerisDataCacheSnapshot::installedPayloadPaths(emptySnapshot);
+    QCOMPARE(emptyPayloadPaths.size(), 4);
+    for (const QString& path : emptyPayloadPaths) {
+        QVERIFY(path.isEmpty());
+    }
+    const QStringList emptySupportPaths = SkyEphemerisDataCacheSnapshot::installedSupportDataPaths(emptySnapshot);
+    QCOMPARE(emptySupportPaths.size(), 3);
+    for (const QString& path : emptySupportPaths) {
+        QVERIFY(path.isEmpty());
+    }
+
+    SkyEphemerisDataCacheSnapshot snapshot;
+    snapshot.installedKernelPath = QStringLiteral("/tmp/kernel.bsp");
+    snapshot.installedEarthOrientationPath = QStringLiteral("/tmp/eop.txt");
+    snapshot.installedLeapSecondTablePath = QStringLiteral("/tmp/leap-seconds.list");
+    snapshot.installedDeltaTDataPath = QStringLiteral("/tmp/delta-t.csv");
+
+    const QStringList payloadPaths = SkyEphemerisDataCacheSnapshot::installedPayloadPaths(snapshot);
+    QCOMPARE(
+        payloadPaths,
+        QStringList({
+            QStringLiteral("/tmp/kernel.bsp"),
+            QStringLiteral("/tmp/eop.txt"),
+            QStringLiteral("/tmp/leap-seconds.list"),
+            QStringLiteral("/tmp/delta-t.csv"),
+        })
+    );
+    QCOMPARE(
+        SkyEphemerisDataCacheSnapshot::installedSupportDataPaths(snapshot),
+        QStringList({
+            QStringLiteral("/tmp/eop.txt"),
+            QStringLiteral("/tmp/leap-seconds.list"),
+            QStringLiteral("/tmp/delta-t.csv"),
+        })
+    );
+
+    // The support data set is the payload set without the planetary kernel.
+    QStringList supportPaths = payloadPaths;
+    supportPaths.removeFirst();
+    QCOMPARE(SkyEphemerisDataCacheSnapshot::installedSupportDataPaths(snapshot), supportPaths);
 }
 
 void SkyEphemerisDataStatusTests::profileIdsCanonicalizeLegacyAlias()

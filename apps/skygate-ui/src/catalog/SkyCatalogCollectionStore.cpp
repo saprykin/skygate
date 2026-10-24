@@ -266,9 +266,7 @@ SkyCatalogCollectionCacheLoadResult SkyCatalogCollectionStore::load() const
     settings.beginGroup(recordsGroup);
     const QStringList groups = settings.childGroups();
     for (const QString& group : groups) {
-        bool isGenerationGroup = false;
-        group.toULongLong(&isGenerationGroup);
-        if (isGenerationGroup) {
+        if (SkyCatalogSourceRecordCodec::isGenerationGroup(group)) {
             // Staged generation records live in numeric groups; only the flat
             // sidecar-named groups under the current group are source records.
             continue;
@@ -340,8 +338,8 @@ bool SkyCatalogCollectionStore::evictSource(const QString& instanceId) const
                                     : SkyCatalogSourceRecordCodec::sourcesGroup();
     const QString group = SkyCatalogSourceRecordCodec::sourceGroup(parentGroup, instanceId);
     settings.beginGroup(group);
-    const QString rawPath = settings.value(QStringLiteral("payloadPath")).toString();
-    const QString binaryPath = settings.value(QStringLiteral("binaryPayloadPath")).toString();
+    const QString rawPath = settings.value(SkyCatalogSourceRecordCodec::payloadPathKey()).toString();
+    const QString binaryPath = settings.value(SkyCatalogSourceRecordCodec::binaryPayloadPathKey()).toString();
     settings.endGroup();
 
     QStringList cachePaths;

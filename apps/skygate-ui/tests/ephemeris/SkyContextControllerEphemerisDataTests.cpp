@@ -477,7 +477,7 @@ void SkyContextControllerEphemerisDataTests::catalogChangePreservesDataSelection
     QVERIFY(originalKernel.has_value());
     QCOMPARE(QString::fromStdString(originalKernel->activePath), kernelPath);
 
-    controller.loadDeepSkyCatalogPreset(QStringLiteral("bundled_messier"));
+    controller.addCatalogSourcePreset(QStringLiteral("bundled_messier"));
 
     QVERIFY(controller.catalogRevision() > originalCatalogRevision);
     QCOMPARE(controller.ephemerisDataRevision(), originalDataRevision);
@@ -502,7 +502,7 @@ void SkyContextControllerEphemerisDataTests::catalogChangePreservesEngineConfigu
     verifyHighPrecisionOptions(*controller.ephemerisEngine());
 
     const std::uint64_t originalCatalogRevision = controller.catalogRevision();
-    controller.loadDeepSkyCatalogPreset(QStringLiteral("bundled_messier"));
+    controller.addCatalogSourcePreset(QStringLiteral("bundled_messier"));
 
     QVERIFY(controller.catalogRevision() > originalCatalogRevision);
     QVERIFY(controller.ephemerisEngine() != nullptr);

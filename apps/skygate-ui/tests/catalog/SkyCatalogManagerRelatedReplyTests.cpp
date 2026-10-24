@@ -1,4 +1,5 @@
 #include "catalog/CatalogCompositionPolicy.hpp"
+#include "catalog/CatalogSourceInstanceTestSupport.hpp"
 #include "catalog/SkyCatalogManager.hpp"
 #include "catalog/SkyCatalogPresets.hpp"
 #include "catalog/SkyCatalogSourceDescriptor.hpp"
@@ -106,7 +107,10 @@ void SkyCatalogManagerRelatedReplyTests::staleConstellationResponseAfterBundledS
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
     QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
 
-    manager.loadCatalogPreset(QStringLiteral("hyg_v42"));
+    manager.loadSource(
+        skygate::ui::tests::presetSourceInstance(QStringLiteral("hyg_v42"), QStringLiteral("primary")),
+        skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
     QTRY_VERIFY(manager.sourceLabel() == QStringLiteral("HYG v4.2"));
     QTRY_VERIFY(networkAccessManager.requestedUrls().contains(constellationUrl));
     QVERIFY(manager.constellationLineRefs().empty());
@@ -116,7 +120,10 @@ void SkyCatalogManagerRelatedReplyTests::staleConstellationResponseAfterBundledS
     QVERIFY(!constellationReply.isNull());
     QVERIFY(!constellationReply->isFinished());
 
-    manager.loadCatalogPreset(QStringLiteral("bundled"));
+    manager.loadSource(
+        skygate::ui::tests::presetSourceInstance(QStringLiteral("bundled"), QStringLiteral("primary")),
+        skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
     QCOMPARE(manager.sourceLabel(), QStringLiteral("Bundled"));
     QVERIFY(manager.constellationLineRefs().empty());
     QVERIFY(manager.constellationAnchorGroups().empty());
@@ -164,7 +171,10 @@ void SkyCatalogManagerRelatedReplyTests::staleConstellationResponseAfterCustomSw
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
     QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
 
-    manager.loadCatalogPreset(QStringLiteral("hyg_v42"));
+    manager.loadSource(
+        skygate::ui::tests::presetSourceInstance(QStringLiteral("hyg_v42"), QStringLiteral("primary")),
+        skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
     QTRY_VERIFY(manager.sourceLabel() == QStringLiteral("HYG v4.2"));
     QTRY_VERIFY(networkAccessManager.requestedUrls().contains(constellationUrl));
     QVERIFY(manager.constellationLineRefs().empty());
@@ -174,7 +184,10 @@ void SkyCatalogManagerRelatedReplyTests::staleConstellationResponseAfterCustomSw
     QVERIFY(!constellationReply.isNull());
     QVERIFY(!constellationReply->isFinished());
 
-    manager.downloadCatalogFromUrl(customUrl);
+    manager.loadSource(
+        skygate::ui::tests::customSourceInstance(customUrl, QStringLiteral("primary")),
+        skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
     QTRY_VERIFY(manager.sourceLabel() == QStringLiteral("Downloaded"));
     QVERIFY(manager.constellationLineRefs().empty());
     const auto revisionAfterSwitch = manager.catalogRevision();
@@ -222,7 +235,10 @@ void SkyCatalogManagerRelatedReplyTests::cancelDuringConstellationLoadIgnoresSta
     SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
 
-    manager.loadCatalogPreset(QStringLiteral("hyg_v42"));
+    manager.loadSource(
+        skygate::ui::tests::presetSourceInstance(QStringLiteral("hyg_v42"), QStringLiteral("primary")),
+        skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
     QTRY_VERIFY(manager.sourceLabel() == QStringLiteral("HYG v4.2"));
     QTRY_VERIFY(networkAccessManager.requestedUrls().contains(constellationUrl));
     QVERIFY(manager.constellationLineRefs().empty());
@@ -267,7 +283,10 @@ void SkyCatalogManagerRelatedReplyTests::currentConstellationResponseAppliesOnce
     SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
 
-    manager.loadCatalogPreset(QStringLiteral("hyg_v42"));
+    manager.loadSource(
+        skygate::ui::tests::presetSourceInstance(QStringLiteral("hyg_v42"), QStringLiteral("primary")),
+        skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
     QTRY_VERIFY(manager.sourceLabel() == QStringLiteral("HYG v4.2"));
     QTRY_VERIFY(manager.constellationLineRefs().size() == 2U);
 

@@ -124,10 +124,6 @@ public:
     void setCatalogUrlText(const QString& catalogUrlText);
     void setDeepSkyCatalogPresetIndex(int deepSkyCatalogPresetIndex);
     void setDeepSkyCatalogUrlText(const QString& deepSkyCatalogUrlText);
-    void loadCatalogPreset(const QString& presetId);
-    void downloadCatalogFromUrl(const QString& urlText);
-    void loadDeepSkyCatalogPreset(const QString& presetId);
-    void downloadDeepSkyCatalogFromUrl(const QString& urlText);
     // Adds the instance when its durable instance ID is not active yet. When
     // the ID is already active this is the explicit reload/update action for
     // that instance, and the target instance ID is preserved.
@@ -239,9 +235,6 @@ private:
         const QString& catalogSummaryText,
         skygate::ui::internal::SkyConstellationLineImportResult lineResult
     );
-    // Applies a legacy slot entry point: an unknown preset reports its status
-    // text, a resolved selection is activated like any other source request.
-    void activateLegacySlotSelection(const skygate::ui::internal::SkyCatalogLegacySlot::Selection& selection);
     [[nodiscard]] skygate::ui::internal::SkyCatalogRuntimeBuildOptions runtimeBuildOptions() const;
     void applyRuntimeResult(const skygate::ui::internal::SkyCatalogRuntimeResult& result);
     void persistCatalogCache() const;

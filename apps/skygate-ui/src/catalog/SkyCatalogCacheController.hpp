@@ -45,7 +45,6 @@ public:
     // stays durable; the accepted in-memory snapshot remains active until a
     // reload or restart.
     [[nodiscard]] bool clearSourceCache(const QString& instanceId) const;
-    [[nodiscard]] bool clearCollectionCache() const;
     [[nodiscard]] SkyCatalogCollectionRestoreResult restoreCollection(
         int catalogPresetIndex,
         int deepSkyCatalogPresetIndex,
