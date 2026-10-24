@@ -58,6 +58,7 @@ add_skygate_core_qtest(skygate-core-math-constants-tests math/MathConstantsTests
 add_skygate_core_qtest(skygate-core-time-constants-tests math/TimeConstantsTests.cpp)
 add_skygate_core_qtest(skygate-core-time-codec-tests time/TimeCodecTests.cpp)
 add_skygate_core_qtest(skygate-core-time-scale-codec-tests time/TimeScaleCodecTests.cpp)
+add_skygate_core_qtest(skygate-core-gregorian-calendar-tests time/GregorianCalendarTests.cpp)
 add_skygate_core_qtest(skygate-core-epoch-range-tests time/AstronomicalEpochRangeTests.cpp)
 add_skygate_core_qtest(skygate-core-epoch-tests time/AstronomicalEpochTests.cpp)
 add_skygate_core_qtest(skygate-core-physical-constants-tests math/PhysicalConstantsTests.cpp)
