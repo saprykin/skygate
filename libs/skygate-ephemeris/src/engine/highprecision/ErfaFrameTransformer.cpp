@@ -102,11 +102,33 @@ private:
         result.stages.push_back(std::move(stage));
     }
 
-    static void markStageUnavailable(
-        CelestialFrameTransformResult::Stage& stage, const EphemerisCorrectionFlags unavailableCorrection
-    ) noexcept
+    // Runs one stage of a composed transform: fetches the matrix the row names,
+    // multiplies or transpose-multiplies 'vector' by it, and records the stage
+    // with the correction it applied. A stage whose matrix is unavailable is
+    // recorded too, and the transform stops with no vector.
+    [[nodiscard]] std::optional<skygate::core::Vector3d> applyStage(
+        const FrameTransformStageCatalog::Row& row,
+        const CelestialReferenceFrame::Type sourceFrame,
+        const CelestialReferenceFrame::Type targetFrame,
+        const bool forward,
+        const skygate::core::Vector3d& vector,
+        CelestialFrameTransformResult& result
+    )
     {
-        EphemerisMetadataMerger::markCorrectionUnavailable(stage.metadata, unavailableCorrection);
+        CelestialFrameTransformResult::Stage stage = makeStage(sourceFrame, targetFrame);
+        const std::optional<skygate::core::Matrix3x3> matrix = m_matrixCache.matrix(row.matrixKind, stage.metadata);
+        if (!matrix.has_value()) {
+            EphemerisMetadataMerger::markCorrectionUnavailable(stage.metadata, row.correction);
+            appendStage(result, std::move(stage));
+            return std::nullopt;
+        }
+
+        const skygate::core::Vector3d transformed =
+            forward ? matrix->multiplied(vector) : matrix->transposeMultiplied(vector);
+        stage.applied = true;
+        EphemerisMetadataMerger::markCorrectionApplied(stage.metadata, row.correction);
+        appendStage(result, std::move(stage));
+        return transformed;
     }
 
     void applyCatalogStages(
@@ -126,22 +148,19 @@ private:
             const FrameTransformStageCatalog::Row& row = FrameTransformStageCatalog::rowForLowerRank(lowerRank);
             const bool firstStage = index == 0U;
             const bool lastStage = static_cast<std::uint8_t>(index + 1U) == stageCount;
-            CelestialFrameTransformResult::Stage stage = makeStage(
+            const std::optional<skygate::core::Vector3d> stageOutput = applyStage(
+                row,
                 firstStage ? m_sourceFrame : (forward ? row.sourceFrame : row.targetFrame),
-                lastStage ? m_targetFrame : (forward ? row.targetFrame : row.sourceFrame)
+                lastStage ? m_targetFrame : (forward ? row.targetFrame : row.sourceFrame),
+                forward,
+                transformed,
+                result
             );
-
-            const std::optional<skygate::core::Matrix3x3> matrix = m_matrixCache.matrix(row.matrixKind, stage.metadata);
-            if (!matrix.has_value()) {
-                markStageUnavailable(stage, row.correction);
-                appendStage(result, std::move(stage));
+            if (!stageOutput.has_value()) {
                 return;
             }
 
-            transformed = forward ? matrix->multiplied(transformed) : matrix->transposeMultiplied(transformed);
-            stage.applied = true;
-            EphemerisMetadataMerger::markCorrectionApplied(stage.metadata, row.correction);
-            appendStage(result, std::move(stage));
+            transformed = *stageOutput;
         }
 
         result.vector = transformed;
@@ -158,20 +177,15 @@ private:
             return std::nullopt;
         }
 
-        const FrameTransformStageCatalog::Row& row = FrameTransformStageCatalog::apparentEquatorAndEquinoxRow();
         CelestialFrameTransformResult result = makeValidResult();
-        CelestialFrameTransformResult::Stage stage = makeStage(m_sourceFrame, m_targetFrame);
-        const std::optional<skygate::core::Matrix3x3> matrix = m_matrixCache.matrix(row.matrixKind, stage.metadata);
-        if (!matrix.has_value()) {
-            markStageUnavailable(stage, row.correction);
-            appendStage(result, std::move(stage));
-            return result;
-        }
-
-        result.vector = forward ? matrix->multiplied(vector) : matrix->transposeMultiplied(vector);
-        stage.applied = true;
-        EphemerisMetadataMerger::markCorrectionApplied(stage.metadata, row.correction);
-        appendStage(result, std::move(stage));
+        result.vector = applyStage(
+            FrameTransformStageCatalog::apparentEquatorAndEquinoxRow(),
+            m_sourceFrame,
+            m_targetFrame,
+            forward,
+            vector,
+            result
+        );
         return result;
     }
 

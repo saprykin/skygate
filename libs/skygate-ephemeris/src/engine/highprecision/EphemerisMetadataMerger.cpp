@@ -1,4 +1,5 @@
 #include "EphemerisMetadataMerger.hpp"
+#include "EpochScaleResolver.hpp"
 #include "ICalcephKernel.hpp"
 #include "engine/ITimeScaleService.hpp"
 
@@ -35,16 +36,9 @@ void mergeStatus(
     }
 }
 
-void markDegraded(EphemerisEngineQueryResult& metadata) noexcept
-{
-    if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-    }
-}
-
 void addDegradedWarning(EphemerisEngineQueryResult& metadata, const EphemerisEngineWarning::Code warningCode) noexcept
 {
-    markDegraded(metadata);
+    EphemerisMetadataMerger::markDegraded(metadata);
     metadata.addWarning(warningCode);
 }
 
@@ -128,6 +122,29 @@ void mergeEarthOrientationWarningCodes(
 
 }  // namespace
 
+void EphemerisMetadataMerger::markDegraded(EphemerisEngineQueryResult& metadata) noexcept
+{
+    if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
+    }
+}
+
+void EphemerisMetadataMerger::markComputationFailed(EphemerisEngineQueryResult& metadata) noexcept
+{
+    metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+    metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+}
+
+void EphemerisMetadataMerger::markTimeScaleUnavailable(
+    EphemerisEngineQueryResult& metadata, const EphemerisMetadataFailurePolicy failurePolicy
+) noexcept
+{
+    metadata.status = failurePolicy == EphemerisMetadataFailurePolicy::MarkFailed
+                          ? EphemerisEngineQueryStatus::Type::Failed
+                          : EphemerisEngineQueryStatus::Type::Degraded;
+    metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
+}
+
 void EphemerisMetadataMerger::merge(
     EphemerisEngineQueryResult& target,
     const EphemerisEngineQueryResult& source,
@@ -201,6 +218,22 @@ void EphemerisMetadataMerger::mergeTimeScale(
     }
 }
 
+void EphemerisMetadataMerger::mergeKernelEpochTimeScale(
+    EphemerisEngineQueryResult& metadata, const TimeScaleConversionResult& conversion
+) noexcept
+{
+    const TimeScaleConversionResult::WarningMask tdbApproximationMask =
+        TimeScaleConversionResult::WarningMask::fromBits(
+            TimeScaleConversionResult::WarningMask::bit(TimeScaleConversionWarningCode::Type::TdbApproximationApplied)
+        );
+    const bool onlyTdbApproximation = !conversion.warningCodeMask.without(tdbApproximationMask).hasAny();
+    if (conversion.status == TimeScaleConversionStatus::Type::Degraded && onlyTdbApproximation) {
+        return;
+    }
+
+    mergeTimeScale(metadata, conversion);
+}
+
 void EphemerisMetadataMerger::mergeEarthOrientation(
     EphemerisEngineQueryResult& metadata, const EarthOrientationSampler::Sample& sample
 ) noexcept
@@ -258,25 +291,28 @@ std::optional<EarthOrientationSampler::Sample> EphemerisMetadataMerger::prepareE
 )
 {
     if (!epoch.isFinite()) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+        markComputationFailed(metadata);
+        return std::nullopt;
+    }
+
+    if (timeScaleService == nullptr) {
+        markTimeScaleUnavailable(metadata, EphemerisMetadataFailurePolicy::MarkFailed);
         return std::nullopt;
     }
 
     std::optional<TimeScaleConversionResult> localConversion;
     std::optional<TimeScaleConversionResult>* conversionSlot =
         cache != nullptr ? &cache->utcConversion : &localConversion;
-    if (timeScaleService == nullptr) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
-        return std::nullopt;
-    } else if (!conversionSlot->has_value()) {
-        *conversionSlot = timeScaleService->convert(epoch, skygate::core::TimeScale::Utc);
-    }
-
-    const TimeScaleConversionResult& conversion = **conversionSlot;
-    mergeTimeScale(metadata, conversion, timeScaleFailurePolicy);
-    if (!conversion.isSuccess()) {
+    const std::optional<skygate::core::AstronomicalEpoch> utcEpoch = EpochScaleResolver::resolveInScale(
+        metadata,
+        epoch,
+        skygate::core::TimeScale::Utc,
+        timeScaleService,
+        timeScaleFailurePolicy,
+        conversionSlot,
+        EpochScaleResolver::SameScaleConversion::Convert
+    );
+    if (!utcEpoch.has_value()) {
         markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::earthOrientation());
         return std::nullopt;
     }
@@ -284,7 +320,7 @@ std::optional<EarthOrientationSampler::Sample> EphemerisMetadataMerger::prepareE
     std::optional<EarthOrientationSampler::Sample> localSample;
     std::optional<EarthOrientationSampler::Sample>& sampleSlot = cache != nullptr ? cache->sample : localSample;
     if (!sampleSlot.has_value()) {
-        sampleSlot = EarthOrientationSampler::sample(earthOrientationProvider, conversion.epoch, sampleOptions);
+        sampleSlot = EarthOrientationSampler::sample(earthOrientationProvider, *utcEpoch, sampleOptions);
     }
 
     mergeEarthOrientation(metadata, *sampleSlot);

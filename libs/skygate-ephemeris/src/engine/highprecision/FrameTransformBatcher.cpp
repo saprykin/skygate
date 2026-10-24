@@ -6,11 +6,11 @@
 #include "IFrameTransformer.hpp"
 #include "ObserverGeodesy.hpp"
 #include "PreparedEphemerisRequestState.hpp"
-#include "engine/EarthOrientationSampler.hpp"
-#include "engine/ITimeScaleService.hpp"
+#include "PreparedRequestStateBuilder.hpp"
 
 #include <algorithm>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace skygate::ephemeris::highprecision {
@@ -28,12 +28,10 @@ void markMissingObserver(
     EphemerisEngineQueryResult& metadata, const std::optional<EphemerisCorrectionFlags> unavailableCorrection = {}
 ) noexcept
 {
-    if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-    }
+    EphemerisMetadataMerger::markDegraded(metadata);
     metadata.addWarning(EphemerisEngineWarning::Code::MissingObserver);
     if (unavailableCorrection.has_value()) {
-        metadata.addUnavailableCorrection(*unavailableCorrection);
+        EphemerisMetadataMerger::markCorrectionUnavailable(metadata, *unavailableCorrection);
     }
 }
 
@@ -111,33 +109,21 @@ FrameTransformBatcher::TopocentricRequestState FrameTransformBatcher::prepareTop
     const EphemerisRequest& request, const PreparedEphemerisRequestState* requestState
 ) const
 {
-    TopocentricRequestState state;
     if (requestState != nullptr && requestState->topocentricStatePrepared) {
-        state.metadata = requestState->topocentricMetadata;
-        state.available = requestState->topocentricStateAvailable;
-        return state;
+        return TopocentricRequestState{
+            .metadata = requestState->topocentricMetadata,
+            .available = requestState->topocentricStateAvailable,
+        };
     }
 
-    if (m_timeScaleService == nullptr) {
-        state.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        state.metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
-        state.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::earthOrientation());
-        state.available = false;
-        return state;
-    }
-
-    const std::optional<EarthOrientationSampler::Sample> earthOrientationSample =
-        EphemerisMetadataMerger::prepareEarthOrientation(
-            request.epoch,
-            m_timeScaleService,
-            m_earthOrientationProvider,
-            state.metadata,
-            EphemerisMetadataFailurePolicy::MarkFailed,
-            EarthOrientationSampler::Options::tolerantFallback()
-        );
-    state.available = earthOrientationSample.has_value();
-
-    return state;
+    PreparedEphemerisRequestState preparedState;
+    PreparedRequestStateBuilder::prepareTopocentricState(
+        request, m_timeScaleService, m_earthOrientationProvider, preparedState
+    );
+    return TopocentricRequestState{
+        .metadata = std::move(preparedState.topocentricMetadata),
+        .available = preparedState.topocentricStateAvailable,
+    };
 }
 
 void FrameTransformBatcher::collectPrimaryTransformInputs(
@@ -183,6 +169,49 @@ void FrameTransformBatcher::collectPrimaryTransformInputs(
             EphemerisMetadataMerger::markCorrectionUnavailable(item.result.metadata, unavailableTransformCorrection);
         }
     }
+}
+
+void FrameTransformBatcher::runVectorPass(
+    const EphemerisRequest& request,
+    const std::span<Item> items,
+    const CelestialReferenceFrame::Type sourceFrame,
+    const CelestialReferenceFrame::Type targetFrame,
+    const std::optional<skygate::core::Vector3d> Item::* vectorMember,
+    const EphemerisCorrectionFlags unavailableCorrection,
+    const VectorDestination destination
+) const
+{
+    if (m_frameTransformer == nullptr) {
+        return;
+    }
+
+    VectorList inputs;
+    ItemIndexList itemIndices;
+    inputs.reserve(items.size());
+    itemIndices.reserve(items.size());
+    for (std::size_t itemIndex = 0U; itemIndex < items.size(); ++itemIndex) {
+        const std::optional<skygate::core::Vector3d>& vector = items[itemIndex].*vectorMember;
+        if (vector.has_value()) {
+            inputs.push_back(*vector);
+            itemIndices.push_back(itemIndex);
+        }
+    }
+    if (inputs.empty()) {
+        return;
+    }
+
+    transformVectors(
+        request,
+        items,
+        TransformRequest{
+            .sourceFrame = sourceFrame,
+            .targetFrame = targetFrame,
+            .inputs = inputs,
+            .itemIndices = itemIndices,
+            .unavailableCorrection = unavailableCorrection,
+            .destination = destination,
+        }
+    );
 }
 
 void FrameTransformBatcher::transformVectors(
@@ -312,25 +341,14 @@ void FrameTransformBatcher::transformItrsVectorsToGcrs(
     const EphemerisRequest& request, const std::span<Item> items
 ) const
 {
-    VectorList gcrsInputs;
-    ItemIndexList gcrsItemIndices;
-    collectVectorInputs(items, gcrsInputs, gcrsItemIndices, &Item::outputVector);
-
-    if (m_frameTransformer == nullptr || gcrsInputs.empty()) {
-        return;
-    }
-
-    transformVectors(
+    runVectorPass(
         request,
         items,
-        TransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Type::Itrs,
-            .targetFrame = CelestialReferenceFrame::Type::Gcrs,
-            .inputs = gcrsInputs,
-            .itemIndices = gcrsItemIndices,
-            .unavailableCorrection = EphemerisCorrectionFlags::earthOrientation(),
-            .destination = VectorDestination::Equatorial,
-        }
+        CelestialReferenceFrame::Type::Itrs,
+        CelestialReferenceFrame::Type::Gcrs,
+        &Item::outputVector,
+        EphemerisCorrectionFlags::earthOrientation(),
+        VectorDestination::Equatorial
     );
 }
 
@@ -344,44 +362,15 @@ void FrameTransformBatcher::transformGcrsVectorsToApparentWhenRequested(
         return;
     }
 
-    VectorList apparentInputs;
-    ItemIndexList apparentItemIndices;
-    collectVectorInputs(items, apparentInputs, apparentItemIndices, &Item::equatorialVector);
-
-    if (m_frameTransformer == nullptr || apparentInputs.empty()) {
-        return;
-    }
-
-    transformVectors(
+    runVectorPass(
         request,
         items,
-        TransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Type::Gcrs,
-            .targetFrame = CelestialReferenceFrame::Type::TrueEquatorAndEquinox,
-            .inputs = apparentInputs,
-            .itemIndices = apparentItemIndices,
-            .unavailableCorrection = EphemerisCorrectionFlags::precessionNutation(),
-            .destination = VectorDestination::Equatorial,
-        }
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::TrueEquatorAndEquinox,
+        &Item::equatorialVector,
+        EphemerisCorrectionFlags::precessionNutation(),
+        VectorDestination::Equatorial
     );
-}
-
-void FrameTransformBatcher::collectVectorInputs(
-    const std::span<const Item> items,
-    VectorList& inputs,
-    ItemIndexList& itemIndices,
-    const std::optional<skygate::core::Vector3d> Item::* vectorMember
-)
-{
-    inputs.reserve(items.size());
-    itemIndices.reserve(items.size());
-    for (std::size_t itemIndex = 0U; itemIndex < items.size(); ++itemIndex) {
-        const std::optional<skygate::core::Vector3d>& vector = items[itemIndex].*vectorMember;
-        if (vector.has_value()) {
-            inputs.push_back(*vector);
-            itemIndices.push_back(itemIndex);
-        }
-    }
 }
 
 }  // namespace skygate::ephemeris::highprecision

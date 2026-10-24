@@ -61,8 +61,6 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/CelestialReferenceFrame.cpp
     src/engine/highprecision/CelestialFrameMath.hpp
     src/engine/highprecision/CelestialFrameMath.cpp
-    src/engine/highprecision/EphemerisTimeScaleMetadataMerger.hpp
-    src/engine/highprecision/EphemerisTimeScaleMetadataMerger.cpp
     src/engine/highprecision/EpochScaleResolver.hpp
     src/engine/highprecision/EpochScaleResolver.cpp
     src/engine/highprecision/HighPrecisionEphemerisEngine.hpp

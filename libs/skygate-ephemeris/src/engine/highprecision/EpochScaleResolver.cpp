@@ -1,8 +1,7 @@
 #include "EpochScaleResolver.hpp"
-#include "EphemerisTimeScaleMetadataMerger.hpp"
+#include "EphemerisMetadataMerger.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
 #include "engine/ITimeScaleService.hpp"
-#include "engine/TimeScaleConversionResult.hpp"
 
 namespace skygate::ephemeris::highprecision {
 
@@ -17,21 +16,81 @@ std::optional<skygate::core::AstronomicalEpoch> EpochScaleResolver::resolve(
         return epoch.normalized();
     }
 
-    if (timeScaleService == nullptr) {
-        metadata.status = failurePolicy == EphemerisMetadataFailurePolicy::MarkFailed
-                              ? EphemerisEngineQueryStatus::Type::Failed
-                              : EphemerisEngineQueryStatus::Type::Degraded;
-        metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
+    const std::optional<skygate::core::AstronomicalEpoch> resolved = resolveConversion(
+        metadata,
+        epoch,
+        skygate::core::TimeScale::Tdb,
+        timeScaleService.get(),
+        failurePolicy,
+        ConversionMerge::KernelEpoch,
+        nullptr
+    );
+    if (!resolved.has_value()) {
         return std::nullopt;
     }
 
-    const TimeScaleConversionResult conversion = timeScaleService->convert(epoch, skygate::core::TimeScale::Tdb);
-    EphemerisTimeScaleMetadataMerger::mergeKernelEpochTimeScaleMetadata(metadata, conversion);
+    return resolved->normalized();
+}
+
+std::optional<skygate::core::AstronomicalEpoch> EpochScaleResolver::resolveInScale(
+    EphemerisEngineQueryResult& metadata,
+    const skygate::core::AstronomicalEpoch& epoch,
+    const skygate::core::TimeScale targetScale,
+    const skygate::ephemeris::ITimeScaleService* timeScaleService,
+    const EphemerisMetadataFailurePolicy failurePolicy,
+    std::optional<TimeScaleConversionResult>* const conversionCache,
+    const SameScaleConversion sameScaleConversion
+) noexcept
+{
+    if (epoch.timeScale == targetScale && sameScaleConversion == SameScaleConversion::Skip) {
+        return epoch.normalized();
+    }
+
+    return resolveConversion(
+        metadata,
+        epoch,
+        targetScale,
+        timeScaleService,
+        failurePolicy,
+        ConversionMerge::StatusAndWarnings,
+        conversionCache
+    );
+}
+
+std::optional<skygate::core::AstronomicalEpoch> EpochScaleResolver::resolveConversion(
+    EphemerisEngineQueryResult& metadata,
+    const skygate::core::AstronomicalEpoch& epoch,
+    const skygate::core::TimeScale targetScale,
+    const skygate::ephemeris::ITimeScaleService* const timeScaleService,
+    const EphemerisMetadataFailurePolicy failurePolicy,
+    const ConversionMerge merge,
+    std::optional<TimeScaleConversionResult>* const conversionCache
+) noexcept
+{
+    if (timeScaleService == nullptr) {
+        EphemerisMetadataMerger::markTimeScaleUnavailable(metadata, failurePolicy);
+        return std::nullopt;
+    }
+
+    std::optional<TimeScaleConversionResult> localConversion;
+    std::optional<TimeScaleConversionResult>* const conversionSlot =
+        conversionCache != nullptr ? conversionCache : &localConversion;
+    if (!conversionSlot->has_value()) {
+        *conversionSlot = timeScaleService->convert(epoch, targetScale);
+    }
+
+    const TimeScaleConversionResult& conversion = **conversionSlot;
+    if (merge == ConversionMerge::KernelEpoch) {
+        EphemerisMetadataMerger::mergeKernelEpochTimeScale(metadata, conversion);
+    } else {
+        EphemerisMetadataMerger::mergeTimeScale(metadata, conversion, failurePolicy);
+    }
+
     if (!conversion.isSuccess()) {
         return std::nullopt;
     }
 
-    return conversion.epoch.normalized();
+    return conversion.epoch;
 }
 
 }  // namespace skygate::ephemeris::highprecision
