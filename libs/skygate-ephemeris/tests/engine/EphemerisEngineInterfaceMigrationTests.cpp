@@ -1,5 +1,4 @@
 #include "UtcTimeCodec.hpp"
-#include "engine/EphemerisEngineQueries.hpp"
 #include "engine/IEphemerisEngine.hpp"
 
 #include <QtTest/QtTest>
@@ -364,7 +363,7 @@ void EphemerisEngineInterfaceMigrationTests::queriesDelegateToRequestAwareSingle
     request.epoch = {.julianDatePart1 = 2'460'000.0, .julianDatePart2 = 0.5};
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
 
-    const auto byId = skygate::ephemeris::EphemerisEngineQueries::computeBodyStateById(engine, request, "target");
+    const auto byId = engine.computeBodyState(request, "target");
     QVERIFY(byId.has_value());
     QCOMPARE(engine.requestBodyLookupCount(), 1);
     QCOMPARE(
@@ -372,7 +371,7 @@ void EphemerisEngineInterfaceMigrationTests::queriesDelegateToRequestAwareSingle
         static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::lightTime())
     );
 
-    const auto byIndex = skygate::ephemeris::EphemerisEngineQueries::computeBodyStateByIndex(engine, request, 0U);
+    const auto byIndex = engine.computeBodyState(request, 0U);
     QVERIFY(byIndex.has_value());
     QCOMPARE(engine.requestBodyLookupCount(), 2);
     QCOMPARE(engine.lastRequestEpoch().julianDatePart1, 2'460'000.0);

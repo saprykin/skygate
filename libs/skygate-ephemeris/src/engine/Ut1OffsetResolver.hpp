@@ -27,8 +27,6 @@ public:
     [[nodiscard]] Result lookupUtcToUt1Offset(const skygate::core::AstronomicalEpoch& utcEpoch) const;
     [[nodiscard]] TimeScaleConversionResult lookupUtcFromUt1(const skygate::core::AstronomicalEpoch& ut1Epoch) const;
 
-    static void mergeWarnings(TimeScaleConversionResult& result, const Result& lookup) noexcept;
-
 private:
     std::shared_ptr<const IEarthOrientationProvider> m_earthOrientationProvider;
     std::shared_ptr<const IDeltaTProvider> m_deltaTProvider;

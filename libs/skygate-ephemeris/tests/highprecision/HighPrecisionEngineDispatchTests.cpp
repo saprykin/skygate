@@ -156,11 +156,11 @@ public:
         std::vector<StarAstrometryBatchResult> results;
         results.reserve(arrays.size());
         for (std::size_t arrayIndex = 0; arrayIndex < arrays.size(); ++arrayIndex) {
+            const EquatorialCoordinate referenceEquatorial = arrays.referenceEquatorial(arrayIndex);
             HighPrecisionCalculatorResult result;
             result.equatorial = EquatorialCoordinate{
-                .rightAscensionHours =
-                    arrays.referenceRightAscensionHours()[arrayIndex] + request.epoch.julianDatePart2,
-                .declinationDeg = arrays.referenceDeclinationDegrees()[arrayIndex],
+                .rightAscensionHours = referenceEquatorial.rightAscensionHours + request.epoch.julianDatePart2,
+                .declinationDeg = referenceEquatorial.declinationDeg,
             };
             result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
             result.metadata.dataSourceProvenance = "batch star astrometry";

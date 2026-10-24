@@ -851,7 +851,7 @@ void TimeScaleOffsetResolverTests::mergesLookupWarningsIntoConversionResult()
     lookup.addWarning(TimeScaleConversionWarningCode::Type::EarthOrientationDataPredicted);
     lookup.diagnosticText = "Earth-orientation sample interpolated with degraded metadata.";
 
-    Ut1OffsetResolver::mergeWarnings(result, lookup);
+    TimeScaleConversionResult::mergeWarnings(result, lookup.status, lookup.warningCodeMask);
 
     QCOMPARE(static_cast<std::uint8_t>(result.status), static_cast<std::uint8_t>(ConversionStatus::Degraded));
     QVERIFY(result.isSuccess());

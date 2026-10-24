@@ -35,11 +35,6 @@ public:
             EphemerisDateRange validityRange;
             std::optional<double> representativeDeltaTSeconds;
             std::optional<double> estimatedUncertaintySeconds;
-
-            [[nodiscard]] bool hasRepresentativeEstimate() const noexcept
-            {
-                return representativeDeltaTSeconds.has_value();
-            }
         };
 
         std::optional<FallbackModelInfo> ancientFallbackModel;

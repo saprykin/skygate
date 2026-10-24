@@ -35,12 +35,7 @@ public:
         DeltaTFallbackApplied,
         DeltaTUnavailable,
         EarthOrientationDataEstimated,
-        EarthOrientationStaleData,
-        EarthOrientationPredictedData,
-        EarthOrientationMissingData,
-        EarthOrientationEpochOutsideRange,
-        EarthOrientationInvalidInput,
-        EarthOrientationEstimatedData
+        EarthOrientationInvalidInput
     };
 
     struct Detail {
@@ -137,28 +132,8 @@ public:
             return TimeScaleConversionDiagnostics::warningText(
                 TimeScaleConversionWarningCode::Type::EarthOrientationDataEstimated
             );
-        case Code::EarthOrientationStaleData:
-            return TimeScaleConversionDiagnostics::warningText(
-                TimeScaleConversionWarningCode::Type::EarthOrientationDataStale
-            );
-        case Code::EarthOrientationPredictedData:
-            return TimeScaleConversionDiagnostics::warningText(
-                TimeScaleConversionWarningCode::Type::EarthOrientationDataPredicted
-            );
-        case Code::EarthOrientationMissingData:
-            return TimeScaleConversionDiagnostics::warningText(
-                TimeScaleConversionWarningCode::Type::EarthOrientationDataMissing
-            );
-        case Code::EarthOrientationEpochOutsideRange:
-            return TimeScaleConversionDiagnostics::warningText(
-                TimeScaleConversionWarningCode::Type::EpochOutsideEarthOrientationData
-            );
         case Code::EarthOrientationInvalidInput:
             return "Earth-orientation data input is invalid.";
-        case Code::EarthOrientationEstimatedData:
-            return TimeScaleConversionDiagnostics::warningText(
-                TimeScaleConversionWarningCode::Type::EarthOrientationDataEstimated
-            );
         }
 
         return "Ephemeris warning.";

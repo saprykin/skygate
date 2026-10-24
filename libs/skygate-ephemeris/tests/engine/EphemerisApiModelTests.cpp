@@ -605,36 +605,6 @@ void EphemerisApiModelTests::engineWarningTextMatchesTimeScaleWarningTexts()
             skygate::ephemeris::TimeScaleConversionDiagnostics::warningText(sharedWarning.timeScaleCode)
         );
     }
-
-    constexpr std::array aliasWarnings{
-        SharedWarning{
-            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationStaleData,
-            skygate::ephemeris::TimeScaleConversionWarningCode::Type::EarthOrientationDataStale
-        },
-        SharedWarning{
-            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationPredictedData,
-            skygate::ephemeris::TimeScaleConversionWarningCode::Type::EarthOrientationDataPredicted
-        },
-        SharedWarning{
-            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationMissingData,
-            skygate::ephemeris::TimeScaleConversionWarningCode::Type::EarthOrientationDataMissing
-        },
-        SharedWarning{
-            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationEpochOutsideRange,
-            skygate::ephemeris::TimeScaleConversionWarningCode::Type::EpochOutsideEarthOrientationData
-        },
-        SharedWarning{
-            skygate::ephemeris::EphemerisEngineWarning::Code::EarthOrientationEstimatedData,
-            skygate::ephemeris::TimeScaleConversionWarningCode::Type::EarthOrientationDataEstimated
-        },
-    };
-
-    for (const SharedWarning& aliasWarning : aliasWarnings) {
-        QCOMPARE(
-            skygate::ephemeris::EphemerisEngineWarning::text(aliasWarning.engineCode),
-            skygate::ephemeris::TimeScaleConversionDiagnostics::warningText(aliasWarning.timeScaleCode)
-        );
-    }
 }
 
 void EphemerisApiModelTests::bodyAndEventStatusLabelsAreCanonical()

@@ -460,9 +460,8 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarForInvalidAstrometry()
     QCOMPARE(batchResults.size(), 2U);
     QCOMPARE(batchResults[0].bodyIndex, 0U);
     QCOMPARE(batchResults[1].bodyIndex, 1U);
-    QCOMPARE(arrays.hasStellarParallaxMask()[0], std::uint8_t{0});
-    QCOMPARE(arrays.hasStellarParallaxMask()[1], std::uint8_t{0});
-    QCOMPARE(arrays.stellarParallaxMasValues()[1], 0.0);
+    QVERIFY(!arrays.stellarParallaxMas(0).has_value());
+    QVERIFY(!arrays.stellarParallaxMas(1).has_value());
 
     for (const StarAstrometryBatchResult& batchResult : batchResults) {
         const HighPrecisionCalculatorResult singleResult =

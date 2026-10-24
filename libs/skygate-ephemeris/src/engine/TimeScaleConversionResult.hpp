@@ -1,7 +1,8 @@
 #pragma once
 
 #include "BitFlagSet.hpp"
-#include "TimeScaleConversionDiagnostics.hpp"
+#include "TimeScaleConversionStatus.hpp"
+#include "TimeScaleConversionWarningCode.hpp"
 #include "time/AstronomicalEpoch.hpp"
 
 #include <string>

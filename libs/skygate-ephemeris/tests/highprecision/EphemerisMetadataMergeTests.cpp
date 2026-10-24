@@ -134,14 +134,14 @@ void EphemerisMetadataMergeTests::degradedEarthOrientationPreservesCodesAndText(
     EphemerisEngineQueryResult metadata;
     EphemerisMetadataMerger::mergeEarthOrientation(metadata, sample);
 
-    QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::EarthOrientationStaleData));
-    QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::EarthOrientationPredictedData));
+    QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::EarthOrientationDataStale));
+    QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::EarthOrientationDataPredicted));
     QVERIFY(!metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
     QVERIFY(!metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
 
     bool foundStaleText = false;
     for (const EphemerisEngineWarning::Detail& detail : metadata.warningDetails) {
-        if (detail.code == EphemerisEngineWarning::Code::EarthOrientationStaleData
+        if (detail.code == EphemerisEngineWarning::Code::EarthOrientationDataStale
             && detail.text == sample.diagnosticText) {
             foundStaleText = true;
         }

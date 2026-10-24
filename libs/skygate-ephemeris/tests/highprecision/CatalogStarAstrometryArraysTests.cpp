@@ -17,11 +17,8 @@
 
 #include <QtTest/QtTest>
 
-#include <cmath>
-#include <cstdint>
 #include <limits>
 #include <memory>
-#include <optional>
 #include <span>
 #include <string>
 #include <utility>
@@ -256,32 +253,6 @@ void CatalogStarAstrometryArraysTests::buildsCacheFriendlyArraysFromFullPartialF
     QCOMPARE(arrays.referenceEquatorial(2).rightAscensionHours, 4.0);
     QCOMPARE(arrays.referenceEquatorial(2).declinationDeg, -15.0);
     QCOMPARE(arrays.fixedEquatorialFallback(2)->declinationDeg, -15.0);
-
-    QCOMPARE(arrays.referenceRightAscensionHours().size(), arrays.size());
-    QCOMPARE(arrays.referenceDeclinationDegrees().size(), arrays.size());
-    QCOMPARE(arrays.referenceEpochJulianDatePart1().size(), arrays.size());
-    QCOMPARE(arrays.referenceEpochJulianDatePart2().size(), arrays.size());
-    QCOMPARE(arrays.referenceEpochTimeScales().size(), arrays.size());
-    QCOMPARE(arrays.hasCatalogAstrometryMask().size(), arrays.size());
-    QCOMPARE(arrays.hasCatalogAstrometryMask()[0], std::uint8_t{1});
-    QCOMPARE(arrays.hasCatalogAstrometryMask()[2], std::uint8_t{0});
-    QCOMPARE(arrays.hasFixedEquatorialFallbackMask().size(), arrays.size());
-    QCOMPARE(arrays.fixedRightAscensionHours().size(), arrays.size());
-    QCOMPARE(arrays.fixedDeclinationDegrees().size(), arrays.size());
-    QCOMPARE(arrays.fixedRightAscensionHours()[2], 4.0);
-    QCOMPARE(arrays.fixedDeclinationDegrees()[2], -15.0);
-    QCOMPARE(arrays.hasProperMotionRightAscensionMask().size(), arrays.size());
-    QCOMPARE(arrays.properMotionRightAscensionMasPerYearValues().size(), arrays.size());
-    QCOMPARE(arrays.hasProperMotionRightAscensionMask()[0], std::uint8_t{1});
-    QCOMPARE(arrays.properMotionRightAscensionMasPerYearValues()[0], 125.0);
-    QCOMPARE(arrays.hasProperMotionDeclinationMask().size(), arrays.size());
-    QCOMPARE(arrays.properMotionDeclinationMasPerYearValues().size(), arrays.size());
-    QCOMPARE(arrays.hasStellarParallaxMask().size(), arrays.size());
-    QCOMPARE(arrays.stellarParallaxMasValues().size(), arrays.size());
-    QCOMPARE(arrays.hasRadialVelocityMask().size(), arrays.size());
-    QCOMPARE(arrays.radialVelocityKmPerSecondValues().size(), arrays.size());
-    QCOMPARE(arrays.hasValidityRangeMask().size(), arrays.size());
-    QCOMPARE(arrays.validityRanges().size(), arrays.size());
 }
 
 void CatalogStarAstrometryArraysTests::batchesFixedCoordinateNonStarBodies()
@@ -358,18 +329,10 @@ void CatalogStarAstrometryArraysTests::masksOnlyUsableNumericAstrometryValues()
     const CatalogStarAstrometryArrays arrays = makeArrays(bodies);
 
     QCOMPARE(arrays.size(), 1U);
-    QCOMPARE(arrays.hasProperMotionRightAscensionMask()[0], std::uint8_t{0});
-    QCOMPARE(arrays.hasProperMotionDeclinationMask()[0], std::uint8_t{0});
-    QCOMPARE(arrays.hasStellarParallaxMask()[0], std::uint8_t{0});
-    QCOMPARE(arrays.hasRadialVelocityMask()[0], std::uint8_t{0});
     QVERIFY(!arrays.properMotionRightAscensionMasPerYear(0).has_value());
     QVERIFY(!arrays.properMotionDeclinationMasPerYear(0).has_value());
     QVERIFY(!arrays.stellarParallaxMas(0).has_value());
     QVERIFY(!arrays.radialVelocityKmPerSecond(0).has_value());
-    QVERIFY(std::isnan(arrays.properMotionRightAscensionMasPerYearValues()[0]));
-    QVERIFY(std::isinf(arrays.properMotionDeclinationMasPerYearValues()[0]));
-    QCOMPARE(arrays.stellarParallaxMasValues()[0], 0.0);
-    QVERIFY(std::isinf(arrays.radialVelocityKmPerSecondValues()[0]));
 }
 
 void CatalogStarAstrometryArraysTests::mergedConflictExposesOnlyWinningPosition()

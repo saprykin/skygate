@@ -13,17 +13,17 @@ EphemerisEngineWarning::Code EarthOrientationSampler::Sample::engineWarningCode(
 {
     switch (code) {
     case WarningCode::StaleData:
-        return EphemerisEngineWarning::Code::EarthOrientationStaleData;
+        return EphemerisEngineWarning::Code::EarthOrientationDataStale;
     case WarningCode::PredictedData:
-        return EphemerisEngineWarning::Code::EarthOrientationPredictedData;
+        return EphemerisEngineWarning::Code::EarthOrientationDataPredicted;
     case WarningCode::MissingData:
-        return EphemerisEngineWarning::Code::EarthOrientationMissingData;
+        return EphemerisEngineWarning::Code::EarthOrientationDataMissing;
     case WarningCode::EpochOutsideRange:
-        return EphemerisEngineWarning::Code::EarthOrientationEpochOutsideRange;
+        return EphemerisEngineWarning::Code::EpochOutsideEarthOrientationData;
     case WarningCode::InvalidInput:
         return EphemerisEngineWarning::Code::EarthOrientationInvalidInput;
     case WarningCode::EstimatedData:
-        return EphemerisEngineWarning::Code::EarthOrientationEstimatedData;
+        return EphemerisEngineWarning::Code::EarthOrientationDataEstimated;
     }
 
     return EphemerisEngineWarning::Code::AccuracyDegraded;

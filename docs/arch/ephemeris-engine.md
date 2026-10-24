@@ -23,9 +23,8 @@ and snapshot models and the ephemeris engines.
 
 - `IEphemerisEngine`: pure interface that computes an `EphemerisSnapshot`
   from a `core::ObservationContext` and resolves individual body states.
-- `EphemerisEngineQueries`: query helper that routes lookups through the
-  engine's direct single-body virtual overloads, with snapshot-scan helpers
-  for finding a body state inside an already-computed snapshot.
+- `EphemerisEngineQueries`: helpers that find a body state inside an
+  already-computed snapshot.
 - `EphemerisSnapshot`: current context, shared immutable catalog body
   vector, and per-frame body states that reference catalog bodies by index.
 

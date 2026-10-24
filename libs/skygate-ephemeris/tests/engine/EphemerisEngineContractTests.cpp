@@ -4,7 +4,6 @@
 #include "ObservationContext.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "catalog/CatalogFactory.hpp"
-#include "engine/EphemerisEngineQueries.hpp"
 #include "engine/EphemerisEngineQueryStatus.hpp"
 #include "engine/EphemerisEngineWarning.hpp"
 #include "engine/IEphemerisEngine.hpp"
@@ -335,12 +334,12 @@ void EphemerisEngineContractTests::contextQueriesRouteThroughSingleBodyOverloads
 
     const ObservationContext context = makeContext();
 
-    const auto byId = EphemerisEngineQueries::computeBodyStateById(engine, context, "target");
+    const auto byId = engine.computeBodyState(context, "target");
     QVERIFY(byId.has_value());
     QCOMPARE(engine.contextSampleCount(), 1);
     QCOMPARE(engine.requestSampleCount(), 0);
 
-    const auto byIndex = EphemerisEngineQueries::computeBodyStateByIndex(engine, context, std::size_t{0});
+    const auto byIndex = engine.computeBodyState(context, std::size_t{0});
     QVERIFY(byIndex.has_value());
     QCOMPARE(engine.contextSampleCount(), 2);
     QCOMPARE(engine.requestSampleCount(), 0);

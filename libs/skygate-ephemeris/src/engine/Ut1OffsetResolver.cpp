@@ -258,13 +258,7 @@ TimeScaleConversionResult Ut1OffsetResolver::lookupUtcFromUt1(const skygate::cor
 
     TimeScaleConversionResult result =
         TimeScaleConversionResult::success(utcEpoch, lookup.status, lookup.warningCodeMask, lookup.diagnosticText);
-    mergeWarnings(result, lookup);
     return result;
-}
-
-void Ut1OffsetResolver::mergeWarnings(TimeScaleConversionResult& result, const Result& lookup) noexcept
-{
-    TimeScaleConversionResult::mergeWarnings(result, lookup.status, lookup.warningCodeMask);
 }
 
 }  // namespace skygate::ephemeris

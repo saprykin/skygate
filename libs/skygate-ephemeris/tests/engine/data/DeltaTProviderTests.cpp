@@ -238,7 +238,7 @@ void DeltaTProviderTests::exposesAncientFallbackMetadata()
         *result.dataInfo.ancientFallbackModel;
     QVERIFY(fallback.validityRange.id == std::string{"delta-t-ancient-fallback"});
     QVERIFY(fallback.provenance == std::string{"Morrison-Stephenson model"});
-    QVERIFY(fallback.hasRepresentativeEstimate());
+    QVERIFY(fallback.representativeDeltaTSeconds.has_value());
     QCOMPARE(*fallback.representativeDeltaTSeconds, 12000.5);
     QVERIFY(fallback.estimatedUncertaintySeconds.has_value());
     QCOMPARE(*fallback.estimatedUncertaintySeconds, 7200.0);

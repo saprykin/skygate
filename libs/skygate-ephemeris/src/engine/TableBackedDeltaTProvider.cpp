@@ -17,6 +17,17 @@ namespace {
     return estimate;
 }
 
+[[nodiscard]] IDeltaTProvider::Estimate
+tableEstimate(const double deltaTSeconds, std::string diagnosticText, const std::string& provenance)
+{
+    return IDeltaTProvider::Estimate{
+        .status = IDeltaTProvider::EstimateStatus::Available,
+        .deltaTSeconds = deltaTSeconds,
+        .diagnosticText = std::move(diagnosticText),
+        .provenance = provenance,
+    };
+}
+
 }  // namespace
 
 TableBackedDeltaTProvider::TableBackedDeltaTProvider(DataInfo dataInfo, std::vector<TableEntry> entries)
@@ -51,20 +62,12 @@ IDeltaTProvider::Estimate TableBackedDeltaTProvider::deltaTSeconds(const skygate
             return entry.effectiveUtcEpoch.sortKey();
         });
         if (upper == m_entries.begin()) {
-            return Estimate{
-                .status = EstimateStatus::Available,
-                .deltaTSeconds = upper->deltaTSeconds,
-                .diagnosticText = "Delta T estimate loaded from table.",
-                .provenance = m_dataInfo.provenance,
-            };
+            return tableEstimate(upper->deltaTSeconds, "Delta T estimate loaded from table.", m_dataInfo.provenance);
         }
         if (upper == m_entries.end()) {
-            return Estimate{
-                .status = EstimateStatus::Available,
-                .deltaTSeconds = m_entries.back().deltaTSeconds,
-                .diagnosticText = "Delta T estimate loaded from table.",
-                .provenance = m_dataInfo.provenance,
-            };
+            return tableEstimate(
+                m_entries.back().deltaTSeconds, "Delta T estimate loaded from table.", m_dataInfo.provenance
+            );
         }
 
         const TableEntry& before = *(upper - 1);
@@ -76,12 +79,11 @@ IDeltaTProvider::Estimate TableBackedDeltaTProvider::deltaTSeconds(const skygate
             return unavailableEstimate("Delta T data contains duplicate or non-monotonic effective UTC epochs.");
         }
 
-        return Estimate{
-            .status = EstimateStatus::Available,
-            .deltaTSeconds = TableInterpolation::lerp(before.deltaTSeconds, after.deltaTSeconds, *ratio),
-            .diagnosticText = "Delta T estimate interpolated from table.",
-            .provenance = m_dataInfo.provenance,
-        };
+        return tableEstimate(
+            TableInterpolation::lerp(before.deltaTSeconds, after.deltaTSeconds, *ratio),
+            "Delta T estimate interpolated from table.",
+            m_dataInfo.provenance
+        );
     }
 
     if (m_dataInfo.ancientFallbackModel.has_value() && m_dataInfo.ancientFallbackModel->validityRange.contains(epoch)) {

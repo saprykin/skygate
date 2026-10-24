@@ -1,6 +1,5 @@
 #pragma once
 
-#include "TimeScaleConversionStatus.hpp"
 #include "TimeScaleConversionWarningCode.hpp"
 
 #include <string_view>
@@ -9,11 +8,6 @@ namespace skygate::ephemeris {
 
 class TimeScaleConversionDiagnostics final {
 public:
-    [[nodiscard]] static constexpr std::string_view displayName(const TimeScaleConversionStatus::Type status) noexcept
-    {
-        return TimeScaleConversionStatus::displayName(status);
-    }
-
     [[nodiscard]] static constexpr std::string_view
     warningText(const TimeScaleConversionWarningCode::Type code) noexcept
     {

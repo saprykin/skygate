@@ -118,52 +118,46 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
 {
     std::vector<EphemerisFactoryCreationDiagnostic> diagnostics;
     const bool needsDefaultCalcephKernelProvider = request.calcephKernelProvider == nullptr;
+    const auto require =
+        [&diagnostics](
+            const bool satisfied, const EphemerisFactoryCreationDiagnostic::Code code, std::string diagnosticText
+        ) {
+            if (satisfied) {
+                return;
+            }
 
-    if (needsDefaultCalcephKernelProvider && request.activeDataSnapshot == nullptr) {
-        diagnostics.push_back(
-            EphemerisFactoryDiagnostics::creationDiagnostic(
-                EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable,
-                EphemerisFactoryCreationDiagnosticSeverity::Error,
-                "An active ephemeris data snapshot is required for high-precision engine creation."
-            )
-        );
-    }
-    if (needsDefaultCalcephKernelProvider && request.dataManifest == nullptr) {
-        diagnostics.push_back(
-            EphemerisFactoryDiagnostics::creationDiagnostic(
-                EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable,
-                EphemerisFactoryCreationDiagnosticSeverity::Error,
-                "An ephemeris data manifest is required for high-precision engine creation."
-            )
-        );
-    }
-    if (request.datasetManifest == nullptr && request.dataManifest == nullptr) {
-        diagnostics.push_back(
-            EphemerisFactoryDiagnostics::creationDiagnostic(
-                EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable,
-                EphemerisFactoryCreationDiagnosticSeverity::Error,
-                "An ephemeris dataset manifest is required for high-precision engine creation."
-            )
-        );
-    }
-    if (request.timeScaleService == nullptr) {
-        diagnostics.push_back(
-            EphemerisFactoryDiagnostics::creationDiagnostic(
-                EphemerisFactoryCreationDiagnostic::Code::RequiredTimeScaleServiceUnavailable,
-                EphemerisFactoryCreationDiagnosticSeverity::Error,
-                "A time-scale service is required for high-precision engine creation."
-            )
-        );
-    }
-    if (request.earthOrientationProvider == nullptr) {
-        diagnostics.push_back(
-            EphemerisFactoryDiagnostics::creationDiagnostic(
-                EphemerisFactoryCreationDiagnostic::Code::RequiredEarthOrientationProviderUnavailable,
-                EphemerisFactoryCreationDiagnosticSeverity::Error,
-                "An Earth-orientation provider is required for high-precision engine creation."
-            )
-        );
-    }
+            diagnostics.push_back(
+                EphemerisFactoryDiagnostics::creationDiagnostic(
+                    code, EphemerisFactoryCreationDiagnosticSeverity::Error, std::move(diagnosticText)
+                )
+            );
+        };
+
+    require(
+        !needsDefaultCalcephKernelProvider || request.activeDataSnapshot != nullptr,
+        EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable,
+        "An active ephemeris data snapshot is required for high-precision engine creation."
+    );
+    require(
+        !needsDefaultCalcephKernelProvider || request.dataManifest != nullptr,
+        EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable,
+        "An ephemeris data manifest is required for high-precision engine creation."
+    );
+    require(
+        request.datasetManifest != nullptr || request.dataManifest != nullptr,
+        EphemerisFactoryCreationDiagnostic::Code::RequiredEphemerisDataUnavailable,
+        "An ephemeris dataset manifest is required for high-precision engine creation."
+    );
+    require(
+        request.timeScaleService != nullptr,
+        EphemerisFactoryCreationDiagnostic::Code::RequiredTimeScaleServiceUnavailable,
+        "A time-scale service is required for high-precision engine creation."
+    );
+    require(
+        request.earthOrientationProvider != nullptr,
+        EphemerisFactoryCreationDiagnostic::Code::RequiredEarthOrientationProviderUnavailable,
+        "An Earth-orientation provider is required for high-precision engine creation."
+    );
 
     if (diagnostics.empty()) {
         const std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelProvider> kernelProvider =

@@ -5,7 +5,6 @@
 
 #include <QtTest/QtTest>
 
-#include <array>
 #include <string>
 
 namespace {
@@ -40,7 +39,6 @@ private slots:
     void failureFromLookupCarriesLookupReport();
     void mergeCombinesMasksAndPromotesDegraded();
     void mergeKeepsFailedResult();
-    void diagnosticsNameMatchesStatusCompanion();
 };
 
 void TimeScaleConversionResultTests::successAppliesDefaultsAndNormalizesEpoch()
@@ -132,21 +130,6 @@ void TimeScaleConversionResultTests::mergeKeepsFailedResult()
     );
     QCOMPARE(result.status, TimeScaleConversionStatus::Type::Failed);
     QCOMPARE(result.warningCodeMask, warningMaskFor(TimeScaleConversionWarningCode::Type::InvalidInput));
-}
-
-void TimeScaleConversionResultTests::diagnosticsNameMatchesStatusCompanion()
-{
-    using namespace skygate::ephemeris;
-
-    constexpr std::array statuses{
-        TimeScaleConversionStatus::Type::Valid,
-        TimeScaleConversionStatus::Type::Degraded,
-        TimeScaleConversionStatus::Type::Failed,
-    };
-
-    for (const TimeScaleConversionStatus::Type status : statuses) {
-        QCOMPARE(TimeScaleConversionDiagnostics::displayName(status), TimeScaleConversionStatus::displayName(status));
-    }
 }
 
 QTEST_APPLESS_MAIN(TimeScaleConversionResultTests)
