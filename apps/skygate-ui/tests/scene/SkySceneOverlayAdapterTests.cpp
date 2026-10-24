@@ -73,13 +73,7 @@ void SkySceneOverlayAdapterTests::selectedObjectInspectorMapsFieldsAndAliases()
              {.label = QStringLiteral("Ephemeris"),
               .value = QStringLiteral("Degraded"),
               .tooltip = QStringLiteral("Required ephemeris data is unavailable.")}},
-        .aliases = QStringLiteral("Andromeda Galaxy"),
-        .ephemerisStatus = QStringLiteral("Degraded"),
-        .ephemerisWarningText = QStringLiteral("Required ephemeris data is unavailable."),
-        .ephemerisProvenance = QStringLiteral("JPL DE440s"),
-        .ephemerisDataRange = QStringLiteral("DE440s short-range kernel: 1849-12-26 to 2150-01-22"),
-        .ephemerisUncertainty = QStringLiteral("0.40 arcsec"),
-        .ephemerisCorrections = QStringLiteral("Applied: light-time")
+        .aliases = QStringLiteral("Andromeda Galaxy")
     };
 
     verifySelectedObjectInspectorPayload(adapter.selectedObjectInspector(inspector), inspector);

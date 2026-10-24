@@ -16,10 +16,4 @@ struct SkySelectedObjectInspector final {
     bool pinned = false;
     std::vector<SkyInspectorField> fields;
     QString aliases;
-    QString ephemerisStatus;
-    QString ephemerisWarningText;
-    QString ephemerisProvenance;
-    QString ephemerisDataRange;
-    QString ephemerisUncertainty;
-    QString ephemerisCorrections;
 };

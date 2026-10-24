@@ -79,6 +79,11 @@ void SkyConstellationRenderBuilder::appendLabels(
             continue;
         }
 
+        // Label placement averages the projected anchors that are on screen, so
+        // the label sits among the drawn anchor points. That is deliberately not
+        // ConstellationReferenceCalculator's direction centroid, which the
+        // selection marker uses to mark the constellation's sky position: the
+        // two differ when only part of the constellation is visible.
         double sumX = 0.0;
         double sumY = 0.0;
         int visiblePointCount = 0;

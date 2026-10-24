@@ -22,11 +22,6 @@
 
 SkySceneModel::SkySceneModel(QObject* parent) : QObject(parent) {}
 
-QObject* SkySceneModel::skyContextController() const noexcept
-{
-    return m_skyContextController;
-}
-
 void SkySceneModel::setSkyContextController(QObject* skyContextController)
 {
     SkyContextController* controller = qobject_cast<SkyContextController*>(skyContextController);
@@ -70,7 +65,6 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
             });
     }
 
-    emit skyContextControllerChanged();
     rebuildSceneFrame();
 }
 

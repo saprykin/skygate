@@ -5,7 +5,6 @@
 #include "math/SphericalGeometry.hpp"
 #include "trail/BodyTrailCalculator.hpp"
 
-#include <chrono>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -19,37 +18,6 @@ constexpr int kObjectTrailAdaptiveRefinementSpanMinutes = 10;
 constexpr double kMaxInterpolationErrorDegrees = 0.05;
 
 }  // namespace
-
-SkyObjectTrailInterpolator::TrailOffsetWindow
-SkyObjectTrailInterpolator::trailOffsetsMinutes(const skygate::ephemeris::BodyTrailOptions& renderOptions) noexcept
-{
-    return TrailOffsetWindow{
-        .startOffsetMinutes = -renderOptions.pastHours * 60, .endOffsetMinutes = renderOptions.futureHours * 60
-    };
-}
-
-std::vector<skygate::ephemeris::BodyTrailSample>
-SkyObjectTrailInterpolator::offsetWindowSamples(const skygate::ephemeris::BodyTrailOptions& renderOptions)
-{
-    const TrailOffsetWindow offsetWindow = trailOffsetsMinutes(renderOptions);
-
-    std::vector<skygate::ephemeris::BodyTrailSample> samples;
-    samples.reserve(
-        static_cast<std::size_t>(
-            (offsetWindow.endOffsetMinutes - offsetWindow.startOffsetMinutes) / renderOptions.sampleStepMinutes
-        )
-        + 1U
-    );
-
-    for (int offsetMinutes = offsetWindow.startOffsetMinutes; offsetMinutes <= offsetWindow.endOffsetMinutes;
-         offsetMinutes += renderOptions.sampleStepMinutes) {
-        samples.push_back(
-            skygate::ephemeris::BodyTrailSample{.offsetMinutes = offsetMinutes, .horizontal = std::nullopt}
-        );
-    }
-
-    return samples;
-}
 
 std::optional<skygate::core::HorizontalCoordinate> SkyObjectTrailInterpolator::interpolateSampleAtOffset(
     const std::vector<skygate::ephemeris::BodyTrailSample>& anchors,
@@ -94,7 +62,8 @@ std::vector<skygate::ephemeris::BodyTrailSample> SkyObjectTrailInterpolator::int
     const skygate::ephemeris::BodyTrailOptions& renderOptions
 )
 {
-    std::vector<skygate::ephemeris::BodyTrailSample> samples = offsetWindowSamples(renderOptions);
+    std::vector<skygate::ephemeris::BodyTrailSample> samples =
+        skygate::ephemeris::BodyTrailCalculator::sampleOffsets(renderOptions);
 
     std::size_t nextAnchorIndex = 0U;
     for (skygate::ephemeris::BodyTrailSample& sample : samples) {
@@ -107,28 +76,30 @@ std::vector<skygate::ephemeris::BodyTrailSample> SkyObjectTrailInterpolator::int
 skygate::ephemeris::BodyTrailSample
 SkyObjectTrailInterpolator::sampleEngineAtOffset(const SkyObjectTrailSamplingInput& input, const int offsetMinutes)
 {
-    skygate::ephemeris::EphemerisRequest sampleRequest = *input.ephemerisRequest;
-    sampleRequest.context.utcTime += std::chrono::minutes(offsetMinutes);
-    sampleRequest.epoch = input.ephemerisRequest->epoch.addMinutes(offsetMinutes);
-
-    skygate::ephemeris::BodyTrailSample sample{.offsetMinutes = offsetMinutes, .horizontal = std::nullopt};
-    const auto bodyState = input.ephemerisEngine->computeBodyState(sampleRequest, std::size_t{input.targetBodyIndex});
-    if (bodyState.has_value() && bodyState->horizontal.isFinite()) {
-        sample.horizontal = bodyState->horizontal;
+    if (!input.ephemerisRequest.has_value()) {
+        return skygate::ephemeris::BodyTrailSample{.offsetMinutes = offsetMinutes, .horizontal = std::nullopt};
     }
-    return sample;
+
+    return skygate::ephemeris::BodyTrailSample{
+        .offsetMinutes = offsetMinutes,
+        .horizontal = skygate::ephemeris::BodyTrailCalculator::sampleAtOffset(
+            *input.ephemerisEngine, *input.ephemerisRequest, input.targetBodyIndex, offsetMinutes
+        )
+    };
 }
 
 std::vector<skygate::ephemeris::BodyTrailSample> SkyObjectTrailInterpolator::sampleEngineWindow(
     const SkyObjectTrailSamplingInput& input, const skygate::ephemeris::BodyTrailOptions& renderOptions
 )
 {
-    std::vector<skygate::ephemeris::BodyTrailSample> samples = offsetWindowSamples(renderOptions);
-    for (skygate::ephemeris::BodyTrailSample& sample : samples) {
-        sample.horizontal = sampleEngineAtOffset(input, sample.offsetMinutes).horizontal;
+    const skygate::ephemeris::BodyTrailCalculator trailCalculator;
+    if (input.ephemerisRequest.has_value()) {
+        return trailCalculator.sample(
+            *input.ephemerisEngine, *input.ephemerisRequest, input.targetBodyIndex, renderOptions
+        );
     }
 
-    return samples;
+    return trailCalculator.sample(*input.ephemerisEngine, input.skyContext, input.targetBodyIndex, renderOptions);
 }
 
 bool SkyObjectTrailInterpolator::interpolationErrorWithinBounds(
@@ -159,7 +130,6 @@ bool SkyObjectTrailInterpolator::interpolationErrorWithinBounds(
 void SkyObjectTrailInterpolator::appendAdaptiveTrailAnchors(
     std::vector<skygate::ephemeris::BodyTrailSample>& anchors,
     const SkyObjectTrailSamplingInput& input,
-    const skygate::ephemeris::BodyTrailOptions& renderOptions,
     const skygate::ephemeris::BodyTrailSample& previous,
     const skygate::ephemeris::BodyTrailSample& next
 )
@@ -182,8 +152,8 @@ void SkyObjectTrailInterpolator::appendAdaptiveTrailAnchors(
         return;
     }
 
-    appendAdaptiveTrailAnchors(anchors, input, renderOptions, previous, midpoint);
-    appendAdaptiveTrailAnchors(anchors, input, renderOptions, midpoint, next);
+    appendAdaptiveTrailAnchors(anchors, input, previous, midpoint);
+    appendAdaptiveTrailAnchors(anchors, input, midpoint, next);
 }
 
 std::vector<skygate::ephemeris::BodyTrailSample> SkyObjectTrailInterpolator::sampleAdaptiveTrail(
@@ -207,9 +177,7 @@ std::vector<skygate::ephemeris::BodyTrailSample> SkyObjectTrailInterpolator::sam
     adaptiveAnchors.reserve(coarseAnchors.size());
     adaptiveAnchors.push_back(coarseAnchors.front());
     for (std::size_t index = 1U; index < coarseAnchors.size(); ++index) {
-        appendAdaptiveTrailAnchors(
-            adaptiveAnchors, input, renderOptions, coarseAnchors[index - 1U], coarseAnchors[index]
-        );
+        appendAdaptiveTrailAnchors(adaptiveAnchors, input, coarseAnchors[index - 1U], coarseAnchors[index]);
     }
 
     return interpolateAnchors(adaptiveAnchors, renderOptions);

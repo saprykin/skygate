@@ -32,12 +32,6 @@ class SkyContextController;
 
 class SkySceneModel final : public QObject {
     Q_OBJECT
-    Q_PROPERTY(
-        QObject* skyContextController
-        READ skyContextController
-        WRITE setSkyContextController
-        NOTIFY skyContextControllerChanged
-    )
     Q_PROPERTY(QVariantList overlayItems READ overlayItems NOTIFY sceneFrameChanged)
     Q_PROPERTY(QVariantList ephemerisDegradationReasons READ ephemerisDegradationReasons NOTIFY sceneFrameChanged)
     Q_PROPERTY(QVariantMap selectionMarker READ selectionMarker NOTIFY sceneFrameChanged)
@@ -50,7 +44,6 @@ class SkySceneModel final : public QObject {
 public:
     explicit SkySceneModel(QObject* parent = nullptr);
 
-    [[nodiscard]] QObject* skyContextController() const noexcept;
     void setSkyContextController(QObject* skyContextController);
 
     [[nodiscard]] QVariantList overlayItems() const;
@@ -74,7 +67,6 @@ public:
     [[nodiscard]] std::span<const SkyRenderGlyph> renderGlyphSpan() const;
 
 signals:
-    void skyContextControllerChanged();
     void sceneFrameChanged();
     void viewportSnapshotChanged();
 

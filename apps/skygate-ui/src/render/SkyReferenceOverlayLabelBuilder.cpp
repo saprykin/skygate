@@ -1,5 +1,5 @@
 #include "SkyReferenceOverlayLabelBuilder.hpp"
-#include "CelestialReferenceCalculator.hpp"
+#include "SkyReferenceOverlayLayers.hpp"
 #include "math/Geometry2d.hpp"
 
 #include <QColor>
@@ -11,7 +11,6 @@
 
 namespace {
 
-constexpr int kReferenceLabelSampleCount = skygate::ephemeris::CelestialReferenceCalculator::kReferenceCircleSamples;
 constexpr double kReferenceLabelEdgeMarginPx = 36.0;
 
 template <typename CoordinateAt>
@@ -32,7 +31,7 @@ void appendReferenceLayerLabel(
     std::optional<QPointF> fallbackPoint;
     double fallbackScore = std::numeric_limits<double>::max();
 
-    for (int index = 0; index < kReferenceLabelSampleCount; ++index) {
+    for (int index = 0; index < skygate::ui::internal::SkyReferenceOverlayLayers::kSampleCount; ++index) {
         const auto projected = preparedProjection.project(coordinateAt(index));
         if (!projected.isVisible()) {
             continue;
@@ -76,41 +75,16 @@ void SkyReferenceOverlayLabelBuilder::appendLabels(
     const skygate::core::ObservationContext& skyContext
 )
 {
-    if (overlayLayers.ecliptic) {
-        appendReferenceLayerLabel(
-            overlayItems, preparedProjection, "Ecliptic", renderTheme.eclipticLine, [&skyContext](const int index) {
-                return skygate::ephemeris::CelestialReferenceCalculator::eclipticCirclePoint(
-                    index, kReferenceLabelSampleCount, skyContext.observer, skyContext.utcTime
-                );
-            }
-        );
-    }
+    for (const auto& layer :
+         skygate::ui::internal::SkyReferenceOverlayLayers::layers(renderTheme, overlayLayers, skyContext.observer)) {
+        if (!layer.enabled) {
+            continue;
+        }
 
-    if (overlayLayers.celestialEquator) {
         appendReferenceLayerLabel(
-            overlayItems,
-            preparedProjection,
-            "Celestial equator",
-            renderTheme.celestialEquatorLine,
-            [&skyContext](const int index) {
-                return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-                    index, kReferenceLabelSampleCount, 0.0, skyContext.observer, skyContext.utcTime
-                );
-            }
-        );
-    }
-
-    if (overlayLayers.circumpolarBoundary && skyContext.observer.isValid()) {
-        const double boundaryDeclinationDeg =
-            skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(skyContext.observer);
-        appendReferenceLayerLabel(
-            overlayItems,
-            preparedProjection,
-            "Circumpolar",
-            renderTheme.circumpolarBoundaryLine,
-            [boundaryDeclinationDeg, &skyContext](const int index) {
-                return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-                    index, kReferenceLabelSampleCount, boundaryDeclinationDeg, skyContext.observer, skyContext.utcTime
+            overlayItems, preparedProjection, layer.label, layer.color, [&layer, &skyContext](const int index) {
+                return skygate::ui::internal::SkyReferenceOverlayLayers::samplePoint(
+                    layer.circle, index, skyContext.observer, skyContext.utcTime
                 );
             }
         );

@@ -689,11 +689,10 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
 
     const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
 
-    QCOMPARE(inspector.ephemerisStatus, QString("Degraded"));
-    QVERIFY(inspector.ephemerisWarningText.contains("Required ephemeris data is unavailable."));
-    QVERIFY(inspector.ephemerisWarningText.contains("outside the effective date range"));
     QCOMPARE(overlayInspectorFieldValue(inspector, "Ephemeris"), QString("Degraded"));
-    QCOMPARE(overlayInspectorFieldTooltip(inspector, "Ephemeris"), inspector.ephemerisWarningText);
+    const QString ephemerisWarningText = overlayInspectorFieldTooltip(inspector, "Ephemeris");
+    QVERIFY(ephemerisWarningText.contains("Required ephemeris data is unavailable."));
+    QVERIFY(ephemerisWarningText.contains("outside the effective date range"));
     QCOMPARE(overlayInspectorFieldValue(inspector, "Provenance"), QString("JPL DE440s smoke fixture"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Data range").contains("DE440s short-range kernel"));
     QCOMPARE(overlayInspectorFieldValue(inspector, "Uncertainty"), QString("0.42 arcsec"));
