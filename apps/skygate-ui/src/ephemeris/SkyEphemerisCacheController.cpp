@@ -94,10 +94,12 @@ bool pathContains(const std::filesystem::path& root, const QString& path)
 
 bool cacheRootContainsActivePath(const std::filesystem::path& root, const EphemerisDataCacheSnapshot& activeSnapshot)
 {
-    return pathContains(root, activeSnapshot.installedKernelPath)
-           || pathContains(root, activeSnapshot.installedEarthOrientationPath)
-           || pathContains(root, activeSnapshot.installedLeapSecondTablePath)
-           || pathContains(root, activeSnapshot.installedDeltaTDataPath);
+    for (const QString& path : EphemerisDataCacheSnapshot::installedPayloadPaths(activeSnapshot)) {
+        if (pathContains(root, path)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void cleanupInactiveActivationRoot(
