@@ -16,16 +16,6 @@
 
 namespace skygate::ephemeris {
 
-std::string_view EphemerisEngineFactory::displayName(const EphemerisFactoryCreationStatus::Type status) noexcept
-{
-    return EphemerisFactoryCreationStatus::displayName(status);
-}
-
-bool EphemerisEngineFactory::isCreationSuccess(const EphemerisFactoryCreationStatus::Type status) noexcept
-{
-    return EphemerisFactoryCreationStatus::isSuccess(status);
-}
-
 namespace {
 
 [[nodiscard]] EphemerisEngineFactoryResult

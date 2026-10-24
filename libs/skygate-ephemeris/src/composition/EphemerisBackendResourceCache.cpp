@@ -72,21 +72,4 @@ void EphemerisBackendResourceCache::applyProviderFields(EphemerisEngineFactoryRe
     request.calcephKernelProvider = m_calcephKernelProvider;
 }
 
-std::shared_ptr<const ITimeScaleService> EphemerisBackendResourceCache::timeScaleService() const noexcept
-{
-    return m_timeScaleService;
-}
-
-std::shared_ptr<const IEarthOrientationProvider>
-EphemerisBackendResourceCache::earthOrientationProvider() const noexcept
-{
-    return m_earthOrientationProvider;
-}
-
-std::shared_ptr<const highprecision::ICalcephKernelProvider>
-EphemerisBackendResourceCache::calcephKernelProvider() const noexcept
-{
-    return m_calcephKernelProvider;
-}
-
 }  // namespace skygate::ephemeris

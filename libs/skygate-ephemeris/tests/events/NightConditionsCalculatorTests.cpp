@@ -314,7 +314,6 @@ void NightConditionsCalculatorTests::twilightEventsAreOrderedForOrdinaryLocation
     const auto conditions = calculator.compute(*rig.engine, request, rig.sunIndex, nullptr, rig.moonIndex, nullptr);
 
     QVERIFY(conditions.valid);
-    QVERIFY(conditions.sunAltitudeDeg.has_value());
     QVERIFY(isAvailable(conditions.sunset));
     QVERIFY(isAvailable(conditions.civilDusk));
     QVERIFY(isAvailable(conditions.nauticalDusk));
@@ -340,7 +339,6 @@ void NightConditionsCalculatorTests::invalidObserverReturnsUnavailableConditions
     const auto conditions = calculator.compute(*rig.engine, request, rig.sunIndex, nullptr, rig.moonIndex, nullptr);
 
     QVERIFY(!conditions.valid);
-    QVERIFY(!conditions.sunAltitudeDeg.has_value());
     QCOMPARE(conditions.sunrise.status, skygate::ephemeris::ObservationEventStatus::Type::Unresolved);
     QCOMPARE(conditions.moonrise.status, skygate::ephemeris::ObservationEventStatus::Type::Unresolved);
     QCOMPARE(conditions.moonIlluminationPercent, 0.0);
@@ -358,7 +356,6 @@ void NightConditionsCalculatorTests::polarTwilightReportsStableUnavailableStatus
     const auto conditions = calculator.compute(*rig.engine, request, rig.sunIndex, nullptr, rig.moonIndex, nullptr);
 
     QVERIFY(conditions.valid);
-    QVERIFY(conditions.sunAltitudeDeg.has_value());
     QVERIFY(conditions.sunrise.status != skygate::ephemeris::ObservationEventStatus::Type::InvalidInput);
     QVERIFY(conditions.sunset.status != skygate::ephemeris::ObservationEventStatus::Type::InvalidInput);
     QVERIFY(conditions.astronomicalDusk.status != skygate::ephemeris::ObservationEventStatus::Type::InvalidInput);

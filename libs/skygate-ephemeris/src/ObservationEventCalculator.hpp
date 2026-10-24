@@ -49,7 +49,6 @@ public:
 
     // Longest search window used when a crossing event is not found earlier.
     static constexpr int kSearchHorizonHours = ObservationEventSearch::kSearchHorizonHours;
-    static constexpr int kSearchHorizonSeconds = ObservationEventSearch::kSearchHorizonSeconds;
 
 private:
     std::shared_ptr<IEphemerisGuidanceStrategy> m_guidanceStrategy;

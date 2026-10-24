@@ -2,19 +2,15 @@
 
 #include "ObservationEvent.hpp"
 
-#include <optional>
 #include <string>
 
 namespace skygate::ephemeris {
 
 struct NightConditions {
     bool valid = false;
-    std::optional<double> sunAltitudeDeg;
     ObservationEvent sunrise;
     ObservationEvent sunset;
-    ObservationEvent civilDawn;
     ObservationEvent civilDusk;
-    ObservationEvent nauticalDawn;
     ObservationEvent nauticalDusk;
     ObservationEvent astronomicalDawn;
     ObservationEvent astronomicalDusk;
