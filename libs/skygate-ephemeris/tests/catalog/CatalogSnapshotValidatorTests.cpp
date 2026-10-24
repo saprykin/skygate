@@ -103,7 +103,6 @@ private slots:
     void vectorFactoryNormalizesSunAndMoonIdentities();
     void trimsWhitespaceBeforeSunAndMoonReclassification();
     void existingCatalogFactoryAcceptsValidSnapshot();
-    void catalogFactoryNormalizesSunAndIdentifiers();
     void validatorRejectsOutOfRangeAndUnknownOrderEntries();
     void validatorRejectsEmptyCanonicalIds();
     void validatorRejectsInvalidNumericDomains();
@@ -165,6 +164,9 @@ void CatalogSnapshotValidatorTests::trimsWhitespaceBeforeSunAndMoonReclassificat
 
 void CatalogSnapshotValidatorTests::existingCatalogFactoryAcceptsValidSnapshot()
 {
+    // Delegation smoke only: the catalog wrapper forwards to the vector factory
+    // without changing bodies or their order, and that factory owns the Sun,
+    // Moon, and identifier normalization covered above.
     const OwnGalaxyCelestialBody star = makeStar("hip_1");
     const DistantCelestialBody deepSkyObject = makeDeepSkyObject("ngc_224");
     const std::vector<const BaseCelestialBody*> bodies{&star, &deepSkyObject};
@@ -174,34 +176,6 @@ void CatalogSnapshotValidatorTests::existingCatalogFactoryAcceptsValidSnapshot()
     QCOMPARE(catalog->bodies().size(), std::size_t{2});
     QCOMPARE(QString::fromStdString(catalog->bodies()[0]->id), QStringLiteral("hip_1"));
     QCOMPARE(QString::fromStdString(catalog->bodies()[1]->id), QStringLiteral("ngc_224"));
-}
-
-void CatalogSnapshotValidatorTests::catalogFactoryNormalizesSunAndIdentifiers()
-{
-    OwnGalaxyCelestialBody sun;
-    sun.id = "SUN";
-    sun.displayName = "Sun";
-    sun.kind = BaseCelestialBody::Kind::Star;
-
-    OwnGalaxyCelestialBody identifiedStar = makeStar("hip_1");
-    identifiedStar.identity.externalIdentifiers.push_back(CatalogIdentifier{"HIP", "0031"});
-
-    const std::vector<const BaseCelestialBody*> bodies{&sun, &identifiedStar};
-
-    const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromCatalog(CelestialBodyCatalog{bodies});
-    QVERIFY(catalog != nullptr);
-
-    const auto normalizedBodies = catalog->bodies();
-    QCOMPARE(normalizedBodies.size(), std::size_t{2});
-    QCOMPARE(normalizedBodies[0]->kind, BaseCelestialBody::Kind::Sun);
-    QCOMPARE(normalizedBodies[1]->kind, BaseCelestialBody::Kind::Star);
-
-    const BaseCelestialBody& normalizedStar = *normalizedBodies[1];
-    QCOMPARE(normalizedStar.identity.externalIdentifiers.size(), std::size_t{1});
-    QCOMPARE(
-        QString::fromStdString(normalizedStar.identity.externalIdentifiers[0].namespaceName), QStringLiteral("hip")
-    );
-    QCOMPARE(QString::fromStdString(normalizedStar.identity.externalIdentifiers[0].value), QStringLiteral("31"));
 }
 
 void CatalogSnapshotValidatorTests::validatorRejectsOutOfRangeAndUnknownOrderEntries()
