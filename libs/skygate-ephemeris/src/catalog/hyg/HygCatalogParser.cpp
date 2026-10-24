@@ -4,6 +4,7 @@
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogObjectIdentity.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
+#include "catalog/io/CatalogColumnValueReader.hpp"
 #include "catalog/io/CatalogParsingUtilities.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
 #include "time/EpochCodec.hpp"
@@ -26,27 +27,19 @@ constexpr std::size_t kHygRowCountLimitFloor = 2000000;
 constexpr std::size_t kHygMinExpectedBytesPerDataRow = 6;
 constexpr double kHygMissingDistanceParsecs = 100'000.0;
 
-[[nodiscard]] std::optional<double> optionalFiniteDoubleColumn(const DelimitedCatalogRow& row, const QString& name)
-{
-    const QString text = row.decodeColumn(name);
-    if (text.isEmpty()) {
-        return std::nullopt;
-    }
-
-    return CatalogParsingUtilities::parseFiniteDouble(QStringView{text});
-}
-
 [[nodiscard]] std::optional<double> parallaxMasFromHygRow(const DelimitedCatalogRow& row)
 {
-    if (const std::optional<double> parallaxMas = optionalFiniteDoubleColumn(row, QStringLiteral("parallax"));
+    if (const std::optional<double> parallaxMas =
+            CatalogColumnValueReader::finiteDouble(row, QStringLiteral("parallax"));
         parallaxMas.has_value()) {
         return parallaxMas;
     }
-    if (const std::optional<double> parallaxMas = optionalFiniteDoubleColumn(row, QStringLiteral("plx"));
+    if (const std::optional<double> parallaxMas = CatalogColumnValueReader::finiteDouble(row, QStringLiteral("plx"));
         parallaxMas.has_value()) {
         return parallaxMas;
     }
-    if (const std::optional<double> distanceParsecs = optionalFiniteDoubleColumn(row, QStringLiteral("dist"));
+    if (const std::optional<double> distanceParsecs =
+            CatalogColumnValueReader::finiteDouble(row, QStringLiteral("dist"));
         distanceParsecs.has_value() && *distanceParsecs > 0.0 && *distanceParsecs < kHygMissingDistanceParsecs) {
         return CatalogStarAstrometry::parallaxMasFromDistanceParsecs(*distanceParsecs);
     }
@@ -140,10 +133,12 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
             CatalogStarAstrometry astrometry;
             astrometry.referenceEquatorial = *body.fixedEquatorial;
             astrometry.referenceEpoch = skygate::core::EpochCodec::j2000Epoch(skygate::core::TimeScale::Tt);
-            astrometry.properMotionRightAscensionMasPerYear = optionalFiniteDoubleColumn(row, QStringLiteral("pmra"));
-            astrometry.properMotionDeclinationMasPerYear = optionalFiniteDoubleColumn(row, QStringLiteral("pmdec"));
+            astrometry.properMotionRightAscensionMasPerYear =
+                CatalogColumnValueReader::finiteDouble(row, QStringLiteral("pmra"));
+            astrometry.properMotionDeclinationMasPerYear =
+                CatalogColumnValueReader::finiteDouble(row, QStringLiteral("pmdec"));
             astrometry.stellarParallaxMas = parallaxMasFromHygRow(row);
-            astrometry.radialVelocityKmPerSecond = optionalFiniteDoubleColumn(row, QStringLiteral("rv"));
+            astrometry.radialVelocityKmPerSecond = CatalogColumnValueReader::finiteDouble(row, QStringLiteral("rv"));
             if (astrometry.properMotionRightAscensionMasPerYear.has_value()
                 || astrometry.properMotionDeclinationMasPerYear.has_value() || astrometry.stellarParallaxMas.has_value()
                 || astrometry.radialVelocityKmPerSecond.has_value()) {

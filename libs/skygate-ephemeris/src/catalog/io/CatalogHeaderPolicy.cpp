@@ -21,7 +21,7 @@ std::string_view CatalogHeaderPolicy::findHeaderLine(std::string_view& remaining
     }
 
     while (!remaining.empty()) {
-        std::string_view line = StringUtilities::takeLine(remaining);
+        std::string_view line = CsvRowTokenizer::takeLine(remaining);
 
         line = StringUtilities::trimAsciiWhitespace(line);
 
@@ -42,15 +42,10 @@ std::string_view CatalogHeaderPolicy::findHeaderLine(std::string_view& remaining
     return {};
 }
 
-QString CatalogHeaderPolicy::decodeTrimmedLine(const std::string_view line)
-{
-    return QString::fromUtf8(line.data(), static_cast<qsizetype>(line.size())).trimmed();
-}
-
 QHash<QString, qsizetype>
 CatalogHeaderPolicy::decodeHeaderLine(const std::string_view headerLine, const QChar separator)
 {
-    const QString line = decodeTrimmedLine(headerLine);
+    const QString line = CsvRowTokenizer::decodeTrimmedLine(headerLine);
     const QVector<QStringView> columns = CsvRowTokenizer::splitColumns(QStringView{line}, separator);
 
     QHash<QString, qsizetype> headerIndex;

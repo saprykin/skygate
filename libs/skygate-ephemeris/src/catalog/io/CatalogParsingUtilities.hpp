@@ -20,6 +20,11 @@ public:
     [[nodiscard]] static std::optional<double> parsePositiveDouble(const QString& text);
     [[nodiscard]] static std::optional<double> parseNonNegativeDouble(QStringView text);
     [[nodiscard]] static std::optional<double> parseNonNegativeDouble(const QString& text);
+    // Screens a value that already exists numerically with the same domains the
+    // text parsers apply, so tabulated data cannot admit a value parsed text
+    // would reject.
+    [[nodiscard]] static std::optional<double> screenedPositiveValue(double value);
+    [[nodiscard]] static std::optional<double> screenedNonNegativeValue(double value);
     [[nodiscard]] static std::optional<double> parseRightAscensionHours(QString text);
     [[nodiscard]] static std::optional<double> parseDeclinationDeg(QString text);
 };

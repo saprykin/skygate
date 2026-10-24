@@ -303,40 +303,6 @@ void logUnexpectedDuplicateIdentities(const CatalogMergeAccumulator& accumulator
     }
 }
 
-void pushOwnGalaxyBody(
-    CatalogCompositionMergeResult& result,
-    const OwnGalaxyCelestialBody& body,
-    const std::string_view sourceId,
-    const std::vector<std::string>& contributorSourceIds
-)
-{
-    result.orderedBodyIndexes.push_back(
-        CelestialBodyCatalog::OrderEntry{
-            .domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = result.ownGalaxyBodies.size()
-        }
-    );
-    result.ownGalaxyBodies.push_back(body);
-    result.sourceIds.emplace_back(sourceId);
-    result.contributorSourceIds.push_back(contributorSourceIds);
-}
-
-void pushDistantBody(
-    CatalogCompositionMergeResult& result,
-    const DistantCelestialBody& body,
-    const std::string_view sourceId,
-    const std::vector<std::string>& contributorSourceIds
-)
-{
-    result.orderedBodyIndexes.push_back(
-        CelestialBodyCatalog::OrderEntry{
-            .domain = CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = result.distantBodies.size()
-        }
-    );
-    result.distantBodies.push_back(body);
-    result.sourceIds.emplace_back(sourceId);
-    result.contributorSourceIds.push_back(contributorSourceIds);
-}
-
 void assembleResult(CatalogCompositionMergeResult& result, const CatalogMergeAccumulator& accumulator)
 {
     result.ownGalaxyBodies.reserve(accumulator.ownGalaxyBodies.size());
@@ -345,25 +311,48 @@ void assembleResult(CatalogCompositionMergeResult& result, const CatalogMergeAcc
     result.sourceIds.reserve(accumulator.sourceIds.size());
     result.contributorSourceIds.reserve(accumulator.sourceIds.size());
 
+    // Both domains append the same way: the order entry points at the body's
+    // position in its own domain vector, and the source bookkeeping stays
+    // parallel to the order entries.
+    const auto pushBody = [&result](
+                              const auto& body,
+                              auto& bodies,
+                              const CelestialBodyCatalog::BodyDomain domain,
+                              const std::string_view sourceId,
+                              const std::vector<std::string>& contributorSourceIds
+                          ) {
+        result.orderedBodyIndexes.push_back(
+            CelestialBodyCatalog::OrderEntry{.domain = domain, .bodyIndex = bodies.size()}
+        );
+        bodies.push_back(body);
+        result.sourceIds.emplace_back(sourceId);
+        result.contributorSourceIds.push_back(contributorSourceIds);
+    };
+
     for (std::size_t position = 0; position < accumulator.sourceIds.size(); ++position) {
         if (!accumulator.active[position]) {
             continue;
         }
+
+        const std::size_t bodyIndex = accumulator.domainIndex[position];
         if (accumulator.isDistant[position]) {
-            pushDistantBody(
-                result,
-                accumulator.distantBodies[accumulator.domainIndex[position]],
+            pushBody(
+                accumulator.distantBodies[bodyIndex],
+                result.distantBodies,
+                CelestialBodyCatalog::BodyDomain::Distant,
                 accumulator.sourceIds[position],
                 accumulator.contributorSourceIds[position]
             );
-        } else {
-            pushOwnGalaxyBody(
-                result,
-                accumulator.ownGalaxyBodies[accumulator.domainIndex[position]],
-                accumulator.sourceIds[position],
-                accumulator.contributorSourceIds[position]
-            );
+            continue;
         }
+
+        pushBody(
+            accumulator.ownGalaxyBodies[bodyIndex],
+            result.ownGalaxyBodies,
+            CelestialBodyCatalog::BodyDomain::OwnGalaxy,
+            accumulator.sourceIds[position],
+            accumulator.contributorSourceIds[position]
+        );
     }
 }
 

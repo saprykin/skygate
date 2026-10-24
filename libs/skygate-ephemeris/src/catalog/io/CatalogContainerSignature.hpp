@@ -5,13 +5,17 @@
 
 namespace skygate::ephemeris {
 
-// Container magic bytes shared by catalog payload routing and ZIP entry
-// extraction.
+// Container and archive-structure magic bytes shared by catalog payload
+// routing, ZIP directory parsing, and ZIP entry extraction. Keeping the three
+// ZIP record signatures in one set means a reader and the router never disagree
+// about what a valid record starts with.
 class CatalogContainerSignature final {
 public:
     CatalogContainerSignature() = delete;
 
     static constexpr std::uint32_t kZipLocalFileHeaderSignature = 0x04034b50U;
+    static constexpr std::uint32_t kZipCentralDirectoryHeaderSignature = 0x02014b50U;
+    static constexpr std::uint32_t kZipEndOfCentralDirectorySignature = 0x06054b50U;
 
     [[nodiscard]] static constexpr bool isGzip(const std::string_view payload) noexcept
     {

@@ -54,6 +54,23 @@ void CatalogCoordinateMerge::logRejectedFixedCoordinates(
     qCWarning(skygateCatalogCompositionLog).noquote() << message;
 }
 
+void CatalogCoordinateMerge::logAstrometryMergeOutcome(
+    const AstrometryMergeOutcome outcome, const BaseCelestialBody& kept, const BaseCelestialBody& rejected
+)
+{
+    switch (outcome) {
+    case AstrometryMergeOutcome::RejectedAgainstFixed:
+        logRejectedAstrometry(kept, rejected, QStringLiteral("fixed coordinates"));
+        break;
+    case AstrometryMergeOutcome::RejectedAgainstReference:
+        logRejectedAstrometry(kept, rejected, QStringLiteral("reference coordinates"));
+        break;
+    case AstrometryMergeOutcome::Adopted:
+    case AstrometryMergeOutcome::MergedFields:
+        break;
+    }
+}
+
 // True when a merge adopts the loser's value for a field the winner already
 // supplies. KeepWinnerValue never replaces the winner's value. TakeHigherOrigin
 // adopts the value whose recorded origin outranks the winner's, across sources
@@ -104,22 +121,11 @@ void CatalogCoordinateMerge::takeHigherPrecedence(
     const ValuePrecedence precedence
 )
 {
-    if (loserValue.empty()) {
-        return;
-    }
-    Q_ASSERT(winnerValue.empty() || winnerOrigin.has_value());
-    Q_ASSERT(loserValue.empty() || loserOrigin.has_value());
-    if (!winnerValue.empty() && !loserValueWins(*loserOrigin, *winnerOrigin, precedence)) {
-        return;
-    }
-
-    winnerValue = loserValue;
-    winnerOrigin = loserOrigin;
+    adoptHigherPrecedence(winnerValue, winnerOrigin, loserValue, loserOrigin, precedence, [](const std::string& value) {
+        return value.empty();
+    });
 }
 
-// The visual magnitude has no optional wrapper: NaN is its absent marker,
-// exactly like an empty display name, and a valid zero is a value like any
-// other.
 void CatalogCoordinateMerge::takeHigherPrecedence(
     double& winnerValue,
     std::optional<CatalogFieldOrigins::ValueOrigin>& winnerOrigin,
@@ -128,21 +134,11 @@ void CatalogCoordinateMerge::takeHigherPrecedence(
     const ValuePrecedence precedence
 )
 {
-    if (std::isnan(loserValue)) {
-        return;
-    }
-    Q_ASSERT(std::isnan(winnerValue) || winnerOrigin.has_value());
-    Q_ASSERT(std::isnan(loserValue) || loserOrigin.has_value());
-    if (!std::isnan(winnerValue) && !loserValueWins(*loserOrigin, *winnerOrigin, precedence)) {
-        return;
-    }
-
-    winnerValue = loserValue;
-    winnerOrigin = loserOrigin;
+    adoptHigherPrecedence(winnerValue, winnerOrigin, loserValue, loserOrigin, precedence, [](const double value) {
+        return std::isnan(value);
+    });
 }
 
-// The deep-sky kind has no optional wrapper: an empty kind is its absent
-// marker, exactly like an empty display name.
 void CatalogCoordinateMerge::takeHigherPrecedence(
     DeepSkyObjectInfo::Kind& winnerValue,
     std::optional<CatalogFieldOrigins::ValueOrigin>& winnerOrigin,
@@ -151,17 +147,11 @@ void CatalogCoordinateMerge::takeHigherPrecedence(
     const ValuePrecedence precedence
 )
 {
-    if (loserValue == DeepSkyObjectInfo::Kind::Unknown) {
-        return;
-    }
-    Q_ASSERT(winnerValue == DeepSkyObjectInfo::Kind::Unknown || winnerOrigin.has_value());
-    Q_ASSERT(loserValue == DeepSkyObjectInfo::Kind::Unknown || loserOrigin.has_value());
-    if (winnerValue != DeepSkyObjectInfo::Kind::Unknown && !loserValueWins(*loserOrigin, *winnerOrigin, precedence)) {
-        return;
-    }
-
-    winnerValue = loserValue;
-    winnerOrigin = loserOrigin;
+    adoptHigherPrecedence(
+        winnerValue, winnerOrigin, loserValue, loserOrigin, precedence, [](const DeepSkyObjectInfo::Kind value) {
+            return value == DeepSkyObjectInfo::Kind::Unknown;
+        }
+    );
 }
 
 // Fills the winner's coordinate model from one losing astrometry. The losing
@@ -303,17 +293,11 @@ void CatalogCoordinateMerge::replaceCoordinateModelInPlace(
     }
 
     if (replacedAstrometry.has_value()) {
-        switch (mergeLosingAstrometry(winner, winnerOrigins, *replacedAstrometry, replacedOrigins, precedence)) {
-        case AstrometryMergeOutcome::RejectedAgainstFixed:
-            logRejectedAstrometry(loser, winner, QStringLiteral("fixed coordinates"));
-            break;
-        case AstrometryMergeOutcome::RejectedAgainstReference:
-            logRejectedAstrometry(loser, winner, QStringLiteral("reference coordinates"));
-            break;
-        case AstrometryMergeOutcome::Adopted:
-        case AstrometryMergeOutcome::MergedFields:
-            break;
-        }
+        logAstrometryMergeOutcome(
+            mergeLosingAstrometry(winner, winnerOrigins, *replacedAstrometry, replacedOrigins, precedence),
+            loser,
+            winner
+        );
     }
 
     CatalogFieldOrigins::refreshCoordinateModelOrigin(winnerOrigins);
@@ -353,17 +337,9 @@ void CatalogCoordinateMerge::mergeStarAstrometryInPlace(
         return;
     }
 
-    switch (mergeLosingAstrometry(winner, winnerOrigins, *loserAstrometry, loserOrigins, precedence)) {
-    case AstrometryMergeOutcome::RejectedAgainstFixed:
-        logRejectedAstrometry(winner, loser, QStringLiteral("fixed coordinates"));
-        break;
-    case AstrometryMergeOutcome::RejectedAgainstReference:
-        logRejectedAstrometry(winner, loser, QStringLiteral("reference coordinates"));
-        break;
-    case AstrometryMergeOutcome::Adopted:
-    case AstrometryMergeOutcome::MergedFields:
-        break;
-    }
+    logAstrometryMergeOutcome(
+        mergeLosingAstrometry(winner, winnerOrigins, *loserAstrometry, loserOrigins, precedence), winner, loser
+    );
 }
 
 }  // namespace skygate::ephemeris

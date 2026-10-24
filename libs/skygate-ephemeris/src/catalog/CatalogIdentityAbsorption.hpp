@@ -182,10 +182,16 @@ private:
     static void retainCanonicalEquivalences(
         CatalogObjectIdentity& winner, std::string_view winnerId, const BaseCelestialBody& loser
     );
-    // The designations a record authoritatively carries: its explicit external
-    // identifiers, plus the designation of a recognized deep-sky canonical id.
-    [[nodiscard]] static std::vector<CatalogIdentifier> authoritativeDesignations(const BaseCelestialBody& body);
-
+    // The fields every body domain carries. Identity, display name, and visual
+    // magnitude merge the same way for own-galaxy and distant records, so the
+    // domain-specific merges below start from this shared block.
+    static void mergeBaseFieldsInPlace(
+        BaseCelestialBody& winner,
+        CatalogFieldOrigins& winnerOrigins,
+        const BaseCelestialBody& loser,
+        const CatalogFieldOrigins& loserOrigins,
+        CatalogCoordinateMerge::ValuePrecedence precedence
+    );
     static void mergeOwnGalaxyInPlace(
         OwnGalaxyCelestialBody& winner,
         CatalogFieldOrigins& winnerOrigins,

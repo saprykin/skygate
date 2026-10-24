@@ -41,7 +41,9 @@ public:
     };
 
     // Adopts the loser's value when the winner carries none, or when the active
-    // precedence mode lets the loser's recorded origin win.
+    // precedence mode lets the loser's recorded origin win. Presence follows the
+    // value model's own absent marker, so these overloads differ only in which
+    // value counts as absent.
     template <typename T>
     static void takeHigherPrecedence(
         std::optional<T>& winnerValue,
@@ -51,19 +53,14 @@ public:
         const ValuePrecedence precedence
     )
     {
-        if (!loserValue.has_value()) {
-            return;
-        }
-        Q_ASSERT(!winnerValue.has_value() || winnerOrigin.has_value());
-        Q_ASSERT(!loserValue.has_value() || loserOrigin.has_value());
-        if (winnerValue.has_value() && !loserValueWins(*loserOrigin, *winnerOrigin, precedence)) {
-            return;
-        }
-
-        winnerValue = loserValue;
-        winnerOrigin = loserOrigin;
+        adoptHigherPrecedence(
+            winnerValue, winnerOrigin, loserValue, loserOrigin, precedence, [](const std::optional<T>& value) {
+                return !value.has_value();
+            }
+        );
     }
 
+    // An empty display name is the absent marker of the text fields.
     static void takeHigherPrecedence(
         std::string& winnerValue,
         std::optional<CatalogFieldOrigins::ValueOrigin>& winnerOrigin,
@@ -71,6 +68,8 @@ public:
         const std::optional<CatalogFieldOrigins::ValueOrigin> loserOrigin,
         const ValuePrecedence precedence
     );
+    // A NaN visual magnitude is the absent marker of the numeric fields, exactly
+    // like an empty display name; a valid zero is a value like any other.
     static void takeHigherPrecedence(
         double& winnerValue,
         std::optional<CatalogFieldOrigins::ValueOrigin>& winnerOrigin,
@@ -78,6 +77,7 @@ public:
         const std::optional<CatalogFieldOrigins::ValueOrigin> loserOrigin,
         const ValuePrecedence precedence
     );
+    // An unknown kind is the absent marker of the enumerated fields.
     static void takeHigherPrecedence(
         DeepSkyObjectInfo::Kind& winnerValue,
         std::optional<CatalogFieldOrigins::ValueOrigin>& winnerOrigin,
@@ -181,6 +181,32 @@ private:
         RejectedAgainstReference
     };
 
+    // Shared body of the takeHigherPrecedence overloads. `isAbsent` names the
+    // value model's absent marker, so the winner's presence check and the
+    // loser's skip check follow one rule for every value kind.
+    template <typename T, typename IsAbsent>
+    static void adoptHigherPrecedence(
+        T& winnerValue,
+        std::optional<CatalogFieldOrigins::ValueOrigin>& winnerOrigin,
+        const T& loserValue,
+        const std::optional<CatalogFieldOrigins::ValueOrigin> loserOrigin,
+        const ValuePrecedence precedence,
+        IsAbsent isAbsent
+    )
+    {
+        if (isAbsent(loserValue)) {
+            return;
+        }
+        Q_ASSERT(isAbsent(winnerValue) || winnerOrigin.has_value());
+        Q_ASSERT(loserOrigin.has_value());
+        if (!isAbsent(winnerValue) && !loserValueWins(*loserOrigin, *winnerOrigin, precedence)) {
+            return;
+        }
+
+        winnerValue = loserValue;
+        winnerOrigin = loserOrigin;
+    }
+
     [[nodiscard]] static bool loserValueWins(
         const CatalogFieldOrigins::ValueOrigin& loserOrigin,
         const CatalogFieldOrigins::ValueOrigin& winnerOrigin,
@@ -213,6 +239,12 @@ private:
     static void
     logRejectedAstrometry(const BaseCelestialBody& winner, const BaseCelestialBody& loser, const QString& keptModel);
     static void logRejectedFixedCoordinates(const BaseCelestialBody& winner, const BaseCelestialBody& loser);
+    // Reports the diagnosis of one astrometry merge outcome: `kept` names the
+    // record whose coordinate model survived and `rejected` the record whose
+    // incompatible astrometry was dropped.
+    static void logAstrometryMergeOutcome(
+        AstrometryMergeOutcome outcome, const BaseCelestialBody& kept, const BaseCelestialBody& rejected
+    );
 };
 
 }  // namespace skygate::ephemeris

@@ -1,7 +1,9 @@
 #include "CatalogIdentityIndex.hpp"
 #include "StringUtilities.hpp"
+#include "catalog/CatalogIdentity.hpp"
 
 #include <algorithm>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -36,9 +38,10 @@ std::vector<std::string> canonicalKeys(const BaseCelestialBody& body)
 
 std::vector<std::string> externalIdentifierKeys(const BaseCelestialBody& body)
 {
+    const std::span<const CatalogIdentifier> identifiers = CatalogIdentity::externalIdentifiers(body);
     std::vector<std::string> keys;
-    keys.reserve(body.identity.externalIdentifiers.size());
-    for (const CatalogIdentifier& identifier : body.identity.externalIdentifiers) {
+    keys.reserve(identifiers.size());
+    for (const CatalogIdentifier& identifier : identifiers) {
         if (!identifier.empty()) {
             keys.push_back(identifier.key());
         }
