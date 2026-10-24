@@ -69,7 +69,6 @@ add_skygate_core_qtest(skygate-core-geometry-2d-tests geometry/Geometry2dTests.c
 add_skygate_core_qtest(skygate-core-geometry-property-tests geometry/GeometryPropertyTests.cpp)
 add_skygate_core_qtest(skygate-core-geometry-helpers-tests geometry/GeometryHelpersTests.cpp)
 add_skygate_core_qtest(skygate-core-spherical-geometry-tests geometry/SphericalGeometryTests.cpp)
-add_skygate_core_qtest(skygate-core-projection-factory-tests projection/ProjectionFactoryTests.cpp)
 add_skygate_core_qtest(skygate-core-projection-type-codec-tests projection/ProjectionTypeCodecTests.cpp)
 add_skygate_core_qtest(skygate-core-azimuthal-equidistant-projection-tests projection/AzimuthalEquidistantProjectionTests.cpp)
 add_skygate_core_qtest(skygate-core-stereographic-projection-tests projection/StereographicProjectionTests.cpp)

@@ -39,7 +39,7 @@ private slots:
     void projectedPolylineViewportLimitUsesLargerSide();
     void dashedLineBuilderCreatesDashSegments();
     void dashedLineBuilderHandlesDegenerateAndDiagonals();
-    void coordinateFiniteQueriesDoNotChangeValidity();
+    void coordinateChecksReportFiniteAndInRangePayload();
     void screenPointVisibilityFollowsStatus();
 };
 
@@ -285,7 +285,7 @@ void GeometryHelpersTests::dashedLineBuilderHandlesDegenerateAndDiagonals()
     QCOMPARE(diagonalSegments.back().y2, 4.0);
 }
 
-void GeometryHelpersTests::coordinateFiniteQueriesDoNotChangeValidity()
+void GeometryHelpersTests::coordinateChecksReportFiniteAndInRangePayload()
 {
     const double nan = std::numeric_limits<double>::quiet_NaN();
 

@@ -14,6 +14,7 @@ class ProjectionTypeCodecTests final : public QObject {
 
 private slots:
     void orderedValuesMatchDisplayOrder();
+    void isKnownRejectsValuesOutsideTheEnum();
     void textRoundTripsEveryValue();
     void fromTextAcceptsCaseAndWhitespace();
     void fromTextRejectsUnknownText();
@@ -39,6 +40,12 @@ void ProjectionTypeCodecTests::orderedValuesMatchDisplayOrder()
     QCOMPARE(
         QString::fromStdString(std::string(skygate::core::ProjectionTypeCodec::text(values[2]))), QString("Perspective")
     );
+}
+
+void ProjectionTypeCodecTests::isKnownRejectsValuesOutsideTheEnum()
+{
+    QVERIFY(!skygate::core::ProjectionTypeCodec::isKnown(static_cast<skygate::core::ProjectionType>(3)));
+    QVERIFY(!skygate::core::ProjectionTypeCodec::isKnown(static_cast<skygate::core::ProjectionType>(255)));
 }
 
 void ProjectionTypeCodecTests::textRoundTripsEveryValue()
