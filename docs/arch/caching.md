@@ -72,9 +72,10 @@ builds geometry only when it receives a new one.
 
 `PreparedProjection` precomputes per-frame projection basis data and
 constants. Each scene rebuild creates one from the current viewport and
-view parameters, not per object. Direct projections and prepared
-projections delegate to the same internal projection algorithms, keeping
-test-only/direct paths numerically aligned with the render path.
+view parameters, not per object. The `ProjectionAlgorithms::project`
+overload that takes a type and parameters runs the same code as the
+prepared projection, so tests that project a single point stay
+numerically aligned with the render path.
 
 ## Large-catalog star decimation
 

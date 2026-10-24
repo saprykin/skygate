@@ -7,12 +7,13 @@ seams.
 
 Update:
 
-- `ProjectionType`
-- a concrete `IProjection` strategy wired in `createProjection(...)`
-- internal `ProjectionAlgorithms` frame setup and project formula
-- `SkyContextProjectionTypeCodec` and the projection list in
-  `apps/skygate-ui/qml/preferences/PreferencesSkySection.qml`
-- projection-specific tests
+- `ProjectionType` with the new enum value
+- `ProjectionTypeCodec` with its ordered value, display text, and parse
+  entry. The preferences view reads `projectionTypeOptions` from the
+  controller, which lists these values, so the QML side needs no change.
+- `ProjectionAlgorithms` with the frame setup in `prepareFrame` and the
+  formula in `project`
+- projection tests under `libs/skygate-core/tests/projection`
 
 ## Adding a catalog source that uses an existing schema
 

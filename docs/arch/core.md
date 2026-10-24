@@ -19,36 +19,46 @@ boundaries.
 
 ## Projection subsystem
 
-- `IProjection`: runtime strategy interface for projections.
-- `createProjection(ProjectionType)`: factory for selecting a concrete
-  projection implementation.
-- Concrete strategies: `StereographicProjection`,
-  `AzimuthalEquidistantProjection`, `PerspectiveProjection`.
+- `ProjectionType`: selects stereographic, azimuthal equidistant, or
+  perspective.
+- `ProjectionParams`: view center, field of view, roll, and viewport size.
 - `PreparedProjection`: per-frame precomputation object used by the render
-  path. Stores the normalized center basis and projection-specific
-  constants so large render passes do not repeat setup work for every star.
-- `ProjectionAlgorithms`: internal implementation shared by the direct
-  projection strategies and `PreparedProjection`, so projection formulas
-  have one behavioral source.
-- `ProjectionPipeline`: internal helper that turns normalized projection
-  results into `ScreenPoint` status and viewport coordinates.
-- Focused geometry helpers:
-  - `Geometry2d` for primitive 2D math, rectangles, and line segments
-  - `RectOccupancyGrid` and `CircleHitIndex` for screen-space indexes
-  - `DashedLineBuilder` for dash generation
-  - `ProjectedPolylineBuilder` for projection-aware polyline splitting
+  path. `PreparedProjection::create` checks the parameters, normalizes the
+  view center, and stores the center basis and projection constants in a
+  `ProjectionFrame`, so large render passes do not repeat setup work for
+  every star. `project` and `projectWithMargin` reuse that frame.
+- `ProjectionAlgorithms`: internal implementation behind the prepared
+  projection. `prepareFrame` fills the `ProjectionFrame`, and `project`
+  applies the projection formula, roll, and visibility rules.
+- `ProjectionPipeline`: internal helper that scales a projected position
+  into viewport pixels and culls it outside the field of view, using a
+  circular bound for the azimuthal projections and a rectangular bound for
+  the perspective one.
+
+The UI builds one `PreparedProjection` per frame and projects every body
+through it. `ProjectionAlgorithms` holds the only copy of each projection
+formula; tests call it directly to check the formulas without building a
+prepared frame.
+
+## Geometry helpers
+
+These helpers back the projection and render paths:
+
+- `Geometry2d` for primitive 2D math, rectangles, and line segments
+- `RectOccupancyGrid` and `CircleHitIndex` for screen-space indexes
+- `DashedLineBuilder` for dash generation
+- `ProjectedPolylineBuilder` for projection-aware polyline splitting. It
+  splits each segment according to the angular distance between its
+  endpoints and the field of view, then resamples through
+  `SphericalGeometry`.
 - `SphericalGeometry`: spherical/vector helpers shared by projection and
   ephemeris code. It converts horizontal coordinates to and from unit
   vectors, builds a projection basis, rotates a vector around an axis,
   measures the angular separation of two directions, and interpolates
-  between directions along the chord between their unit vectors. A rotated
-  or interpolated vector that collapses to zero length falls back to the
-  zenith direction.
-
-`PreparedProjection` is the preferred high-throughput path in the current
-UI. The `IProjection` strategies still exist as a clean abstraction
-boundary and are created by the controller when the projection type is
-selected.
+  between directions along the great circle, using arc-length weights and
+  falling back to a normalized chord when the directions are nearly
+  collinear. A rotated or interpolated vector that collapses to zero length
+  falls back to the zenith direction.
 
 ## Time abstraction
 
