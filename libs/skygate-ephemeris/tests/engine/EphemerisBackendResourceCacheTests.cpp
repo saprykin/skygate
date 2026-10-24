@@ -196,6 +196,14 @@ private:
     );
 }
 
+[[nodiscard]] skygate::ephemeris::EphemerisEngineFactoryRequest
+providerFields(const skygate::ephemeris::EphemerisBackendResourceCache& cache)
+{
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    cache.applyProviderFields(request);
+    return request;
+}
+
 }  // namespace
 
 class EphemerisBackendResourceCacheTests final : public QObject {
@@ -217,15 +225,15 @@ void EphemerisBackendResourceCacheTests::reusesProvidersWhenRevisionAndManifestU
     skygate::ephemeris::EphemerisBackendResourceCache cache;
     cache.refresh(snapshot, nullptr, 7U);
 
-    const auto firstTimeScaleService = cache.timeScaleService();
-    const auto firstEarthOrientationProvider = cache.earthOrientationProvider();
-    QVERIFY(firstTimeScaleService != nullptr);
-    QVERIFY(firstEarthOrientationProvider != nullptr);
-    QVERIFY(cache.calcephKernelProvider() == nullptr);
+    const skygate::ephemeris::EphemerisEngineFactoryRequest firstFields = providerFields(cache);
+    QVERIFY(firstFields.timeScaleService != nullptr);
+    QVERIFY(firstFields.earthOrientationProvider != nullptr);
+    QVERIFY(firstFields.calcephKernelProvider == nullptr);
 
     cache.refresh(snapshot, nullptr, 7U);
-    QVERIFY(cache.timeScaleService() == firstTimeScaleService);
-    QVERIFY(cache.earthOrientationProvider() == firstEarthOrientationProvider);
+    const skygate::ephemeris::EphemerisEngineFactoryRequest secondFields = providerFields(cache);
+    QVERIFY(secondFields.timeScaleService == firstFields.timeScaleService);
+    QVERIFY(secondFields.earthOrientationProvider == firstFields.earthOrientationProvider);
 }
 
 void EphemerisBackendResourceCacheTests::invalidatesAndReloadsProvidersOnRevisionChange()
@@ -234,16 +242,16 @@ void EphemerisBackendResourceCacheTests::invalidatesAndReloadsProvidersOnRevisio
     skygate::ephemeris::EphemerisBackendResourceCache cache;
     cache.refresh(snapshot, nullptr, 7U);
 
-    const auto firstTimeScaleService = cache.timeScaleService();
-    const auto firstEarthOrientationProvider = cache.earthOrientationProvider();
-    QVERIFY(firstTimeScaleService != nullptr);
-    QVERIFY(firstEarthOrientationProvider != nullptr);
+    const skygate::ephemeris::EphemerisEngineFactoryRequest firstFields = providerFields(cache);
+    QVERIFY(firstFields.timeScaleService != nullptr);
+    QVERIFY(firstFields.earthOrientationProvider != nullptr);
 
     cache.refresh(snapshot, nullptr, 8U);
-    QVERIFY(cache.timeScaleService() != nullptr);
-    QVERIFY(cache.earthOrientationProvider() != nullptr);
-    QVERIFY(cache.timeScaleService() != firstTimeScaleService);
-    QVERIFY(cache.earthOrientationProvider() != firstEarthOrientationProvider);
+    const skygate::ephemeris::EphemerisEngineFactoryRequest secondFields = providerFields(cache);
+    QVERIFY(secondFields.timeScaleService != nullptr);
+    QVERIFY(secondFields.earthOrientationProvider != nullptr);
+    QVERIFY(secondFields.timeScaleService != firstFields.timeScaleService);
+    QVERIFY(secondFields.earthOrientationProvider != firstFields.earthOrientationProvider);
 }
 
 void EphemerisBackendResourceCacheTests::preservesInjectedProvidersWhenNothingLoaded()
@@ -262,14 +270,16 @@ void EphemerisBackendResourceCacheTests::preservesInjectedProvidersWhenNothingLo
         }
     );
     cache.refresh(snapshot, nullptr, 1U);
-    QVERIFY(cache.timeScaleService() == injectedTimeScaleService);
-    QVERIFY(cache.earthOrientationProvider() == injectedEarthOrientationProvider);
-    QVERIFY(cache.calcephKernelProvider() == injectedCalcephKernelProvider);
+    skygate::ephemeris::EphemerisEngineFactoryRequest fields = providerFields(cache);
+    QVERIFY(fields.timeScaleService == injectedTimeScaleService);
+    QVERIFY(fields.earthOrientationProvider == injectedEarthOrientationProvider);
+    QVERIFY(fields.calcephKernelProvider == injectedCalcephKernelProvider);
 
     cache.refresh(snapshot, nullptr, 2U);
-    QVERIFY(cache.timeScaleService() == injectedTimeScaleService);
-    QVERIFY(cache.earthOrientationProvider() == injectedEarthOrientationProvider);
-    QVERIFY(cache.calcephKernelProvider() == injectedCalcephKernelProvider);
+    fields = providerFields(cache);
+    QVERIFY(fields.timeScaleService == injectedTimeScaleService);
+    QVERIFY(fields.earthOrientationProvider == injectedEarthOrientationProvider);
+    QVERIFY(fields.calcephKernelProvider == injectedCalcephKernelProvider);
 }
 
 void EphemerisBackendResourceCacheTests::assemblesProviderFieldsIntoFactoryRequest()
@@ -290,8 +300,8 @@ void EphemerisBackendResourceCacheTests::assemblesProviderFieldsIntoFactoryReque
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     cache.applyProviderFields(request);
 
-    QVERIFY(request.timeScaleService == cache.timeScaleService());
-    QVERIFY(request.earthOrientationProvider == cache.earthOrientationProvider());
+    QVERIFY(request.timeScaleService != nullptr);
+    QVERIFY(request.earthOrientationProvider != nullptr);
     QVERIFY(request.calcephKernelProvider == injectedCalcephKernelProvider);
 }
 
@@ -319,7 +329,7 @@ void EphemerisBackendResourceCacheTests::cachedKernelProviderSkipsChecksumVerifi
     );
     cache.refresh(snapshot, &manifest, 5U);
 
-    const auto kernelProvider = cache.calcephKernelProvider();
+    const auto kernelProvider = providerFields(cache).calcephKernelProvider;
     QVERIFY(kernelProvider != nullptr);
     const auto kernel = kernelProvider->openKernel();
     QVERIFY(kernel != nullptr);

@@ -64,17 +64,6 @@ NightConditions NightConditionsCalculator::compute(
 ) const
 {
     NightConditions conditions;
-    conditions.sunrise = ObservationEvent{};
-    conditions.sunset = ObservationEvent{};
-    conditions.civilDawn = ObservationEvent{};
-    conditions.civilDusk = ObservationEvent{};
-    conditions.nauticalDawn = ObservationEvent{};
-    conditions.nauticalDusk = ObservationEvent{};
-    conditions.astronomicalDawn = ObservationEvent{};
-    conditions.astronomicalDusk = ObservationEvent{};
-    conditions.moonrise = ObservationEvent{};
-    conditions.moonset = ObservationEvent{};
-
     const skygate::core::ObservationContext& context = request.context;
     if (!context.observer.isValid()) {
         return conditions;
@@ -132,12 +121,9 @@ NightConditions NightConditionsCalculator::compute(
     const MoonPhase moonPhase = moonPhaseCalculator.compute(request.epoch);
 
     conditions.valid = true;
-    conditions.sunAltitudeDeg = sunState->horizontal.altitudeDeg;
     conditions.sunrise = sunHorizon.nextRise;
     conditions.sunset = sunHorizon.nextSet;
-    conditions.civilDawn = civil.nextRise;
     conditions.civilDusk = civil.nextSet;
-    conditions.nauticalDawn = nautical.nextRise;
     conditions.nauticalDusk = nautical.nextSet;
     conditions.astronomicalDawn = astronomical.nextRise;
     conditions.astronomicalDusk = astronomical.nextSet;

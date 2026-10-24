@@ -42,10 +42,6 @@ public:
 
     void applyProviderFields(EphemerisEngineFactoryRequest& request) const noexcept;
 
-    [[nodiscard]] std::shared_ptr<const ITimeScaleService> timeScaleService() const noexcept;
-    [[nodiscard]] std::shared_ptr<const IEarthOrientationProvider> earthOrientationProvider() const noexcept;
-    [[nodiscard]] std::shared_ptr<const highprecision::ICalcephKernelProvider> calcephKernelProvider() const noexcept;
-
 private:
     std::shared_ptr<const ITimeScaleService> m_timeScaleService;
     std::shared_ptr<const IEarthOrientationProvider> m_earthOrientationProvider;

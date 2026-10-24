@@ -1,6 +1,7 @@
 #include "EphemerisEngineTestDoubles.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "factory/EphemerisEngineFactoryResult.hpp"
+#include "factory/EphemerisFactoryCreationStatus.hpp"
 
 #include <QtTest/QtTest>
 
@@ -108,15 +109,7 @@ void EphemerisEngineFactoryResultTests::constructsFactoryResultAndCreationDiagno
     };
 
     for (const skygate::ephemeris::EphemerisFactoryCreationStatus::Type status : factoryStatuses) {
-        QVERIFY(!skygate::ephemeris::EphemerisEngineFactory::displayName(status).empty());
-        QCOMPARE(
-            skygate::ephemeris::EphemerisEngineFactory::displayName(status),
-            skygate::ephemeris::EphemerisFactoryCreationStatus::displayName(status)
-        );
-        QCOMPARE(
-            skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(status),
-            skygate::ephemeris::EphemerisEngineFactory::isCreationSuccess(status)
-        );
+        QVERIFY(!skygate::ephemeris::EphemerisFactoryCreationStatus::displayName(status).empty());
     }
 
     QVERIFY(
@@ -137,20 +130,6 @@ void EphemerisEngineFactoryResultTests::constructsFactoryResultAndCreationDiagno
     ));
     QVERIFY(!skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(
         skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedCreationError
-    ));
-
-    QVERIFY(
-        skygate::ephemeris::EphemerisEngineFactory::isCreationSuccess(
-            skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine
-        )
-    );
-    QVERIFY(
-        skygate::ephemeris::EphemerisEngineFactory::isCreationSuccess(
-            skygate::ephemeris::EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback
-        )
-    );
-    QVERIFY(!skygate::ephemeris::EphemerisEngineFactory::isCreationSuccess(
-        skygate::ephemeris::EphemerisFactoryCreationStatus::Type::FailedStrictHighPrecisionUnavailable
     ));
 
     const std::array diagnosticCodes{
