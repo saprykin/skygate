@@ -11,6 +11,10 @@ public:
     // Returns the position of 'value' between 'lowerKey' and 'upperKey' as a
     // ratio. Returns nullopt when the interval has no positive width.
     [[nodiscard]] static std::optional<double> ratio(double value, double lowerKey, double upperKey) noexcept;
+
+    // Returns the linear interpolation between the two samples of an interval
+    // at a ratio that ratio() reported for that interval.
+    [[nodiscard]] static double lerp(double lower, double upper, double ratio) noexcept;
 };
 
 }  // namespace skygate::ephemeris

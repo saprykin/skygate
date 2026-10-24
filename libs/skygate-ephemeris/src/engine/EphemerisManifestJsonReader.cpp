@@ -1,8 +1,7 @@
 #include "EphemerisManifestJsonReader.hpp"
 #include "EphemerisDataFileUtilities.hpp"
+#include "EphemerisEpochParsing.hpp"
 #include "StringUtilities.hpp"
-#include "TextParsingUtilities.hpp"
-#include "time/CalendarTime.hpp"
 
 #include <QByteArray>
 #include <QJsonArray>
@@ -41,13 +40,7 @@ std::string EphemerisManifestJsonReader::fieldDiagnostic(
 std::optional<skygate::core::AstronomicalEpoch>
 EphemerisManifestJsonReader::parseUtcDateEpoch(const QString& text) noexcept
 {
-    const std::string value = EphemerisDataFileUtilities::stringFromQString(text);
-    const std::optional<skygate::core::CivilDateTime> dateTime = TextParsingUtilities::parseUtcDate(value);
-    if (!dateTime.has_value()) {
-        return std::nullopt;
-    }
-
-    return skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*dateTime);
+    return EphemerisEpochParsing::epochFromDateColumn(EphemerisDataFileUtilities::stringFromQString(text));
 }
 
 bool EphemerisManifestJsonReader::hasNonEmptyString(const QJsonObject& object, const QString& key) noexcept

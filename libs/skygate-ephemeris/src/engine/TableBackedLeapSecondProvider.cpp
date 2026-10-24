@@ -1,5 +1,7 @@
 #include "TableBackedLeapSecondProvider.hpp"
+#include "LeapSecondTableScan.hpp"
 
+#include <optional>
 #include <utility>
 
 namespace skygate::ephemeris {
@@ -28,16 +30,7 @@ TableBackedLeapSecondProvider::taiMinusUtcSeconds(const skygate::core::Astronomi
         return std::nullopt;
     }
 
-    const double requestedEpochKey = utcEpoch.sortKey();
-    std::optional<int> offset;
-    for (const ILeapSecondProvider::TableEntry& entry : m_entries) {
-        if (entry.effectiveUtcEpoch.sortKey() > requestedEpochKey) {
-            break;
-        }
-        offset = entry.taiMinusUtcSeconds;
-    }
-
-    return offset;
+    return LeapSecondTableScan::offsetAtUtcKey(m_entries, utcEpoch.sortKey());
 }
 
 }  // namespace skygate::ephemeris

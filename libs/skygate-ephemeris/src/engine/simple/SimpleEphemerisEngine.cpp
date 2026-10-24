@@ -2,6 +2,7 @@
 #include "EphemerisRequestFactory.hpp"
 #include "StringUtilities.hpp"
 #include "reference/EquatorialToHorizontalCalculator.hpp"
+#include "reference/SimpleBodyStateCalculator.hpp"
 
 #include <cstdint>
 #include <limits>
@@ -288,12 +289,12 @@ std::optional<CelestialBodyState> SimpleEphemerisEngine::computeBodyStateById(
 
 CelestialBodyState SimpleEphemerisEngine::computeStateForBody(
     const BaseCelestialBody& body, const std::size_t bodyIndex, const skygate::core::ObservationContext& context
-) const
+)
 {
     CelestialBodyState state = makeSimpleBodyState(bodyIndex);
 
-    if (const auto equatorial = m_bodyStateCalculator.computeEquatorial(body, context.utcTime);
-        equatorial.has_value()) {
+    const SimpleBodyStateCalculator bodyStateCalculator;
+    if (const auto equatorial = bodyStateCalculator.computeEquatorial(body, context.utcTime); equatorial.has_value()) {
         state.equatorial = *equatorial;
         if (context.observer.isValid()) {
             state.horizontal =

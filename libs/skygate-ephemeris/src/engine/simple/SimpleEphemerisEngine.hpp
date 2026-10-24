@@ -1,7 +1,6 @@
 #pragma once
 
 #include "engine/IEphemerisEngine.hpp"
-#include "reference/SimpleBodyStateCalculator.hpp"
 
 #include <memory>
 #include <optional>
@@ -36,16 +35,19 @@ public:
     [[nodiscard]] std::optional<CelestialBodyState>
     computeBodyState(const skygate::core::ObservationContext& context, std::size_t bodyIndex) const override;
 
+    /// State of one catalog body: the equatorial place, the horizontal place
+    /// when the observer is valid, and the status and warnings that describe
+    /// the result. The fallback strategy reports the same body computation.
+    [[nodiscard]] static CelestialBodyState computeStateForBody(
+        const BaseCelestialBody& body, std::size_t bodyIndex, const skygate::core::ObservationContext& context
+    );
+
 private:
     [[nodiscard]] EphemerisSnapshot computeSnapshot(const skygate::core::ObservationContext& context) const;
     [[nodiscard]] std::optional<CelestialBodyState>
     computeBodyStateById(const skygate::core::ObservationContext& context, std::string_view bodyId) const;
-    [[nodiscard]] CelestialBodyState computeStateForBody(
-        const BaseCelestialBody& body, std::size_t bodyIndex, const skygate::core::ObservationContext& context
-    ) const;
     std::shared_ptr<const CelestialBodyCatalog> m_catalog;
     EphemerisEngineOptions m_options;
-    SimpleBodyStateCalculator m_bodyStateCalculator;
 };
 
 }  // namespace skygate::ephemeris

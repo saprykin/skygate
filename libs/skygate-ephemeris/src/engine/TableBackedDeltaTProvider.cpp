@@ -78,7 +78,7 @@ IDeltaTProvider::Estimate TableBackedDeltaTProvider::deltaTSeconds(const skygate
 
         return Estimate{
             .status = EstimateStatus::Available,
-            .deltaTSeconds = before.deltaTSeconds + (after.deltaTSeconds - before.deltaTSeconds) * *ratio,
+            .deltaTSeconds = TableInterpolation::lerp(before.deltaTSeconds, after.deltaTSeconds, *ratio),
             .diagnosticText = "Delta T estimate interpolated from table.",
             .provenance = m_dataInfo.provenance,
         };

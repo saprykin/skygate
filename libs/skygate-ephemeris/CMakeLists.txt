@@ -86,6 +86,9 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/DeltaTDataLoader.cpp
     src/engine/DeltaTDataParser.hpp
     src/engine/DeltaTDataParser.cpp
+    src/engine/EphemerisEpochParsing.hpp
+    src/engine/EphemerisTableLoading.hpp
+    src/engine/EphemerisTableParsing.hpp
     src/engine/IEarthOrientationProvider.hpp
     src/engine/TableBackedEarthOrientationProvider.hpp
     src/engine/TableBackedEarthOrientationProvider.cpp
@@ -133,6 +136,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/LeapSecondTableLoader.cpp
     src/engine/LeapSecondTableParser.hpp
     src/engine/LeapSecondTableParser.cpp
+    src/engine/LeapSecondTableScan.hpp
+    src/engine/LeapSecondTableScan.cpp
     src/engine/highprecision/ObserverGeodesy.hpp
     src/engine/highprecision/ObserverGeodesy.cpp
     src/engine/highprecision/SolarSystemCorrectionPipeline.hpp
@@ -149,6 +154,7 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/TableInterpolation.cpp
     src/engine/TimeScaleConversionStatus.hpp
     src/engine/TimeScaleConversionWarningCode.hpp
+    src/engine/TimeScaleOffsetLookup.hpp
     src/engine/TimeScaleConversionDiagnostics.hpp
     src/engine/TimeScaleConversionResult.hpp
     src/engine/TimeScaleConversionResult.cpp

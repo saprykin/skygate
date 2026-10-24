@@ -1,6 +1,6 @@
 #include "EphemerisTableMetadata.hpp"
+#include "EphemerisEpochParsing.hpp"
 #include "StringUtilities.hpp"
-#include "time/CalendarTime.hpp"
 
 #include <optional>
 
@@ -56,9 +56,7 @@ std::optional<std::string> EphemerisTableMetadata::assignRangeEndpoint(
     bool& hasEndpoint
 )
 {
-    const std::optional<skygate::core::CivilDateTime> date = TextParsingUtilities::parseUtcDate(value);
-    const std::optional<skygate::core::AstronomicalEpoch> epoch =
-        date.has_value() ? skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*date) : std::nullopt;
+    const std::optional<skygate::core::AstronomicalEpoch> epoch = EphemerisEpochParsing::epochFromDateColumn(value);
     if (!epoch.has_value()) {
         return malformedMetadata(dataLabel, subject, lineNumber);
     }
