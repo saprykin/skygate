@@ -27,18 +27,20 @@ void EphemerisPrecisionPolicyTests::sceneRenderAndTrailsUseLeanCorrections()
         request, skygate::ephemeris::EphemerisPrecisionPolicy::Trail, engine
     );
 
-    const auto expectedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::precessionNutation()
-                                     | skygate::ephemeris::EphemerisCorrectionFlags::earthOrientation()
-                                     | skygate::ephemeris::EphemerisCorrectionFlags::diurnalParallax()
-                                     | skygate::ephemeris::EphemerisCorrectionFlags::atmosphericRefraction();
+    const auto leanCorrections = skygate::ephemeris::EphemerisCorrectionFlags::precessionNutation()
+                                 | skygate::ephemeris::EphemerisCorrectionFlags::earthOrientation()
+                                 | skygate::ephemeris::EphemerisCorrectionFlags::diurnalParallax();
     QCOMPARE(
         static_cast<std::uint32_t>(sceneRequest.options.correctionFlags()),
-        static_cast<std::uint32_t>(expectedCorrections)
+        static_cast<std::uint32_t>(
+            leanCorrections | skygate::ephemeris::EphemerisCorrectionFlags::atmosphericRefraction()
+        )
     );
+    QVERIFY(sceneRequest.options.requestsAtmosphericRefraction());
     QCOMPARE(
-        static_cast<std::uint32_t>(trailRequest.options.correctionFlags()),
-        static_cast<std::uint32_t>(expectedCorrections)
+        static_cast<std::uint32_t>(trailRequest.options.correctionFlags()), static_cast<std::uint32_t>(leanCorrections)
     );
+    QVERIFY(!trailRequest.options.requestsAtmosphericRefraction());
 }
 
 void EphemerisPrecisionPolicyTests::detailAndEventPoliciesPreserveCorrections()
