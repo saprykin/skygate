@@ -25,21 +25,6 @@ constexpr double kMaxAngularStepDeg = 5.0;
     return std::clamp(static_cast<int>(std::ceil(angularDistanceDeg / angularStepDeg)), 1, kMaxAdaptiveSubsegments);
 }
 
-[[nodiscard]] Vector3d
-interpolateUnitVector(const Vector3d& start, const Vector3d& end, const double angularDistance, const double t) noexcept
-{
-    const double sinAngularDistance = std::sin(angularDistance);
-    if (!std::isfinite(sinAngularDistance) || std::abs(sinAngularDistance) <= MathConstants::kEpsilon) {
-        const Vector3d interpolated = start + ((end - start) * t);
-        return interpolated.normalized().value_or(Vector3d{});
-    }
-
-    const double startWeight = std::sin((1.0 - t) * angularDistance) / sinAngularDistance;
-    const double endWeight = std::sin(t * angularDistance) / sinAngularDistance;
-    const Vector3d interpolated = (start * startWeight) + (end * endWeight);
-    return interpolated.normalized().value_or(Vector3d{});
-}
-
 void appendProjectedSegment(
     std::vector<LineSegment2d>& segments,
     const ScreenPoint& start,
@@ -73,10 +58,11 @@ void appendAdaptiveProjectedSegment(
     for (int subsegmentIndex = 1; subsegmentIndex <= subsegmentCount; ++subsegmentIndex) {
         const double t = static_cast<double>(subsegmentIndex) / static_cast<double>(subsegmentCount);
         const HorizontalCoordinate coordinate =
-            subsegmentIndex == subsegmentCount ? endCoordinate
-                                               : SphericalGeometry::horizontalFromUnitVector(
-                                                     interpolateUnitVector(startVector, endVector, angularDistance, t)
-                                                 );
+            subsegmentIndex == subsegmentCount
+                ? endCoordinate
+                : SphericalGeometry::horizontalFromUnitVector(
+                      SphericalGeometry::interpolateUnitVector(startVector, endVector, angularDistance, t)
+                  );
         const ScreenPoint point = projection.project(coordinate);
         const bool hasPoint = point.isVisible() && point.isFinite();
         if (hasPreviousPoint && hasPoint) {

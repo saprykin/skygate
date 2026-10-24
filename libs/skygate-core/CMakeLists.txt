@@ -26,6 +26,7 @@ add_library(skygate-core STATIC
     src/math/CircleHitIndex.hpp
     src/math/CircleHitTarget.hpp
     src/math/Geometry2d.hpp
+    src/math/GridCellBuckets.hpp
     src/math/GridCellRange.hpp
     src/math/LineSegment2d.hpp
     src/math/LinePattern.hpp
@@ -64,6 +65,7 @@ add_library(skygate-core STATIC
     src/math/AngleMath.cpp
     src/math/CircleHitIndex.cpp
     src/math/Geometry2d.cpp
+    src/math/GridCellBuckets.cpp
     src/math/LinePattern.cpp
     src/math/Matrix3x3.cpp
     src/math/ProjectedPolylineBuilder.cpp
