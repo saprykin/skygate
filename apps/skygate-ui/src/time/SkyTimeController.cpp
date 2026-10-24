@@ -10,22 +10,37 @@
 #include <QTimeZone>
 
 #include <chrono>
+#include <optional>
 
 namespace {
 
-QTimeZone validTimeZoneOrFallback(const QString& timeZoneId)
+// Single validation path for persisted and user supplied time zone ids.
+std::optional<QTimeZone> availableTimeZone(const QString& timeZoneId)
 {
     const QByteArray idBytes = timeZoneId.trimmed().toUtf8();
-    if (!idBytes.isEmpty() && QTimeZone::isTimeZoneIdAvailable(idBytes)) {
-        return QTimeZone(idBytes);
+    if (idBytes.isEmpty() || !QTimeZone::isTimeZoneIdAvailable(idBytes)) {
+        return std::nullopt;
     }
 
-    const QByteArray systemId = QTimeZone::systemTimeZoneId();
-    if (!systemId.isEmpty() && QTimeZone::isTimeZoneIdAvailable(systemId)) {
-        return QTimeZone(systemId);
+    return QTimeZone(idBytes);
+}
+
+QTimeZone systemTimeZoneOrUtc()
+{
+    const std::optional<QTimeZone> systemTimeZone = availableTimeZone(QString::fromUtf8(QTimeZone::systemTimeZoneId()));
+    return systemTimeZone.has_value() ? *systemTimeZone : QTimeZone::utc();
+}
+
+// Startup fallback: a missing id follows the system zone, while an id that is
+// present but unavailable falls back to UTC.
+QTimeZone initialTimeZoneOrFallback(const QString& timeZoneId)
+{
+    const std::optional<QTimeZone> timeZone = availableTimeZone(timeZoneId);
+    if (timeZone.has_value()) {
+        return *timeZone;
     }
 
-    return QTimeZone::utc();
+    return timeZoneId.trimmed().isEmpty() ? systemTimeZoneOrUtc() : QTimeZone::utc();
 }
 
 const skygate::core::SystemTimeSource& defaultTimeSource()
@@ -39,7 +54,7 @@ const skygate::core::SystemTimeSource& defaultTimeSource()
 SkyTimeController::SkyTimeController(QObject* parent) : SkyTimeController(defaultTimeSource(), parent) {}
 
 SkyTimeController::SkyTimeController(const skygate::core::ITimeSource& timeSource, QObject* parent)
-    : QObject(parent), m_utcTime(timeSource.nowUtc()), m_timeZone(validTimeZoneOrFallback({})),
+    : QObject(parent), m_utcTime(timeSource.nowUtc()), m_timeZone(initialTimeZoneOrFallback({})),
       m_timeZoneCatalogModel(new TimeZoneCatalogModel(this))
 {
     m_timeZoneCatalogModel->setReferenceUtcDateTime(utcDateTime());
@@ -121,10 +136,7 @@ void SkyTimeController::setUtcTimePoint(const skygate::core::UtcTimePoint& utcTi
 
 bool SkyTimeController::setInitialTimeZoneId(const QString& timeZoneId)
 {
-    const QByteArray idBytes = timeZoneId.trimmed().toUtf8();
-    const QTimeZone nextTimeZone =
-        idBytes.isEmpty() ? validTimeZoneOrFallback({})
-                          : (QTimeZone::isTimeZoneIdAvailable(idBytes) ? QTimeZone(idBytes) : QTimeZone::utc());
+    const QTimeZone nextTimeZone = initialTimeZoneOrFallback(timeZoneId);
     const QString previousDateText = formattedDateText();
     const QString previousTimeText = formattedTimeText();
     const bool changed = m_timeZone != nextTimeZone;
@@ -156,19 +168,18 @@ bool SkyTimeController::setDateTimeText(const QString& dateText, const QString& 
 
 bool SkyTimeController::setTimeZoneId(const QString& timeZoneId)
 {
-    const QByteArray idBytes = timeZoneId.trimmed().toUtf8();
-    if (idBytes.isEmpty() || !QTimeZone::isTimeZoneIdAvailable(idBytes)) {
+    const std::optional<QTimeZone> nextTimeZone = availableTimeZone(timeZoneId);
+    if (!nextTimeZone.has_value()) {
         return false;
     }
 
-    const QTimeZone nextTimeZone(idBytes);
-    if (m_timeZone == nextTimeZone) {
+    if (m_timeZone == *nextTimeZone) {
         return true;
     }
 
     const QString previousDateText = formattedDateText();
     const QString previousTimeText = formattedTimeText();
-    m_timeZone = nextTimeZone;
+    m_timeZone = *nextTimeZone;
     emitDisplayTextChanges(previousDateText, previousTimeText);
     emit timeZoneChanged();
     return true;

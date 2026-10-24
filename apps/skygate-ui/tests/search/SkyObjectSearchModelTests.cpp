@@ -50,16 +50,6 @@ skygate::ephemeris::DistantCelestialBody makeDeepSkyBody(
 void setCatalogData(
     SkyObjectSearchModel& model,
     std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> ownGalaxyBodies,
-    std::vector<skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups
-)
-{
-    const skygate::ephemeris::CelestialBodyCatalog catalog(std::move(ownGalaxyBodies));
-    model.setCatalogData(catalog.bodies(), std::move(constellationAnchorGroups));
-}
-
-void setCatalogData(
-    SkyObjectSearchModel& model,
-    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> ownGalaxyBodies,
     std::vector<skygate::ephemeris::DistantCelestialBody> distantBodies,
     std::vector<skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups
 )
@@ -78,6 +68,20 @@ void setCatalogData(
         std::move(ownGalaxyBodies), std::move(distantBodies), std::move(order)
     );
     model.setCatalogData(catalog.bodies(), std::move(constellationAnchorGroups));
+}
+
+void setCatalogData(
+    SkyObjectSearchModel& model,
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> ownGalaxyBodies,
+    std::vector<skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups
+)
+{
+    setCatalogData(
+        model,
+        std::move(ownGalaxyBodies),
+        std::vector<skygate::ephemeris::DistantCelestialBody>{},
+        std::move(constellationAnchorGroups)
+    );
 }
 
 QString displayTextAt(const SkyObjectSearchModel& model, const int row)

@@ -158,21 +158,7 @@ void SkyObjectSearchModel::setCatalogData(
             return candidate.isBody;
         }
 
-        if (candidate.brightnessMagnitude
-            < existing.brightnessMagnitude - skygate::core::NumericTolerance::kDisplayChange) {
-            return true;
-        }
-        if (candidate.brightnessMagnitude
-            > existing.brightnessMagnitude + skygate::core::NumericTolerance::kDisplayChange) {
-            return false;
-        }
-
-        const int displayCompare = QString::compare(candidate.displayText, existing.displayText, Qt::CaseInsensitive);
-        if (displayCompare != 0) {
-            return displayCompare < 0;
-        }
-
-        return QString::compare(candidate.targetId, existing.targetId, Qt::CaseInsensitive) < 0;
+        return ranksBefore(candidate, existing);
     };
     const auto upsertEntry = [this, &sourceIndexByDisplayKey, &shouldReplaceEntry](SourceEntry entry) {
         entry.displayText = entry.displayText.trimmed();
@@ -295,7 +281,7 @@ void SkyObjectSearchModel::setCatalogData(
                     skygate::ui::internal::SkySelectionTargetKind::Type::ConstellationLabel
                 ),
                 .targetId = QString::fromStdString(anchorGroup.first),
-                .brightnessMagnitude = 99.0,
+                .brightnessMagnitude = kUnrankedBrightnessMagnitude,
                 .selectable = true,
                 .isBody = false,
             }
@@ -362,20 +348,22 @@ void SkyObjectSearchModel::rebuildRows()
             return lhs.matchRank < rhs.matchRank;
         }
 
-        const SourceEntry& lhsEntry = m_sourceEntries.at(lhs.sourceIndex);
-        const SourceEntry& rhsEntry = m_sourceEntries.at(rhs.sourceIndex);
-        if (std::abs(lhsEntry.brightnessMagnitude - rhsEntry.brightnessMagnitude)
-            > skygate::core::NumericTolerance::kDisplayChange) {
-            return lhsEntry.brightnessMagnitude < rhsEntry.brightnessMagnitude;
-        }
-
-        const int displayCompare = QString::compare(lhsEntry.displayText, rhsEntry.displayText, Qt::CaseInsensitive);
-        if (displayCompare != 0) {
-            return displayCompare < 0;
-        }
-
-        return QString::compare(lhsEntry.targetId, rhsEntry.targetId, Qt::CaseInsensitive) < 0;
+        return ranksBefore(m_sourceEntries.at(lhs.sourceIndex), m_sourceEntries.at(rhs.sourceIndex));
     });
 
     endResetModel();
+}
+
+bool SkyObjectSearchModel::ranksBefore(const SourceEntry& lhs, const SourceEntry& rhs)
+{
+    if (std::abs(lhs.brightnessMagnitude - rhs.brightnessMagnitude) > skygate::core::NumericTolerance::kDisplayChange) {
+        return lhs.brightnessMagnitude < rhs.brightnessMagnitude;
+    }
+
+    const int displayCompare = QString::compare(lhs.displayText, rhs.displayText, Qt::CaseInsensitive);
+    if (displayCompare != 0) {
+        return displayCompare < 0;
+    }
+
+    return QString::compare(lhs.targetId, rhs.targetId, Qt::CaseInsensitive) < 0;
 }

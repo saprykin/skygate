@@ -2,20 +2,27 @@
 #include "TimeZoneCatalogEntry.hpp"
 
 #include "SkyQtTimeCodec.hpp"
+#include "StringUtilities.hpp"
 #include "TimeZoneAliasCatalog.hpp"
 
+#include <QStringList>
 #include <QTimeZone>
 
 #include <algorithm>
+#include <string>
 
 namespace {
 
-QString normalizedFilterText(const QString& value)
+// Case folding and trimming come from the shared lookup-key helper; the
+// separator folding and whitespace collapsing stay local because time zone
+// ids and labels use '_' and '-' as word breaks (America/Los_Angeles).
+QString normalizedFilterKey(const QString& value)
 {
-    QString normalized = value.trimmed().toCaseFolded();
-    normalized.replace(QLatin1Char('_'), QLatin1Char(' '));
-    normalized.replace(QLatin1Char('-'), QLatin1Char(' '));
-    return normalized.simplified();
+    QString text = value;
+    text.replace(QLatin1Char('_'), QLatin1Char(' '));
+    text.replace(QLatin1Char('-'), QLatin1Char(' '));
+    const std::string normalized = skygate::ephemeris::StringUtilities::normalizedLookupKey(text.toStdString());
+    return QString::fromStdString(normalized).simplified();
 }
 
 QString humanizedTimeZoneId(const QString& timeZoneId)
@@ -27,16 +34,18 @@ QString humanizedTimeZoneId(const QString& timeZoneId)
     return text.simplified();
 }
 
-QString rawTimeZoneLabel(const QTimeZone& timeZone, const QDateTime& utcDateTime)
+QStringList seasonalTimeZoneLabels(const QTimeZone& timeZone, const QDateTime& referenceUtc)
 {
-    const QDateTime zonedDateTime = utcDateTime.toTimeZone(timeZone);
-    QStringList labels;
-    labels.push_back(timeZone.abbreviation(zonedDateTime).trimmed());
-    labels.push_back(timeZone.displayName(zonedDateTime, QTimeZone::ShortName).trimmed());
-    labels.push_back(timeZone.displayName(zonedDateTime, QTimeZone::LongName).trimmed());
-    labels.removeAll(QString());
-    labels.removeDuplicates();
-    return labels.join(QLatin1Char(' '));
+    // Abbreviation probes keep seasonal ids such as CET and CEST searchable
+    // outside the displayed season. The current-season label comes from the
+    // shared codec so the offset fallback stays consistent with the details.
+    const QDateTime winterUtc(QDate(2026, 1, 15), QTime(12, 0, 0), QTimeZone::UTC);
+    const QDateTime summerUtc(QDate(2026, 7, 15), QTime(12, 0, 0), QTimeZone::UTC);
+    return {
+        timeZone.abbreviation(winterUtc.toTimeZone(timeZone)).trimmed(),
+        timeZone.abbreviation(summerUtc.toTimeZone(timeZone)).trimmed(),
+        SkyQtTimeCodec::timeZoneLabel(referenceUtc.toTimeZone(timeZone)),
+    };
 }
 
 QVector<TimeZoneCatalogEntry> loadTimeZoneEntries()
@@ -87,16 +96,16 @@ QVariant TimeZoneCatalogModel::data(const QModelIndex& index, const int role) co
         return {};
     }
 
-    const Row& row = m_rows.at(index.row());
+    const TimeZoneCatalogEntry& entry = m_rows.at(index.row());
     switch (role) {
     case RowKindRole:
         return QStringLiteral("timeZone");
     case DisplayTextRole:
-        return row.entry.id;
+        return entry.id;
     case DetailTextRole:
-        return detailText(row.entry);
+        return detailText(entry);
     case TimeZoneIdRole:
-        return row.entry.id;
+        return entry.id;
     case SelectableRole:
         return true;
     default:
@@ -122,7 +131,7 @@ QString TimeZoneCatalogModel::filterText() const
 
 void TimeZoneCatalogModel::setFilterText(const QString& filterText)
 {
-    const QString normalized = normalizedFilterText(filterText);
+    const QString normalized = normalizedFilterKey(filterText);
     if (m_filterText == normalized) {
         return;
     }
@@ -175,10 +184,15 @@ void TimeZoneCatalogModel::rebuildRows()
     m_rows.clear();
     for (const TimeZoneCatalogEntry& entry : m_entries) {
         if (matchesFilter(entry)) {
-            m_rows.push_back(Row{.entry = entry});
+            m_rows.push_back(entry);
         }
     }
     endResetModel();
+}
+
+QDateTime TimeZoneCatalogModel::referenceUtcDateTime() const
+{
+    return m_referenceUtcDateTime.isValid() ? m_referenceUtcDateTime.toUTC() : QDateTime::currentDateTimeUtc();
 }
 
 QString TimeZoneCatalogModel::detailText(const TimeZoneCatalogEntry& entry) const
@@ -188,9 +202,7 @@ QString TimeZoneCatalogModel::detailText(const TimeZoneCatalogEntry& entry) cons
         return {};
     }
 
-    const QDateTime utc =
-        m_referenceUtcDateTime.isValid() ? m_referenceUtcDateTime.toUTC() : QDateTime::currentDateTimeUtc();
-    const QDateTime zonedDateTime = utc.toTimeZone(timeZone);
+    const QDateTime zonedDateTime = referenceUtcDateTime().toTimeZone(timeZone);
     const QString label = SkyQtTimeCodec::timeZoneLabel(zonedDateTime);
     const QString offsetLabel = SkyQtTimeCodec::formatUtcOffsetLabel(timeZone.offsetFromUtc(zonedDateTime));
     return label == offsetLabel ? offsetLabel : QString("%1 · %2").arg(label, offsetLabel);
@@ -202,23 +214,23 @@ bool TimeZoneCatalogModel::matchesFilter(const TimeZoneCatalogEntry& entry) cons
         return true;
     }
 
-    const QString id = normalizedFilterText(entry.id);
+    const QString id = normalizedFilterKey(entry.id);
     if (id.contains(m_filterText)) {
         return true;
     }
 
-    const QString humanizedId = normalizedFilterText(humanizedTimeZoneId(entry.id));
+    const QString humanizedId = normalizedFilterKey(humanizedTimeZoneId(entry.id));
     if (humanizedId.contains(m_filterText)) {
         return true;
     }
 
     const QString aliases =
-        normalizedFilterText(TimeZoneAliasCatalog::aliasesForTimeZoneId(entry.id).join(QLatin1Char(' ')));
+        normalizedFilterKey(TimeZoneAliasCatalog::aliasesForTimeZoneId(entry.id).join(QLatin1Char(' ')));
     if (aliases.contains(m_filterText)) {
         return true;
     }
 
-    const QString detail = normalizedFilterText(detailText(entry));
+    const QString detail = normalizedFilterKey(detailText(entry));
     if (detail.contains(m_filterText)) {
         return true;
     }
@@ -228,12 +240,8 @@ bool TimeZoneCatalogModel::matchesFilter(const TimeZoneCatalogEntry& entry) cons
         return false;
     }
 
-    const QDateTime referenceUtc =
-        m_referenceUtcDateTime.isValid() ? m_referenceUtcDateTime.toUTC() : QDateTime::currentDateTimeUtc();
-    const QString seasonalLabels = normalizedFilterText(
-        rawTimeZoneLabel(timeZone, QDateTime(QDate(2026, 1, 15), QTime(12, 0, 0), QTimeZone::UTC)) + QLatin1Char(' ')
-        + rawTimeZoneLabel(timeZone, QDateTime(QDate(2026, 7, 15), QTime(12, 0, 0), QTimeZone::UTC)) + QLatin1Char(' ')
-        + rawTimeZoneLabel(timeZone, referenceUtc)
-    );
+    const QDateTime referenceUtc = referenceUtcDateTime();
+    const QString seasonalLabels =
+        normalizedFilterKey(seasonalTimeZoneLabels(timeZone, referenceUtc).join(QLatin1Char(' ')));
     return seasonalLabels.contains(m_filterText);
 }
