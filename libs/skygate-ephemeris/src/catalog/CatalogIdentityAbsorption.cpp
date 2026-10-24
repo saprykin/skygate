@@ -5,6 +5,7 @@
 #include "catalog/CatalogCoordinateMerge.hpp"
 #include "catalog/CatalogFieldOrigins.hpp"
 #include "catalog/CatalogIdentifier.hpp"
+#include "catalog/CatalogIdentity.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -73,26 +74,6 @@ void CatalogIdentityAbsorption::retainCanonicalEquivalences(
     }
 }
 
-// The designations a record authoritatively carries. Explicit external
-// identifiers come first; a recognized deep-sky canonical id contributes the
-// designation it was derived from, because the identity contract treats that
-// id as a global identity even when a producer supplied no matching external
-// identifier.
-std::vector<CatalogIdentifier> CatalogIdentityAbsorption::authoritativeDesignations(const BaseCelestialBody& body)
-{
-    std::vector<CatalogIdentifier> designations;
-    designations.reserve(body.identity.externalIdentifiers.size() + 1U);
-    for (const CatalogIdentifier& identifier : body.identity.externalIdentifiers) {
-        CatalogIdentifier::appendUnique(designations, identifier);
-    }
-
-    if (const std::optional<CatalogIdentifier> designation = CatalogIdentifier::designationFromCanonicalId(body.id);
-        designation.has_value()) {
-        CatalogIdentifier::appendUnique(designations, *designation);
-    }
-    return designations;
-}
-
 // True when two records disagree about an authoritative namespace: both claim
 // at least one value for the namespace but their value sets do not overlap.
 // An overlapping value would already have been resolved authoritatively, so
@@ -101,8 +82,8 @@ std::vector<CatalogIdentifier> CatalogIdentityAbsorption::authoritativeDesignati
 // designations; a shared descriptive name must keep them distinct.
 bool CatalogIdentityAbsorption::hasContradictoryIdentifiers(const BaseCelestialBody& lhs, const BaseCelestialBody& rhs)
 {
-    const std::vector<CatalogIdentifier> lhsDesignations = authoritativeDesignations(lhs);
-    const std::vector<CatalogIdentifier> rhsDesignations = authoritativeDesignations(rhs);
+    const std::vector<CatalogIdentifier> lhsDesignations = CatalogIdentity::authoritativeDesignations(lhs);
+    const std::vector<CatalogIdentifier> rhsDesignations = CatalogIdentity::authoritativeDesignations(rhs);
 
     std::vector<std::string_view> checkedNamespaces;
     for (const CatalogIdentifier& lhsIdentifier : lhsDesignations) {
@@ -142,8 +123,8 @@ bool CatalogIdentityAbsorption::hasContradictoryIdentifiers(const BaseCelestialB
     return false;
 }
 
-void CatalogIdentityAbsorption::mergeOwnGalaxyInPlace(
-    OwnGalaxyCelestialBody& winner,
+void CatalogIdentityAbsorption::mergeBaseFieldsInPlace(
+    BaseCelestialBody& winner,
     CatalogFieldOrigins& winnerOrigins,
     const BaseCelestialBody& loser,
     const CatalogFieldOrigins& loserOrigins,
@@ -161,7 +142,17 @@ void CatalogIdentityAbsorption::mergeOwnGalaxyInPlace(
         loserOrigins.visualMagnitude,
         precedence
     );
+}
 
+void CatalogIdentityAbsorption::mergeOwnGalaxyInPlace(
+    OwnGalaxyCelestialBody& winner,
+    CatalogFieldOrigins& winnerOrigins,
+    const BaseCelestialBody& loser,
+    const CatalogFieldOrigins& loserOrigins,
+    const CatalogCoordinateMerge::ValuePrecedence precedence
+)
+{
+    mergeBaseFieldsInPlace(winner, winnerOrigins, loser, loserOrigins, precedence);
     CatalogCoordinateMerge::mergeFixedEquatorialInPlace(winner, winnerOrigins, loser, loserOrigins, precedence);
     CatalogCoordinateMerge::mergeStarAstrometryInPlace(winner, winnerOrigins, loser, loserOrigins, precedence);
 }
@@ -174,18 +165,7 @@ void CatalogIdentityAbsorption::mergeDistantInPlace(
     const CatalogCoordinateMerge::ValuePrecedence precedence
 )
 {
-    mergeIdentityInto(winner.identity, loser.identity);
-    CatalogCoordinateMerge::takeHigherPrecedence(
-        winner.displayName, winnerOrigins.displayName, loser.displayName, loserOrigins.displayName, precedence
-    );
-    CatalogCoordinateMerge::takeHigherPrecedence(
-        winner.visualMagnitude,
-        winnerOrigins.visualMagnitude,
-        loser.visualMagnitude,
-        loserOrigins.visualMagnitude,
-        precedence
-    );
-
+    mergeBaseFieldsInPlace(winner, winnerOrigins, loser, loserOrigins, precedence);
     CatalogCoordinateMerge::mergeLosingFixedPosition(winner, winnerOrigins, loser, loserOrigins, precedence);
 
     const DeepSkyObjectInfo* loserDeepSky = loser.deepSkyObjectInfo();

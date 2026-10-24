@@ -11,10 +11,11 @@
 
 namespace skygate::ephemeris {
 
-// Shared header preparation and tokenization policy for catalog readers and
-// the payload format detector. Both sides use the same rules for the UTF-8
-// BOM, leading blank lines, leading full-line comments, quoting, and case
-// normalization so detection and parsing cannot disagree about a header.
+// Header preparation and column recognition for catalog readers and the
+// payload format detector. Both sides use the same rules for the UTF-8 BOM,
+// leading blank lines, leading full-line comments, and case normalization so
+// detection and parsing cannot disagree about a header. Line termination and
+// field tokenization belong to CsvRowTokenizer, which this class delegates to.
 class CatalogHeaderPolicy final {
 public:
     CatalogHeaderPolicy() = delete;
@@ -27,10 +28,6 @@ public:
     // header line exists. This is the only place that strips the BOM, so the
     // returned line never carries one.
     [[nodiscard]] static std::string_view findHeaderLine(std::string_view& remaining) noexcept;
-
-    // Decodes one payload line to UTF-8 text with surrounding whitespace
-    // removed.
-    [[nodiscard]] static QString decodeTrimmedLine(std::string_view line);
 
     // Decodes a header line into a lowercased column-name -> original-column
     // index map. Quoted fields are decoded and empty names are omitted. The

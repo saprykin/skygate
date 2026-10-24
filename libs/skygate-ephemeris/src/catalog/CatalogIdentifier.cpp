@@ -38,16 +38,6 @@ constexpr DesignationPrefix kDesignationPrefixes[] = {
     return (character >= 'A' && character <= 'Z') || (character >= 'a' && character <= 'z');
 }
 
-[[nodiscard]] std::string_view designationPrefixForNamespace(const std::string_view namespaceName) noexcept
-{
-    for (const DesignationPrefix& prefix : kDesignationPrefixes) {
-        if (StringUtilities::equalsIgnoreAsciiCase(namespaceName, prefix.namespaceName)) {
-            return prefix.text;
-        }
-    }
-    return {};
-}
-
 }  // namespace
 
 CatalogIdentifier CatalogIdentifier::make(const std::string_view namespaceName, const std::string_view value)
@@ -147,7 +137,7 @@ std::optional<CatalogIdentifier> CatalogIdentifier::designationFromCanonicalId(c
         return std::nullopt;
     }
 
-    const std::string_view prefix = designationPrefixForNamespace(namespaceName);
+    const std::string_view prefix = designationPrefix(namespaceName);
     if (prefix.empty()) {
         return std::nullopt;
     }
@@ -156,6 +146,39 @@ std::optional<CatalogIdentifier> CatalogIdentifier::designationFromCanonicalId(c
     designationText.push_back(' ');
     designationText.append(value);
     return designationFromText(designationText);
+}
+
+std::string_view CatalogIdentifier::designationPrefix(const std::string_view namespaceName) noexcept
+{
+    for (const DesignationPrefix& prefix : kDesignationPrefixes) {
+        if (StringUtilities::equalsIgnoreAsciiCase(namespaceName, prefix.namespaceName)) {
+            return prefix.text;
+        }
+    }
+    return {};
+}
+
+std::string CatalogIdentifier::normalizedDesignationText(const std::string_view text)
+{
+    const std::string_view trimmed = StringUtilities::trimAsciiWhitespace(text);
+    const std::optional<CatalogIdentifier> designation = designationFromText(trimmed);
+    if (!designation.has_value()) {
+        return std::string(trimmed);
+    }
+
+    const std::string_view prefix = designationPrefix(designation->namespaceName);
+    std::string_view suffix = trimmed.substr(prefix.size());
+    if (!suffix.empty() && suffix.front() == ' ') {
+        suffix.remove_prefix(1U);
+    }
+    if (suffix.empty()) {
+        return std::string(trimmed);
+    }
+
+    std::string normalized(prefix);
+    normalized.push_back(' ');
+    normalized.append(stripLeadingZeros(std::string(suffix)));
+    return normalized;
 }
 
 bool CatalogIdentifier::appendUnique(std::vector<CatalogIdentifier>& identifiers, CatalogIdentifier identifier)

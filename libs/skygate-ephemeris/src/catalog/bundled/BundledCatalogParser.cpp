@@ -2,7 +2,7 @@
 #include "StringUtilities.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/bundled/BundledCatalogData.hpp"
-#include "catalog/normalize/CatalogSnapshotValidator.hpp"
+#include "catalog/io/CatalogParsingUtilities.hpp"
 
 #include <QObject>
 
@@ -14,28 +14,6 @@
 
 namespace skygate::ephemeris {
 namespace {
-
-// Zero is a sentinel in the bundled table: a zero extent means the size was
-// never measured, while a zero position angle means the major axis runs
-// north-south. Both screens use the snapshot validator's numeric domains so
-// the parser cannot admit a value the model would reject.
-[[nodiscard]] std::optional<double> extentFromTableValue(const double value) noexcept
-{
-    const std::optional<double> extent = value;
-    if (!CatalogSnapshotValidator::isKnownPositiveOptionalValue(extent)) {
-        return std::nullopt;
-    }
-    return extent;
-}
-
-[[nodiscard]] std::optional<double> positionAngleFromTableValue(const double value) noexcept
-{
-    const std::optional<double> positionAngle = value;
-    if (!CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(positionAngle)) {
-        return std::nullopt;
-    }
-    return positionAngle;
-}
 
 std::vector<CatalogIdentifier> bundledMessierExternalIdentifiers(const std::string_view aliases)
 {
@@ -94,12 +72,16 @@ BundledCatalogParser::parse(const std::string_view data, const CatalogParseProgr
         const std::vector<std::string_view> aliasViews = StringUtilities::splitView(entry.aliases, '|');
         std::vector<std::string> aliases(aliasViews.begin(), aliasViews.end());
         body.identity.aliases = aliases;
+        // Zero is a sentinel in the bundled table: a zero extent means the size
+        // was never measured, while a zero position angle means the major axis
+        // runs north-south. The shared screens keep the parser from admitting a
+        // value the model would reject.
         body.deepSkyObject = DeepSkyObjectInfo{
             .kind = entry.kind,
             .aliases = std::move(aliases),
-            .majorAxisArcmin = extentFromTableValue(entry.majorAxisArcmin),
-            .minorAxisArcmin = extentFromTableValue(entry.minorAxisArcmin),
-            .positionAngleDeg = positionAngleFromTableValue(entry.positionAngleDeg),
+            .majorAxisArcmin = CatalogParsingUtilities::screenedPositiveValue(entry.majorAxisArcmin),
+            .minorAxisArcmin = CatalogParsingUtilities::screenedPositiveValue(entry.minorAxisArcmin),
+            .positionAngleDeg = CatalogParsingUtilities::screenedNonNegativeValue(entry.positionAngleDeg),
         };
         result.orderedBodyIndexes.push_back(
             CelestialBodyCatalog::OrderEntry{

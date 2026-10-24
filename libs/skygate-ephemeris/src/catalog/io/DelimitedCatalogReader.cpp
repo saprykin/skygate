@@ -1,9 +1,9 @@
 #include "DelimitedCatalogReader.hpp"
 #include "CatalogHeaderPolicy.hpp"
 #include "CsvRowTokenizer.hpp"
-#include "StringUtilities.hpp"
 
 #include <algorithm>
+#include <utility>
 
 namespace skygate::ephemeris {
 
@@ -40,8 +40,11 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
         return result;
     }
 
-    for (const std::string_view rawLine : StringUtilities::splitView(remaining, '\n')) {
-        const QString line = CatalogHeaderPolicy::decodeTrimmedLine(rawLine);
+    // Data rows use the same line policy as the header probe, so a CRLF payload
+    // reads the same in both passes.
+    while (!remaining.empty()) {
+        const std::string_view rawLine = CsvRowTokenizer::takeLine(remaining);
+        const QString line = CsvRowTokenizer::decodeTrimmedLine(rawLine);
         if (line.isEmpty()) {
             continue;
         }

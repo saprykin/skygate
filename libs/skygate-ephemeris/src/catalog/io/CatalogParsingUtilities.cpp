@@ -82,10 +82,10 @@ std::optional<double> CatalogParsingUtilities::parseFiniteDouble(const QString& 
 std::optional<double> CatalogParsingUtilities::parsePositiveDouble(const QStringView text)
 {
     const std::optional<double> value = parseFiniteDouble(text);
-    if (!value.has_value() || !CatalogSnapshotValidator::isKnownPositiveOptionalValue(value)) {
+    if (!value.has_value()) {
         return std::nullopt;
     }
-    return value;
+    return screenedPositiveValue(*value);
 }
 
 std::optional<double> CatalogParsingUtilities::parsePositiveDouble(const QString& text)
@@ -96,15 +96,33 @@ std::optional<double> CatalogParsingUtilities::parsePositiveDouble(const QString
 std::optional<double> CatalogParsingUtilities::parseNonNegativeDouble(const QStringView text)
 {
     const std::optional<double> value = parseFiniteDouble(text);
-    if (!value.has_value() || !CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(value)) {
+    if (!value.has_value()) {
         return std::nullopt;
     }
-    return value;
+    return screenedNonNegativeValue(*value);
 }
 
 std::optional<double> CatalogParsingUtilities::parseNonNegativeDouble(const QString& text)
 {
     return parseNonNegativeDouble(QStringView{text});
+}
+
+std::optional<double> CatalogParsingUtilities::screenedPositiveValue(const double value)
+{
+    const std::optional<double> candidate = value;
+    if (!CatalogSnapshotValidator::isKnownPositiveOptionalValue(candidate)) {
+        return std::nullopt;
+    }
+    return candidate;
+}
+
+std::optional<double> CatalogParsingUtilities::screenedNonNegativeValue(const double value)
+{
+    const std::optional<double> candidate = value;
+    if (!CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(candidate)) {
+        return std::nullopt;
+    }
+    return candidate;
 }
 
 std::optional<double> CatalogParsingUtilities::parseRightAscensionHours(QString text)

@@ -46,6 +46,15 @@ struct CatalogIdentifier {
     // The designation a canonical deep-sky body id was derived from, matched
     // ASCII case-insensitively like every other identity key.
     [[nodiscard]] static std::optional<CatalogIdentifier> designationFromCanonicalId(std::string_view canonicalId);
+    // The prefix a designation namespace is written with, for example "NGC" for
+    // ngc and "M" for messier. Empty when the namespace is not a deep-sky
+    // designation namespace.
+    [[nodiscard]] static std::string_view designationPrefix(std::string_view namespaceName) noexcept;
+    // Spelling of a designation as catalog sources and display aliases write it:
+    // the namespace prefix, one space, and the catalog number without leading
+    // zeros, keeping a component suffix as supplied. A text that is not a
+    // designation is returned trimmed and otherwise unchanged.
+    [[nodiscard]] static std::string normalizedDesignationText(std::string_view text);
     // Appends `identifier` unless it is empty or already present.
     static bool appendUnique(std::vector<CatalogIdentifier>& identifiers, CatalogIdentifier identifier);
     // Drops leading zeros from a catalog number, keeping a single zero for a

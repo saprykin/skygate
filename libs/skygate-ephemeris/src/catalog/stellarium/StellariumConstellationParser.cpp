@@ -9,9 +9,8 @@
 #include <QJsonParseError>
 
 namespace skygate::ephemeris {
-namespace {
 
-bool looksLikeJsonPayload(const std::string_view payload)
+bool StellariumConstellationParser::looksLikeJsonPayload(const std::string_view payload) noexcept
 {
     for (const char byte : payload) {
         if (byte == ' ' || byte == '\t' || byte == '\n' || byte == '\r') {
@@ -22,8 +21,6 @@ bool looksLikeJsonPayload(const std::string_view payload)
 
     return false;
 }
-
-}  // namespace
 
 StellariumConstellationParser::ParseResult StellariumConstellationParser::parse(const std::string_view payload) const
 {

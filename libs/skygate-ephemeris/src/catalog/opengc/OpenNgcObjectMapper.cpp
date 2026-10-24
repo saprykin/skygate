@@ -4,6 +4,7 @@
 #include "catalog/io/CatalogParsingUtilities.hpp"
 
 #include <QRegularExpression>
+#include <QString>
 #include <QStringList>
 
 #include <optional>
@@ -23,17 +24,16 @@ std::optional<CatalogIdentifier> recognizedDesignation(const QString& text)
     return CatalogIdentifier::designationFromText(CatalogParsingUtilities::toUtf8String(text.trimmed()));
 }
 
-QString designationAliasLabel(const std::string_view namespaceName)
+// One designation as an alias reads: the prefix CatalogIdentifier knows for the
+// namespace, a space, and the catalog number.
+QString designationAliasText(const std::string_view namespaceName, const QString& value)
 {
-    if (namespaceName == CatalogIdentifier::kMessierNamespace) {
-        return QStringLiteral("M");
-    }
-    if (namespaceName == CatalogIdentifier::kNgcNamespace) {
-        return QStringLiteral("NGC");
-    }
-    return QStringLiteral("IC");
+    return QString::fromLatin1(CatalogIdentifier::designationPrefix(namespaceName)) + QLatin1Char(' ') + value;
 }
 
+// Label normalization is this mapper's display rule; the designation spelling
+// itself, including the zero strip and the component suffix, belongs to
+// CatalogIdentifier.
 QString normalizedCatalogAlias(QString text)
 {
     text = CatalogParsingUtilities::normalizedLabelText(text);
@@ -41,21 +41,9 @@ QString normalizedCatalogAlias(QString text)
         return {};
     }
 
-    const std::optional<CatalogIdentifier> designation =
-        CatalogIdentifier::designationFromText(CatalogParsingUtilities::toUtf8String(text));
-    if (!designation.has_value()) {
-        return text;
-    }
-
-    qsizetype numberStart = 0;
-    while (numberStart < text.size() && !text.at(numberStart).isDigit()) {
-        ++numberStart;
-    }
-    const QString suffix = OpenNgcObjectMapper::withoutLeadingZeros(text.sliced(numberStart));
-    if (suffix.isEmpty()) {
-        return text;
-    }
-    return designationAliasLabel(designation->namespaceName) + QStringLiteral(" ") + suffix;
+    return QString::fromStdString(
+        CatalogIdentifier::normalizedDesignationText(CatalogParsingUtilities::toUtf8String(text))
+    );
 }
 
 QString objectIdFromAlias(const QString& alias)
@@ -148,7 +136,7 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
 {
     OpenNgcObjectMapping mapping;
     if (!messier.isEmpty()) {
-        appendAlias(mapping.aliases, "M " + messier);
+        appendAlias(mapping.aliases, designationAliasText(CatalogIdentifier::kMessierNamespace, messier));
         mapping.externalIdentifiers.push_back(
             CatalogIdentifier::make(
                 CatalogIdentifier::kMessierNamespace, CatalogParsingUtilities::toUtf8String(messier)
@@ -156,13 +144,13 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
         );
     }
     if (!ngc.isEmpty()) {
-        appendAlias(mapping.aliases, "NGC " + ngc);
+        appendAlias(mapping.aliases, designationAliasText(CatalogIdentifier::kNgcNamespace, ngc));
         mapping.externalIdentifiers.push_back(
             CatalogIdentifier::make(CatalogIdentifier::kNgcNamespace, CatalogParsingUtilities::toUtf8String(ngc))
         );
     }
     if (!ic.isEmpty()) {
-        appendAlias(mapping.aliases, "IC " + ic);
+        appendAlias(mapping.aliases, designationAliasText(CatalogIdentifier::kIcNamespace, ic));
         mapping.externalIdentifiers.push_back(
             CatalogIdentifier::make(CatalogIdentifier::kIcNamespace, CatalogParsingUtilities::toUtf8String(ic))
         );
@@ -185,9 +173,11 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
                               : (!ic.isEmpty() ? QString("IC %1").arg(ic) : normalizedCatalogAlias(name)));
     const QString id =
         !messier.isEmpty()
-            ? objectIdFromAlias("M " + messier)
-            : (!ngc.isEmpty() ? objectIdFromAlias("NGC " + ngc)
-                              : (!ic.isEmpty() ? objectIdFromAlias("IC " + ic) : objectIdFromAlias(name)));
+            ? objectIdFromAlias(designationAliasText(CatalogIdentifier::kMessierNamespace, messier))
+            : (!ngc.isEmpty()
+                   ? objectIdFromAlias(designationAliasText(CatalogIdentifier::kNgcNamespace, ngc))
+                   : (!ic.isEmpty() ? objectIdFromAlias(designationAliasText(CatalogIdentifier::kIcNamespace, ic))
+                                    : objectIdFromAlias(name)));
 
     mapping.id = CatalogParsingUtilities::toUtf8String(id);
     mapping.displayName = CatalogParsingUtilities::toUtf8String(displayName);

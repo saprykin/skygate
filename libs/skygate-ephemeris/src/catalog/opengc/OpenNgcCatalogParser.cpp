@@ -1,7 +1,7 @@
 #include "OpenNgcCatalogParser.hpp"
 #include "OpenNgcObjectMapper.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
-#include "catalog/io/CatalogParsingUtilities.hpp"
+#include "catalog/io/CatalogColumnValueReader.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
 
 #include <QString>
@@ -60,9 +60,8 @@ OpenNgcCatalogParser::parse(const std::string_view data, const CatalogParseProgr
                 return {};
             }
 
-            const auto raHours =
-                CatalogParsingUtilities::parseRightAscensionHours(row.decodeColumn(QStringLiteral("RA")));
-            const auto decDeg = CatalogParsingUtilities::parseDeclinationDeg(row.decodeColumn(QStringLiteral("Dec")));
+            const auto raHours = CatalogColumnValueReader::rightAscensionHours(row, QStringLiteral("RA"));
+            const auto decDeg = CatalogColumnValueReader::declinationDeg(row, QStringLiteral("Dec"));
             if (!raHours.has_value() || !decDeg.has_value()) {
                 return RowParseOutcome{
                     .invalidCategoryIndex = 0,
@@ -97,8 +96,7 @@ OpenNgcCatalogParser::parse(const std::string_view data, const CatalogParseProgr
                 };
             }
 
-            const auto visualMagnitude =
-                CatalogParsingUtilities::parseFiniteDouble(row.decodeColumn(QStringLiteral("V-Mag")));
+            const auto visualMagnitude = CatalogColumnValueReader::finiteDouble(row, QStringLiteral("V-Mag"));
             DistantCelestialBody body;
             body.id = std::move(mapping.id);
             body.displayName = std::move(mapping.displayName);
@@ -112,12 +110,9 @@ OpenNgcCatalogParser::parse(const std::string_view data, const CatalogParseProgr
             body.deepSkyObject = DeepSkyObjectInfo{
                 .kind = mapping.kind,
                 .aliases = std::move(mapping.aliases),
-                .majorAxisArcmin =
-                    CatalogParsingUtilities::parsePositiveDouble(row.decodeColumn(QStringLiteral("MajAx"))),
-                .minorAxisArcmin =
-                    CatalogParsingUtilities::parsePositiveDouble(row.decodeColumn(QStringLiteral("MinAx"))),
-                .positionAngleDeg =
-                    CatalogParsingUtilities::parseNonNegativeDouble(row.decodeColumn(QStringLiteral("PosAng"))),
+                .majorAxisArcmin = CatalogColumnValueReader::positiveDouble(row, QStringLiteral("MajAx")),
+                .minorAxisArcmin = CatalogColumnValueReader::positiveDouble(row, QStringLiteral("MinAx")),
+                .positionAngleDeg = CatalogColumnValueReader::nonNegativeDouble(row, QStringLiteral("PosAng")),
             };
 
             return RowParseOutcome{.distantBody = std::move(body)};

@@ -347,6 +347,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/stellarium/StellariumAnchorGroupExtractor.hpp
     src/catalog/stellarium/StellariumLineRefExtractor.hpp
     src/catalog/io/zip/ZipBinaryUtilities.hpp
+    src/catalog/io/zip/ZipFieldReader.hpp
     src/catalog/io/zip/ZipEntryMetadata.hpp
     src/StringUtilities.cpp
     src/NumericParsingUtilities.cpp
@@ -393,6 +394,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/DelimitedCatalogReader.cpp
     src/catalog/io/DelimitedCatalogRow.cpp
     src/catalog/io/CsvRowTokenizer.hpp
+    src/catalog/io/CatalogColumnValueReader.hpp
     src/catalog/hyg/HygCatalogParser.hpp
     src/catalog/InMemoryStarCatalog.hpp
     src/catalog/opengc/OpenNgcObjectMapper.cpp
@@ -402,6 +404,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/zip/ZipEntryExtractor.cpp
     src/catalog/io/zip/ZipEntryExtractor.hpp
     src/catalog/io/zip/ZipBinaryUtilities.cpp
+    src/catalog/io/zip/ZipFieldReader.cpp
     src/catalog/io/zip/ZipEntryMetadata.cpp
     src/catalog/stellarium/StellariumConstellationParser.cpp
     src/catalog/stellarium/StellariumHipParser.cpp
@@ -434,6 +437,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/bundled/BundledCatalogData.cpp
     src/catalog/bundled/BundledCatalogParser.cpp
     src/catalog/io/CsvRowTokenizer.cpp
+    src/catalog/io/CatalogColumnValueReader.cpp
     src/catalog/hyg/HygCatalogParser.cpp
     src/catalog/InMemoryStarCatalog.cpp
     src/catalog/opengc/OpenNgcCatalogParser.cpp
