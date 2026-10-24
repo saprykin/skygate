@@ -288,6 +288,10 @@ add_skygate_ui_qtest(
     LABELS integration
     TIMEOUT 45
 )
+add_skygate_ui_qtest(
+    skygate-ui-theme-json-codec-tests
+    theme/SkyThemeJsonCodecTests.cpp
+)
 add_skygate_ui_qtest(skygate-ui-overlay-layer-settings-tests theme/SkyOverlayLayerSettingsTests.cpp)
 add_skygate_ui_qtest(
     skygate-ui-catalog-cache-restore-tests
