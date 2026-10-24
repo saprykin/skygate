@@ -4,8 +4,7 @@
 #include "math/TimeConstants.hpp"
 #include "reference/EclipticToEquatorialCalculator.hpp"
 #include "reference/EquatorialToHorizontalCalculator.hpp"
-#include "time/AstronomicalTime.hpp"
-#include "time/EpochCodec.hpp"
+#include "reference/ReferenceEpochElements.hpp"
 
 namespace skygate::ephemeris {
 
@@ -18,7 +17,7 @@ skygate::core::HorizontalCoordinate CelestialReferenceCalculator::eclipticPoint(
 ) noexcept
 {
     const double obliquityDeg =
-        skygate::core::AstronomicalTime::meanObliquityDeg(skygate::core::EpochCodec::daysSinceJ2000(utcTime));
+        ReferenceEpochElements::meanObliquityDeg(ReferenceEpochElements::daysSinceJ2000(utcTime));
     return EquatorialToHorizontalCalculator::compute(
         EclipticToEquatorialCalculator::compute(eclipticLongitudeDeg, 0.0, obliquityDeg), observer, utcTime
     );

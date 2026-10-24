@@ -65,6 +65,7 @@ private slots:
     void astronomicalEpochAddsSecondsAndNormalizes();
     void astronomicalEpochComparesEqual();
     void astronomicalTimeReportsJ2000SiderealTime();
+    void astronomicalTimeReportsLocalSiderealTimeAndHourAngle();
     void calendarTimeAndEpochCodecAgreeOnJulianDate();
     void epochFromUtcTimeExactTracksApproximateEpoch();
     void calendarTimeRecognizesUtcLeapSecondLabels();
@@ -248,6 +249,26 @@ void TimeCodecTests::astronomicalTimeReportsJ2000SiderealTime()
 {
     QVERIFY(isNear(skygate::core::AstronomicalTime::meanObliquityDeg(0.0), 23.4393));
     QVERIFY(isNear(skygate::core::AstronomicalTime::greenwichMeanSiderealTimeDeg(j2000UtcTime()), 280.46061837));
+}
+
+void TimeCodecTests::astronomicalTimeReportsLocalSiderealTimeAndHourAngle()
+{
+    const skygate::core::UtcTimePoint utcTime = j2000UtcTime();
+    const double gmstDeg = skygate::core::AstronomicalTime::greenwichMeanSiderealTimeDeg(utcTime);
+
+    // East longitude advances local sidereal time and west longitude retards it.
+    QVERIFY(isNear(skygate::core::AstronomicalTime::localSiderealTimeDeg(utcTime, 0.0), gmstDeg));
+    QVERIFY(isNear(skygate::core::AstronomicalTime::localSiderealTimeDeg(utcTime, 15.0), gmstDeg + 15.0));
+    QVERIFY(isNear(skygate::core::AstronomicalTime::localSiderealTimeDeg(utcTime, -30.0), gmstDeg - 30.0));
+
+    // The hour angle is the local sidereal time minus the right ascension, so it
+    // stays unwrapped while the body is west of the meridian.
+    QVERIFY(isNear(skygate::core::AstronomicalTime::hourAngleDeg(17.0, utcTime, 0.0), gmstDeg - 255.0));
+    QVERIFY(isNear(skygate::core::AstronomicalTime::hourAngleDeg(17.0, utcTime, 45.0), gmstDeg - 210.0));
+    // East of the meridian it wraps into the eastern half of the circle.
+    QVERIFY(isNear(skygate::core::AstronomicalTime::hourAngleDeg(6.0, utcTime, 0.0), gmstDeg - 450.0));
+    // A body on the local meridian has a zero hour angle.
+    QVERIFY(isNear(skygate::core::AstronomicalTime::hourAngleDeg(gmstDeg / 15.0, utcTime, 0.0), 0.0));
 }
 
 void TimeCodecTests::calendarTimeAndEpochCodecAgreeOnJulianDate()
