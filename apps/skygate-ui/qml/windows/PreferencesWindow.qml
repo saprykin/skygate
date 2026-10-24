@@ -28,7 +28,6 @@ Window {
     property color dividerColor: theme.dividerColor
     property color textPrimary: theme.textPrimary
     property color textSecondary: theme.textSecondary
-    property color textMuted: theme.textMuted
     // Section identities follow the preferencesSectionStack child order.
     readonly property int generalSection: 0
     readonly property int skySection: 1

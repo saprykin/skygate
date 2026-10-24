@@ -122,12 +122,11 @@ FocusScope {
                 wrapMode: Text.WordWrap
             }
 
-            Label {
+            PreferencesFieldLabel {
+                theme: dateTimePopup.theme
                 objectName: "dateTimePopupDateLabel"
                 text: "Date"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 10
+                textPixelSize: 10
             }
 
             PreferencesTextField {
@@ -151,12 +150,11 @@ FocusScope {
                 onAccepted: dateTimePopup.applyChanges()
             }
 
-            Label {
+            PreferencesFieldLabel {
+                theme: dateTimePopup.theme
                 objectName: "dateTimePopupTimeLabel"
                 text: "Time"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 10
+                textPixelSize: 10
             }
 
             PreferencesTextField {

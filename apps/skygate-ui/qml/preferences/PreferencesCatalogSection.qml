@@ -29,25 +29,15 @@ Item {
                     text: "Active Catalog Sources"
                 }
 
-                Label {
+                PreferencesValueLabel {
+                    theme: catalogSection.theme
                     objectName: "catalogParticipationSummaryLabel"
-                    Layout.fillWidth: true
                     text: skyContextController.catalogParticipationSummary
-                    color: theme.listItemPrimaryText
-                    font.pixelSize: 11
-                    font.family: "Avenir Next"
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
                 }
 
-                Label {
-                    Layout.fillWidth: true
+                PreferencesValueLabel {
+                    theme: catalogSection.theme
                     text: skyContextController.catalogDatasetInfoText
-                    color: theme.listItemPrimaryText
-                    font.pixelSize: 11
-                    font.family: "Avenir Next"
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
                 }
 
                 Repeater {

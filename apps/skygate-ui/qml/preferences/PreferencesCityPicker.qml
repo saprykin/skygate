@@ -8,12 +8,6 @@ Item {
     property string placeholderText: "Choose a city"
     property string selectedCityId: ""
     property string selectedText: ""
-    readonly property alias hostWindow: pickerShell.hostWindow
-    readonly property alias popupSpacing: pickerShell.popupSpacing
-    readonly property alias popupMargin: pickerShell.popupMargin
-    readonly property alias popupOriginInWindow: pickerShell.popupOriginInWindow
-    readonly property alias availableSpaceAbove: pickerShell.availableSpaceAbove
-    readonly property alias availableSpaceBelow: pickerShell.availableSpaceBelow
 
     signal cityChosen(string cityId, string displayText, double latitudeDeg, double longitudeDeg)
 
@@ -36,7 +30,6 @@ Item {
 
         rowDelegate: Component {
             Rectangle {
-                required property string rowKind
                 required property string displayText
                 required property string detailText
                 required property string cityId

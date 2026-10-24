@@ -22,12 +22,9 @@ Item {
             text: "Location"
         }
 
-        Label {
+        PreferencesFieldLabel {
+            theme: root.theme
             text: "Location Source"
-            color: theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 11
-            Layout.alignment: Qt.AlignVCenter
         }
 
         PreferencesComboBox {
@@ -48,13 +45,10 @@ Item {
             onActivated: root.preferencesDraft.setLocationSource(currentText)
         }
 
-        Label {
-            text: "City"
-            color: theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 11
-            Layout.alignment: Qt.AlignVCenter
+        PreferencesFieldLabel {
+            theme: root.theme
             visible: root.preferencesDraft.locationSourceText === "City"
+            text: "City"
         }
 
         PreferencesCityPicker {
@@ -73,12 +67,9 @@ Item {
             }
         }
 
-        Label {
+        PreferencesFieldLabel {
+            theme: root.theme
             text: "Timezone"
-            color: theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 11
-            Layout.alignment: Qt.AlignVCenter
         }
 
         PreferencesTimeZonePicker {
@@ -95,12 +86,9 @@ Item {
             }
         }
 
-        Label {
+        PreferencesFieldLabel {
+            theme: root.theme
             text: "Latitude"
-            color: theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 11
-            Layout.alignment: Qt.AlignVCenter
         }
 
         PreferencesTextField {
@@ -128,12 +116,9 @@ Item {
             }
         }
 
-        Label {
+        PreferencesFieldLabel {
+            theme: root.theme
             text: "Longitude"
-            color: theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 11
-            Layout.alignment: Qt.AlignVCenter
         }
 
         PreferencesTextField {
@@ -161,12 +146,10 @@ Item {
             }
         }
 
-        Label {
+        PreferencesFieldLabel {
+            theme: root.theme
             text: "Elevation (m)"
-            color: theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 10
-            Layout.alignment: Qt.AlignVCenter
+            textPixelSize: 10
         }
 
         PreferencesTextField {
@@ -196,12 +179,10 @@ Item {
             text: "View"
         }
 
-        Label {
+        PreferencesFieldLabel {
+            theme: root.theme
             text: "Projection"
-            color: theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 10
-            Layout.alignment: Qt.AlignVCenter
+            textPixelSize: 10
         }
 
         PreferencesComboBox {
