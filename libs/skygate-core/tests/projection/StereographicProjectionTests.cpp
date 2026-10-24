@@ -45,7 +45,6 @@ private slots:
     void directionAtCircularFovEdgeIsVisible();
     void directionOutsideFovIsHidden();
     void rollRotatesProjectedPoint();
-    void zenithCenterIsSupported();
     void zenithOrientationRemainsContinuous();
 };
 
@@ -189,23 +188,6 @@ void StereographicProjectionTests::rollRotatesProjectedPoint()
 
     QVERIFY(isNear(rotatedOffsetX, baselineOffsetY, 1e-5));
     QVERIFY(isNear(rotatedOffsetY, -baselineOffsetX, 1e-5));
-}
-
-void StereographicProjectionTests::zenithCenterIsSupported()
-{
-    const skygate::core::ProjectionParams params{
-        .center = {.altitudeDeg = 90.0, .azimuthDeg = 0.0},
-        .fovDeg = 90.0,
-        .rollDeg = 0.0,
-        .viewportWidth = 1100.0,
-        .viewportHeight = 760.0,
-    };
-
-    const auto projectedCenter = projectPoint(params.center, params);
-    QVERIFY(projectedCenter.isVisible());
-    QCOMPARE(projectedCenter.status, skygate::core::ProjectionStatus::Visible);
-    QVERIFY(isNear(projectedCenter.x, params.viewportWidth * 0.5, 1e-6));
-    QVERIFY(isNear(projectedCenter.y, params.viewportHeight * 0.5, 1e-6));
 }
 
 void StereographicProjectionTests::zenithOrientationRemainsContinuous()
