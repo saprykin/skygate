@@ -34,7 +34,9 @@ corrections.
 - When diurnal parallax (topocentric) is requested, the position is
   transformed to ITRS, the observer parallax is applied, and `horizontal`
   is populated as the topocentric altitude/azimuth. Atmospheric refraction
-  is applied to `horizontal` when it is both requested and enabled.
+  is applied to `horizontal` when it is both requested and enabled; the
+  correction fades smoothly to zero between -1 and -2 degrees true
+  altitude, so the applied value is continuous.
 - `horizontal` is unset (`NaN`) unless the topocentric path runs;
   `equatorial` reflects geometric/astrometric GCRS, apparent of date, or a
   topocentric direction, depending on the requested corrections.
