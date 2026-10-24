@@ -1,9 +1,8 @@
 #include "PlanetEquatorialCalculator.hpp"
 #include "EclipticToEquatorialCalculator.hpp"
 #include "PlanetIdentity.hpp"
+#include "ReferenceEpochElements.hpp"
 #include "math/AngleMath.hpp"
-#include "time/AstronomicalTime.hpp"
-#include "time/EpochCodec.hpp"
 
 #include <array>
 #include <cmath>
@@ -68,8 +67,8 @@ std::optional<skygate::core::EquatorialCoordinate> PlanetEquatorialCalculator::c
         return std::nullopt;
     }
 
-    const double daysSinceJ2000 = skygate::core::EpochCodec::daysSinceJ2000(utcTime);
-    const double obliquityDeg = skygate::core::AstronomicalTime::meanObliquityDeg(daysSinceJ2000);
+    const double daysSinceJ2000 = ReferenceEpochElements::daysSinceJ2000(utcTime);
+    const double obliquityDeg = ReferenceEpochElements::meanObliquityDeg(daysSinceJ2000);
 
     for (const PlanetApproximateOrbit& orbit : kPlanetApproximateOrbits) {
         if (planet->key() != orbit.key) {

@@ -30,6 +30,8 @@ set(SKYGATE_EPHEMERIS_REFERENCE_SOURCES
     src/reference/MoonEquatorialCalculator.cpp
     src/reference/PlanetEquatorialCalculator.hpp
     src/reference/PlanetEquatorialCalculator.cpp
+    src/reference/ReferenceEpochElements.hpp
+    src/reference/ReferenceEpochElements.cpp
     src/reference/SunEquatorialCalculator.hpp
     src/reference/SunEquatorialCalculator.cpp
     src/reference/SimpleBodyStateCalculator.hpp
