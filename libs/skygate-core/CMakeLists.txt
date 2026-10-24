@@ -78,6 +78,7 @@ add_library(skygate-core STATIC
     src/projections/ProjectionAlgorithms.hpp
     src/projections/ProjectionFrame.hpp
     src/projections/ProjectionPipeline.cpp
+    src/projections/ProjectionPipeline.hpp
     src/projections/ProjectionTypeCodec.cpp
 )
 
