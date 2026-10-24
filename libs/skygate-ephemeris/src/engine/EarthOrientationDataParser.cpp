@@ -92,7 +92,6 @@ void applyMetadataLine(
         );
         return;
     }
-    }
 }
 
 // FINALS dates use two-digit years, so the MJD column is needed to pick the
