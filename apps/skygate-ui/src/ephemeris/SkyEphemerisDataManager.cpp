@@ -85,18 +85,10 @@ bool cacheSnapshotsEqual(const EphemerisDataCacheSnapshot& lhs, const EphemerisD
            && lhs.dataRevisionToken == rhs.dataRevisionToken && lhs.lastUpdateResult == rhs.lastUpdateResult;
 }
 
-StagedUpdateDownloadRequest
-combineDownloadCancellation(StagedUpdateDownloadRequest request, const SkyEphemerisDataManager* manager)
-{
-    const auto original = request.cancellationRequested;
-    request.cancellationRequested = [manager, original] {
-        return manager->updateCancellationRequested() || (original != nullptr && original());
-    };
-    return request;
-}
-
-StagedUpdateActivationRequest
-combineActivationCancellation(StagedUpdateActivationRequest request, const SkyEphemerisDataManager* manager)
+// Both staged requests carry the same cancellation callback, so one helper
+// combines them with the manager's own flag instead of keeping two copies.
+template <typename Request>
+Request combineCancellation(Request request, const SkyEphemerisDataManager* manager)
 {
     const auto original = request.cancellationRequested;
     request.cancellationRequested = [manager, original] {
@@ -327,22 +319,21 @@ bool SkyEphemerisDataManager::updateCancellationRequested() const noexcept
 SkyEphemerisDataManager::StagedUpdateDownloadResult
 SkyEphemerisDataManager::stageEphemerisUpdateAsset(const StagedUpdateDownloadRequest& request)
 {
-    return m_downloadService->stage(combineDownloadCancellation(request, this));
+    return m_downloadService->stage(combineCancellation(request, this));
 }
 
 void SkyEphemerisDataManager::stageEphemerisUpdateAssetAsync(
     const StagedUpdateDownloadRequest& request, std::function<void(StagedUpdateDownloadResult)> completionHandler
 )
 {
-    m_downloadService->stageAsync(combineDownloadCancellation(request, this), std::move(completionHandler));
+    m_downloadService->stageAsync(combineCancellation(request, this), std::move(completionHandler));
 }
 
 SkyEphemerisDataManager::StagedUpdateActivationResult
 SkyEphemerisDataManager::activateVerifiedStagedUpdateSet(const StagedUpdateActivationRequest& request)
 {
-    StagedUpdateActivationResult result = m_cacheController.activate(
-        combineActivationCancellation(request, this), m_activeCacheSnapshot, m_settingsStore
-    );
+    StagedUpdateActivationResult result =
+        m_cacheController.activate(combineCancellation(request, this), m_activeCacheSnapshot, m_settingsStore);
     if (result.isSuccess()) {
         applyCacheSnapshot(result.cacheSnapshot, ActiveSource::Installed, true);
     }

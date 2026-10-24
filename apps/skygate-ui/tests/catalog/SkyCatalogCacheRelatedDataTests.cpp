@@ -108,33 +108,35 @@ void SkyCatalogCacheRelatedDataTests::roundTripsEachSourcesOwnRelatedDataset()
 
     SkyCatalogCollectionPersistRequest request;
     SkyCatalogSourcePersistEntry sourceA;
-    sourceA.instanceId = QStringLiteral("custom:owner-a");
-    sourceA.title = QStringLiteral("Owner A");
-    sourceA.urls = QStringList{QStringLiteral("https://example.test/owner-a.csv")};
-    sourceA.relatedDatasetUrls = QStringList{QStringLiteral("https://example.test/owner-a-lines.json")};
-    sourceA.policy = CatalogCompositionPolicy::Merge;
-    sourceA.enabled = true;
+    sourceA.record.instanceId = QStringLiteral("custom:owner-a");
+    sourceA.record.title = QStringLiteral("Owner A");
+    sourceA.record.urls = QStringList{QStringLiteral("https://example.test/owner-a.csv")};
+    sourceA.record.relatedDatasetUrls = QStringList{QStringLiteral("https://example.test/owner-a-lines.json")};
+    sourceA.record.policy = CatalogCompositionPolicy::Merge;
+    sourceA.record.enabled = true;
     sourceA.catalog = sourceACatalog.get();
-    sourceA.payload = skygate::ui::tests::sampleHygCsvPayload({.id = 11, .hip = 11, .properName = "Owner A Star"});
-    sourceA.constellationLineRows = "hip_11|hip_12\nhip_12|hip_13\n";
-    sourceA.constellationAnchorGroupRows = "Orion|hip_11,hip_12\n";
-    sourceA.constellationLineSchemaVersion = kCurrentConstellationSchemaVersion;
-    sourceA.constellationCount = 1;
+    sourceA.record.payload =
+        skygate::ui::tests::sampleHygCsvPayload({.id = 11, .hip = 11, .properName = "Owner A Star"});
+    sourceA.record.constellationLineRows = "hip_11|hip_12\nhip_12|hip_13\n";
+    sourceA.record.constellationAnchorGroupRows = "Orion|hip_11,hip_12\n";
+    sourceA.record.constellationLineSchemaVersion = kCurrentConstellationSchemaVersion;
+    sourceA.record.constellationCount = 1;
     request.sources.push_back(std::move(sourceA));
 
     SkyCatalogSourcePersistEntry sourceB;
-    sourceB.instanceId = QStringLiteral("custom:owner-b");
-    sourceB.title = QStringLiteral("Owner B");
-    sourceB.urls = QStringList{QStringLiteral("https://example.test/owner-b.csv")};
-    sourceB.relatedDatasetUrls = QStringList{QStringLiteral("https://example.test/owner-b-lines.json")};
-    sourceB.policy = CatalogCompositionPolicy::Merge;
-    sourceB.enabled = true;
+    sourceB.record.instanceId = QStringLiteral("custom:owner-b");
+    sourceB.record.title = QStringLiteral("Owner B");
+    sourceB.record.urls = QStringList{QStringLiteral("https://example.test/owner-b.csv")};
+    sourceB.record.relatedDatasetUrls = QStringList{QStringLiteral("https://example.test/owner-b-lines.json")};
+    sourceB.record.policy = CatalogCompositionPolicy::Merge;
+    sourceB.record.enabled = true;
     sourceB.catalog = sourceBCatalog.get();
-    sourceB.payload = skygate::ui::tests::sampleHygCsvPayload({.id = 22, .hip = 22, .properName = "Owner B Star"});
-    sourceB.constellationLineRows = "hip_21|hip_22\n";
-    sourceB.constellationAnchorGroupRows = "Lyra|hip_21,hip_22\n";
-    sourceB.constellationLineSchemaVersion = kCurrentConstellationSchemaVersion;
-    sourceB.constellationCount = 2;
+    sourceB.record.payload =
+        skygate::ui::tests::sampleHygCsvPayload({.id = 22, .hip = 22, .properName = "Owner B Star"});
+    sourceB.record.constellationLineRows = "hip_21|hip_22\n";
+    sourceB.record.constellationAnchorGroupRows = "Lyra|hip_21,hip_22\n";
+    sourceB.record.constellationLineSchemaVersion = kCurrentConstellationSchemaVersion;
+    sourceB.record.constellationCount = 2;
     request.sources.push_back(std::move(sourceB));
 
     SkySettingsStore store;

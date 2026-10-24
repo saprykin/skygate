@@ -434,7 +434,7 @@ void SkyEphemerisDownloadService::stageNetworkUrl(
     });
     state->cancellationTimer->start(50);
 
-    QObject::connect(state->reply, &QNetworkReply::finished, this, [this, state] {
+    QObject::connect(state->reply, &QNetworkReply::finished, this, [state] {
         if (state->completed) {
             return;
         }

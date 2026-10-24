@@ -11,6 +11,7 @@
 
 namespace skygate::ui::internal {
 struct SkyCatalogSourceDescriptor;
+struct SkyCatalogSourceInstance;
 struct SkyCatalogSourcePersistEntry;
 }  // namespace skygate::ui::internal
 
@@ -23,7 +24,6 @@ struct SkyCatalogSourceCacheRecord final {
     QString descriptorId;
     QString title;
     QString version;
-    QString url;
     QStringList urls;
     QStringList relatedDatasetUrls;
     QString archiveSelector;
@@ -44,6 +44,24 @@ struct SkyCatalogSourceCacheRecord final {
     QByteArray constellationAnchorGroupRows;
     int constellationLineSchemaVersion = 0;
     std::size_t constellationCount = 0;
+
+    // Copies the configuration an instance owns into this record. The durable
+    // identity stays with the caller: a record built from a descriptor or the
+    // legacy slots adopts the migrated ID instead of the freshly allocated
+    // one.
+    void applyConfiguration(const skygate::ui::internal::SkyCatalogSourceInstance& instance);
+
+    // The requested configuration this stored record describes. The stored
+    // title is copied verbatim, including the presentation suffix a restore
+    // may add.
+    [[nodiscard]] skygate::ui::internal::SkyCatalogSourceInstance configuredInstance() const;
+
+    // The stored record for one configured instance: its configuration and
+    // policy, with the defaults every new source starts from.
+    [[nodiscard]] static SkyCatalogSourceCacheRecord fromInstance(
+        const skygate::ui::internal::SkyCatalogSourceInstance& instance,
+        skygate::ephemeris::CatalogCompositionPolicy policy
+    );
 
     // The stored record for a source configured from a preset descriptor. The
     // descriptor supplies the configuration; the identity is the one a source

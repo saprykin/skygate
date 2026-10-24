@@ -183,13 +183,13 @@ void SkyCatalogCacheRestoreTests::restoresBinaryCatalogPayloadsWithoutUpgrade()
 
     SkyCatalogCollectionPersistRequest request;
     SkyCatalogSourcePersistEntry entry;
-    entry.instanceId = QStringLiteral("preset:hyg_v42");
-    entry.title = QStringLiteral("HYG v4.2");
-    entry.urls = QStringList{QStringLiteral("https://example.test/hyg.csv.gz")};
-    entry.policy = CatalogCompositionPolicy::Merge;
-    entry.enabled = true;
+    entry.record.instanceId = QStringLiteral("preset:hyg_v42");
+    entry.record.title = QStringLiteral("HYG v4.2");
+    entry.record.urls = QStringList{QStringLiteral("https://example.test/hyg.csv.gz")};
+    entry.record.policy = CatalogCompositionPolicy::Merge;
+    entry.record.enabled = true;
     entry.catalog = catalog.get();
-    entry.payload = skygate::ui::tests::sampleHygCsvPayload();
+    entry.record.payload = skygate::ui::tests::sampleHygCsvPayload();
     request.sources.push_back(std::move(entry));
 
     SkySettingsStore store;
@@ -444,17 +444,17 @@ void SkyCatalogCacheRestoreTests::roundTripsParseOptionsDescriptorAndAttribution
 {
     SkyCatalogCollectionPersistRequest request;
     SkyCatalogSourcePersistEntry entry;
-    entry.instanceId = QStringLiteral("custom:archive");
-    entry.descriptorId = QStringLiteral("archive_demo");
-    entry.title = QStringLiteral("Archive Catalog");
-    entry.version = QStringLiteral("v2026.1");
-    entry.urls = QStringList{kArchiveSourceUrl};
-    entry.archiveSelector = kDeepSkyMember;
-    entry.schemaHint = CatalogSourceType::OpenNgcCsv;
-    entry.attribution = QStringLiteral("Demo archive attribution");
-    entry.policy = CatalogCompositionPolicy::Merge;
-    entry.enabled = true;
-    entry.payload = skygate::ui::tests::sampleTwoMemberCatalogZip();
+    entry.record.instanceId = QStringLiteral("custom:archive");
+    entry.record.descriptorId = QStringLiteral("archive_demo");
+    entry.record.title = QStringLiteral("Archive Catalog");
+    entry.record.version = QStringLiteral("v2026.1");
+    entry.record.urls = QStringList{kArchiveSourceUrl};
+    entry.record.archiveSelector = kDeepSkyMember;
+    entry.record.schemaHint = CatalogSourceType::OpenNgcCsv;
+    entry.record.attribution = QStringLiteral("Demo archive attribution");
+    entry.record.policy = CatalogCompositionPolicy::Merge;
+    entry.record.enabled = true;
+    entry.record.payload = skygate::ui::tests::sampleTwoMemberCatalogZip();
     request.sources.push_back(std::move(entry));
 
     SkySettingsStore store;
@@ -498,26 +498,26 @@ void SkyCatalogCacheRestoreTests::persistsAndRestoresBundledRecordsFromFactory()
     SkyCatalogCollectionPersistRequest request;
 
     SkyCatalogSourcePersistEntry bundled;
-    bundled.instanceId = QStringLiteral("preset:bundled");
-    bundled.descriptorId = QStringLiteral("bundled");
-    bundled.title = QStringLiteral("Bundled");
-    bundled.policy = CatalogCompositionPolicy::Merge;
-    bundled.enabled = false;
-    bundled.bundled = true;
+    bundled.record.instanceId = QStringLiteral("preset:bundled");
+    bundled.record.descriptorId = QStringLiteral("bundled");
+    bundled.record.title = QStringLiteral("Bundled");
+    bundled.record.policy = CatalogCompositionPolicy::Merge;
+    bundled.record.enabled = false;
+    bundled.record.bundled = true;
     // A bundled record is configuration only: a supplied payload or catalog
     // must not be persisted as durable data.
-    bundled.payload = QByteArray("stale bundled payload");
+    bundled.record.payload = QByteArray("stale bundled payload");
     bundled.catalog = bundledCatalog.get();
     request.sources.push_back(std::move(bundled));
 
     SkyCatalogSourcePersistEntry downloaded;
-    downloaded.instanceId = QStringLiteral("custom:stars");
-    downloaded.title = QStringLiteral("Custom stars");
-    downloaded.urls = QStringList{QStringLiteral("https://example.test/stars.csv")};
-    downloaded.policy = CatalogCompositionPolicy::DeepSkyOnly;
-    downloaded.enabled = true;
+    downloaded.record.instanceId = QStringLiteral("custom:stars");
+    downloaded.record.title = QStringLiteral("Custom stars");
+    downloaded.record.urls = QStringList{QStringLiteral("https://example.test/stars.csv")};
+    downloaded.record.policy = CatalogCompositionPolicy::DeepSkyOnly;
+    downloaded.record.enabled = true;
     downloaded.catalog = downloadedCatalog.get();
-    downloaded.payload = skygate::ui::tests::sampleHygCsvPayload({.hip = 43, .properName = "Vega"});
+    downloaded.record.payload = skygate::ui::tests::sampleHygCsvPayload({.hip = 43, .properName = "Vega"});
     request.sources.push_back(std::move(downloaded));
 
     SkySettingsStore store;
@@ -682,13 +682,14 @@ void SkyCatalogCacheRestoreTests::roundTripsThreeEnabledSourcesPlusDisabledSourc
         catalogs.push_back(CatalogCacheFixture::makeStarCatalog(id, "Star " + std::to_string(index)));
 
         SkyCatalogSourcePersistEntry entry;
-        entry.instanceId = QStringLiteral("custom:%1").arg(index);
-        entry.title = QStringLiteral("Custom %1").arg(index);
-        entry.urls = QStringList{QStringLiteral("https://example.test/custom-%1.csv").arg(index)};
-        entry.policy = CatalogCompositionPolicy::Merge;
-        entry.enabled = index != 3;
+        entry.record.instanceId = QStringLiteral("custom:%1").arg(index);
+        entry.record.title = QStringLiteral("Custom %1").arg(index);
+        entry.record.urls = QStringList{QStringLiteral("https://example.test/custom-%1.csv").arg(index)};
+        entry.record.policy = CatalogCompositionPolicy::Merge;
+        entry.record.enabled = index != 3;
         entry.catalog = catalogs.back().get();
-        entry.payload = skygate::ui::tests::sampleHygCsvPayload({.hip = hips[index], .properName = QByteArray("Star")});
+        entry.record.payload =
+            skygate::ui::tests::sampleHygCsvPayload({.hip = hips[index], .properName = QByteArray("Star")});
         request.sources.push_back(std::move(entry));
     }
 
@@ -739,11 +740,11 @@ void SkyCatalogCacheRestoreTests::restoreDerivesDeepSkyFoundCountFromMixedSource
 
     SkyCatalogCollectionPersistRequest request;
     SkyCatalogSourcePersistEntry entry;
-    entry.instanceId = QStringLiteral("custom:mixed");
-    entry.title = QStringLiteral("Mixed source");
-    entry.urls = QStringList{QStringLiteral("https://example.test/mixed.csv")};
-    entry.policy = CatalogCompositionPolicy::DeepSkyOnly;
-    entry.enabled = true;
+    entry.record.instanceId = QStringLiteral("custom:mixed");
+    entry.record.title = QStringLiteral("Mixed source");
+    entry.record.urls = QStringList{QStringLiteral("https://example.test/mixed.csv")};
+    entry.record.policy = CatalogCompositionPolicy::DeepSkyOnly;
+    entry.record.enabled = true;
     entry.catalog = mixedCatalog.get();
     request.sources.push_back(std::move(entry));
 

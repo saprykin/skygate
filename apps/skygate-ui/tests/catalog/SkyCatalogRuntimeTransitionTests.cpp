@@ -659,7 +659,6 @@ void SkyCatalogRuntimeTransitionTests::provenanceKeepsStableIdentitiesBeyondByte
                 .instanceId = instanceId,
                 .title = QStringLiteral("Source %1").arg(index),
                 .version = QString(),
-                .url = QString(),
                 .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
                 .enabled = true,
                 .catalog =
@@ -707,7 +706,6 @@ void SkyCatalogRuntimeTransitionTests::titleChangesKeepIdentityWhileTitlesStayDi
                 .instanceId = instanceId,
                 .title = title,
                 .version = QString(),
-                .url = QString(),
                 .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
                 .enabled = true,
                 .catalog = CatalogRuntimeFixture::makeSingleStarCatalog(std::move(bodyId), "Star"),

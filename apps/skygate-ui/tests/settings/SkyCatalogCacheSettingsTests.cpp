@@ -157,7 +157,6 @@ void SkyCatalogCacheSettingsTests::clearSourceCacheEvictsPayloadKeepsConfigurati
     QCOMPARE(loadedStar.descriptorId, savedSnapshot.sources[0].descriptorId);
     QCOMPARE(loadedStar.title, savedSnapshot.sources[0].title);
     QCOMPARE(loadedStar.version, savedSnapshot.sources[0].version);
-    QCOMPARE(loadedStar.url, savedSnapshot.sources[0].url);
     QCOMPARE(loadedStar.urls, savedSnapshot.sources[0].urls);
     QCOMPARE(loadedStar.relatedDatasetUrls, savedSnapshot.sources[0].relatedDatasetUrls);
     QCOMPARE(loadedStar.archiveSelector, savedSnapshot.sources[0].archiveSelector);

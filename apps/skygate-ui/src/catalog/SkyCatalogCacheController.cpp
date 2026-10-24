@@ -191,7 +191,6 @@ void SkyCatalogCacheController::appendRestoredSource(
         entry.record.title = savedLabel(sourceRecord.title, QStringLiteral("Saved"));
     }
     entry.record.version = sourceRecord.version;
-    entry.record.url = sourceRecord.url;
     entry.record.policy = sourceRecord.policy;
     entry.record.enabled = sourceRecord.enabled;
     entry.record.bundled = sourceRecord.bundled;
@@ -206,15 +205,9 @@ void SkyCatalogCacheController::appendRestoredSource(
             skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(entry.record.catalog->bodies());
     }
 
+    entry.instance = sourceRecord.configuredInstance();
     entry.instance.instanceId = restoredInstanceId;
-    entry.instance.descriptorId = sourceRecord.descriptorId;
     entry.instance.title = stripSavedSuffixes(sourceRecord.title);
-    entry.instance.version = sourceRecord.version;
-    entry.instance.urls = sourceRecord.urls;
-    entry.instance.relatedDatasetUrls = sourceRecord.relatedDatasetUrls;
-    entry.instance.archiveSelector = sourceRecord.archiveSelector;
-    entry.instance.schemaHint = sourceRecord.schemaHint;
-    entry.instance.attribution = sourceRecord.attribution;
 
     entry.payload = sourceRecord.payload;
     entry.requiresBinaryUpgrade = decoded.requiresBinaryUpgrade;
@@ -360,12 +353,14 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
             }
         } else {
             const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::createCustom(catalogUrlText);
+            record = SkyCatalogSourceCacheRecord::fromInstance(
+                instance, skygate::ephemeris::CatalogCompositionPolicy::Merge
+            );
             record.instanceId = SkyCatalogSourceInstance::migratedLegacyInstanceId(instance);
             record.title = stripSavedSuffixes(legacy.sourceLabel);
             if (record.title.isEmpty()) {
                 record.title = instance.title;
             }
-            record.urls = instance.urls;
         }
         record.payload = legacy.catalogPayload;
         record.binaryPayload = legacy.catalogBinaryPayload;
@@ -391,12 +386,14 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
             }
         } else {
             const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::createCustom(deepSkyCatalogUrlText);
+            record = SkyCatalogSourceCacheRecord::fromInstance(
+                instance, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly
+            );
             record.instanceId = SkyCatalogSourceInstance::migratedLegacyInstanceId(instance);
             record.title = stripSavedSuffixes(legacy.deepSkySourceLabel);
             if (record.title.isEmpty()) {
                 record.title = instance.title;
             }
-            record.urls = instance.urls;
         }
         record.payload = legacy.deepSkyCatalogPayload;
         record.binaryPayload = legacy.deepSkyBinaryPayload;

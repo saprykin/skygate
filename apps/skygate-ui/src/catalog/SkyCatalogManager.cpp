@@ -729,7 +729,6 @@ SkyCatalogRuntimeResult SkyCatalogManager::applySourceResult(
     record.instanceId = result.sourceId;
     record.title = result.sourceLabel;
     record.version = result.sourceVersion;
-    record.url = result.sourceUrl;
     record.policy = policy;
     record.enabled = true;
     record.catalog = std::move(result.catalog);
@@ -1013,17 +1012,10 @@ void SkyCatalogManager::persistCatalogCache() const
         const bool payloadEvicted = operation != nullptr && operation->payloadEvicted();
         if (operation != nullptr && operation->hasAcceptedFacts()) {
             const SkyCatalogSourceInstance& acceptedInstance = operation->acceptedInstance();
-            entry.descriptorId = acceptedInstance.descriptorId;
-            entry.title = acceptedInstance.title;
-            entry.version = acceptedInstance.version;
-            entry.urls = acceptedInstance.urls;
-            entry.relatedDatasetUrls = acceptedInstance.relatedDatasetUrls;
-            entry.archiveSelector = acceptedInstance.archiveSelector;
-            entry.schemaHint = acceptedInstance.schemaHint;
-            entry.attribution = acceptedInstance.attribution;
+            entry.record.applyConfiguration(acceptedInstance);
             if (!source.bundled && !payloadEvicted) {
                 entry.catalog = source.catalog.get();
-                entry.payload = operation->acceptedPayload();
+                entry.record.payload = operation->acceptedPayload();
             }
         }
 
@@ -1039,12 +1031,13 @@ void SkyCatalogManager::persistCatalogCache() const
         if (!source.bundled && !payloadEvicted
             && (!ownedRelatedData.lineRefVector().empty() || !ownedRelatedData.anchorGroupVector().empty()
                 || ownedRelatedData.count() > 0U)) {
-            entry.constellationLineRows =
+            entry.record.constellationLineRows =
                 SkyCatalogRelatedDataCodec::serializeConstellationLineRows(ownedRelatedData.lineRefVector());
-            entry.constellationAnchorGroupRows =
+            entry.record.constellationAnchorGroupRows =
                 SkyCatalogRelatedDataCodec::serializeConstellationAnchorGroupRows(ownedRelatedData.anchorGroupVector());
-            entry.constellationLineSchemaVersion = SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
-            entry.constellationCount = ownedRelatedData.count();
+            entry.record.constellationLineSchemaVersion =
+                SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
+            entry.record.constellationCount = ownedRelatedData.count();
         }
         request.sources.push_back(std::move(entry));
     }

@@ -94,20 +94,13 @@ CatalogCacheFixture::persistRequestFromRestoreResult(const SkyCatalogCollectionR
     SkyCatalogCollectionPersistRequest request;
     for (const SkyCatalogSourceRestoreEntry& entry : result.sources) {
         SkyCatalogSourcePersistEntry persisted;
-        persisted.instanceId = entry.record.instanceId;
-        persisted.descriptorId = entry.instance.descriptorId;
-        persisted.title = entry.instance.title;
-        persisted.version = entry.instance.version;
-        persisted.urls = entry.instance.urls;
-        persisted.relatedDatasetUrls = entry.instance.relatedDatasetUrls;
-        persisted.archiveSelector = entry.instance.archiveSelector;
-        persisted.schemaHint = entry.instance.schemaHint;
-        persisted.attribution = entry.instance.attribution;
-        persisted.policy = entry.record.policy;
-        persisted.enabled = entry.record.enabled;
-        persisted.bundled = entry.record.bundled;
+        persisted.record.instanceId = entry.record.instanceId;
+        persisted.record.applyConfiguration(entry.instance);
+        persisted.record.policy = entry.record.policy;
+        persisted.record.enabled = entry.record.enabled;
+        persisted.record.bundled = entry.record.bundled;
         persisted.catalog = entry.record.catalog.get();
-        persisted.payload = entry.payload;
+        persisted.record.payload = entry.payload;
         request.sources.push_back(std::move(persisted));
     }
     return request;

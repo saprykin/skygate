@@ -196,20 +196,22 @@ public:
     }
 
 private:
+    static void cancelTransfer(std::shared_ptr<CatalogDownloadCancellation>& cancellation)
+    {
+        if (cancellation != nullptr) {
+            cancellation->cancel();
+            cancellation.reset();
+        }
+    }
+
     void cancelCatalogWork()
     {
-        if (m_catalogCancellation != nullptr) {
-            m_catalogCancellation->cancel();
-            m_catalogCancellation.reset();
-        }
+        cancelTransfer(m_catalogCancellation);
     }
 
     void cancelRelatedWork()
     {
-        if (m_relatedCancellation != nullptr) {
-            m_relatedCancellation->cancel();
-            m_relatedCancellation.reset();
-        }
+        cancelTransfer(m_relatedCancellation);
     }
 
     // The configuration most recently requested for the instance, including an

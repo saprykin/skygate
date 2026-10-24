@@ -179,6 +179,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/SkyCatalogSourceOperation.hpp
     src/catalog/SkyCatalogSourceOperationRegistry.cpp
     src/catalog/SkyCatalogSourceOperationRegistry.hpp
+    src/catalog/SkyCatalogSourcePersistEntry.cpp
     src/catalog/SkyCatalogSourcePersistEntry.hpp
     src/catalog/SkyCatalogSourceRestoreEntry.hpp
     src/catalog/SkyConstellationLineImportResult.cpp

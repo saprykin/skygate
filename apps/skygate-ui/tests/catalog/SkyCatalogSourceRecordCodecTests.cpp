@@ -27,7 +27,6 @@ SkyCatalogSourceCacheRecord configuredRecord()
     record.descriptorId = QStringLiteral("alpha");
     record.title = QStringLiteral("Alpha");
     record.version = QStringLiteral("v1");
-    record.url = QStringLiteral("https://example.test/alpha.csv");
     record.urls =
         QStringList{QStringLiteral("https://example.test/alpha.csv"), QStringLiteral("https://example.test/a2.csv")};
     record.relatedDatasetUrls = QStringList{QStringLiteral("https://example.test/lines.json")};
@@ -60,7 +59,6 @@ void compareConfigurationFields(const SkyCatalogSourceCacheRecord& loaded, const
     QCOMPARE(loaded.descriptorId, expected.descriptorId);
     QCOMPARE(loaded.title, expected.title);
     QCOMPARE(loaded.version, expected.version);
-    QCOMPARE(loaded.url, expected.url);
     QCOMPARE(loaded.urls, expected.urls);
     QCOMPARE(loaded.relatedDatasetUrls, expected.relatedDatasetUrls);
     QCOMPARE(loaded.archiveSelector, expected.archiveSelector);

@@ -24,7 +24,6 @@ constexpr std::string_view kInstanceId = "instanceId";
 constexpr std::string_view kDescriptorId = "descriptorId";
 constexpr std::string_view kTitle = "title";
 constexpr std::string_view kVersion = "version";
-constexpr std::string_view kUrl = "url";
 constexpr std::string_view kUrls = "urls";
 constexpr std::string_view kRelatedDatasetUrls = "relatedDatasetUrls";
 constexpr std::string_view kArchiveSelector = "archiveSelector";
@@ -190,7 +189,6 @@ void SkyCatalogSourceRecordCodec::saveRecord(
     settings.setValue(key(RecordKey::kDescriptorId), record.descriptorId);
     settings.setValue(key(RecordKey::kTitle), record.title);
     settings.setValue(key(RecordKey::kVersion), record.version);
-    settings.setValue(key(RecordKey::kUrl), record.url);
     settings.setValue(key(RecordKey::kUrls), record.urls);
     settings.setValue(key(RecordKey::kRelatedDatasetUrls), record.relatedDatasetUrls);
     settings.setValue(key(RecordKey::kArchiveSelector), record.archiveSelector);
@@ -219,7 +217,6 @@ SkyCatalogSourceCacheRecord SkyCatalogSourceRecordCodec::loadRecord(
     record.descriptorId = settings.value(key(RecordKey::kDescriptorId)).toString();
     record.title = settings.value(key(RecordKey::kTitle)).toString();
     record.version = settings.value(key(RecordKey::kVersion)).toString();
-    record.url = settings.value(key(RecordKey::kUrl)).toString();
     record.urls = settings.value(key(RecordKey::kUrls)).toStringList();
     record.relatedDatasetUrls = settings.value(key(RecordKey::kRelatedDatasetUrls)).toStringList();
     record.archiveSelector = settings.value(key(RecordKey::kArchiveSelector)).toString();

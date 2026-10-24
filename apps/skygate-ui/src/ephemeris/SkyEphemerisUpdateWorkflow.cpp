@@ -40,24 +40,22 @@ using skygate::ui::internal::SkyEphemerisUpdateOperation;
     return text;
 }
 
-[[nodiscard]] QString joinedDiagnostics(const std::vector<QString>& diagnostics, const QString& fallback)
+[[nodiscard]] QString diagnosticText(const QString& diagnostic)
 {
-    QStringList parts;
-    for (const QString& diagnostic : diagnostics) {
-        const QString trimmed = diagnostic.trimmed();
-        if (!trimmed.isEmpty()) {
-            parts.append(trimmed);
-        }
-    }
-
-    return parts.isEmpty() ? fallback : parts.join(QStringLiteral("; "));
+    return diagnostic;
 }
 
-[[nodiscard]] QString joinedDiagnostics(const std::vector<std::string>& diagnostics, const QString& fallback)
+[[nodiscard]] QString diagnosticText(const std::string& diagnostic)
+{
+    return QString::fromStdString(diagnostic);
+}
+
+template <typename Diagnostics>
+[[nodiscard]] QString joinedDiagnostics(const Diagnostics& diagnostics, const QString& fallback)
 {
     QStringList parts;
-    for (const std::string& diagnostic : diagnostics) {
-        const QString trimmed = QString::fromStdString(diagnostic).trimmed();
+    for (const auto& diagnostic : diagnostics) {
+        const QString trimmed = diagnosticText(diagnostic).trimmed();
         if (!trimmed.isEmpty()) {
             parts.append(trimmed);
         }

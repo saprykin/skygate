@@ -2,30 +2,22 @@
 #include "SkyEphemerisDataProfileIds.hpp"
 
 namespace skygate::ui::internal {
-namespace {
-
-QString trimmed(const QString& value)
-{
-    return value.trimmed();
-}
-
-}  // namespace
 
 SkyEphemerisDataCacheSnapshot
 SkyEphemerisDataCacheSnapshotPolicy::normalizedSnapshot(SkyEphemerisDataCacheSnapshot snapshot)
 {
-    snapshot.installedKernelAssetId = trimmed(snapshot.installedKernelAssetId);
+    snapshot.installedKernelAssetId = snapshot.installedKernelAssetId.trimmed();
     snapshot.installedKernelProfileId = SkyEphemerisDataProfileIds::canonical(snapshot.installedKernelProfileId);
-    snapshot.installedKernelPath = trimmed(snapshot.installedKernelPath);
-    snapshot.installedKernelVersion = trimmed(snapshot.installedKernelVersion);
-    snapshot.installedEarthOrientationPath = trimmed(snapshot.installedEarthOrientationPath);
-    snapshot.installedEarthOrientationVersion = trimmed(snapshot.installedEarthOrientationVersion);
-    snapshot.installedLeapSecondTablePath = trimmed(snapshot.installedLeapSecondTablePath);
-    snapshot.installedLeapSecondTableVersion = trimmed(snapshot.installedLeapSecondTableVersion);
-    snapshot.installedDeltaTDataPath = trimmed(snapshot.installedDeltaTDataPath);
-    snapshot.installedDeltaTDataVersion = trimmed(snapshot.installedDeltaTDataVersion);
-    snapshot.dataRevisionToken = trimmed(snapshot.dataRevisionToken);
-    snapshot.lastUpdateResult = trimmed(snapshot.lastUpdateResult);
+    snapshot.installedKernelPath = snapshot.installedKernelPath.trimmed();
+    snapshot.installedKernelVersion = snapshot.installedKernelVersion.trimmed();
+    snapshot.installedEarthOrientationPath = snapshot.installedEarthOrientationPath.trimmed();
+    snapshot.installedEarthOrientationVersion = snapshot.installedEarthOrientationVersion.trimmed();
+    snapshot.installedLeapSecondTablePath = snapshot.installedLeapSecondTablePath.trimmed();
+    snapshot.installedLeapSecondTableVersion = snapshot.installedLeapSecondTableVersion.trimmed();
+    snapshot.installedDeltaTDataPath = snapshot.installedDeltaTDataPath.trimmed();
+    snapshot.installedDeltaTDataVersion = snapshot.installedDeltaTDataVersion.trimmed();
+    snapshot.dataRevisionToken = snapshot.dataRevisionToken.trimmed();
+    snapshot.lastUpdateResult = snapshot.lastUpdateResult.trimmed();
     if (snapshot.dataRevisionToken.isEmpty()) {
         snapshot.dataRevisionToken = SkyEphemerisDataCacheSnapshot{}.dataRevisionToken;
     }

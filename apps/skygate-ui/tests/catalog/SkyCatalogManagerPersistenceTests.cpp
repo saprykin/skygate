@@ -39,7 +39,6 @@ void compareConfiguredSourceFields(
     QCOMPARE(actual.descriptorId, expected.descriptorId);
     QCOMPARE(actual.title, expected.title);
     QCOMPARE(actual.version, expected.version);
-    QCOMPARE(actual.url, expected.url);
     QCOMPARE(actual.urls, expected.urls);
     QCOMPARE(actual.relatedDatasetUrls, expected.relatedDatasetUrls);
     QCOMPARE(actual.archiveSelector, expected.archiveSelector);
