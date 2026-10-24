@@ -83,9 +83,9 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
             .invalidErrorCode = CatalogLoadResult::ErrorCode::InvalidHygCsv,
             .rowCountLimitFloor = kHygRowCountLimitFloor,
             .minExpectedBytesPerDataRow = kHygMinExpectedBytesPerDataRow,
-            .emptyInputDetail = "HYG CSV payload is empty.",
-            .missingColumnsDetail = "HYG CSV payload is missing one of the required columns: ra, dec, mag.",
-            .rowLimitDetail = "HYG CSV payload exceeds the supported row limit.",
+            .emptyInputDetail = schema->emptyInputDetail(),
+            .missingColumnsDetail = schema->missingRequiredColumnsDetail(),
+            .rowLimitDetail = schema->rowLimitDetail(),
         },
         DelimitedCatalogParserOptions{
             .zeroResultCode = CatalogLoadResult::ErrorCode::InvalidHygCsv,

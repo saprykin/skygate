@@ -17,10 +17,6 @@ public:
     };
 
     [[nodiscard]] ParseResult parse(std::string_view payload) const;
-
-    // True when the payload's first non-whitespace byte starts a JSON object or
-    // array. A whitespace-only payload does not look like JSON.
-    [[nodiscard]] static bool looksLikeJsonPayload(std::string_view payload) noexcept;
 };
 
 }  // namespace skygate::ephemeris

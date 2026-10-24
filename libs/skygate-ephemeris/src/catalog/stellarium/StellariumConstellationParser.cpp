@@ -9,8 +9,11 @@
 #include <QJsonParseError>
 
 namespace skygate::ephemeris {
+namespace {
 
-bool StellariumConstellationParser::looksLikeJsonPayload(const std::string_view payload) noexcept
+// True when the payload's first non-whitespace byte starts a JSON object or
+// array. A whitespace-only payload does not look like JSON.
+[[nodiscard]] bool looksLikeJsonPayload(const std::string_view payload) noexcept
 {
     for (const char byte : payload) {
         if (byte == ' ' || byte == '\t' || byte == '\n' || byte == '\r') {
@@ -21,6 +24,8 @@ bool StellariumConstellationParser::looksLikeJsonPayload(const std::string_view 
 
     return false;
 }
+
+}  // namespace
 
 StellariumConstellationParser::ParseResult StellariumConstellationParser::parse(const std::string_view payload) const
 {

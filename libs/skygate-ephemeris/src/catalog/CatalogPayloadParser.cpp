@@ -1,5 +1,6 @@
 #include "CatalogPayloadParser.hpp"
 #include "CatalogLoader.hpp"
+#include "catalog/CatalogParsingLogging.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
 #include "catalog/io/CatalogContainerSignature.hpp"
 #include "catalog/io/CatalogPayloadFormatDetector.hpp"
@@ -16,8 +17,6 @@
 
 namespace skygate::ephemeris {
 namespace {
-
-Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
 CatalogLoadResult logSuccessfulParse(CatalogLoadResult result)
 {

@@ -7,9 +7,11 @@
 #include <QString>
 #include <QStringList>
 
+#include <array>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace skygate::ephemeris {
 namespace {
@@ -135,26 +137,36 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
 )
 {
     OpenNgcObjectMapping mapping;
-    if (!messier.isEmpty()) {
-        appendAlias(mapping.aliases, designationAliasText(CatalogIdentifier::kMessierNamespace, messier));
+
+    // The cross-reference columns in catalog precedence order: a Messier number
+    // names the object before its NGC number, and the NGC number before an IC
+    // number. The first filled column is the object's primary designation.
+    const std::array<std::pair<std::string_view, QString>, 3> designationColumns{{
+        {CatalogIdentifier::kMessierNamespace, messier},
+        {CatalogIdentifier::kNgcNamespace, ngc},
+        {CatalogIdentifier::kIcNamespace, ic},
+    }};
+
+    std::string_view primaryNamespace;
+    QString primaryValue;
+    QString primaryAlias;
+    for (const auto& [namespaceName, value] : designationColumns) {
+        if (value.isEmpty()) {
+            continue;
+        }
+
+        const QString aliasText = designationAliasText(namespaceName, value);
+        appendAlias(mapping.aliases, aliasText);
         mapping.externalIdentifiers.push_back(
-            CatalogIdentifier::make(
-                CatalogIdentifier::kMessierNamespace, CatalogParsingUtilities::toUtf8String(messier)
-            )
+            CatalogIdentifier::make(namespaceName, CatalogParsingUtilities::toUtf8String(value))
         );
+        if (primaryValue.isEmpty()) {
+            primaryNamespace = namespaceName;
+            primaryValue = value;
+            primaryAlias = aliasText;
+        }
     }
-    if (!ngc.isEmpty()) {
-        appendAlias(mapping.aliases, designationAliasText(CatalogIdentifier::kNgcNamespace, ngc));
-        mapping.externalIdentifiers.push_back(
-            CatalogIdentifier::make(CatalogIdentifier::kNgcNamespace, CatalogParsingUtilities::toUtf8String(ngc))
-        );
-    }
-    if (!ic.isEmpty()) {
-        appendAlias(mapping.aliases, designationAliasText(CatalogIdentifier::kIcNamespace, ic));
-        mapping.externalIdentifiers.push_back(
-            CatalogIdentifier::make(CatalogIdentifier::kIcNamespace, CatalogParsingUtilities::toUtf8String(ic))
-        );
-    }
+
     // The primary Name column is itself a designation column: a recognized
     // NGC/IC name is authoritative even when the optional cross-reference
     // columns are absent.
@@ -166,18 +178,13 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
     appendDelimitedAliases(mapping.aliases, identifiers);
     appendDelimitedAliases(mapping.aliases, commonNames);
 
-    const QString displayName =
-        !messier.isEmpty()
-            ? QString("M%1").arg(messier)
-            : (!ngc.isEmpty() ? QString("NGC %1").arg(ngc)
-                              : (!ic.isEmpty() ? QString("IC %1").arg(ic) : normalizedCatalogAlias(name)));
-    const QString id =
-        !messier.isEmpty()
-            ? objectIdFromAlias(designationAliasText(CatalogIdentifier::kMessierNamespace, messier))
-            : (!ngc.isEmpty()
-                   ? objectIdFromAlias(designationAliasText(CatalogIdentifier::kNgcNamespace, ngc))
-                   : (!ic.isEmpty() ? objectIdFromAlias(designationAliasText(CatalogIdentifier::kIcNamespace, ic))
-                                    : objectIdFromAlias(name)));
+    // Messier objects read as "M31"; the other designations keep the spaced
+    // catalog spelling their alias uses.
+    const QString displayName = !primaryValue.isEmpty() ? (primaryNamespace == CatalogIdentifier::kMessierNamespace
+                                                               ? QStringLiteral("M%1").arg(primaryValue)
+                                                               : primaryAlias)
+                                                        : normalizedCatalogAlias(name);
+    const QString id = objectIdFromAlias(primaryValue.isEmpty() ? name : primaryAlias);
 
     mapping.id = CatalogParsingUtilities::toUtf8String(id);
     mapping.displayName = CatalogParsingUtilities::toUtf8String(displayName);

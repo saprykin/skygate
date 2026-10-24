@@ -43,10 +43,9 @@ OpenNgcCatalogParser::parse(const std::string_view data, const CatalogParseProgr
             .invalidErrorCode = CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv,
             .rowCountLimitFloor = kOpenNgcRowCountLimitFloor,
             .minExpectedBytesPerDataRow = kOpenNgcMinExpectedBytesPerDataRow,
-            .emptyInputDetail = "OpenNGC CSV payload is empty.",
-            .missingColumnsDetail = "OpenNGC CSV payload is missing one of the required columns: "
-                                    "Name, Type, RA, Dec.",
-            .rowLimitDetail = "OpenNGC CSV payload exceeds the supported row limit.",
+            .emptyInputDetail = schema->emptyInputDetail(),
+            .missingColumnsDetail = schema->missingRequiredColumnsDetail(),
+            .rowLimitDetail = schema->rowLimitDetail(),
         },
         DelimitedCatalogParserOptions{
             .zeroResultCode = CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv,

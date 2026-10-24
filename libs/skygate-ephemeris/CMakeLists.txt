@@ -195,6 +195,7 @@ add_library(skygate-ephemeris STATIC
     ${SKYGATE_EPHEMERIS_REFERENCE_SOURCES}
     ${SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES}
     src/catalog/CatalogCompositionLogging.hpp
+    src/catalog/CatalogParsingLogging.hpp
     src/catalog/CatalogCompositionPolicy.hpp
     src/catalog/CatalogCompositionPolicyRules.hpp
     src/catalog/CatalogCompositionSourceEntry.hpp
@@ -368,6 +369,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogIdentityIndex.cpp
     src/catalog/CatalogComposer.cpp
     src/catalog/CatalogCompositionLogging.cpp
+    src/catalog/CatalogParsingLogging.cpp
     src/catalog/CatalogCompositionPolicyRules.cpp
     src/catalog/CatalogCompositionResult.cpp
     src/catalog/CatalogCompositionMerger.cpp

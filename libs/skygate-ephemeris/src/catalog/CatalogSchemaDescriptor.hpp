@@ -6,6 +6,7 @@
 #include <QChar>
 #include <QString>
 
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <string>
@@ -25,6 +26,32 @@ struct CatalogSchemaDescriptor final {
     QChar delimiter = ',';
     std::vector<QString> requiredColumns;
     CatalogParserFactory createParser;
+
+    // Reader diagnostics of a delimited schema. Each names the schema by its
+    // diagnostic name and, for a missing column, lists the required columns of
+    // this descriptor, so the messages and the header probe cannot describe
+    // different column sets.
+    [[nodiscard]] std::string emptyInputDetail() const
+    {
+        return diagnosticName + " payload is empty.";
+    }
+
+    [[nodiscard]] std::string missingRequiredColumnsDetail() const
+    {
+        std::string detail = diagnosticName + " payload is missing one of the required columns: ";
+        for (std::size_t index = 0; index < requiredColumns.size(); ++index) {
+            if (index > 0U) {
+                detail += ", ";
+            }
+            detail += requiredColumns[index].toStdString();
+        }
+        return detail + ".";
+    }
+
+    [[nodiscard]] std::string rowLimitDetail() const
+    {
+        return diagnosticName + " payload exceeds the supported row limit.";
+    }
 };
 
 }  // namespace skygate::ephemeris

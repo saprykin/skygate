@@ -1,5 +1,6 @@
 #include "DelimitedCatalogParser.hpp"
 #include "DelimitedCatalogReader.hpp"
+#include "catalog/CatalogParsingLogging.hpp"
 
 #include <QLoggingCategory>
 #include <QString>
@@ -9,8 +10,6 @@
 
 namespace skygate::ephemeris {
 namespace {
-
-Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
 struct InvalidRowCategory {
     std::string_view logLabel;

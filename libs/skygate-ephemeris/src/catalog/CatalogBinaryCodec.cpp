@@ -31,6 +31,14 @@ constexpr std::uint32_t kBinaryCatalogMagic = 0x53474243U;  // "SGBC"
 constexpr std::uint64_t kMaxBodyCount = 5'000'000ULL;
 constexpr std::uint64_t kMaxOrderEntryCount = 10'000'000ULL;
 
+// Reads an element count and rejects a value above `limit`, so a corrupt
+// payload cannot reserve more than the codec is willing to hold.
+[[nodiscard]] bool readCount(QDataStream& stream, std::uint64_t& count, const std::uint64_t limit)
+{
+    stream >> count;
+    return stream.status() == QDataStream::Ok && count <= limit;
+}
+
 void writeString(QDataStream& stream, const std::string& value)
 {
     stream << QString::fromStdString(value);
@@ -47,15 +55,48 @@ void writeString(QDataStream& stream, const std::string& value)
     return true;
 }
 
-void writeOptionalDouble(QDataStream& stream, const std::optional<double>& value)
+void writeStringList(QDataStream& stream, const std::vector<std::string>& values)
 {
-    stream << value.has_value();
-    if (value.has_value()) {
-        stream << *value;
+    stream << static_cast<std::uint64_t>(values.size());
+    for (const std::string& value : values) {
+        writeString(stream, value);
     }
 }
 
-[[nodiscard]] bool readOptionalDouble(QDataStream& stream, std::optional<double>& value)
+// Reads a length-prefixed string list. `rejectEmpty` marks a field whose empty
+// entries carry no meaning, so a payload holding one is rejected outright.
+[[nodiscard]] bool readStringList(QDataStream& stream, std::vector<std::string>& values, const bool rejectEmpty)
+{
+    values.clear();
+    std::uint64_t count = 0U;
+    if (!readCount(stream, count, kMaxBodyCount)) {
+        return false;
+    }
+
+    values.reserve(static_cast<std::size_t>(count));
+    for (std::uint64_t index = 0; index < count; ++index) {
+        std::string value;
+        if (!readString(stream, value) || (rejectEmpty && value.empty())) {
+            return false;
+        }
+        values.push_back(std::move(value));
+    }
+    return true;
+}
+
+// A presence flag followed by the value when it is present, which keeps an
+// absent value distinct from a default-constructed one.
+template <typename T, typename Write>
+void writeOptional(QDataStream& stream, const std::optional<T>& value, Write write)
+{
+    stream << value.has_value();
+    if (value.has_value()) {
+        write(*value);
+    }
+}
+
+template <typename T, typename Read>
+[[nodiscard]] bool readOptional(QDataStream& stream, std::optional<T>& value, Read read)
 {
     bool hasValue = false;
     stream >> hasValue;
@@ -66,12 +107,54 @@ void writeOptionalDouble(QDataStream& stream, const std::optional<double>& value
         value = std::nullopt;
         return true;
     }
-    double rawValue = 0.0;
-    stream >> rawValue;
-    if (stream.status() != QDataStream::Ok) {
+
+    T parsed{};
+    if (!read(parsed)) {
         return false;
     }
-    value = rawValue;
+    value = std::move(parsed);
+    return true;
+}
+
+void writeOptionalDouble(QDataStream& stream, const std::optional<double>& value)
+{
+    writeOptional(stream, value, [&stream](const double scalar) { stream << scalar; });
+}
+
+[[nodiscard]] bool readOptionalDouble(QDataStream& stream, std::optional<double>& value)
+{
+    return readOptional(stream, value, [&stream](double& scalar) {
+        stream >> scalar;
+        return stream.status() == QDataStream::Ok;
+    });
+}
+
+void writeIdentifiers(QDataStream& stream, const std::vector<CatalogIdentifier>& identifiers)
+{
+    stream << static_cast<std::uint64_t>(identifiers.size());
+    for (const CatalogIdentifier& identifier : identifiers) {
+        writeString(stream, identifier.namespaceName);
+        writeString(stream, identifier.value);
+    }
+}
+
+[[nodiscard]] bool readIdentifiers(QDataStream& stream, std::vector<CatalogIdentifier>& identifiers)
+{
+    identifiers.clear();
+    std::uint64_t identifierCount = 0U;
+    if (!readCount(stream, identifierCount, kMaxBodyCount)) {
+        return false;
+    }
+
+    identifiers.reserve(static_cast<std::size_t>(identifierCount));
+    for (std::uint64_t index = 0; index < identifierCount; ++index) {
+        CatalogIdentifier identifier;
+        if (!readString(stream, identifier.namespaceName) || !readString(stream, identifier.value)
+            || identifier.namespaceName.empty() || identifier.value.empty()) {
+            return false;
+        }
+        identifiers.push_back(std::move(identifier));
+    }
     return true;
 }
 
@@ -79,19 +162,9 @@ void writeObjectIdentity(QDataStream& stream, const CatalogObjectIdentity& ident
 {
     writeString(stream, identity.sourceRecordId);
     stream << static_cast<std::uint8_t>(identity.idScope);
-    stream << static_cast<std::uint64_t>(identity.externalIdentifiers.size());
-    for (const CatalogIdentifier& identifier : identity.externalIdentifiers) {
-        writeString(stream, identifier.namespaceName);
-        writeString(stream, identifier.value);
-    }
-    stream << static_cast<std::uint64_t>(identity.aliases.size());
-    for (const std::string& alias : identity.aliases) {
-        writeString(stream, alias);
-    }
-    stream << static_cast<std::uint64_t>(identity.retainedCanonicalIds.size());
-    for (const std::string& retainedId : identity.retainedCanonicalIds) {
-        writeString(stream, retainedId);
-    }
+    writeIdentifiers(stream, identity.externalIdentifiers);
+    writeStringList(stream, identity.aliases);
+    writeStringList(stream, identity.retainedCanonicalIds);
 }
 
 [[nodiscard]] bool readObjectIdentity(QDataStream& stream, CatalogObjectIdentity& identity)
@@ -108,54 +181,8 @@ void writeObjectIdentity(QDataStream& stream, const CatalogObjectIdentity& ident
     }
     identity.idScope = static_cast<CatalogObjectIdentity::IdScope>(idScope);
 
-    std::uint64_t identifierCount = 0U;
-    stream >> identifierCount;
-    if (stream.status() != QDataStream::Ok || identifierCount > kMaxBodyCount) {
-        return false;
-    }
-    identity.externalIdentifiers.clear();
-    identity.externalIdentifiers.reserve(static_cast<std::size_t>(identifierCount));
-    for (std::uint64_t index = 0; index < identifierCount; ++index) {
-        CatalogIdentifier identifier;
-        if (!readString(stream, identifier.namespaceName) || !readString(stream, identifier.value)) {
-            return false;
-        }
-        if (identifier.namespaceName.empty() || identifier.value.empty()) {
-            return false;
-        }
-        identity.externalIdentifiers.push_back(std::move(identifier));
-    }
-
-    std::uint64_t aliasCount = 0U;
-    stream >> aliasCount;
-    if (stream.status() != QDataStream::Ok || aliasCount > kMaxBodyCount) {
-        return false;
-    }
-    identity.aliases.clear();
-    identity.aliases.reserve(static_cast<std::size_t>(aliasCount));
-    for (std::uint64_t index = 0; index < aliasCount; ++index) {
-        std::string alias;
-        if (!readString(stream, alias)) {
-            return false;
-        }
-        identity.aliases.push_back(std::move(alias));
-    }
-
-    std::uint64_t retainedCanonicalIdCount = 0U;
-    stream >> retainedCanonicalIdCount;
-    if (stream.status() != QDataStream::Ok || retainedCanonicalIdCount > kMaxBodyCount) {
-        return false;
-    }
-    identity.retainedCanonicalIds.clear();
-    identity.retainedCanonicalIds.reserve(static_cast<std::size_t>(retainedCanonicalIdCount));
-    for (std::uint64_t index = 0; index < retainedCanonicalIdCount; ++index) {
-        std::string retainedId;
-        if (!readString(stream, retainedId) || retainedId.empty()) {
-            return false;
-        }
-        identity.retainedCanonicalIds.push_back(std::move(retainedId));
-    }
-    return true;
+    return readIdentifiers(stream, identity.externalIdentifiers) && readStringList(stream, identity.aliases, false)
+           && readStringList(stream, identity.retainedCanonicalIds, true);
 }
 
 void writeEpoch(QDataStream& stream, const skygate::core::AstronomicalEpoch& epoch)
@@ -213,10 +240,9 @@ void writeStarAstrometry(QDataStream& stream, const CatalogStarAstrometry& astro
     writeOptionalDouble(stream, astrometry.properMotionDeclinationMasPerYear);
     writeOptionalDouble(stream, astrometry.stellarParallaxMas);
     writeOptionalDouble(stream, astrometry.radialVelocityKmPerSecond);
-    stream << astrometry.validityRange.has_value();
-    if (astrometry.validityRange.has_value()) {
-        writeDateRange(stream, *astrometry.validityRange);
-    }
+    writeOptional(stream, astrometry.validityRange, [&stream](const EphemerisDateRange& range) {
+        writeDateRange(stream, range);
+    });
 }
 
 [[nodiscard]] bool readStarAstrometry(QDataStream& stream, CatalogStarAstrometry& astrometry)
@@ -230,30 +256,15 @@ void writeStarAstrometry(QDataStream& stream, const CatalogStarAstrometry& astro
         || !readOptionalDouble(stream, astrometry.radialVelocityKmPerSecond)) {
         return false;
     }
-    bool hasValidityRange = false;
-    stream >> hasValidityRange;
-    if (stream.status() != QDataStream::Ok) {
-        return false;
-    }
-    if (!hasValidityRange) {
-        astrometry.validityRange = std::nullopt;
-        return true;
-    }
-    EphemerisDateRange range;
-    if (!readDateRange(stream, range)) {
-        return false;
-    }
-    astrometry.validityRange = std::move(range);
-    return true;
+    return readOptional(stream, astrometry.validityRange, [&stream](EphemerisDateRange& range) {
+        return readDateRange(stream, range);
+    });
 }
 
 void writeDeepSkyInfo(QDataStream& stream, const DeepSkyObjectInfo& info)
 {
     stream << static_cast<std::uint8_t>(info.kind);
-    stream << static_cast<std::uint64_t>(info.aliases.size());
-    for (const std::string& alias : info.aliases) {
-        writeString(stream, alias);
-    }
+    writeStringList(stream, info.aliases);
     writeOptionalDouble(stream, info.majorAxisArcmin);
     writeOptionalDouble(stream, info.minorAxisArcmin);
     writeOptionalDouble(stream, info.positionAngleDeg);
@@ -262,30 +273,15 @@ void writeDeepSkyInfo(QDataStream& stream, const DeepSkyObjectInfo& info)
 [[nodiscard]] bool readDeepSkyInfo(QDataStream& stream, DeepSkyObjectInfo& info)
 {
     std::uint8_t kind = 0U;
-    std::uint64_t aliasCount = 0U;
-    stream >> kind >> aliasCount;
-    if (stream.status() != QDataStream::Ok || aliasCount > kMaxBodyCount
+    stream >> kind;
+    if (stream.status() != QDataStream::Ok
         || !CatalogSnapshotValidator::isKnownDeepSkyObjectKind(static_cast<DeepSkyObjectInfo::Kind>(kind))) {
         return false;
     }
     info.kind = static_cast<DeepSkyObjectInfo::Kind>(kind);
-    info.aliases.clear();
-    info.aliases.reserve(static_cast<std::size_t>(aliasCount));
-    for (std::uint64_t index = 0; index < aliasCount; ++index) {
-        std::string alias;
-        if (!readString(stream, alias)) {
-            return false;
-        }
-        info.aliases.push_back(std::move(alias));
-    }
-    return readOptionalDouble(stream, info.majorAxisArcmin) && readOptionalDouble(stream, info.minorAxisArcmin)
-           && readOptionalDouble(stream, info.positionAngleDeg);
-}
 
-[[nodiscard]] bool readBodyCount(QDataStream& stream, std::uint64_t& count)
-{
-    stream >> count;
-    return stream.status() == QDataStream::Ok && count <= kMaxBodyCount;
+    return readStringList(stream, info.aliases, false) && readOptionalDouble(stream, info.majorAxisArcmin)
+           && readOptionalDouble(stream, info.minorAxisArcmin) && readOptionalDouble(stream, info.positionAngleDeg);
 }
 
 }  // namespace
@@ -300,10 +296,9 @@ void CatalogBinaryCodec::writeBodyHeader(
     writeString(stream, body.displayName);
     stream << static_cast<std::uint8_t>(body.kind) << body.visualMagnitude;
     writeObjectIdentity(stream, body.identity);
-    stream << fixedEquatorial.has_value();
-    if (fixedEquatorial.has_value()) {
-        writeEquatorial(stream, *fixedEquatorial);
-    }
+    writeOptional(stream, fixedEquatorial, [&stream](const skygate::core::EquatorialCoordinate& coordinate) {
+        writeEquatorial(stream, coordinate);
+    });
 }
 
 bool CatalogBinaryCodec::readBodyHeader(
@@ -322,26 +317,10 @@ bool CatalogBinaryCodec::readBodyHeader(
     }
     body.kind = static_cast<BaseCelestialBody::Kind>(kind);
 
-    if (!readObjectIdentity(stream, body.identity)) {
-        return false;
-    }
-
-    bool hasFixedEquatorial = false;
-    stream >> hasFixedEquatorial;
-    if (stream.status() != QDataStream::Ok) {
-        return false;
-    }
-    if (!hasFixedEquatorial) {
-        fixedEquatorial = std::nullopt;
-        return true;
-    }
-
-    skygate::core::EquatorialCoordinate coordinate;
-    if (!readEquatorial(stream, coordinate)) {
-        return false;
-    }
-    fixedEquatorial = coordinate;
-    return true;
+    return readObjectIdentity(stream, body.identity)
+           && readOptional(stream, fixedEquatorial, [&stream](skygate::core::EquatorialCoordinate& coordinate) {
+                  return readEquatorial(stream, coordinate);
+              });
 }
 
 QByteArray CatalogBinaryCodec::serialize(const CelestialBodyCatalog& catalog)
@@ -357,20 +336,18 @@ QByteArray CatalogBinaryCodec::serialize(const CelestialBodyCatalog& catalog)
     stream << static_cast<std::uint64_t>(ownGalaxyBodies.size());
     for (const OwnGalaxyCelestialBody& body : ownGalaxyBodies) {
         writeBodyHeader(stream, body, body.fixedEquatorial);
-        stream << body.starAstrometry.has_value();
-        if (body.starAstrometry.has_value()) {
-            writeStarAstrometry(stream, *body.starAstrometry);
-        }
+        writeOptional(stream, body.starAstrometry, [&stream](const CatalogStarAstrometry& astrometry) {
+            writeStarAstrometry(stream, astrometry);
+        });
     }
 
     const auto distantBodies = catalog.distantBodies();
     stream << static_cast<std::uint64_t>(distantBodies.size());
     for (const DistantCelestialBody& body : distantBodies) {
         writeBodyHeader(stream, body, body.fixedEquatorial);
-        stream << body.deepSkyObject.has_value();
-        if (body.deepSkyObject.has_value()) {
-            writeDeepSkyInfo(stream, *body.deepSkyObject);
-        }
+        writeOptional(stream, body.deepSkyObject, [&stream](const DeepSkyObjectInfo& info) {
+            writeDeepSkyInfo(stream, info);
+        });
     }
 
     const auto orderedIndexes = catalog.orderedBodyIndexes();
@@ -396,60 +373,41 @@ std::unique_ptr<IStarCatalog> CatalogBinaryCodec::deserialize(const QByteArray& 
     }
 
     std::uint64_t ownGalaxyCount = 0U;
-    if (!readBodyCount(stream, ownGalaxyCount)) {
+    if (!readCount(stream, ownGalaxyCount, kMaxBodyCount)) {
         return nullptr;
     }
     std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies;
     ownGalaxyBodies.reserve(static_cast<std::size_t>(ownGalaxyCount));
     for (std::uint64_t index = 0; index < ownGalaxyCount; ++index) {
         OwnGalaxyCelestialBody body;
-        if (!readBodyHeader(stream, body, body.fixedEquatorial)) {
+        if (!readBodyHeader(stream, body, body.fixedEquatorial)
+            || !readOptional(stream, body.starAstrometry, [&stream](CatalogStarAstrometry& astrometry) {
+                   return readStarAstrometry(stream, astrometry);
+               })) {
             return nullptr;
-        }
-        bool hasStarAstrometry = false;
-        stream >> hasStarAstrometry;
-        if (stream.status() != QDataStream::Ok) {
-            return nullptr;
-        }
-        if (hasStarAstrometry) {
-            CatalogStarAstrometry astrometry;
-            if (!readStarAstrometry(stream, astrometry)) {
-                return nullptr;
-            }
-            body.starAstrometry = std::move(astrometry);
         }
         ownGalaxyBodies.push_back(std::move(body));
     }
 
     std::uint64_t distantCount = 0U;
-    if (!readBodyCount(stream, distantCount)) {
+    if (!readCount(stream, distantCount, kMaxBodyCount)) {
         return nullptr;
     }
     std::vector<DistantCelestialBody> distantBodies;
     distantBodies.reserve(static_cast<std::size_t>(distantCount));
     for (std::uint64_t index = 0; index < distantCount; ++index) {
         DistantCelestialBody body;
-        if (!readBodyHeader(stream, body, body.fixedEquatorial)) {
+        if (!readBodyHeader(stream, body, body.fixedEquatorial)
+            || !readOptional(stream, body.deepSkyObject, [&stream](DeepSkyObjectInfo& info) {
+                   return readDeepSkyInfo(stream, info);
+               })) {
             return nullptr;
-        }
-        bool hasDeepSkyInfo = false;
-        stream >> hasDeepSkyInfo;
-        if (stream.status() != QDataStream::Ok) {
-            return nullptr;
-        }
-        if (hasDeepSkyInfo) {
-            DeepSkyObjectInfo info;
-            if (!readDeepSkyInfo(stream, info)) {
-                return nullptr;
-            }
-            body.deepSkyObject = std::move(info);
         }
         distantBodies.push_back(std::move(body));
     }
 
     std::uint64_t orderEntryCount = 0U;
-    stream >> orderEntryCount;
-    if (stream.status() != QDataStream::Ok || orderEntryCount > kMaxOrderEntryCount) {
+    if (!readCount(stream, orderEntryCount, kMaxOrderEntryCount)) {
         return nullptr;
     }
     std::vector<CelestialBodyCatalog::OrderEntry> orderedIndexes;
