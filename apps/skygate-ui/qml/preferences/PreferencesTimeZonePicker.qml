@@ -8,12 +8,6 @@ Item {
     property string placeholderText: "Choose a timezone"
     property string selectedTimeZoneId: ""
     property string selectedText: ""
-    readonly property alias hostWindow: pickerShell.hostWindow
-    readonly property alias popupSpacing: pickerShell.popupSpacing
-    readonly property alias popupMargin: pickerShell.popupMargin
-    readonly property alias popupOriginInWindow: pickerShell.popupOriginInWindow
-    readonly property alias availableSpaceAbove: pickerShell.availableSpaceAbove
-    readonly property alias availableSpaceBelow: pickerShell.availableSpaceBelow
 
     signal timeZoneChosen(string timeZoneId, string displayText)
 

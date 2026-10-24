@@ -15,7 +15,6 @@ Rectangle {
         && sceneModel.ephemerisDegradationReasons !== null
         && sceneModel.ephemerisDegradationReasons.length > 0
     readonly property int statusButtonSpacing: 1
-    property alias nightConditionsToggleItem: nightConditionsButton
     signal dateTimeClicked()
     signal nightConditionsClicked()
     signal degradationClicked()

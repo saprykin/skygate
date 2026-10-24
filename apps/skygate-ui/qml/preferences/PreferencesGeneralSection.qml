@@ -43,12 +43,10 @@ Item {
                 text: "Logging"
             }
 
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Output"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 10
-                Layout.alignment: Qt.AlignVCenter
+                textPixelSize: 10
             }
 
             RowLayout {
@@ -66,12 +64,9 @@ Item {
                         onToggled: root.preferencesDraft.logToTerminal = checked
                     }
 
-                    Label {
+                    PreferencesFieldLabel {
+                        theme: root.theme
                         text: "Terminal"
-                        color: theme.formLabelText
-                        font.family: "Avenir Next"
-                        font.pixelSize: 11
-                        Layout.alignment: Qt.AlignVCenter
                     }
                 }
 
@@ -85,12 +80,9 @@ Item {
                         onToggled: root.preferencesDraft.logToFile = checked
                     }
 
-                    Label {
+                    PreferencesFieldLabel {
+                        theme: root.theme
                         text: "File"
-                        color: theme.formLabelText
-                        font.family: "Avenir Next"
-                        font.pixelSize: 11
-                        Layout.alignment: Qt.AlignVCenter
                     }
                 }
 
@@ -99,12 +91,10 @@ Item {
                 }
             }
 
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Log file"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 10
-                Layout.alignment: Qt.AlignVCenter
+                textPixelSize: 10
             }
 
             RowLayout {

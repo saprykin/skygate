@@ -44,12 +44,10 @@ Item {
                 text: "Appearance"
             }
 
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Theme"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 10
-                Layout.alignment: Qt.AlignVCenter
+                textPixelSize: 10
             }
 
             PreferencesComboBox {
@@ -90,12 +88,9 @@ Item {
                 checked: root.preferencesDraft.overlayHorizon
                 onToggled: root.preferencesDraft.overlayHorizon = checked
             }
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Horizon"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
-                Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
                 theme: root.theme
@@ -103,12 +98,9 @@ Item {
                 checked: root.preferencesDraft.overlayAltAzGrid
                 onToggled: root.preferencesDraft.overlayAltAzGrid = checked
             }
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Alt/Az grid"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
-                Layout.alignment: Qt.AlignVCenter
             }
 
             PreferencesCheckBox {
@@ -117,12 +109,9 @@ Item {
                 checked: root.preferencesDraft.overlayConstellationLines
                 onToggled: root.preferencesDraft.overlayConstellationLines = checked
             }
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Constellation lines"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
-                Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
                 theme: root.theme
@@ -130,12 +119,9 @@ Item {
                 checked: root.preferencesDraft.overlayConstellationLabels
                 onToggled: root.preferencesDraft.overlayConstellationLabels = checked
             }
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Constellation labels"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
-                Layout.alignment: Qt.AlignVCenter
             }
 
             PreferencesCheckBox {
@@ -144,12 +130,9 @@ Item {
                 checked: root.preferencesDraft.overlaySolarSystemLabels
                 onToggled: root.preferencesDraft.overlaySolarSystemLabels = checked
             }
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Solar system labels"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
-                Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
                 theme: root.theme
@@ -157,12 +140,9 @@ Item {
                 checked: root.preferencesDraft.overlayDeepSkyObjects
                 onToggled: root.preferencesDraft.overlayDeepSkyObjects = checked
             }
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Deep sky objects"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
-                Layout.alignment: Qt.AlignVCenter
             }
 
             PreferencesCheckBox {
@@ -171,12 +151,9 @@ Item {
                 checked: root.preferencesDraft.overlayDeepSkyLabels
                 onToggled: root.preferencesDraft.overlayDeepSkyLabels = checked
             }
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Deep sky labels"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
-                Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
                 theme: root.theme
@@ -184,12 +161,9 @@ Item {
                 checked: root.preferencesDraft.overlayEcliptic
                 onToggled: root.preferencesDraft.overlayEcliptic = checked
             }
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Ecliptic"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
-                Layout.alignment: Qt.AlignVCenter
             }
 
             PreferencesCheckBox {
@@ -198,12 +172,9 @@ Item {
                 checked: root.preferencesDraft.overlayCelestialEquator
                 onToggled: root.preferencesDraft.overlayCelestialEquator = checked
             }
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Celestial equator"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
-                Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
                 theme: root.theme
@@ -211,12 +182,9 @@ Item {
                 checked: root.preferencesDraft.overlayCircumpolarBoundary
                 onToggled: root.preferencesDraft.overlayCircumpolarBoundary = checked
             }
-            Label {
+            PreferencesFieldLabel {
+                theme: root.theme
                 text: "Circumpolar boundary"
-                color: theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
-                Layout.alignment: Qt.AlignVCenter
             }
         }
     }

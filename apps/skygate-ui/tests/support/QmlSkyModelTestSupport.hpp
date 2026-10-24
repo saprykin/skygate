@@ -80,19 +80,4 @@ inline bool catalogContainsDisplayName(
     });
 }
 
-inline bool
-catalogContainsAlias(const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies, const QString& alias)
-{
-    return std::any_of(bodies.begin(), bodies.end(), [&alias](const skygate::ephemeris::BaseCelestialBody* body) {
-        if (body == nullptr || !body->deepSkyObjectValue().has_value()) {
-            return false;
-        }
-        return std::any_of(
-            body->deepSkyObjectValue()->aliases.begin(),
-            body->deepSkyObjectValue()->aliases.end(),
-            [&alias](const std::string& bodyAlias) { return QString::fromStdString(bodyAlias) == alias; }
-        );
-    });
-}
-
 }  // namespace skygate::ui::tests

@@ -49,12 +49,10 @@ Item {
                     text: "Ephemeris Engine"
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     text: "Engine"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
                 }
 
                 PreferencesComboBox {
@@ -77,37 +75,28 @@ Item {
                     }
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     visible: engineSection.controllerText("ephemerisEngineStatusText", "") !== ""
-                    Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Status"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
+                    Layout.preferredHeight: visible ? implicitHeight : 0
                 }
 
-                Label {
+                PreferencesValueLabel {
+                    theme: engineSection.theme
                     objectName: "ephemerisEngineStatusLabel"
                     visible: engineSection.controllerText("ephemerisEngineStatusText", "") !== ""
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: visible ? implicitHeight : 0
                     text: engineSection.controllerText("ephemerisEngineStatusText", "")
-                    color: theme.listItemPrimaryText
-                    font.pixelSize: 11
-                    font.family: "Avenir Next"
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
+                    Layout.preferredHeight: visible ? implicitHeight : 0
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     visible: engineSection.supportsCorrections()
-                    Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Corrections"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
+                    Layout.preferredHeight: visible ? implicitHeight : 0
                 }
 
                 PreferencesComboBox {
@@ -126,14 +115,12 @@ Item {
                     onActivated: preferencesDraft.ephemerisCorrectionPresetIndex = currentIndex
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     visible: engineSection.supportsAtmosphereSettings()
-                    Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Refraction"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
+                    Layout.preferredHeight: visible ? implicitHeight : 0
                 }
 
                 RowLayout {
@@ -151,23 +138,18 @@ Item {
                         onToggled: preferencesDraft.ephemerisRefractionEnabled = checked
                     }
 
-                    Label {
+                    PreferencesFieldLabel {
+                        theme: engineSection.theme
                         text: "Apply atmospheric refraction"
-                        color: theme.formLabelText
-                        font.family: "Avenir Next"
-                        font.pixelSize: 11
-                        Layout.alignment: Qt.AlignVCenter
                     }
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
-                    Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Pressure"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
+                    Layout.preferredHeight: visible ? implicitHeight : 0
                 }
 
                 PreferencesTextField {
@@ -182,14 +164,12 @@ Item {
                     onEditingFinished: preferencesDraft.ephemerisAtmosphericPressureText = text
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
-                    Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Temperature"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
+                    Layout.preferredHeight: visible ? implicitHeight : 0
                 }
 
                 PreferencesTextField {
@@ -204,14 +184,12 @@ Item {
                     onEditingFinished: preferencesDraft.ephemerisAtmosphericTemperatureText = text
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
-                    Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Humidity"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
+                    Layout.preferredHeight: visible ? implicitHeight : 0
                 }
 
                 PreferencesTextField {
@@ -226,14 +204,12 @@ Item {
                     onEditingFinished: preferencesDraft.ephemerisRelativeHumidityText = text
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
-                    Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Wavelength"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
+                    Layout.preferredHeight: visible ? implicitHeight : 0
                 }
 
                 PreferencesTextField {
@@ -255,31 +231,22 @@ Item {
                     text: "Planetary Kernels"
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     text: "Installed"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
                 }
 
-                Label {
+                PreferencesValueLabel {
+                    theme: engineSection.theme
                     objectName: "ephemerisShortRangeKernelStatusLabel"
-                    Layout.fillWidth: true
                     text: engineSection.controllerText("ephemerisKernelDisplayText", "Bundled")
-                    color: theme.listItemPrimaryText
-                    font.pixelSize: 11
-                    font.family: "Avenir Next"
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     text: "Download"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
                 }
 
                 PreferencesComboBox {
@@ -304,27 +271,20 @@ Item {
                     }
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     text: "Cache"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 7
 
-                    Label {
+                    PreferencesValueLabel {
+                        theme: engineSection.theme
                         objectName: "ephemerisPlanetaryKernelCacheSizeLabel"
-                        Layout.fillWidth: true
                         text: engineSection.controllerText("ephemerisPlanetaryKernelCacheSizeText", "0 B")
-                        color: theme.listItemPrimaryText
-                        font.pixelSize: 11
-                        font.family: "Avenir Next"
-                        elide: Text.ElideRight
-                        verticalAlignment: Text.AlignVCenter
                     }
 
                     PreferencesActionButton {
@@ -343,69 +303,46 @@ Item {
                     text: "Time and Earth Data"
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     text: "Earth orientation"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
                 }
 
-                Label {
+                PreferencesValueLabel {
+                    theme: engineSection.theme
                     objectName: "ephemerisEarthOrientationStatusLabel"
-                    Layout.fillWidth: true
                     text: engineSection.controllerText("ephemerisEarthOrientationStatusText", "Not installed")
-                    color: theme.listItemPrimaryText
-                    font.pixelSize: 11
-                    font.family: "Avenir Next"
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     text: "Leap seconds"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
                 }
 
-                Label {
+                PreferencesValueLabel {
+                    theme: engineSection.theme
                     objectName: "ephemerisLeapSecondStatusLabel"
-                    Layout.fillWidth: true
                     text: engineSection.controllerText("ephemerisLeapSecondStatusText", "Not installed")
-                    color: theme.listItemPrimaryText
-                    font.pixelSize: 11
-                    font.family: "Avenir Next"
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     text: "Delta T"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
                 }
 
-                Label {
+                PreferencesValueLabel {
+                    theme: engineSection.theme
                     objectName: "ephemerisDeltaTStatusLabel"
-                    Layout.fillWidth: true
                     text: engineSection.controllerText("ephemerisDeltaTStatusText", "Not installed")
-                    color: theme.listItemPrimaryText
-                    font.pixelSize: 11
-                    font.family: "Avenir Next"
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     text: "Download"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
                 }
 
                 PreferencesComboBox {
@@ -430,27 +367,20 @@ Item {
                     }
                 }
 
-                Label {
+                PreferencesFieldLabel {
+                    theme: engineSection.theme
                     text: "Cache"
-                    color: theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    Layout.alignment: Qt.AlignVCenter
+                    textPixelSize: 10
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 7
 
-                    Label {
+                    PreferencesValueLabel {
+                        theme: engineSection.theme
                         objectName: "ephemerisSupportDataCacheSizeLabel"
-                        Layout.fillWidth: true
                         text: engineSection.controllerText("ephemerisSupportDataCacheSizeText", "0 B")
-                        color: theme.listItemPrimaryText
-                        font.pixelSize: 11
-                        font.family: "Avenir Next"
-                        elide: Text.ElideRight
-                        verticalAlignment: Text.AlignVCenter
                     }
 
                     PreferencesActionButton {
