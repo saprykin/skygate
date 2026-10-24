@@ -1,4 +1,5 @@
 #include "SkyWindowSizeSettings.hpp"
+#include "SkySettingsKeyBuilder.hpp"
 #include "SkySettingsValueCodecs.hpp"
 #include "diagnostics/SkyLoggingCategories.hpp"
 
@@ -8,11 +9,6 @@
 
 namespace skygate::ui::internal {
 namespace {
-
-QString appSettingsKey(const char* name)
-{
-    return QStringLiteral("app/%1").arg(QString::fromUtf8(name));
-}
 
 QSize normalizedMainWindowSize(const QSize& size) noexcept
 {
@@ -31,8 +27,8 @@ bool SkyWindowSizeSettings::save(const QSize& size)
 {
     QSettings settings;
     const QSize normalizedSize = normalizedMainWindowSize(size);
-    settings.setValue(appSettingsKey("mainWindowWidth"), normalizedSize.width());
-    settings.setValue(appSettingsKey("mainWindowHeight"), normalizedSize.height());
+    settings.setValue(SkySettingsKeyBuilder::appKey("mainWindowWidth"), normalizedSize.width());
+    settings.setValue(SkySettingsKeyBuilder::appKey("mainWindowHeight"), normalizedSize.height());
     settings.sync();
     if (settings.status() != QSettings::NoError) {
         qCWarning(skygateSettingsLog) << "Failed to save SkyGate main window size";
@@ -45,8 +41,12 @@ QSize SkyWindowSizeSettings::load()
 {
     QSettings settings;
     return normalizedMainWindowSize(QSize(
-        SkySettingsValueCodecs::readIntSetting(settings, appSettingsKey("mainWindowWidth"), kDefaultMainWindowWidth),
-        SkySettingsValueCodecs::readIntSetting(settings, appSettingsKey("mainWindowHeight"), kDefaultMainWindowHeight)
+        SkySettingsValueCodecs::readIntSetting(
+            settings, SkySettingsKeyBuilder::appKey("mainWindowWidth"), kDefaultMainWindowWidth
+        ),
+        SkySettingsValueCodecs::readIntSetting(
+            settings, SkySettingsKeyBuilder::appKey("mainWindowHeight"), kDefaultMainWindowHeight
+        )
     ));
 }
 

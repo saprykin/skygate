@@ -27,7 +27,6 @@ private slots:
     void savesAndLoadsStateSnapshot();
     void savesAndLoadsNegativeUtcEpochMicros();
     void loadsLegacyUtcEpochSecondsAsMicros();
-    void savesLoadsAndDefaultsMainWindowSize();
     void defaultsRoundTripThroughStore();
     void malformedStateValuesFallBackToDefaults();
     void partialStateAndUnknownOverlayKeysAreTolerated();
@@ -175,25 +174,6 @@ void SkySettingsStoreTests::loadsLegacyUtcEpochSecondsAsMicros()
 
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->utcEpochMicros, -1'234'000'000LL);
-}
-
-void SkySettingsStoreTests::savesLoadsAndDefaultsMainWindowSize()
-{
-    QSettings settings;
-    settings.clear();
-
-    const SkySettingsStore store;
-    QCOMPARE(store.loadMainWindowSize(), QSize(1100, 760));
-
-    QVERIFY(store.saveMainWindowSize(QSize(1280, 820)));
-    QCOMPARE(store.loadMainWindowSize(), QSize(1280, 820));
-
-    settings.setValue("app/mainWindowWidth", "wide");
-    settings.setValue("app/mainWindowHeight", 12);
-    QCOMPARE(store.loadMainWindowSize(), QSize(1100, 760));
-
-    QVERIFY(store.saveMainWindowSize(QSize(300, 300)));
-    QCOMPARE(store.loadMainWindowSize(), QSize(1100, 760));
 }
 
 void SkySettingsStoreTests::defaultsRoundTripThroughStore()

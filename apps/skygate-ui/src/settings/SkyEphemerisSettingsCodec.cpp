@@ -6,6 +6,7 @@
 
 #include <QSettings>
 
+#include <array>
 #include <cstdint>
 #include <string>
 
@@ -16,10 +17,39 @@ using skygate::ephemeris::EphemerisCorrectionFlags;
 using skygate::ephemeris::EphemerisEngineDescriptorRegistry;
 using skygate::ephemeris::EphemerisEngineKind;
 
-QString ephemerisSettingsKey(const char* name)
-{
-    return SkySettingsKeyBuilder::key(QString::fromUtf8(name));
-}
+// Every ephemeris setting name in one table, so saving, loading, and the
+// presence check cannot drift apart.
+struct EphemerisSettingKeys final {
+    static constexpr const char* kEngineKind = "ephemeris/engineKind";
+    static constexpr const char* kCorrectionFlags = "ephemeris/correctionFlags";
+    static constexpr const char* kCorrectionPresetId = "ephemeris/correctionPresetId";
+    static constexpr const char* kFallbackToSimpleEngine = "ephemeris/fallbackToSimpleEngine";
+    static constexpr const char* kRefractionEnabled = "ephemeris/refractionEnabled";
+    static constexpr const char* kAtmosphericPressureHpa = "ephemeris/atmosphericPressureHpa";
+    static constexpr const char* kAtmosphericTemperatureC = "ephemeris/atmosphericTemperatureC";
+    static constexpr const char* kRelativeHumidity = "ephemeris/relativeHumidity";
+    static constexpr const char* kObservingWavelengthMicrometers = "ephemeris/observingWavelengthMicrometers";
+    static constexpr const char* kPreferredDataProfileId = "ephemeris/preferredDataProfileId";
+    static constexpr const char* kOnlineUpdatesEnabled = "ephemeris/onlineUpdatesEnabled";
+    static constexpr const char* kUpdatePresetId = "ephemeris/updatePresetId";
+    static constexpr const char* kUpdateManifestUrl = "ephemeris/updateManifestUrl";
+
+    static constexpr std::array<const char*, 13> kAll{
+        kEngineKind,
+        kCorrectionFlags,
+        kCorrectionPresetId,
+        kFallbackToSimpleEngine,
+        kRefractionEnabled,
+        kAtmosphericPressureHpa,
+        kAtmosphericTemperatureC,
+        kRelativeHumidity,
+        kObservingWavelengthMicrometers,
+        kPreferredDataProfileId,
+        kOnlineUpdatesEnabled,
+        kUpdatePresetId,
+        kUpdateManifestUrl,
+    };
+};
 
 [[nodiscard]] QString engineKindToString(const EphemerisEngineKind::Type engineKind)
 {
@@ -61,70 +91,98 @@ readCorrectionFlags(QSettings& settings, const QString& key, const EphemerisCorr
 
 void SkyEphemerisSettingsCodec::save(QSettings& settings, const SkyEphemerisUserSettingsSnapshot& snapshot)
 {
-    settings.setValue(ephemerisSettingsKey("ephemeris/engineKind"), engineKindToString(snapshot.engineKind));
     settings.setValue(
-        ephemerisSettingsKey("ephemeris/correctionFlags"),
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kEngineKind), engineKindToString(snapshot.engineKind)
+    );
+    settings.setValue(
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kCorrectionFlags),
         static_cast<qulonglong>(static_cast<std::uint32_t>(snapshot.correctionFlags))
     );
-    settings.setValue(ephemerisSettingsKey("ephemeris/correctionPresetId"), snapshot.correctionPresetId);
-    settings.setValue(ephemerisSettingsKey("ephemeris/fallbackToSimpleEngine"), snapshot.fallbackToSimpleEngine);
-    settings.setValue(ephemerisSettingsKey("ephemeris/refractionEnabled"), snapshot.refractionEnabled);
-    settings.setValue(ephemerisSettingsKey("ephemeris/atmosphericPressureHpa"), snapshot.atmosphericPressureHpa);
-    settings.setValue(ephemerisSettingsKey("ephemeris/atmosphericTemperatureC"), snapshot.atmosphericTemperatureC);
-    settings.setValue(ephemerisSettingsKey("ephemeris/relativeHumidity"), snapshot.relativeHumidity);
     settings.setValue(
-        ephemerisSettingsKey("ephemeris/observingWavelengthMicrometers"), snapshot.observingWavelengthMicrometers
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kCorrectionPresetId), snapshot.correctionPresetId
     );
-    settings.setValue(ephemerisSettingsKey("ephemeris/preferredDataProfileId"), snapshot.preferredDataProfileId);
-    settings.setValue(ephemerisSettingsKey("ephemeris/onlineUpdatesEnabled"), snapshot.onlineUpdatesEnabled);
-    settings.setValue(ephemerisSettingsKey("ephemeris/updatePresetId"), snapshot.updatePresetId);
-    settings.setValue(ephemerisSettingsKey("ephemeris/updateManifestUrl"), snapshot.updateManifestUrl);
+    settings.setValue(
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kFallbackToSimpleEngine), snapshot.fallbackToSimpleEngine
+    );
+    settings.setValue(SkySettingsKeyBuilder::key(EphemerisSettingKeys::kRefractionEnabled), snapshot.refractionEnabled);
+    settings.setValue(
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kAtmosphericPressureHpa), snapshot.atmosphericPressureHpa
+    );
+    settings.setValue(
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kAtmosphericTemperatureC), snapshot.atmosphericTemperatureC
+    );
+    settings.setValue(SkySettingsKeyBuilder::key(EphemerisSettingKeys::kRelativeHumidity), snapshot.relativeHumidity);
+    settings.setValue(
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kObservingWavelengthMicrometers),
+        snapshot.observingWavelengthMicrometers
+    );
+    settings.setValue(
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kPreferredDataProfileId), snapshot.preferredDataProfileId
+    );
+    settings.setValue(
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kOnlineUpdatesEnabled), snapshot.onlineUpdatesEnabled
+    );
+    settings.setValue(SkySettingsKeyBuilder::key(EphemerisSettingKeys::kUpdatePresetId), snapshot.updatePresetId);
+    settings.setValue(SkySettingsKeyBuilder::key(EphemerisSettingKeys::kUpdateManifestUrl), snapshot.updateManifestUrl);
 }
 
 SkyEphemerisUserSettingsSnapshot SkyEphemerisSettingsCodec::load(QSettings& settings)
 {
     SkyEphemerisUserSettingsSnapshot snapshot;
-    snapshot.engineKind = engineKindFromString(
-        settings.value(ephemerisSettingsKey("ephemeris/engineKind"), engineKindToString(snapshot.engineKind)).toString()
+    const QString storedEngineKind =
+        settings
+            .value(
+                SkySettingsKeyBuilder::key(EphemerisSettingKeys::kEngineKind), engineKindToString(snapshot.engineKind)
+            )
+            .toString();
+    snapshot.engineKind = engineKindFromString(storedEngineKind);
+    snapshot.correctionFlags = readCorrectionFlags(
+        settings, SkySettingsKeyBuilder::key(EphemerisSettingKeys::kCorrectionFlags), snapshot.correctionFlags
     );
-    snapshot.correctionFlags =
-        readCorrectionFlags(settings, ephemerisSettingsKey("ephemeris/correctionFlags"), snapshot.correctionFlags);
     snapshot.correctionPresetId = SkySettingsValueCodecs::readNonBlankStringSetting(
-        settings, ephemerisSettingsKey("ephemeris/correctionPresetId"), snapshot.correctionPresetId
+        settings, SkySettingsKeyBuilder::key(EphemerisSettingKeys::kCorrectionPresetId), snapshot.correctionPresetId
     );
     snapshot.fallbackToSimpleEngine = SkySettingsValueCodecs::readBoolSetting(
-        settings, ephemerisSettingsKey("ephemeris/fallbackToSimpleEngine"), snapshot.fallbackToSimpleEngine
+        settings,
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kFallbackToSimpleEngine),
+        snapshot.fallbackToSimpleEngine
     );
     snapshot.refractionEnabled = SkySettingsValueCodecs::readBoolSetting(
-        settings, ephemerisSettingsKey("ephemeris/refractionEnabled"), snapshot.refractionEnabled
+        settings, SkySettingsKeyBuilder::key(EphemerisSettingKeys::kRefractionEnabled), snapshot.refractionEnabled
     );
     snapshot.atmosphericPressureHpa = SkySettingsValueCodecs::readDoubleSetting(
-        settings, ephemerisSettingsKey("ephemeris/atmosphericPressureHpa"), snapshot.atmosphericPressureHpa
+        settings,
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kAtmosphericPressureHpa),
+        snapshot.atmosphericPressureHpa
     );
     snapshot.atmosphericTemperatureC = SkySettingsValueCodecs::readDoubleSetting(
-        settings, ephemerisSettingsKey("ephemeris/atmosphericTemperatureC"), snapshot.atmosphericTemperatureC
+        settings,
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kAtmosphericTemperatureC),
+        snapshot.atmosphericTemperatureC
     );
     snapshot.relativeHumidity = SkySettingsValueCodecs::readDoubleSetting(
-        settings, ephemerisSettingsKey("ephemeris/relativeHumidity"), snapshot.relativeHumidity
+        settings, SkySettingsKeyBuilder::key(EphemerisSettingKeys::kRelativeHumidity), snapshot.relativeHumidity
     );
     snapshot.observingWavelengthMicrometers = SkySettingsValueCodecs::readDoubleSetting(
         settings,
-        ephemerisSettingsKey("ephemeris/observingWavelengthMicrometers"),
+        SkySettingsKeyBuilder::key(EphemerisSettingKeys::kObservingWavelengthMicrometers),
         snapshot.observingWavelengthMicrometers
     );
     snapshot.preferredDataProfileId = SkyEphemerisDataProfileIds::canonical(
         SkySettingsValueCodecs::readNonBlankStringSetting(
-            settings, ephemerisSettingsKey("ephemeris/preferredDataProfileId"), snapshot.preferredDataProfileId
+            settings,
+            SkySettingsKeyBuilder::key(EphemerisSettingKeys::kPreferredDataProfileId),
+            snapshot.preferredDataProfileId
         )
     );
     snapshot.onlineUpdatesEnabled = SkySettingsValueCodecs::readBoolSetting(
-        settings, ephemerisSettingsKey("ephemeris/onlineUpdatesEnabled"), snapshot.onlineUpdatesEnabled
+        settings, SkySettingsKeyBuilder::key(EphemerisSettingKeys::kOnlineUpdatesEnabled), snapshot.onlineUpdatesEnabled
     );
     snapshot.updatePresetId = SkySettingsValueCodecs::readNonBlankStringSetting(
-        settings, ephemerisSettingsKey("ephemeris/updatePresetId"), snapshot.updatePresetId
+        settings, SkySettingsKeyBuilder::key(EphemerisSettingKeys::kUpdatePresetId), snapshot.updatePresetId
     );
     snapshot.updateManifestUrl =
-        settings.value(ephemerisSettingsKey("ephemeris/updateManifestUrl"), snapshot.updateManifestUrl)
+        settings.value(SkySettingsKeyBuilder::key(EphemerisSettingKeys::kUpdateManifestUrl), snapshot.updateManifestUrl)
             .toString()
             .trimmed();
     return snapshot;
@@ -132,19 +190,12 @@ SkyEphemerisUserSettingsSnapshot SkyEphemerisSettingsCodec::load(QSettings& sett
 
 bool SkyEphemerisSettingsCodec::hasStoredSettings(QSettings& settings)
 {
-    return settings.contains(ephemerisSettingsKey("ephemeris/engineKind"))
-           || settings.contains(ephemerisSettingsKey("ephemeris/correctionFlags"))
-           || settings.contains(ephemerisSettingsKey("ephemeris/correctionPresetId"))
-           || settings.contains(ephemerisSettingsKey("ephemeris/fallbackToSimpleEngine"))
-           || settings.contains(ephemerisSettingsKey("ephemeris/refractionEnabled"))
-           || settings.contains(ephemerisSettingsKey("ephemeris/atmosphericPressureHpa"))
-           || settings.contains(ephemerisSettingsKey("ephemeris/atmosphericTemperatureC"))
-           || settings.contains(ephemerisSettingsKey("ephemeris/relativeHumidity"))
-           || settings.contains(ephemerisSettingsKey("ephemeris/observingWavelengthMicrometers"))
-           || settings.contains(ephemerisSettingsKey("ephemeris/preferredDataProfileId"))
-           || settings.contains(ephemerisSettingsKey("ephemeris/onlineUpdatesEnabled"))
-           || settings.contains(ephemerisSettingsKey("ephemeris/updatePresetId"))
-           || settings.contains(ephemerisSettingsKey("ephemeris/updateManifestUrl"));
+    for (const char* name : EphemerisSettingKeys::kAll) {
+        if (settings.contains(SkySettingsKeyBuilder::key(name))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace skygate::ui::internal

@@ -1,6 +1,5 @@
 #include "SkyThemeRepository.hpp"
 #include "SkyThemeDefinition.hpp"
-#include "SkyThemeDescriptor.hpp"
 #include "SkyThemeJsonCodec.hpp"
 #include "SkyThemeOption.hpp"
 #include "SkyThemeOptionsAdapter.hpp"
@@ -156,7 +155,6 @@ void SkyThemeRepository::loadManifest(const QString& manifestResourcePath)
         if (parsedTheme->id == defaultThemeId) {
             m_defaultThemeIndex = static_cast<qsizetype>(m_themes.size());
         }
-        m_descriptors.push_back(SkyThemeDescriptor{.id = id, .resourcePath = resourcePath});
         m_themes.push_back(parsedTheme.value());
     }
 }

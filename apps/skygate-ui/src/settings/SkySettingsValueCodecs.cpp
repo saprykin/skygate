@@ -28,6 +28,24 @@ std::optional<bool> SkySettingsValueCodecs::boolFromSettingValue(const QVariant&
     return std::nullopt;
 }
 
+std::optional<bool> SkySettingsValueCodecs::readOptionalBoolSetting(
+    QSettings& settings, const QString& key, const LoggingCategoryAccessor loggingCategory, const char* invalidValueNote
+)
+{
+    if (!settings.contains(key)) {
+        return std::nullopt;
+    }
+
+    const QVariant value = settings.value(key);
+    const std::optional<bool> parsedValue = boolFromSettingValue(value);
+    if (!parsedValue.has_value()) {
+        qCWarning(loggingCategory).noquote()
+            << "Invalid boolean setting" << key << "value" << value.toString() << "-" << invalidValueNote;
+        return std::nullopt;
+    }
+    return *parsedValue;
+}
+
 bool SkySettingsValueCodecs::readBoolSetting(QSettings& settings, const QString& key, const bool fallback)
 {
     if (!settings.contains(key)) {
@@ -118,6 +136,14 @@ SkySettingsValueCodecs::readNonBlankStringSetting(QSettings& settings, const QSt
         return fallback;
     }
     return configuredValue;
+}
+
+void SkySettingsValueCodecs::writeNonBlankStringSetting(
+    QSettings& settings, const QString& key, const QString& value, const QString& fallback
+)
+{
+    const QString trimmedValue = value.trimmed();
+    settings.setValue(key, trimmedValue.isEmpty() ? fallback : trimmedValue);
 }
 
 }  // namespace skygate::ui::internal

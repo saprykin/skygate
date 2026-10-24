@@ -12,11 +12,6 @@ QString SkyThemePalette::id() const
     return m_definition.id;
 }
 
-QString SkyThemePalette::displayName() const
-{
-    return m_definition.displayName;
-}
-
 #define SKYGATE_DEFINE_UI_COLOR_GETTER(name)                                                                           \
     QColor SkyThemePalette::name() const noexcept                                                                      \
     {                                                                                                                  \
