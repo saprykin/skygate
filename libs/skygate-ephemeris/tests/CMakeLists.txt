@@ -324,6 +324,11 @@ add_skygate_ephemeris_qtest(
     engine/TimeScaleConversionResultTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-time-scale-offset-resolver-tests
+    engine/TimeScaleOffsetResolverTests.cpp
+    LABELS "unit;validation;time-eop"
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-bit-flag-set-tests
     engine/BitFlagSetTests.cpp
 )
