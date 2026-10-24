@@ -12,11 +12,12 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-// The Bennett fit holds its shape down to kFullCorrectionAltitudeDeg and is
-// unusable below it. Instead of cutting the correction off there, the model
-// fades it linearly to zero across the band between that altitude and
-// kMinimumModelAltitudeDeg, so the correction stays continuous and no path
-// that samples altitude across the edge gains a step.
+// The Bennett fit sets the correction at and above kFullCorrectionAltitudeDeg.
+// Below it the model keeps applying the same fit and fades it to zero with a
+// smoothstep weight across the band ending at kMinimumModelAltitudeDeg. The
+// weight and its slope are zero at the band bottom and one at the band top, so
+// the correction meets the zero region and the full fit with a matching slope.
+// No path that samples altitude across either edge gains a step or a corner.
 constexpr double kMinimumModelAltitudeDeg = -2.0;
 constexpr double kFullCorrectionAltitudeDeg = -1.0;
 constexpr double kMaximumModelAltitudeDeg = 89.9;
@@ -68,13 +69,15 @@ constexpr double kCelsiusToKelvinOffset = 273.0;
     return std::isfinite(altitudeDeg) && altitudeDeg <= kMinimumModelAltitudeDeg;
 }
 
-// One at kFullCorrectionAltitudeDeg, zero at kMinimumModelAltitudeDeg, and
-// flat outside that band.
+// Smoothstep weight, zero at kMinimumModelAltitudeDeg and one at
+// kFullCorrectionAltitudeDeg. Both ends have zero slope, which makes the
+// tapered correction meet Bennett's own slope at the band top.
 [[nodiscard]] double refractionTaperFactor(const double altitudeDeg) noexcept
 {
-    return std::clamp(
+    const double normalizedAltitudeDeg = std::clamp(
         (altitudeDeg - kMinimumModelAltitudeDeg) / (kFullCorrectionAltitudeDeg - kMinimumModelAltitudeDeg), 0.0, 1.0
     );
+    return normalizedAltitudeDeg * normalizedAltitudeDeg * (3.0 - (2.0 * normalizedAltitudeDeg));
 }
 
 [[nodiscard]] double pressureScale(const EphemerisEngineOptions& options) noexcept
