@@ -91,6 +91,18 @@ private:
         ItemIndexList& transformItemIndices
     ) const;
 
+    // Gathers the vectors 'vectorMember' holds and runs one transform pass over
+    // them, merging the transform metadata into the items the pass covered.
+    void runVectorPass(
+        const EphemerisRequest& request,
+        std::span<Item> items,
+        CelestialReferenceFrame::Type sourceFrame,
+        CelestialReferenceFrame::Type targetFrame,
+        const std::optional<skygate::core::Vector3d> Item::* vectorMember,
+        EphemerisCorrectionFlags unavailableCorrection,
+        VectorDestination destination
+    ) const;
+
     void transformVectors(
         const EphemerisRequest& request, std::span<Item> items, const TransformRequest& transformRequest
     ) const;
@@ -109,13 +121,6 @@ private:
 
     void transformItrsVectorsToGcrs(const EphemerisRequest& request, std::span<Item> items) const;
     void transformGcrsVectorsToApparentWhenRequested(const EphemerisRequest& request, std::span<Item> items) const;
-
-    static void collectVectorInputs(
-        std::span<const Item> items,
-        VectorList& inputs,
-        ItemIndexList& itemIndices,
-        const std::optional<skygate::core::Vector3d> Item::* vectorMember
-    );
 
     const IFrameTransformer* const m_frameTransformer;
     const skygate::ephemeris::ITimeScaleService* const m_timeScaleService;

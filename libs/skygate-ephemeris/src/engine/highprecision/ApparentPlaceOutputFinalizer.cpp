@@ -52,8 +52,7 @@ bool ApparentPlaceOutputFinalizer::finalizeEquatorialCoordinate(FrameTransformBa
         return true;
     }
 
-    item.result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-    item.result.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+    EphemerisMetadataMerger::markComputationFailed(item.result.metadata);
 
     return false;
 }

@@ -1,6 +1,6 @@
 #include "FrameTransformMatrixCache.hpp"
 #include "ErfaAstrometry.hpp"
-#include "engine/ITimeScaleService.hpp"
+#include "EpochScaleResolver.hpp"
 #include "math/MathConstants.hpp"
 
 #include <optional>
@@ -21,8 +21,7 @@ void FrameTransformMatrixCache::Entry::recordMatrix(std::optional<skygate::core:
 {
     matrix = std::move(value);
     if (!matrix.has_value()) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+        EphemerisMetadataMerger::markComputationFailed(metadata);
     }
 }
 
@@ -36,8 +35,7 @@ FrameTransformMatrixCache::matrix(const MatrixKind kind, EphemerisEngineQueryRes
 {
     const std::size_t index = static_cast<std::size_t>(kind);
     if (index >= m_entries.size()) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+        EphemerisMetadataMerger::markComputationFailed(metadata);
         return std::nullopt;
     }
 
@@ -101,8 +99,7 @@ void FrameTransformMatrixCache::computeEntry(const MatrixKind kind, Entry& entry
     }
     }
 
-    entry.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-    entry.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+    EphemerisMetadataMerger::markComputationFailed(entry.metadata);
 }
 
 std::optional<skygate::core::AstronomicalEpoch> FrameTransformMatrixCache::epochInScale(
@@ -110,38 +107,25 @@ std::optional<skygate::core::AstronomicalEpoch> FrameTransformMatrixCache::epoch
 )
 {
     if (!m_epoch.isFinite()) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+        EphemerisMetadataMerger::markComputationFailed(metadata);
         return std::nullopt;
     }
 
+    // A same-scale epoch needs no conversion and no conversion slot, so it is
+    // resolved before the check that the target scale is cacheable.
     if (m_epoch.timeScale == targetScale) {
         return m_epoch.normalized();
     }
 
-    if (m_timeScaleService == nullptr) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
+    std::optional<TimeScaleConversionResult>* const conversionCache = conversionCacheFor(targetScale);
+    if (conversionCache == nullptr) {
+        EphemerisMetadataMerger::markTimeScaleUnavailable(metadata, EphemerisMetadataFailurePolicy::MarkFailed);
         return std::nullopt;
     }
 
-    std::optional<TimeScaleConversionResult>* cachedConversion = conversionCacheFor(targetScale);
-    if (cachedConversion == nullptr) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
-        return std::nullopt;
-    }
-    if (!cachedConversion->has_value()) {
-        *cachedConversion = m_timeScaleService->convert(m_epoch, targetScale);
-    }
-
-    const TimeScaleConversionResult& conversion = **cachedConversion;
-    EphemerisMetadataMerger::mergeTimeScale(metadata, conversion, EphemerisMetadataFailurePolicy::MarkFailed);
-    if (!conversion.isSuccess()) {
-        return std::nullopt;
-    }
-
-    return conversion.epoch;
+    return EpochScaleResolver::resolveInScale(
+        metadata, m_epoch, targetScale, m_timeScaleService, EphemerisMetadataFailurePolicy::MarkFailed, conversionCache
+    );
 }
 
 std::optional<EarthOrientationSampler::Sample>
@@ -161,12 +145,6 @@ FrameTransformMatrixCache::earthOrientation(EphemerisEngineQueryResult& metadata
 std::optional<skygate::core::AstronomicalEpoch>
 FrameTransformMatrixCache::ut1Epoch(EphemerisEngineQueryResult& metadata)
 {
-    if (!m_epoch.isFinite()) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
-        return std::nullopt;
-    }
-
     if (m_epoch.timeScale == skygate::core::TimeScale::Ut1 || m_earthOrientationProvider == nullptr) {
         return epochInScale(skygate::core::TimeScale::Ut1, metadata);
     }

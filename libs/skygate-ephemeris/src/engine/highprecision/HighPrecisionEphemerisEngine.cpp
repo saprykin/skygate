@@ -4,7 +4,6 @@
 #include "EphemerisMetadataMerger.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "EphemerisResultBuilder.hpp"
-#include "EphemerisTimeScaleMetadataMerger.hpp"
 #include "EpochScaleResolver.hpp"
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
@@ -66,7 +65,9 @@ constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris 
 
     if (dependencies.timeScaleService == nullptr) {
         CelestialBodyState failedState = builder.buildFailedState(input);
-        failedState.metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
+        EphemerisMetadataMerger::markTimeScaleUnavailable(
+            failedState.metadata, EphemerisMetadataFailurePolicy::MarkFailed
+        );
         return failedState;
     }
 
@@ -93,7 +94,7 @@ constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris 
     fallbackState->metadata.warningCodeMask.merge(originalResult.metadata.warningCodeMask);
     fallbackState->metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
     fallbackState->metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
-    EphemerisTimeScaleMetadataMerger::mergeKernelEpochTimeScaleMetadata(fallbackState->metadata, conversion);
+    EphemerisMetadataMerger::mergeKernelEpochTimeScale(fallbackState->metadata, conversion);
     return fallbackState;
 }
 

@@ -16,6 +16,8 @@ namespace skygate::ephemeris::highprecision {
 
 class ICalcephKernel;
 
+// Single home for how conversion, Earth-orientation, and computation failures
+// reach an engine query result.
 class EphemerisMetadataMerger final {
 public:
     EphemerisMetadataMerger() = delete;
@@ -25,6 +27,21 @@ public:
         std::optional<TimeScaleConversionResult> utcConversion;
         std::optional<EarthOrientationSampler::Sample> sample;
     };
+
+    // Downgrades a Valid status to Degraded and leaves every other status as
+    // it is.
+    static void markDegraded(EphemerisEngineQueryResult& metadata) noexcept;
+
+    // Records a failed computation: Failed status and the ComputationFailed
+    // warning.
+    static void markComputationFailed(EphemerisEngineQueryResult& metadata) noexcept;
+
+    // Records missing time-scale data and sets the status the failure policy
+    // asks for.
+    static void markTimeScaleUnavailable(
+        EphemerisEngineQueryResult& metadata,
+        EphemerisMetadataFailurePolicy failurePolicy = EphemerisMetadataFailurePolicy::MarkFailed
+    ) noexcept;
 
     static void merge(
         EphemerisEngineQueryResult& target,
@@ -48,6 +65,13 @@ public:
         EphemerisMetadataFailurePolicy failurePolicy = EphemerisMetadataFailurePolicy::MarkDegraded
     ) noexcept;
 
+    // Merges the conversion that produced a kernel epoch. A degraded conversion
+    // whose only warning is the TDB approximation is transparent; every other
+    // successful or failed conversion outcome is merged through mergeTimeScale.
+    static void mergeKernelEpochTimeScale(
+        EphemerisEngineQueryResult& metadata, const TimeScaleConversionResult& conversion
+    ) noexcept;
+
     static void
     mergeEarthOrientation(EphemerisEngineQueryResult& metadata, const EarthOrientationSampler::Sample& sample) noexcept;
 
@@ -56,8 +80,10 @@ public:
     static void mergeKernelDiagnostics(EphemerisEngineQueryResult& metadata, const ICalcephKernel& kernel) noexcept;
 
     // Converts 'epoch' to UTC, samples Earth orientation, and merges the
-    // time-scale conversion and the sample into 'metadata'. Returns the sample
-    // when both steps succeed; otherwise marks the Earth-orientation
+    // time-scale conversion and the sample into 'metadata'. An epoch that
+    // already is in UTC is converted as well, so the diagnostics of the
+    // conversion stay part of the Earth-orientation contract. Returns the
+    // sample when both steps succeed; otherwise marks the Earth-orientation
     // correction unavailable. 'cache' reuses a conversion and sample across
     // repeated calls.
     [[nodiscard]] static std::optional<EarthOrientationSampler::Sample> prepareEarthOrientation(

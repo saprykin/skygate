@@ -60,20 +60,47 @@ PreparedRequestStateBuilder::build(const EphemerisRequest& request) const
     }
 
     if (requestsTopocentricState(request) && m_dependencies.timeScaleService != nullptr) {
-        preparedState->topocentricStatePrepared = true;
-        preparedState->observerItrsPositionAu = ObserverGeodesy::observerItrsPositionAu(request.context.observer);
-        preparedState->earthOrientationSample = EphemerisMetadataMerger::prepareEarthOrientation(
-            request.epoch,
+        prepareTopocentricState(
+            request,
             m_dependencies.timeScaleService.get(),
             m_dependencies.earthOrientationProvider.get(),
-            preparedState->topocentricMetadata,
-            EphemerisMetadataFailurePolicy::MarkFailed,
-            EarthOrientationSampler::Options::tolerantFallback()
+            *preparedState
         );
-        preparedState->topocentricStateAvailable = preparedState->earthOrientationSample.has_value();
     }
 
     return preparedState;
+}
+
+void PreparedRequestStateBuilder::prepareTopocentricState(
+    const EphemerisRequest& request,
+    const skygate::ephemeris::ITimeScaleService* const timeScaleService,
+    const skygate::ephemeris::IEarthOrientationProvider* const earthOrientationProvider,
+    PreparedEphemerisRequestState& state
+)
+{
+    state.topocentricStatePrepared = true;
+    state.observerItrsPositionAu = ObserverGeodesy::observerItrsPositionAu(request.context.observer);
+    if (timeScaleService == nullptr) {
+        EphemerisMetadataMerger::markTimeScaleUnavailable(
+            state.topocentricMetadata, EphemerisMetadataFailurePolicy::MarkFailed
+        );
+        EphemerisMetadataMerger::markCorrectionUnavailable(
+            state.topocentricMetadata, EphemerisCorrectionFlags::earthOrientation()
+        );
+        state.earthOrientationSample.reset();
+        state.topocentricStateAvailable = false;
+        return;
+    }
+
+    state.earthOrientationSample = EphemerisMetadataMerger::prepareEarthOrientation(
+        request.epoch,
+        timeScaleService,
+        earthOrientationProvider,
+        state.topocentricMetadata,
+        EphemerisMetadataFailurePolicy::MarkFailed,
+        EarthOrientationSampler::Options::tolerantFallback()
+    );
+    state.topocentricStateAvailable = state.earthOrientationSample.has_value();
 }
 
 }  // namespace skygate::ephemeris::highprecision
