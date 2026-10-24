@@ -2,12 +2,14 @@
 #include "ConstellationReferenceCalculator.hpp"
 #include "SkySelectionOverlayInput.hpp"
 #include "SkySelectionTargetKind.hpp"
+#include "SkyTrailTargetResolver.hpp"
 #include "scene/SkySceneLookupKey.hpp"
 #include "scene/SkySelectionMarker.hpp"
 
 #include <QPointF>
 
 #include <algorithm>
+#include <array>
 #include <optional>
 #include <string>
 
@@ -87,20 +89,22 @@ SkySelectionMarker SkySelectionMarkerBuilder::build(const SkySelectionOverlayInp
         return {};
     }
 
-    QString targetKind;
-    QString targetId;
-    if (!input.selectedObjectTargetId.isEmpty()) {
-        targetKind = skygate::ui::internal::SkySelectionTargetKind::token(
-            skygate::ui::internal::SkySelectionTargetKind::Type::Body
-        );
-        targetId = input.selectedObjectTargetId;
-    } else if (!input.trackedTargetId.trimmed().isEmpty()) {
-        targetKind = input.trackedTargetKind;
-        targetId = input.trackedTargetId;
-    } else {
-        targetKind = input.selectedSearchTargetKind;
-        targetId = input.selectedSearchTargetId;
+    // The marker follows the target precedence of the trail resolver and keeps
+    // the target kind, so it can place both bodies and constellation labels.
+    const SkyTrailTargetResolver targetResolver;
+    const std::array<SkyTrailTargetResolver::Target, SkyTrailTargetResolver::kTargetCount> targetCandidates =
+        targetResolver.targetCandidates(input);
+    const auto targetIt = std::find_if(
+        targetCandidates.begin(), targetCandidates.end(), [](const SkyTrailTargetResolver::Target& candidate) {
+            return !candidate.id.isEmpty();
+        }
+    );
+    if (targetIt == targetCandidates.end()) {
+        return {};
     }
+
+    const QString targetKind = targetIt->kind;
+    const QString targetId = targetIt->id;
     if (targetKind.trimmed().isEmpty() || targetId.trimmed().isEmpty()) {
         return {};
     }

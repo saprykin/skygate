@@ -267,6 +267,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/render/SkyRenderGlyphTessellator.hpp
     src/render/SkyReferenceOverlayLabelBuilder.cpp
     src/render/SkyReferenceOverlayLabelBuilder.hpp
+    src/render/SkyReferenceOverlayLayers.cpp
+    src/render/SkyReferenceOverlayLayers.hpp
     src/settings/SkySettingsSnapshotCodecs.cpp
     src/settings/SkySettingsSnapshotCodecs.hpp
     src/settings/SkyCatalogSourceSettingsSnapshot.hpp

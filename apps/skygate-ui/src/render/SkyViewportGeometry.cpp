@@ -1,7 +1,7 @@
 #include "SkyViewportGeometry.hpp"
-#include "CelestialReferenceCalculator.hpp"
 #include "SkyCardinalDirectionPolicy.hpp"
 #include "SkyRenderGlyphTessellator.hpp"
+#include "SkyReferenceOverlayLayers.hpp"
 #include "SkyRenderLine.hpp"
 #include "SkyViewportGeometryInput.hpp"
 #include "SkyViewportLineSegment.hpp"
@@ -23,7 +23,6 @@ constexpr double kGridMeridianAltitudeMaxDeg = 85.0;
 // Projected chords longer than this share of the larger viewport dimension are
 // dropped, which removes the screen-wide jumps where geometry wraps.
 constexpr double kOverlaySegmentLengthViewportFraction = 0.30;
-constexpr int kReferenceCircleSampleCount = skygate::ephemeris::CelestialReferenceCalculator::kReferenceCircleSamples;
 constexpr float kGridLineWidthPx = 1.0F;
 constexpr float kCardinalLineWidthPx = 1.8F;
 constexpr float kHorizonLineWidthPx = 2.2F;
@@ -167,51 +166,23 @@ void appendReferenceLines(
     const double maxSegmentLengthSquared
 )
 {
-    if (input.overlayLayers.ecliptic) {
-        appendProjectedPolyline(
-            sink,
-            input.projection,
-            kReferenceCircleSampleCount,
-            maxSegmentLengthSquared,
-            input.renderTheme.eclipticLine,
-            kReferenceLineWidthPx,
-            [&input](const int index) {
-                return skygate::ephemeris::CelestialReferenceCalculator::eclipticCirclePoint(
-                    index, kReferenceCircleSampleCount, input.observer, input.utcTime
-                );
-            }
-        );
-    }
+    for (const auto& layer : skygate::ui::internal::SkyReferenceOverlayLayers::layers(
+             input.renderTheme, input.overlayLayers, input.observer
+         )) {
+        if (!layer.enabled) {
+            continue;
+        }
 
-    if (input.overlayLayers.celestialEquator) {
         appendProjectedPolyline(
             sink,
             input.projection,
-            kReferenceCircleSampleCount,
+            skygate::ui::internal::SkyReferenceOverlayLayers::kSampleCount,
             maxSegmentLengthSquared,
-            input.renderTheme.celestialEquatorLine,
+            layer.color,
             kReferenceLineWidthPx,
-            [&input](const int index) {
-                return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-                    index, kReferenceCircleSampleCount, 0.0, input.observer, input.utcTime
-                );
-            }
-        );
-    }
-
-    if (input.overlayLayers.circumpolarBoundary && input.observer.isValid()) {
-        const double boundaryDeclinationDeg =
-            skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(input.observer);
-        appendProjectedPolyline(
-            sink,
-            input.projection,
-            kReferenceCircleSampleCount,
-            maxSegmentLengthSquared,
-            input.renderTheme.circumpolarBoundaryLine,
-            kReferenceLineWidthPx,
-            [boundaryDeclinationDeg, &input](const int index) {
-                return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-                    index, kReferenceCircleSampleCount, boundaryDeclinationDeg, input.observer, input.utcTime
+            [&layer, &input](const int index) {
+                return skygate::ui::internal::SkyReferenceOverlayLayers::samplePoint(
+                    layer.circle, index, input.observer, input.utcTime
                 );
             }
         );

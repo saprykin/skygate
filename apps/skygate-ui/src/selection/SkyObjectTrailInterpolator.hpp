@@ -18,16 +18,7 @@ class BodyTrailCalculator;
 // interpolation that fills the grid between anchors.
 class SkyObjectTrailInterpolator final {
 public:
-    // Sampling window of one trail in minutes relative to its present sample.
-    struct TrailOffsetWindow final {
-        int startOffsetMinutes = 0;
-        int endOffsetMinutes = 0;
-    };
-
     SkyObjectTrailInterpolator() = delete;
-
-    [[nodiscard]] static TrailOffsetWindow
-    trailOffsetsMinutes(const skygate::ephemeris::BodyTrailOptions& renderOptions) noexcept;
 
     // One engine sample per render step across the whole window.
     [[nodiscard]] static std::vector<skygate::ephemeris::BodyTrailSample> sampleEngineWindow(
@@ -56,10 +47,6 @@ public:
     );
 
 private:
-    // Empty render-grid samples for the window, each holding only its offset.
-    [[nodiscard]] static std::vector<skygate::ephemeris::BodyTrailSample>
-    offsetWindowSamples(const skygate::ephemeris::BodyTrailOptions& renderOptions);
-
     [[nodiscard]] static skygate::ephemeris::BodyTrailSample
     sampleEngineAtOffset(const SkyObjectTrailSamplingInput& input, int offsetMinutes);
 
@@ -76,7 +63,6 @@ private:
     static void appendAdaptiveTrailAnchors(
         std::vector<skygate::ephemeris::BodyTrailSample>& anchors,
         const SkyObjectTrailSamplingInput& input,
-        const skygate::ephemeris::BodyTrailOptions& renderOptions,
         const skygate::ephemeris::BodyTrailSample& previous,
         const skygate::ephemeris::BodyTrailSample& next
     );

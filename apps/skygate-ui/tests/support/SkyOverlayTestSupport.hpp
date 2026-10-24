@@ -90,13 +90,6 @@ inline void verifySelectedObjectInspectorPayload(const QVariantMap& payload, con
         QCOMPARE(fieldMap.value(QStringLiteral("value")).toString(), expectedField.value);
         QCOMPARE(fieldMap.value(QStringLiteral("tooltip")).toString(), expectedField.tooltip);
     }
-
-    QCOMPARE(payload.value(QStringLiteral("ephemerisStatus")).toString(), expected.ephemerisStatus);
-    QCOMPARE(payload.value(QStringLiteral("ephemerisWarningText")).toString(), expected.ephemerisWarningText);
-    QCOMPARE(payload.value(QStringLiteral("ephemerisProvenance")).toString(), expected.ephemerisProvenance);
-    QCOMPARE(payload.value(QStringLiteral("ephemerisDataRange")).toString(), expected.ephemerisDataRange);
-    QCOMPARE(payload.value(QStringLiteral("ephemerisUncertainty")).toString(), expected.ephemerisUncertainty);
-    QCOMPARE(payload.value(QStringLiteral("ephemerisCorrections")).toString(), expected.ephemerisCorrections);
 }
 
 }  // namespace skygate::ui::tests

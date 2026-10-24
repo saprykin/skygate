@@ -48,7 +48,6 @@ struct LineBucketKey final {
 
 struct VertexBucket final {
     QColor color;
-    float widthPx = 1.0F;
     std::vector<float> coordinates;
 };
 
@@ -112,7 +111,6 @@ void SkyViewportSceneGraph::syncLineNodes(QSGNode* rootNode, const std::span<con
         };
         auto& bucket = buckets[bucketKey];
         bucket.color = lineSegment.color;
-        bucket.widthPx = lineSegment.widthPx;
 
         const std::optional<skygate::core::Vector2d> offset = skygate::core::Geometry2d::perpendicularOffset2d(
             lineSegment.x1, lineSegment.y1, lineSegment.x2, lineSegment.y2, lineSegment.widthPx * 0.5F

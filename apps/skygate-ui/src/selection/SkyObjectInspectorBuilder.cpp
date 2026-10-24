@@ -186,6 +186,9 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
         return {};
     }
 
+    // The inspector follows the selected object, then the selected search
+    // target. Unlike the marker and the trail it ignores the tracked target, so
+    // clearing the search selection hides the inspector while tracking stays on.
     const QString targetId =
         !input.selectedObjectTargetId.isEmpty()
             ? input.selectedObjectTargetId
@@ -277,12 +280,6 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
         .title = QString::fromStdString(body.displayName),
         .pinned = input.inspectorPinned,
         .fields = std::move(fields),
-        .aliases = skygate::ui::internal::SkyObjectInspectorFormatters::aliasesText(body),
-        .ephemerisStatus = ephemerisMetadata.status,
-        .ephemerisWarningText = ephemerisMetadata.warningText,
-        .ephemerisProvenance = ephemerisMetadata.provenance,
-        .ephemerisDataRange = ephemerisMetadata.dataRange,
-        .ephemerisUncertainty = ephemerisMetadata.uncertainty,
-        .ephemerisCorrections = ephemerisMetadata.corrections
+        .aliases = skygate::ui::internal::SkyObjectInspectorFormatters::aliasesText(body)
     };
 }

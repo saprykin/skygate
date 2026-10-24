@@ -77,23 +77,5 @@ QVariantMap SkySceneOverlayAdapter::selectedObjectInspector(const SkySelectedObj
     entry.insert("pinned", inspector.pinned);
     entry.insert("fields", fields);
     entry.insert("aliases", inspector.aliases);
-    if (!inspector.ephemerisStatus.isEmpty()) {
-        entry.insert("ephemerisStatus", inspector.ephemerisStatus);
-    }
-    if (!inspector.ephemerisWarningText.isEmpty()) {
-        entry.insert("ephemerisWarningText", inspector.ephemerisWarningText);
-    }
-    if (!inspector.ephemerisProvenance.isEmpty()) {
-        entry.insert("ephemerisProvenance", inspector.ephemerisProvenance);
-    }
-    if (!inspector.ephemerisDataRange.isEmpty()) {
-        entry.insert("ephemerisDataRange", inspector.ephemerisDataRange);
-    }
-    if (!inspector.ephemerisUncertainty.isEmpty()) {
-        entry.insert("ephemerisUncertainty", inspector.ephemerisUncertainty);
-    }
-    if (!inspector.ephemerisCorrections.isEmpty()) {
-        entry.insert("ephemerisCorrections", inspector.ephemerisCorrections);
-    }
     return entry;
 }
