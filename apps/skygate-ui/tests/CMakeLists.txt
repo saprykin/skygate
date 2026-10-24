@@ -453,6 +453,10 @@ add_skygate_ui_qtest(
 )
 add_skygate_ui_qtest(skygate-ui-sky-hit-target-index-tests selection/SkyHitTargetIndexTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-object-trail-geometry-tests selection/SkyObjectTrailGeometryTests.cpp)
+add_skygate_ui_qtest(
+    skygate-ui-sky-object-trail-refraction-kink-tests
+    selection/SkyObjectTrailRefractionKinkTests.cpp
+)
 add_skygate_ui_qtest(skygate-ui-sky-object-trail-guidance-tests selection/SkyObjectTrailGuidanceTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-render-builders-tests render/SkyRenderBuildersTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-catalog-internals-tests catalog/SkyCatalogInternalsTests.cpp)
