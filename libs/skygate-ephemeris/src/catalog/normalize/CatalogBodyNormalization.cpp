@@ -17,11 +17,4 @@ void CatalogBodyNormalization::apply(OwnGalaxyCelestialBody& body)
     }
 }
 
-void CatalogBodyNormalization::apply(std::vector<OwnGalaxyCelestialBody>& bodies)
-{
-    for (OwnGalaxyCelestialBody& body : bodies) {
-        apply(body);
-    }
-}
-
 }  // namespace skygate::ephemeris

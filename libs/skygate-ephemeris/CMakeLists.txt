@@ -397,7 +397,6 @@ add_library(skygate-ephemeris STATIC
     src/catalog/InMemoryStarCatalog.hpp
     src/catalog/opengc/OpenNgcObjectMapper.cpp
     src/catalog/opengc/OpenNgcCatalogParser.hpp
-    src/catalog/io/zip/ZipCodec.hpp
     src/catalog/io/zip/ZipDirectoryReader.cpp
     src/catalog/io/zip/ZipDirectoryReader.hpp
     src/catalog/io/zip/ZipEntryExtractor.cpp
@@ -438,7 +437,6 @@ add_library(skygate-ephemeris STATIC
     src/catalog/hyg/HygCatalogParser.cpp
     src/catalog/InMemoryStarCatalog.cpp
     src/catalog/opengc/OpenNgcCatalogParser.cpp
-    src/catalog/io/zip/ZipCodec.cpp
     src/trail/BodyTrailCalculator.cpp
 )
 

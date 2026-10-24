@@ -189,13 +189,12 @@ private slots:
     void reorderingSourcesChangesWinners();
     void preservesStableSourceOrdering();
     void reportsDeterministicCounts();
-    void reportsSourceRowAndPerKindCounts();
+    void reportsSurvivingCountsAndSourceOrder();
     void bundledAugmentationCarriesOwnProvenance();
     void deepSkyFallbackFillsGapsWithoutReplacingValues();
     void deepSkyFallbackNeverOverridesReplacementOrder();
     void doesNotDuplicatePrimarySolarSystemBodies();
     void bundledBrightStarsOnlyAddedWhenNoStarsPresent();
-    void usesCurrentConstellationCountWhenLarger();
     void ignoresNonDeepSkyRowsFromDeepSkySource();
     void reorderedBridgeSourcesKeepWinnerAndContributors();
     void repeatedImportsKeepWinnerAndContributors();
@@ -502,7 +501,7 @@ void CatalogCompositionCollectionTests::reportsDeterministicCounts()
     QCOMPARE(withKnownCount.foundDeepSkyObjectCount, std::size_t{41});
 }
 
-void CatalogCompositionCollectionTests::reportsSourceRowAndPerKindCounts()
+void CatalogCompositionCollectionTests::reportsSurvivingCountsAndSourceOrder()
 {
     auto mixed = createCatalog(
         {
@@ -535,14 +534,9 @@ void CatalogCompositionCollectionTests::reportsSourceRowAndPerKindCounts()
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.bodyCount, std::size_t{4});
-    QCOMPARE(result.starCount, std::size_t{2});
     QCOMPARE(result.deepSkyObjectCount, std::size_t{2});
-    QCOMPARE(result.planetCount, std::size_t{0});
-    QCOMPARE(result.moonCount, std::size_t{0});
-    QCOMPARE(result.sunCount, std::size_t{0});
 
     QCOMPARE(result.sourceOrder, (std::vector<std::string>{"mixed", "deep-sky"}));
-    QCOMPARE(result.sourceRowCounts, (std::vector<std::size_t>{3U, 1U}));
 }
 
 void CatalogCompositionCollectionTests::bundledAugmentationCarriesOwnProvenance()
@@ -777,23 +771,6 @@ void CatalogCompositionCollectionTests::bundledBrightStarsOnlyAddedWhenNoStarsPr
     QVERIFY(findBodyById(withStarResult.catalog->bodies(), "sirius") == nullptr);
 }
 
-void CatalogCompositionCollectionTests::usesCurrentConstellationCountWhenLarger()
-{
-    auto primary = createCatalog({makeStar("hip_1", "HIP 1", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)}, {});
-    QVERIFY(primary != nullptr);
-
-    CatalogCompositionRequest request;
-    request.currentConstellationCount = 12U;
-    request.sources = {
-        {.sourceId = "primary", .enabled = true, .catalog = primary.get(), .policy = CatalogCompositionPolicy::Merge},
-    };
-
-    const CatalogCompositionResult result = skygate::ephemeris::CatalogComposer::composeCollection(request);
-
-    QVERIFY(result.isSuccess());
-    QCOMPARE(result.constellationCount, std::size_t{12});
-}
-
 void CatalogCompositionCollectionTests::ignoresNonDeepSkyRowsFromDeepSkySource()
 {
     auto primary = createCatalog({makeStar("hip_1", "HIP 1", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)}, {});
@@ -881,7 +858,6 @@ void CatalogCompositionCollectionTests::reorderedBridgeSourcesKeepWinnerAndContr
         const CatalogCompositionResult result = skygate::ephemeris::CatalogComposer::composeCollection(request);
         QVERIFY(result.isSuccess());
         QCOMPARE(result.bodyCount, std::size_t{1});
-        QCOMPARE(result.starCount, std::size_t{1});
 
         const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
         const BaseCelestialBody* winner = findBodyById(bodies, outcome.winnerId);
@@ -944,7 +920,6 @@ void CatalogCompositionCollectionTests::repeatedImportsKeepWinnerAndContributors
     for (const CatalogCompositionResult* result : {&first, &repeated, &afterReload}) {
         QVERIFY(result->isSuccess());
         QCOMPARE(result->bodyCount, std::size_t{1});
-        QCOMPARE(result->starCount, std::size_t{1});
 
         const std::span<const BaseCelestialBody* const> bodies = result->catalog->bodies();
         const BaseCelestialBody* winner = findBodyById(bodies, "c_hd2");

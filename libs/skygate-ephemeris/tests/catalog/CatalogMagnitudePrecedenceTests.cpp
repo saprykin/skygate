@@ -63,7 +63,6 @@ void CatalogMagnitudePrecedenceTests::bridgeWithinOneSourceResolvesMagnitudeByRo
     QVERIFY(result.isSuccess());
     const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
     QCOMPARE(result.bodyCount, std::size_t{1});
-    QCOMPARE(result.starCount, std::size_t{1});
     QCOMPARE(CatalogMergeTestSupport::countBodiesById(bodies, "a_hip_17"), std::size_t{0});
     QCOMPARE(CatalogMergeTestSupport::countBodiesById(bodies, "b_hd_27"), std::size_t{0});
 

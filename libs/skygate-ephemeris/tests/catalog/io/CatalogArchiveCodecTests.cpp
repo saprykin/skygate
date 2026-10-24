@@ -1,10 +1,11 @@
 #include "CatalogArchiveTestSupport.hpp"
 
-#include "catalog/io/zip/ZipCodec.hpp"
+#include "catalog/io/CatalogZipEntrySelector.hpp"
 
 #include <QtTest/QtTest>
 
 #include <array>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -39,12 +40,12 @@ void CatalogArchiveCodecTests::extractsFirstCsvEntryFromZipPayloads()
         0x00, 0x01, 0x00, 0x01, 0x00, 0x4d, 0x00, 0x00, 0x00, 0x72, 0x00, 0x00, 0x00, 0x00, 0x00
     };
 
-    const auto zipEntry = ZipCodec{}.extractFirstCsvEntry(
-        std::string_view(reinterpret_cast<const char*>(kZippedCsv.data()), kZippedCsv.size())
+    const CatalogZipEntrySelection selection = CatalogZipEntrySelector::select(
+        std::string_view(reinterpret_cast<const char*>(kZippedCsv.data()), kZippedCsv.size()), std::nullopt
     );
 
-    QVERIFY(zipEntry.has_value());
-    QVERIFY(zipEntry->find("hip") != std::string::npos);
+    QVERIFY(selection.status == CatalogZipEntrySelection::Status::Selected);
+    QVERIFY(selection.payload.find("hip") != std::string::npos);
 }
 
 void CatalogArchiveCodecTests::extractsStoredCsvEntryFromZipPayloads()
@@ -56,10 +57,11 @@ void CatalogArchiveCodecTests::extractsStoredCsvEntryFromZipPayloads()
         },
     });
 
-    const auto zipEntry = skygate::ephemeris::ZipCodec{}.extractFirstCsvEntry(zipData);
+    const skygate::ephemeris::CatalogZipEntrySelection selection =
+        skygate::ephemeris::CatalogZipEntrySelector::select(zipData, std::nullopt);
 
-    QVERIFY(zipEntry.has_value());
-    QCOMPARE(*zipEntry, std::string("hip,ra,dec,mag\n42,1,2,3\n"));
+    QVERIFY(selection.status == skygate::ephemeris::CatalogZipEntrySelection::Status::Selected);
+    QCOMPARE(selection.payload, std::string("hip,ra,dec,mag\n42,1,2,3\n"));
 }
 
 void CatalogArchiveCodecTests::choosesCsvEntryOverEarlierNonCsvEntry()
@@ -75,10 +77,11 @@ void CatalogArchiveCodecTests::choosesCsvEntryOverEarlierNonCsvEntry()
         },
     });
 
-    const auto zipEntry = skygate::ephemeris::ZipCodec{}.extractFirstCsvEntry(zipData);
+    const skygate::ephemeris::CatalogZipEntrySelection selection =
+        skygate::ephemeris::CatalogZipEntrySelector::select(zipData, std::nullopt);
 
-    QVERIFY(zipEntry.has_value());
-    QVERIFY(zipEntry->find("hip,ra,dec,mag") != std::string::npos);
+    QVERIFY(selection.status == skygate::ephemeris::CatalogZipEntrySelection::Status::Selected);
+    QVERIFY(selection.payload.find("hip,ra,dec,mag") != std::string::npos);
 }
 
 void CatalogArchiveCodecTests::ignoresDirectoriesAndMatchesCsvCaseInsensitively()
@@ -94,10 +97,11 @@ void CatalogArchiveCodecTests::ignoresDirectoriesAndMatchesCsvCaseInsensitively(
         },
     });
 
-    const auto zipEntry = skygate::ephemeris::ZipCodec{}.extractFirstCsvEntry(zipData);
+    const skygate::ephemeris::CatalogZipEntrySelection selection =
+        skygate::ephemeris::CatalogZipEntrySelector::select(zipData, std::nullopt);
 
-    QVERIFY(zipEntry.has_value());
-    QVERIFY(zipEntry->find("8,1,2,3") != std::string::npos);
+    QVERIFY(selection.status == skygate::ephemeris::CatalogZipEntrySelection::Status::Selected);
+    QVERIFY(selection.payload.find("8,1,2,3") != std::string::npos);
 }
 
 void CatalogArchiveCodecTests::rejectsUnsupportedCompressionAndCorruptHeaders()
@@ -109,7 +113,10 @@ void CatalogArchiveCodecTests::rejectsUnsupportedCompressionAndCorruptHeaders()
             .compressionMethod = 12U,
         },
     });
-    QVERIFY(!skygate::ephemeris::ZipCodec{}.extractFirstCsvEntry(unsupportedZip).has_value());
+    QVERIFY(
+        skygate::ephemeris::CatalogZipEntrySelector::select(unsupportedZip, std::nullopt).status
+        != skygate::ephemeris::CatalogZipEntrySelection::Status::Selected
+    );
 
     std::string corruptZip = skygate::ephemeris::tests::makeZip({
         skygate::ephemeris::tests::ZipEntrySpec{
@@ -118,7 +125,10 @@ void CatalogArchiveCodecTests::rejectsUnsupportedCompressionAndCorruptHeaders()
         },
     });
     corruptZip[0] = '\0';
-    QVERIFY(!skygate::ephemeris::ZipCodec{}.extractFirstCsvEntry(corruptZip).has_value());
+    QVERIFY(
+        skygate::ephemeris::CatalogZipEntrySelector::select(corruptZip, std::nullopt).status
+        != skygate::ephemeris::CatalogZipEntrySelection::Status::Selected
+    );
 }
 
 void CatalogArchiveCodecTests::findsEndOfCentralDirectoryWithComment()
@@ -133,10 +143,11 @@ void CatalogArchiveCodecTests::findsEndOfCentralDirectoryWithComment()
         "archive comment"
     );
 
-    const auto zipEntry = skygate::ephemeris::ZipCodec{}.extractFirstCsvEntry(zipData);
+    const skygate::ephemeris::CatalogZipEntrySelection selection =
+        skygate::ephemeris::CatalogZipEntrySelector::select(zipData, std::nullopt);
 
-    QVERIFY(zipEntry.has_value());
-    QVERIFY(zipEntry->find("11,1,2,3") != std::string::npos);
+    QVERIFY(selection.status == skygate::ephemeris::CatalogZipEntrySelection::Status::Selected);
+    QVERIFY(selection.payload.find("11,1,2,3") != std::string::npos);
 }
 
 QTEST_APPLESS_MAIN(CatalogArchiveCodecTests)

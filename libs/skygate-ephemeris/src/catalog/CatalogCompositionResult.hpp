@@ -18,11 +18,12 @@ namespace skygate::ephemeris {
 // contributorSourceIds is parallel to sourceIds and lists every source that
 // contributed to the surviving body in precedence order.
 //
-// The count fields are all derived from this single composition result so
-// consumers do not re-derive them from source catalogs. bodyCount is the
-// number of unique surviving objects; sourceOrder/sourceRowCounts describe how
-// many surviving rows each source contributed; the per-kind counts describe
-// the surviving snapshot by object kind.
+// bodyCount is the number of unique surviving objects and deepSkyObjectCount
+// is the surviving deep-sky object count; both are derived from the composed
+// snapshot so publishing consumers do not re-derive them from source catalogs.
+// foundDeepSkyObjectCount carries the pre-merge deep-sky figure reported by the
+// sources, and sourceOrder lists the distinct contributing sources in
+// precedence order without duplicates.
 //
 // A rejected collection leaves catalog null, isSuccess() false, and records
 // the reason in errorCode/errorDetail. errorCode is NoError and errorDetail is
@@ -37,15 +38,9 @@ struct CatalogCompositionResult final {
     std::vector<std::string> sourceIds;
     std::vector<std::vector<std::string>> contributorSourceIds;
     std::size_t bodyCount = 0;
-    std::size_t constellationCount = 0;
     std::size_t deepSkyObjectCount = 0;
     std::size_t foundDeepSkyObjectCount = 0;
-    std::size_t starCount = 0;
-    std::size_t planetCount = 0;
-    std::size_t moonCount = 0;
-    std::size_t sunCount = 0;
     std::vector<std::string> sourceOrder;
-    std::vector<std::size_t> sourceRowCounts;
     ErrorCode errorCode = ErrorCode::NoError;
     std::string errorDetail;
 
