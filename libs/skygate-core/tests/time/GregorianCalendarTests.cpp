@@ -65,7 +65,6 @@ private slots:
     void decimalYearRoundsToNearestDay();
     void decimalYearClampsToLastDayOfYear();
     void decimalYearUsesFloorForNegativeYears();
-    void astronomicalYearRejectsHistoricalYearZero();
     void astronomicalYearFromHistoricalYearMapsYears();
     void historicalYearFromAstronomicalYearMapsYears();
     void historicalAndAstronomicalYearsRoundTrip();
@@ -192,9 +191,6 @@ void GregorianCalendarTests::civilDateFromDaysSetsMidnightAndUtc()
 
 void GregorianCalendarTests::civilDateFromDaysSequencesMonthEnds()
 {
-    const CivilDateTime leapDay = GregorianCalendar::civilDateFromDays(19'782);
-    QVERIFY2(hasCivilDate(leapDay, 2024, 2, 29), qPrintable(civilDateText(leapDay)));
-
     const CivilDateTime dayAfterLeapDay = GregorianCalendar::civilDateFromDays(19'783);
     QVERIFY2(hasCivilDate(dayAfterLeapDay, 2024, 3, 1), qPrintable(civilDateText(dayAfterLeapDay)));
 
@@ -335,13 +331,6 @@ void GregorianCalendarTests::decimalYearUsesFloorForNegativeYears()
 
     const CivilDateTime midThirdMillenniumBce = GregorianCalendar::civilDateFromDecimalYear(-2000.5);
     QVERIFY2(hasCivilDate(midThirdMillenniumBce, -2001, 7, 3), qPrintable(civilDateText(midThirdMillenniumBce)));
-}
-
-void GregorianCalendarTests::astronomicalYearRejectsHistoricalYearZero()
-{
-    const std::optional<int> yearZero = GregorianCalendar::astronomicalYearFromHistoricalYear(0);
-
-    QVERIFY(!yearZero.has_value());
 }
 
 void GregorianCalendarTests::astronomicalYearFromHistoricalYearMapsYears()

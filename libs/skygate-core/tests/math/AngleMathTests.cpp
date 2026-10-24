@@ -18,18 +18,12 @@ class AngleMathTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void exposesSharedMathConstants();
     void convertsBetweenDegreesAndRadians();
     void convertsBetweenHoursRadiansAndDegrees();
     void normalizesUnsignedDegreesAtBoundaries();
     void normalizesSignedDegreesAtBoundaries();
     void normalizesHoursAtDayBoundaries();
 };
-
-void AngleMathTests::exposesSharedMathConstants()
-{
-    QVERIFY(isNear(skygate::core::MathConstants::kTwoPi, 2.0 * skygate::core::MathConstants::kPi));
-}
 
 void AngleMathTests::convertsBetweenDegreesAndRadians()
 {

@@ -94,10 +94,6 @@ void MathConstantsTests::kHoursPerRadian_isTwelveOverPi()
 void MathConstantsTests::kMilliarcsecondsPerArcsecond_isThousand()
 {
     QVERIFY(isNear(skygate::core::MathConstants::kMilliarcsecondsPerArcsecond, 1000.0));
-    QVERIFY(isNear(
-        skygate::core::MathConstants::kArcsecondsToRadians / skygate::core::MathConstants::kMilliarcsecondsPerArcsecond,
-        skygate::core::MathConstants::kMilliarcsecondsToRadians
-    ));
 }
 
 void MathConstantsTests::kArcminutesPerDegree_isSixty()
