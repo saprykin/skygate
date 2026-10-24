@@ -72,7 +72,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     return std::nullopt;
 }
 
-[[nodiscard]] bool applyMetadataLine(
+void applyMetadataLine(
     IDeltaTProvider::DataInfo& info,
     const std::string_view line,
     const std::size_t lineNumber,
@@ -82,17 +82,17 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
 )
 {
     if (EphemerisTableMetadata::applyCommonLine(info, line, kDataLabel, lineNumber, diagnosticText)) {
-        return true;
+        return;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "ancient_fallback_start");
         value.has_value()) {
         diagnosticText = setFallbackStart(info, *value, lineNumber, hasFallbackStart);
-        return true;
+        return;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "ancient_fallback_end");
         value.has_value()) {
         diagnosticText = setFallbackEnd(info, *value, lineNumber, hasFallbackEnd);
-        return true;
+        return;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "ancient_fallback_source");
         value.has_value()) {
@@ -100,7 +100,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
             info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
         fallback.provenance = std::move(*value);
         info.ancientFallbackModel = std::move(fallback);
-        return true;
+        return;
     }
     if (std::optional<std::string> value =
             TextParsingUtilities::metadataValue(line, "ancient_fallback_delta_t_seconds");
@@ -109,14 +109,14 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
         if (!seconds.has_value()) {
             diagnosticText =
                 EphemerisTableMetadata::malformedMetadata(kDataLabel, "ancient fallback estimate", lineNumber);
-            return true;
+            return;
         }
 
         IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
             info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
         fallback.representativeDeltaTSeconds = *seconds;
         info.ancientFallbackModel = std::move(fallback);
-        return true;
+        return;
     }
     if (std::optional<std::string> value =
             TextParsingUtilities::metadataValue(line, "ancient_fallback_uncertainty_seconds");
@@ -125,17 +125,14 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
         if (!seconds.has_value() || *seconds < 0.0) {
             diagnosticText =
                 EphemerisTableMetadata::malformedMetadata(kDataLabel, "ancient fallback uncertainty", lineNumber);
-            return true;
+            return;
         }
 
         IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
             info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
         fallback.estimatedUncertaintySeconds = *seconds;
         info.ancientFallbackModel = std::move(fallback);
-        return true;
     }
-
-    return true;
 }
 
 [[nodiscard]] bool parseUsnoEntryLine(std::string_view line, IDeltaTProvider::TableEntry& entry) noexcept
@@ -242,7 +239,7 @@ DeltaTDataParser::Result DeltaTDataParser::parse(const EphemerisTextDataAsset& a
         asset.content,
         [&info, &hasFallbackStart, &hasFallbackEnd](
             const std::string_view line, const std::size_t lineNumber, std::optional<std::string>& diagnosticText
-        ) { return applyMetadataLine(info, line, lineNumber, hasFallbackStart, hasFallbackEnd, diagnosticText); },
+        ) { applyMetadataLine(info, line, lineNumber, hasFallbackStart, hasFallbackEnd, diagnosticText); },
         [](const std::string_view, const std::string_view, const bool) noexcept { return false; },
         [](const std::string_view, const std::string_view trimmedLine, IDeltaTProvider::TableEntry& entry) noexcept {
             return parseEntryLine(trimmedLine, entry);

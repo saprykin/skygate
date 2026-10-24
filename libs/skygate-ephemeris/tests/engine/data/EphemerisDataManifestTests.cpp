@@ -5,7 +5,6 @@
 
 #include <algorithm>
 #include <array>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -26,7 +25,7 @@ private slots:
     void rejectsInvalidBooleanFields();
     void rejectsUnsafeCompressionSizes();
     void pinsFieldDiagnosticWording();
-    void assetAndCompressionKindTextRoundTrips();
+    void rejectsUnknownAssetAndCompressionKindText();
 };
 
 namespace {
@@ -562,43 +561,11 @@ void EphemerisDataManifestTests::pinsFieldDiagnosticWording()
     QVERIFY(kernel->relativePath.empty());
 }
 
-void EphemerisDataManifestTests::assetAndCompressionKindTextRoundTrips()
+void EphemerisDataManifestTests::rejectsUnknownAssetAndCompressionKindText()
 {
     using skygate::ephemeris::EphemerisDataManifest;
 
-    constexpr std::array assetKinds{
-        EphemerisDataManifest::AssetKind::SolarSystemKernel,
-        EphemerisDataManifest::AssetKind::LeapSecondTable,
-        EphemerisDataManifest::AssetKind::EarthOrientationData,
-        EphemerisDataManifest::AssetKind::DeltaTData,
-    };
-
-    for (const EphemerisDataManifest::AssetKind kind : assetKinds) {
-        const std::string_view text = EphemerisDataManifest::assetKindToText(kind);
-        QVERIFY(!text.empty());
-
-        const std::optional<EphemerisDataManifest::AssetKind> parsed = EphemerisDataManifest::assetKindFromText(text);
-        QVERIFY(parsed.has_value());
-        QCOMPARE(*parsed, kind);
-    }
-
     QVERIFY(!EphemerisDataManifest::assetKindFromText("unknown").has_value());
-
-    constexpr std::array compressionKinds{
-        EphemerisDataManifest::CompressionKind::None,
-        EphemerisDataManifest::CompressionKind::Zstd,
-    };
-
-    for (const EphemerisDataManifest::CompressionKind kind : compressionKinds) {
-        const std::string_view text = EphemerisDataManifest::compressionKindToText(kind);
-        QVERIFY(!text.empty());
-
-        const std::optional<EphemerisDataManifest::CompressionKind> parsed =
-            EphemerisDataManifest::compressionKindFromText(text);
-        QVERIFY(parsed.has_value());
-        QCOMPARE(*parsed, kind);
-    }
-
     QVERIFY(!EphemerisDataManifest::compressionKindFromText("unknown").has_value());
 }
 

@@ -74,17 +74,6 @@ std::optional<std::size_t> EphemerisEngineDescriptorRegistry::indexOf(const Ephe
     return std::nullopt;
 }
 
-const EphemerisEngineDescriptor* EphemerisEngineDescriptorRegistry::findById(const std::string_view id) noexcept
-{
-    const auto& all = descriptors();
-    for (const EphemerisEngineDescriptor& descriptor : all) {
-        if (descriptor.id == id) {
-            return &descriptor;
-        }
-    }
-    return nullptr;
-}
-
 const EphemerisEngineDescriptor*
 EphemerisEngineDescriptorRegistry::findByIdIgnoreAsciiCase(const std::string_view id) noexcept
 {
