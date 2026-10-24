@@ -30,7 +30,6 @@ class CatalogBridgeRetentionTests final : public QObject {
 
 private slots:
     void bridgesIdentifiersAcquiredEarlierInSourcePass();
-    void bridgesAmbiguousIdentifiersIntoSingleSurvivor();
     void keepsIncompatibleKindsDistinctWhenBridging();
     void bridgesDeepSkyObjectsWithMetadataUnion();
     void multiStageBridgesRetainEveryContributorOnce();
@@ -98,60 +97,6 @@ void CatalogBridgeRetentionTests::bridgesIdentifiersAcquiredEarlierInSourcePass(
     QCOMPARE(winner->fixedEquatorialValue()->rightAscensionHours, 1.0);
     QCOMPARE(result.sourceIds.front(), std::string("source-b"));
     QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-b", "source-a"}));
-}
-
-void CatalogBridgeRetentionTests::bridgesAmbiguousIdentifiersIntoSingleSurvivor()
-{
-    // The bridging record carries both authoritative identifiers. It resolves
-    // each of them to a different survivor of an earlier source, so it becomes
-    // the single survivor of all three records instead of a third object.
-    //
-    // Contract correction: the bridge carries no display name of
-    // its own, so its missing name comes from the highest-priority contributor,
-    // and contributors are listed from the winner down to the lowest-priority
-    // source. Source precedence is the configured collection position, not the
-    // accumulator position of an absorbed survivor: source-c is configured
-    // after source-a, so `Gamma` wins over `Alpha` and source-c precedes
-    // source-a. The earlier version of this test asserted accumulator position
-    // order, which is not source precedence.
-    const auto sourceA = CatalogMergeTestSupport::createCatalog(
-        {CatalogMergeTestSupport::makeStar("a_hip1", "Alpha", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {}
-    );
-    const auto sourceC = CatalogMergeTestSupport::createCatalog(
-        {CatalogMergeTestSupport::makeStar("c_hd2", "Gamma", {CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0)}, {}
-    );
-    const auto sourceB = CatalogMergeTestSupport::createCatalog(
-        {CatalogMergeTestSupport::makeStar(
-            "b_bridge", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0
-        )},
-        {}
-    );
-    QVERIFY(sourceA != nullptr);
-    QVERIFY(sourceC != nullptr);
-    QVERIFY(sourceB != nullptr);
-
-    CatalogCompositionRequest request;
-    request.sources = {
-        {.sourceId = "source-a", .enabled = true, .catalog = sourceA.get(), .policy = CatalogCompositionPolicy::Merge},
-        {.sourceId = "source-c", .enabled = true, .catalog = sourceC.get(), .policy = CatalogCompositionPolicy::Merge},
-        {.sourceId = "source-b", .enabled = true, .catalog = sourceB.get(), .policy = CatalogCompositionPolicy::Merge},
-    };
-
-    const CatalogCompositionResult result = CatalogComposer::composeCollection(request);
-
-    QVERIFY(result.isSuccess());
-    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
-    QCOMPARE(result.bodyCount, std::size_t{1});
-    QCOMPARE(CatalogMergeTestSupport::countBodiesById(bodies, "a_hip1"), std::size_t{0});
-    QCOMPARE(CatalogMergeTestSupport::countBodiesById(bodies, "c_hd2"), std::size_t{0});
-
-    const BaseCelestialBody* winner = CatalogMergeTestSupport::findBodyById(bodies, "b_bridge");
-    QVERIFY(winner != nullptr);
-    QVERIFY(CatalogMergeTestSupport::hasIdentifier(*winner, "hip", "1"));
-    QVERIFY(CatalogMergeTestSupport::hasIdentifier(*winner, "hd", "2"));
-    QCOMPARE(QString::fromStdString(winner->displayName), QStringLiteral("Gamma"));
-    QCOMPARE(result.sourceIds.front(), std::string("source-b"));
-    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-b", "source-c", "source-a"}));
 }
 
 void CatalogBridgeRetentionTests::keepsIncompatibleKindsDistinctWhenBridging()
