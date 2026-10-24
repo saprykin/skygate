@@ -30,9 +30,9 @@ struct SkyEphemerisDataCacheSnapshot final {
     [[nodiscard]] static std::optional<bool> legacyKernelLongRange(const SkyEphemerisDataCacheSnapshot& snapshot);
 
     // The installed payload paths in one place, so the completeness check, the
-    // fallback decision, the cache-size view, and the cache-clearing paths
-    // enumerate the same set. Empty fields are part of the enumeration; callers
-    // that read files skip them.
+    // activation-root containment check, the cache-size view, and the
+    // cache-clearing paths enumerate the same set. Empty fields are part of the
+    // enumeration; callers that read files skip them.
     [[nodiscard]] static QStringList installedPayloadPaths(const SkyEphemerisDataCacheSnapshot& snapshot);
     [[nodiscard]] static QStringList installedSupportDataPaths(const SkyEphemerisDataCacheSnapshot& snapshot);
 };
