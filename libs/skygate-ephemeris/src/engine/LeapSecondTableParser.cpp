@@ -1,5 +1,7 @@
 #include "LeapSecondTableParser.hpp"
+#include "EphemerisEpochParsing.hpp"
 #include "EphemerisTableMetadata.hpp"
+#include "EphemerisTableParsing.hpp"
 #include "IEphemerisDataSnapshot.hpp"
 #include "NumericParsingUtilities.hpp"
 #include "StringUtilities.hpp"
@@ -21,6 +23,14 @@ namespace {
 constexpr std::string_view kDataLabel = "Leap-second table";
 constexpr std::string_view kValidityRangeId = "leap-seconds";
 constexpr std::size_t kMetadataMarkerSize = EphemerisTableMetadata::kMetadataLinePrefix.size() - 1U;
+
+constexpr EphemerisTableParsing::TableParseSpec kParseSpec{
+    .dataLabel = kDataLabel,
+    .rowLabel = kDataLabel,
+    .validityRangeId = kValidityRangeId,
+    .rejectDuplicateDates = false,
+    .endValidityRangeAtExpiration = true,
+};
 
 [[nodiscard]] std::optional<skygate::core::CivilDateTime> parseIanaCommentDate(const std::string_view text) noexcept
 {
@@ -69,15 +79,10 @@ void applyMetadataLine(
         return false;
     }
 
-    const std::optional<skygate::core::CivilDateTime> effectiveDate = TextParsingUtilities::parseUtcDate(columns[0]);
-    const std::optional<int> taiMinusUtcSeconds = NumericParsingUtilities::parseInt(columns[1]);
-    if (!effectiveDate.has_value() || !taiMinusUtcSeconds.has_value()) {
-        return false;
-    }
-
     const std::optional<skygate::core::AstronomicalEpoch> effectiveEpoch =
-        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*effectiveDate);
-    if (!effectiveEpoch.has_value()) {
+        EphemerisEpochParsing::epochFromDateColumn(columns[0]);
+    const std::optional<int> taiMinusUtcSeconds = NumericParsingUtilities::parseInt(columns[1]);
+    if (!effectiveEpoch.has_value() || !taiMinusUtcSeconds.has_value()) {
         return false;
     }
 
@@ -125,51 +130,33 @@ void applyMetadataLine(
     return parseCsvEntryLine(line, entry) || parseIanaEntryLine(line, entry);
 }
 
-[[nodiscard]] LeapSecondTableParser::Result
-failureResult(ILeapSecondProvider::TableInfo info, const EphemerisTableDataStatus status, std::string diagnosticText)
-{
-    info.status = status;
-    info.diagnosticText = std::move(diagnosticText);
-
-    LeapSecondTableParser::Result result;
-    result.tableInfo = std::move(info);
-    return result;
-}
-
 }  // namespace
 
 LeapSecondTableParser::Result LeapSecondTableParser::parse(const EphemerisTextDataAsset& asset)
 {
-    ILeapSecondProvider::TableInfo info;
-    info.version = asset.version;
-    info.provenance = asset.provenance;
-
+    Result result;
     std::vector<ILeapSecondProvider::TableEntry> entries;
-    std::optional<std::string> malformedLine = EphemerisTableMetadata::parseTableLines(
-        asset.content,
-        [&info](const std::string_view line, const std::size_t lineNumber, std::optional<std::string>& diagnosticText) {
-            applyMetadataLine(info, line, lineNumber, diagnosticText);
-        },
-        [](const std::string_view, const std::string_view, const bool) noexcept { return false; },
-        [](const std::string_view,
-           const std::string_view trimmedLine,
-           ILeapSecondProvider::TableEntry& entry) noexcept { return parseEntryLine(trimmedLine, entry); },
-        entries,
-        kDataLabel
-    );
-    if (malformedLine.has_value()) {
-        return failureResult(std::move(info), EphemerisTableDataStatus::Malformed, std::move(*malformedLine));
-    }
-
-    if (std::optional<std::string> diagnosticText = EphemerisTableMetadata::finalizeParsedTable(
-            info, entries, kDataLabel, kDataLabel, kValidityRangeId, false, true
+    if (std::optional<std::string> diagnosticText = EphemerisTableParsing::parsePayload(
+            asset,
+            result.tableInfo,
+            entries,
+            [&result](
+                const std::string_view line,
+                const std::size_t lineNumber,
+                std::optional<std::string>& metadataDiagnostic
+            ) { applyMetadataLine(result.tableInfo, line, lineNumber, metadataDiagnostic); },
+            EphemerisTableParsing::skipNoLines,
+            [](const std::string_view,
+               const std::string_view trimmedLine,
+               ILeapSecondProvider::TableEntry& entry) noexcept { return parseEntryLine(trimmedLine, entry); },
+            kParseSpec,
+            [](const ILeapSecondProvider::TableInfo&) noexcept { return std::optional<std::string>{}; }
         );
         diagnosticText.has_value()) {
-        return failureResult(std::move(info), EphemerisTableDataStatus::Malformed, std::move(*diagnosticText));
+        EphemerisTableParsing::markFailed(result.tableInfo, std::move(*diagnosticText));
+        return result;
     }
 
-    LeapSecondTableParser::Result result;
-    result.tableInfo = std::move(info);
     result.entries = std::move(entries);
     return result;
 }

@@ -1,25 +1,17 @@
 #pragma once
 
 #include "ILeapSecondProvider.hpp"
-#include "TimeScaleConversionResult.hpp"
+#include "TimeScaleOffsetLookup.hpp"
 #include "TimeScaleServiceOptions.hpp"
 
 #include <memory>
-#include <optional>
-#include <string>
 
 namespace skygate::ephemeris {
 
 class LeapSecondOffsetResolver final {
 public:
-    struct Result {
-        std::optional<int> offsetSeconds;
-        TimeScaleConversionStatus::Type status = TimeScaleConversionStatus::Type::Valid;
-        TimeScaleConversionResult::WarningMask warningCodeMask;
-        std::string diagnosticText;
-
-        void addWarning(const TimeScaleConversionWarningCode::Type code) noexcept;
-    };
+    /// The resolved TAI-UTC step count and its report.
+    using Result = TimeScaleOffsetLookup;
 
     LeapSecondOffsetResolver(
         std::shared_ptr<const ILeapSecondProvider> leapSecondProvider, TimeScaleServiceOptions options

@@ -637,8 +637,8 @@ void TimeScaleOffsetResolverTests::resolvesExactEarthOrientationRow()
     const Ut1OffsetResolver::Result lookup = resolver.lookupUtcToUt1Offset(epochForDate(2026, 4, 1));
 
     QVERIFY(lookup.isSuccess());
-    QVERIFY(lookup.ut1MinusUtcSeconds.has_value());
-    QCOMPARE(*lookup.ut1MinusUtcSeconds, 0.10);
+    QVERIFY(lookup.offsetSeconds.has_value());
+    QCOMPARE(*lookup.offsetSeconds, 0.10);
     QCOMPARE(static_cast<std::uint8_t>(lookup.status), static_cast<std::uint8_t>(ConversionStatus::Valid));
     QVERIFY(!lookup.warningCodeMask.hasAny());
     QCOMPARE(QString::fromStdString(lookup.diagnosticText), QStringLiteral("Earth-orientation sample resolved."));
@@ -652,8 +652,8 @@ void TimeScaleOffsetResolverTests::resolvesInterpolatedEarthOrientationSample()
     const Ut1OffsetResolver::Result lookup = resolver.lookupUtcToUt1Offset(epochForDate(2026, 4, 6));
 
     QVERIFY(lookup.isSuccess());
-    QVERIFY(lookup.ut1MinusUtcSeconds.has_value());
-    QVERIFY(std::abs(*lookup.ut1MinusUtcSeconds - 0.20) < 1.0e-12);
+    QVERIFY(lookup.offsetSeconds.has_value());
+    QVERIFY(std::abs(*lookup.offsetSeconds - 0.20) < 1.0e-12);
     QCOMPARE(static_cast<std::uint8_t>(lookup.status), static_cast<std::uint8_t>(ConversionStatus::Valid));
     QCOMPARE(QString::fromStdString(lookup.diagnosticText), QStringLiteral("Earth-orientation sample interpolated."));
 }
@@ -710,7 +710,7 @@ void TimeScaleOffsetResolverTests::reportsUnusableEarthOrientationWithoutFallbac
     const Ut1OffsetResolver::Result missing = resolver.lookupUtcToUt1Offset(epochForDate(2026, 4, 1));
 
     QVERIFY(!missing.isSuccess());
-    QVERIFY(!missing.ut1MinusUtcSeconds.has_value());
+    QVERIFY(!missing.offsetSeconds.has_value());
     QCOMPARE(static_cast<std::uint8_t>(missing.status), static_cast<std::uint8_t>(ConversionStatus::Failed));
     QVERIFY(hasWarning(missing, TimeScaleConversionWarningCode::Type::EarthOrientationDataMissing));
     QVERIFY(!hasWarning(missing, TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied));
@@ -753,8 +753,8 @@ void TimeScaleOffsetResolverTests::usesDeltaTFallbackForMissingEarthOrientation(
 
     // ut1 - utc = (tai - utc) + (tt - tai) - (tt - ut1)
     const double expectedSeconds = 37.0 + TimeConstants::kTtMinusTaiSeconds - 69.2;
-    QVERIFY(lookup.ut1MinusUtcSeconds.has_value());
-    QVERIFY(std::abs(*lookup.ut1MinusUtcSeconds - expectedSeconds) < 1.0e-9);
+    QVERIFY(lookup.offsetSeconds.has_value());
+    QVERIFY(std::abs(*lookup.offsetSeconds - expectedSeconds) < 1.0e-9);
     QVERIFY(hasWarning(lookup, TimeScaleConversionWarningCode::Type::EarthOrientationDataMissing));
     QVERIFY(hasWarning(lookup, TimeScaleConversionWarningCode::Type::DeltaTFallbackApplied));
     QVERIFY(!hasWarning(lookup, TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied));
@@ -770,7 +770,7 @@ void TimeScaleOffsetResolverTests::reportsDeltaTUnavailableInFallback()
     const Ut1OffsetResolver::Result lookup = resolver.lookupUtcToUt1Offset(epochForDate(2026, 4, 1));
 
     QVERIFY(!lookup.isSuccess());
-    QVERIFY(!lookup.ut1MinusUtcSeconds.has_value());
+    QVERIFY(!lookup.offsetSeconds.has_value());
     QCOMPARE(static_cast<std::uint8_t>(lookup.status), static_cast<std::uint8_t>(ConversionStatus::Failed));
     QVERIFY(hasWarning(lookup, TimeScaleConversionWarningCode::Type::DeltaTUnavailable));
     QCOMPARE(
@@ -790,7 +790,7 @@ void TimeScaleOffsetResolverTests::reportsLeapSecondFailureInDeltaTFallback()
     const Ut1OffsetResolver::Result lookup = resolver.lookupUtcToUt1Offset(epochForDate(2026, 4, 1));
 
     QVERIFY(!lookup.isSuccess());
-    QVERIFY(!lookup.ut1MinusUtcSeconds.has_value());
+    QVERIFY(!lookup.offsetSeconds.has_value());
     QCOMPARE(static_cast<std::uint8_t>(lookup.status), static_cast<std::uint8_t>(ConversionStatus::Failed));
     QVERIFY(hasWarning(lookup, TimeScaleConversionWarningCode::Type::EpochOutsideLeapSecondTable));
     QCOMPARE(
@@ -846,7 +846,7 @@ void TimeScaleOffsetResolverTests::mergesLookupWarningsIntoConversionResult()
     QVERIFY(!result.warningCodeMask.hasAny());
 
     Ut1OffsetResolver::Result lookup;
-    lookup.ut1MinusUtcSeconds = 0.10;
+    lookup.offsetSeconds = 0.10;
     lookup.status = ConversionStatus::Degraded;
     lookup.addWarning(TimeScaleConversionWarningCode::Type::EarthOrientationDataPredicted);
     lookup.diagnosticText = "Earth-orientation sample interpolated with degraded metadata.";

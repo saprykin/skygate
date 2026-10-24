@@ -1,11 +1,28 @@
 #include "LeapSecondTableLoader.hpp"
-#include "EphemerisDataStaleness.hpp"
+#include "EphemerisTableLoading.hpp"
+#include "IEphemerisDataSnapshot.hpp"
 #include "LeapSecondTableParser.hpp"
 #include "TableBackedLeapSecondProvider.hpp"
 
+#include <optional>
 #include <utility>
+#include <vector>
 
 namespace skygate::ephemeris {
+
+namespace {
+
+using LoadedLeapSecondTable = EphemerisTableLoading::LoadedTable<ILeapSecondProvider, ILeapSecondProvider::TableInfo>;
+
+[[nodiscard]] LeapSecondTableLoader::Result toLoaderResult(LoadedLeapSecondTable loaded)
+{
+    LeapSecondTableLoader::Result result;
+    result.tableInfo = std::move(loaded.info);
+    result.provider = std::move(loaded.provider);
+    return result;
+}
+
+}  // namespace
 
 LeapSecondTableLoader::Result LeapSecondTableLoader::loadFromSnapshot(
     const IEphemerisDataSnapshot& snapshot, const LeapSecondTableLoader::Options& options
@@ -13,10 +30,11 @@ LeapSecondTableLoader::Result LeapSecondTableLoader::loadFromSnapshot(
 {
     const std::optional<EphemerisTextDataAsset> asset = snapshot.leapSecondTableAsset();
     if (!asset.has_value()) {
-        Result result;
-        result.tableInfo.status = ILeapSecondProvider::TableStatus::Missing;
-        result.tableInfo.diagnosticText = "Leap-second table asset is missing from the data snapshot.";
-        return result;
+        return toLoaderResult(
+            EphemerisTableLoading::missingAsset<ILeapSecondProvider, ILeapSecondProvider::TableInfo>(
+                "Leap-second table asset is missing from the data snapshot."
+            )
+        );
     }
 
     return loadFromTextAsset(*asset, options);
@@ -27,21 +45,19 @@ LeapSecondTableLoader::Result LeapSecondTableLoader::loadFromTextAsset(
 )
 {
     LeapSecondTableParser::Result parsed = LeapSecondTableParser::parse(asset);
-    Result result;
-    if (!parsed.isSuccess()) {
-        result.tableInfo = std::move(parsed.tableInfo);
-        return result;
-    }
-
-    auto& info = parsed.tableInfo;
-    if (EphemerisDataStaleness::isStale(options.referenceEpoch, info.expiresAt)) {
-        info.status = ILeapSecondProvider::TableStatus::Stale;
-        info.diagnosticText = "Leap-second table is stale for the reference epoch.";
-    }
-
-    result.tableInfo = info;
-    result.provider = std::make_shared<TableBackedLeapSecondProvider>(std::move(info), std::move(parsed.entries));
-    return result;
+    const bool parseSucceeded = parsed.isSuccess();
+    return toLoaderResult(
+        EphemerisTableLoading::loadParsedTable<ILeapSecondProvider, ILeapSecondProvider::TableInfo>(
+            std::move(parsed.tableInfo),
+            std::move(parsed.entries),
+            parseSucceeded,
+            options.referenceEpoch,
+            "Leap-second table is stale for the reference epoch.",
+            [](ILeapSecondProvider::TableInfo tableInfo, std::vector<ILeapSecondProvider::TableEntry> entries) {
+                return std::make_shared<TableBackedLeapSecondProvider>(std::move(tableInfo), std::move(entries));
+            }
+        )
+    );
 }
 
 }  // namespace skygate::ephemeris

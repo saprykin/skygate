@@ -1,5 +1,7 @@
 #include "EarthOrientationDataParser.hpp"
+#include "EphemerisEpochParsing.hpp"
 #include "EphemerisTableMetadata.hpp"
+#include "EphemerisTableParsing.hpp"
 #include "EphemerisTimePolicy.hpp"
 #include "IEphemerisDataSnapshot.hpp"
 #include "NumericParsingUtilities.hpp"
@@ -24,64 +26,44 @@ constexpr std::string_view kValidityRangeId = "earth-orientation";
 constexpr std::string_view kPredictionRangeId = "earth-orientation-prediction";
 constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation prediction interval";
 
+constexpr EphemerisTableParsing::TableParseSpec kParseSpec{
+    .dataLabel = kDataLabel,
+    .rowLabel = kRowLabel,
+    .validityRangeId = kValidityRangeId,
+    .rejectDuplicateDates = false,
+    .endValidityRangeAtExpiration = false,
+};
+
 [[nodiscard]] bool startsWithIntegerYear(const std::string_view line) noexcept
 {
     const std::vector<std::string_view> columns = TextParsingUtilities::splitAsciiWhitespace(line);
     return !columns.empty() && NumericParsingUtilities::parseInt(columns.front()).has_value();
 }
 
-[[nodiscard]] std::optional<std::string> setPredictionStart(
+[[nodiscard]] std::optional<std::string> setPredictionEndpoint(
     IEarthOrientationProvider::DataInfo& info,
+    skygate::core::AstronomicalEpoch EphemerisDateRange::* const endpoint,
+    const std::string_view subject,
     const std::string& value,
     const std::size_t lineNumber,
-    bool& hasPredictionStart
+    bool& hasEndpoint
 )
 {
-    EphemerisDateRange range = info.predictionRange.value_or(EphemerisDateRange{});
-    if (std::optional<std::string> diagnosticText = EphemerisTableMetadata::assignRangeEndpoint(
-            range,
-            &EphemerisDateRange::start,
-            value,
-            kPredictionRangeId,
-            kPredictionRangeDisplayName,
-            kDataLabel,
-            "prediction start",
-            lineNumber,
-            hasPredictionStart
-        );
-        diagnosticText.has_value()) {
-        return diagnosticText;
-    }
-
-    info.predictionRange = range;
-    return std::nullopt;
-}
-
-[[nodiscard]] std::optional<std::string> setPredictionEnd(
-    IEarthOrientationProvider::DataInfo& info,
-    const std::string& value,
-    const std::size_t lineNumber,
-    bool& hasPredictionEnd
-)
-{
-    EphemerisDateRange range = info.predictionRange.value_or(EphemerisDateRange{});
-    if (std::optional<std::string> diagnosticText = EphemerisTableMetadata::assignRangeEndpoint(
-            range,
-            &EphemerisDateRange::end,
-            value,
-            kPredictionRangeId,
-            kPredictionRangeDisplayName,
-            kDataLabel,
-            "prediction end",
-            lineNumber,
-            hasPredictionEnd
-        );
-        diagnosticText.has_value()) {
-        return diagnosticText;
-    }
-
-    info.predictionRange = range;
-    return std::nullopt;
+    return EphemerisTableParsing::assignOptionalRangeEndpoint(
+        info.predictionRange, [endpoint, subject, &value, lineNumber, &hasEndpoint](EphemerisDateRange& range) {
+            return EphemerisTableMetadata::assignRangeEndpoint(
+                range,
+                endpoint,
+                value,
+                kPredictionRangeId,
+                kPredictionRangeDisplayName,
+                kDataLabel,
+                subject,
+                lineNumber,
+                hasEndpoint
+            );
+        }
+    );
 }
 
 void applyMetadataLine(
@@ -98,13 +80,18 @@ void applyMetadataLine(
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "prediction_start");
         value.has_value()) {
-        diagnosticText = setPredictionStart(info, *value, lineNumber, hasPredictionStart);
+        diagnosticText = setPredictionEndpoint(
+            info, &EphemerisDateRange::start, "prediction start", *value, lineNumber, hasPredictionStart
+        );
         return;
     }
     if (std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "prediction_end");
         value.has_value()) {
-        diagnosticText = setPredictionEnd(info, *value, lineNumber, hasPredictionEnd);
+        diagnosticText = setPredictionEndpoint(
+            info, &EphemerisDateRange::end, "prediction end", *value, lineNumber, hasPredictionEnd
+        );
         return;
+    }
     }
 }
 
@@ -148,7 +135,7 @@ void applyMetadataLine(
     }
 
     const std::optional<skygate::core::AstronomicalEpoch> effectiveEpoch =
-        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*effectiveDate);
+        EphemerisEpochParsing::epochFromCivilDate(effectiveDate);
     if (!effectiveEpoch.has_value()) {
         return false;
     }
@@ -319,7 +306,7 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     }
 
     const std::optional<skygate::core::AstronomicalEpoch> effectiveEpoch =
-        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*effectiveDate);
+        EphemerisEpochParsing::epochFromCivilDate(effectiveDate);
     if (!effectiveEpoch.has_value()) {
         return false;
     }
@@ -344,13 +331,14 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
         return parseIersC04EntryLine(line, entry);
     }
 
-    const std::optional<skygate::core::CivilDateTime> effectiveDate = TextParsingUtilities::parseUtcDate(columns[0]);
+    const std::optional<skygate::core::AstronomicalEpoch> effectiveEpoch =
+        EphemerisEpochParsing::epochFromDateColumn(columns[0]);
     const std::optional<double> ut1MinusUtcSeconds = NumericParsingUtilities::parseFiniteDouble(columns[1]);
     const std::optional<double> polarMotionXArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[2]);
     const std::optional<double> polarMotionYArcseconds = NumericParsingUtilities::parseFiniteDouble(columns[3]);
     bool predicted = false;
     bool estimated = false;
-    if (!effectiveDate.has_value() || !ut1MinusUtcSeconds.has_value() || !polarMotionXArcseconds.has_value()
+    if (!effectiveEpoch.has_value() || !ut1MinusUtcSeconds.has_value() || !polarMotionXArcseconds.has_value()
         || !polarMotionYArcseconds.has_value()) {
         return parseIersC04EntryLine(line, entry);
     }
@@ -360,12 +348,6 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     if (columns.size() == 6U
         && (!TextParsingUtilities::parseBool(columns[4], predicted)
             || !TextParsingUtilities::parseBool(columns[5], estimated))) {
-        return false;
-    }
-
-    const std::optional<skygate::core::AstronomicalEpoch> effectiveEpoch =
-        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*effectiveDate);
-    if (!effectiveEpoch.has_value()) {
         return false;
     }
 
@@ -400,66 +382,59 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     return line.find(',') == std::string_view::npos && !startsWithIntegerYear(line);
 }
 
-[[nodiscard]] EarthOrientationDataParser::Result failureResult(
-    IEarthOrientationProvider::DataInfo info, const EphemerisTableDataStatus status, std::string diagnosticText
+// A prediction range is usable only when its metadata names both endpoints and
+// forms a valid range.
+[[nodiscard]] std::optional<std::string> checkPredictionRange(
+    const IEarthOrientationProvider::DataInfo& info, const bool hasPredictionStart, const bool hasPredictionEnd
 )
 {
-    info.status = status;
-    info.diagnosticText = std::move(diagnosticText);
+    if (!info.predictionRange.has_value()) {
+        return std::nullopt;
+    }
+    if (!hasPredictionStart || !hasPredictionEnd || !info.predictionRange->isValid()) {
+        return "Earth-orientation prediction metadata must include a valid start and end range.";
+    }
 
-    EarthOrientationDataParser::Result result;
-    result.dataInfo = std::move(info);
-    return result;
+    return std::nullopt;
 }
 
 }  // namespace
 
 EarthOrientationDataParser::Result EarthOrientationDataParser::parse(const EphemerisTextDataAsset& asset)
 {
-    IEarthOrientationProvider::DataInfo info;
-    info.version = asset.version;
-    info.provenance = asset.provenance;
-
+    Result result;
     std::vector<IEarthOrientationProvider::TableEntry> entries;
     bool hasPredictionStart = false;
     bool hasPredictionEnd = false;
-    std::optional<std::string> malformedLine = EphemerisTableMetadata::parseTableLines(
-        asset.content,
-        [&info, &hasPredictionStart, &hasPredictionEnd](
-            const std::string_view line, const std::size_t lineNumber, std::optional<std::string>& diagnosticText
-        ) { applyMetadataLine(info, line, lineNumber, hasPredictionStart, hasPredictionEnd, diagnosticText); },
-        [](const std::string_view rawLine, const std::string_view trimmedLine, const bool entriesEmpty) noexcept {
-            return isFinals2000ADateOnlyLine(rawLine) || (entriesEmpty && isIgnorableHeaderLine(trimmedLine));
-        },
-        [](const std::string_view rawLine,
-           const std::string_view,
-           IEarthOrientationProvider::TableEntry& entry) noexcept { return parseEntryLine(rawLine, entry); },
-        entries,
-        kDataLabel
-    );
-    if (malformedLine.has_value()) {
-        return failureResult(std::move(info), EphemerisTableDataStatus::Malformed, std::move(*malformedLine));
-    }
-
-    if (info.predictionRange.has_value()) {
-        if (!hasPredictionStart || !hasPredictionEnd || !info.predictionRange->isValid()) {
-            return failureResult(
-                std::move(info),
-                EphemerisTableDataStatus::Malformed,
-                "Earth-orientation prediction metadata must include a valid start and end range."
-            );
-        }
-    }
-
-    if (std::optional<std::string> diagnosticText = EphemerisTableMetadata::finalizeParsedTable(
-            info, entries, kDataLabel, kRowLabel, kValidityRangeId, false, false
+    if (std::optional<std::string> diagnosticText = EphemerisTableParsing::parsePayload(
+            asset,
+            result.dataInfo,
+            entries,
+            [&result, &hasPredictionStart, &hasPredictionEnd](
+                const std::string_view line,
+                const std::size_t lineNumber,
+                std::optional<std::string>& metadataDiagnostic
+            ) {
+                applyMetadataLine(
+                    result.dataInfo, line, lineNumber, hasPredictionStart, hasPredictionEnd, metadataDiagnostic
+                );
+            },
+            [](const std::string_view rawLine, const std::string_view trimmedLine, const bool entriesEmpty) noexcept {
+                return isFinals2000ADateOnlyLine(rawLine) || (entriesEmpty && isIgnorableHeaderLine(trimmedLine));
+            },
+            [](const std::string_view rawLine,
+               const std::string_view,
+               IEarthOrientationProvider::TableEntry& entry) noexcept { return parseEntryLine(rawLine, entry); },
+            kParseSpec,
+            [&hasPredictionStart, &hasPredictionEnd](const IEarthOrientationProvider::DataInfo& info) {
+                return checkPredictionRange(info, hasPredictionStart, hasPredictionEnd);
+            }
         );
         diagnosticText.has_value()) {
-        return failureResult(std::move(info), EphemerisTableDataStatus::Malformed, std::move(*diagnosticText));
+        EphemerisTableParsing::markFailed(result.dataInfo, std::move(*diagnosticText));
+        return result;
     }
 
-    EarthOrientationDataParser::Result result;
-    result.dataInfo = std::move(info);
     result.entries = std::move(entries);
     return result;
 }

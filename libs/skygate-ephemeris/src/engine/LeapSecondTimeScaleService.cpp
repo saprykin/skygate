@@ -1,4 +1,5 @@
 #include "LeapSecondTimeScaleService.hpp"
+#include "EphemerisEpochParsing.hpp"
 #include "TdbTtConverter.hpp"
 #include "math/TimeConstants.hpp"
 #include "time/CalendarTime.hpp"
@@ -52,14 +53,14 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convert(
     case skygate::core::TimeScale::Utc: {
         if (targetScale == skygate::core::TimeScale::Ut1) {
             const Ut1OffsetResolver::Result lookup = m_ut1OffsetResolver.lookupUtcToUt1Offset(epoch);
-            if (!lookup.ut1MinusUtcSeconds.has_value()) {
+            if (!lookup.offsetSeconds.has_value()) {
                 return TimeScaleConversionResult::failureFromLookup(
                     epoch, targetScale, lookup.warningCodeMask, lookup.diagnosticText
                 );
             }
 
             TimeScaleConversionResult result = TimeScaleConversionResult::success(
-                epoch.addSeconds(*lookup.ut1MinusUtcSeconds, skygate::core::TimeScale::Ut1)
+                epoch.addSeconds(*lookup.offsetSeconds, skygate::core::TimeScale::Ut1)
             );
             applyLookup(result, lookup);
             return result;
@@ -174,12 +175,12 @@ TimeScaleConversionResult LeapSecondTimeScaleService::convertCivilDateTime(
             ? skygate::core::CalendarTime::leapSecondPredecessor(dateTime)
             : std::nullopt;
     if (precedingSecond.has_value()) {
-        precedingEpoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*precedingSecond);
+        precedingEpoch = EphemerisEpochParsing::epochFromCivilDate(*precedingSecond);
         if (precedingEpoch.has_value()) {
             epoch = precedingEpoch->addSeconds(1.0, skygate::core::TimeScale::Utc);
         }
     } else {
-        epoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
+        epoch = EphemerisEpochParsing::epochFromCivilDate(dateTime);
     }
 
     if (!epoch.has_value()) {

@@ -13,4 +13,9 @@ TableInterpolation::ratio(const double value, const double lowerKey, const doubl
     return (value - lowerKey) / denominator;
 }
 
+double TableInterpolation::lerp(const double lower, const double upper, const double ratio) noexcept
+{
+    return lower + (upper - lower) * ratio;
+}
+
 }  // namespace skygate::ephemeris

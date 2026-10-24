@@ -137,12 +137,11 @@ missingDataSample(const skygate::core::AstronomicalEpoch& utcEpoch, const EarthO
 
     EarthOrientationSampler::Sample sample;
     sample.requestedUtcEpoch = utcEpoch;
-    sample.ut1MinusUtcSeconds =
-        lower.ut1MinusUtcSeconds + (upper.ut1MinusUtcSeconds - lower.ut1MinusUtcSeconds) * *ratio;
+    sample.ut1MinusUtcSeconds = TableInterpolation::lerp(lower.ut1MinusUtcSeconds, upper.ut1MinusUtcSeconds, *ratio);
     sample.polarMotionXArcseconds =
-        lower.polarMotionXArcseconds + (upper.polarMotionXArcseconds - lower.polarMotionXArcseconds) * *ratio;
+        TableInterpolation::lerp(lower.polarMotionXArcseconds, upper.polarMotionXArcseconds, *ratio);
     sample.polarMotionYArcseconds =
-        lower.polarMotionYArcseconds + (upper.polarMotionYArcseconds - lower.polarMotionYArcseconds) * *ratio;
+        TableInterpolation::lerp(lower.polarMotionYArcseconds, upper.polarMotionYArcseconds, *ratio);
     sample.predicted = lower.predicted || upper.predicted;
     sample.estimated = lower.estimated || upper.estimated;
     sample.status = EarthOrientationSampler::Sample::Status::Valid;

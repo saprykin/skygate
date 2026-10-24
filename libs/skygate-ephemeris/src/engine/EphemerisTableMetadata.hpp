@@ -1,10 +1,10 @@
 #pragma once
 
+#include "EphemerisEpochParsing.hpp"
 #include "EphemerisTableDataStatus.hpp"
 #include "StringUtilities.hpp"
 #include "TextParsingUtilities.hpp"
 #include "time/AstronomicalEpoch.hpp"
-#include "time/CalendarTime.hpp"
 #include "time/EphemerisDateRange.hpp"
 
 #include <algorithm>
@@ -81,10 +81,8 @@ public:
         }
         if (const std::optional<std::string> value = TextParsingUtilities::metadataValue(line, "expires");
             value.has_value()) {
-            const std::optional<skygate::core::CivilDateTime> expiresDate = TextParsingUtilities::parseUtcDate(*value);
             const std::optional<skygate::core::AstronomicalEpoch> expiresEpoch =
-                expiresDate.has_value() ? skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(*expiresDate)
-                                        : std::nullopt;
+                EphemerisEpochParsing::epochFromDateColumn(*value);
             if (!expiresEpoch.has_value()) {
                 diagnosticText = malformedMetadata(dataLabel, "expiration", lineNumber);
                 return true;

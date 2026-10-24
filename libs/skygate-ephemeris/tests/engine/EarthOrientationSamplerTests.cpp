@@ -329,7 +329,7 @@ void EarthOrientationSamplerTests::propagatesOriginTextToUt1Resolution()
     const Ut1OffsetResolver::Result lookup = resolver.lookupUtcToUt1Offset(epoch);
 
     QVERIFY(lookup.isSuccess());
-    QVERIFY(lookup.ut1MinusUtcSeconds.has_value());
+    QVERIFY(lookup.offsetSeconds.has_value());
     QCOMPARE(lookup.diagnosticText, sample.diagnosticText);
 }
 

@@ -1,8 +1,7 @@
 #include "SimpleEphemerisFallbackStrategy.hpp"
-#include "reference/EquatorialToHorizontalCalculator.hpp"
-#include "reference/SimpleBodyStateCalculator.hpp"
+#include "SimpleEphemerisEngine.hpp"
 
-#include <cstdint>
+#include <cstddef>
 #include <limits>
 #include <optional>
 #include <string>
@@ -23,31 +22,32 @@ std::optional<CelestialBodyState> SimpleEphemerisFallbackStrategy::computeFallba
     const EphemerisRequest& request, const BaseCelestialBody& body, const std::size_t bodyIndex
 ) const
 {
-    const std::optional<skygate::core::EquatorialCoordinate> equatorial =
-        SimpleBodyStateCalculator{}.computeEquatorial(body, request.context.utcTime);
-    if (!equatorial.has_value()) {
+    CelestialBodyState state = SimpleEphemerisEngine::computeStateForBody(body, bodyIndex, request.context);
+    if (state.metadata.status == EphemerisEngineQueryStatus::Type::Unsupported) {
         return std::nullopt;
     }
 
-    CelestialBodyState state;
-    state.bodyIndex = static_cast<std::uint32_t>(bodyIndex);
-    state.equatorial = *equatorial;
-    state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
-    state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
+    // The fallback reports its own metadata: the simple-engine status and
+    // warnings do not describe a degraded solar-system fallback.
+    state.metadata = EphemerisEngineQueryResult{};
     state.metadata.dataSourceProvenanceKind = EphemerisDataSourceProvenance::Type::SimpleSolarSystemFallback;
     state.metadata.dataSourceProvenance = std::string{
         EphemerisDataSourceProvenance::displayName(EphemerisDataSourceProvenance::Type::SimpleSolarSystemFallback)
     };
 
-    const EphemerisCorrectionFlags requested = request.options.correctionFlags();
-    EphemerisCorrectionFlags applied = EphemerisCorrectionFlags::geometric();
-    if (requestsTopocentricState(request) && request.context.observer.isValid()) {
-        state.horizontal =
-            EquatorialToHorizontalCalculator::compute(*equatorial, request.context.observer, request.context.utcTime);
-        applied |= EphemerisCorrectionFlags::diurnalParallax();
+    const double notAvailable = std::numeric_limits<double>::quiet_NaN();
+    if (!requestsTopocentricState(request)) {
+        state.horizontal.altitudeDeg = notAvailable;
+        state.horizontal.azimuthDeg = notAvailable;
     }
 
+    EphemerisCorrectionFlags applied = EphemerisCorrectionFlags::geometric();
+    if (requestsTopocentricState(request) && request.context.observer.isValid()) {
+        applied |= EphemerisCorrectionFlags::diurnalParallax();
+    }
     state.metadata.appliedCorrections = applied;
+
+    const EphemerisCorrectionFlags requested = request.options.correctionFlags();
     const EphemerisCorrectionFlags unapplied = EphemerisCorrectionFlags::without(requested, applied);
     if (unapplied != EphemerisCorrectionFlags::noCorrections()) {
         state.metadata.addUnavailableCorrection(unapplied);

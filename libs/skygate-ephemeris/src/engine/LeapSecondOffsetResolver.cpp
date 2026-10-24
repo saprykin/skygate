@@ -1,4 +1,5 @@
 #include "LeapSecondOffsetResolver.hpp"
+#include "LeapSecondTableScan.hpp"
 #include "TimeScaleConversionWarningCode.hpp"
 
 #include <optional>
@@ -49,6 +50,11 @@ namespace {
     return result;
 }
 
+[[nodiscard]] std::optional<double> seconds(const std::optional<int> offsetSeconds) noexcept
+{
+    return offsetSeconds.has_value() ? std::optional<double>{static_cast<double>(*offsetSeconds)} : std::nullopt;
+}
+
 [[nodiscard]] LeapSecondOffsetResolver::Result lookupUtcOffset(
     const std::shared_ptr<const ILeapSecondProvider>& provider,
     const TimeScaleServiceOptions& options,
@@ -72,7 +78,7 @@ namespace {
     }
 
     if (tableInfo.validityRange.has_value() && !tableInfo.validityRange->contains(utcEpoch)) {
-        const std::optional<int> tableOffset = provider->taiMinusUtcSeconds(utcEpoch);
+        const std::optional<double> tableOffset = seconds(provider->taiMinusUtcSeconds(utcEpoch));
         if (!options.allowDegradedLeapSecondFallback) {
             result.status = TimeScaleConversionStatus::Type::Failed;
             result.addWarning(TimeScaleConversionWarningCode::Type::EpochOutsideLeapSecondTable);
@@ -80,7 +86,7 @@ namespace {
             return result;
         }
 
-        result.offsetSeconds = tableOffset.value_or(options.fallbackTaiMinusUtcSeconds);
+        result.offsetSeconds = tableOffset.value_or(static_cast<double>(options.fallbackTaiMinusUtcSeconds));
         result.status = TimeScaleConversionStatus::Type::Degraded;
         result.addWarning(TimeScaleConversionWarningCode::Type::EpochOutsideLeapSecondTable);
         result.addWarning(TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied);
@@ -88,7 +94,7 @@ namespace {
         return result;
     }
 
-    result.offsetSeconds = provider->taiMinusUtcSeconds(utcEpoch);
+    result.offsetSeconds = seconds(provider->taiMinusUtcSeconds(utcEpoch));
     if (!result.offsetSeconds.has_value()) {
         return fallbackOffset(
             options,
@@ -122,18 +128,7 @@ namespace {
         result.diagnosticText = "Leap-second table is stale for TAI conversion.";
     }
 
-    const double requestedKey = taiEpoch.sortKey();
-    std::optional<int> offset;
-    for (const ILeapSecondProvider::TableEntry& entry : provider->entries()) {
-        const skygate::core::AstronomicalEpoch entryTaiEpoch = entry.effectiveUtcEpoch.addSeconds(
-            static_cast<double>(entry.taiMinusUtcSeconds), skygate::core::TimeScale::Tai
-        );
-        if (entryTaiEpoch.sortKey() > requestedKey) {
-            break;
-        }
-        offset = entry.taiMinusUtcSeconds;
-    }
-
+    const std::optional<int> offset = LeapSecondTableScan::offsetAtTaiKey(provider->entries(), taiEpoch.sortKey());
     if (tableInfo.validityRange.has_value() && taiEpochOutsideUtcRange(taiEpoch, *tableInfo.validityRange, provider)) {
         if (!options.allowDegradedLeapSecondFallback) {
             result.status = TimeScaleConversionStatus::Type::Failed;
@@ -142,7 +137,7 @@ namespace {
             return result;
         }
 
-        result.offsetSeconds = offset.value_or(options.fallbackTaiMinusUtcSeconds);
+        result.offsetSeconds = seconds(offset).value_or(static_cast<double>(options.fallbackTaiMinusUtcSeconds));
         result.status = TimeScaleConversionStatus::Type::Degraded;
         result.addWarning(TimeScaleConversionWarningCode::Type::EpochOutsideLeapSecondTable);
         result.addWarning(TimeScaleConversionWarningCode::Type::LeapSecondFallbackApplied);
@@ -158,16 +153,11 @@ namespace {
         );
     }
 
-    result.offsetSeconds = *offset;
+    result.offsetSeconds = seconds(offset);
     return result;
 }
 
 }  // namespace
-
-void LeapSecondOffsetResolver::Result::addWarning(const TimeScaleConversionWarningCode::Type code) noexcept
-{
-    warningCodeMask.add(TimeScaleConversionResult::WarningMask::bit(code));
-}
 
 LeapSecondOffsetResolver::LeapSecondOffsetResolver(
     std::shared_ptr<const ILeapSecondProvider> leapSecondProvider, TimeScaleServiceOptions options

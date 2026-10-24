@@ -13,6 +13,9 @@ private slots:
     void ratioAtIntervalEndIsOne();
     void rejectsEmptyAndReversedIntervals();
     void rejectsUndefinedIntervalWidths();
+    void lerpAtIntervalStartReturnsLowerSample();
+    void lerpAtIntervalEndReturnsUpperSample();
+    void lerpAtMidpointReturnsSampleAverage();
 };
 
 void TableInterpolationTests::ratioAtIntervalStartIsZero()
@@ -55,6 +58,27 @@ void TableInterpolationTests::rejectsUndefinedIntervalWidths()
     QVERIFY(!TableInterpolation::ratio(10.0, nan, 20.0).has_value());
     QVERIFY(!TableInterpolation::ratio(10.0, 0.0, nan).has_value());
     QVERIFY(!TableInterpolation::ratio(10.0, infinity, infinity).has_value());
+}
+
+void TableInterpolationTests::lerpAtIntervalStartReturnsLowerSample()
+{
+    using skygate::ephemeris::TableInterpolation;
+
+    QCOMPARE(TableInterpolation::lerp(0.25, 0.75, 0.0), 0.25);
+}
+
+void TableInterpolationTests::lerpAtIntervalEndReturnsUpperSample()
+{
+    using skygate::ephemeris::TableInterpolation;
+
+    QCOMPARE(TableInterpolation::lerp(0.25, 0.75, 1.0), 0.75);
+}
+
+void TableInterpolationTests::lerpAtMidpointReturnsSampleAverage()
+{
+    using skygate::ephemeris::TableInterpolation;
+
+    QCOMPARE(TableInterpolation::lerp(0.25, 0.75, 0.5), 0.5);
 }
 
 QTEST_MAIN(TableInterpolationTests)
