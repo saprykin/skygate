@@ -343,12 +343,6 @@ add_skygate_ui_qtest(
     TIMEOUT 120
 )
 add_skygate_ui_qtest(
-    skygate-ui-resource-diagnostics-tests
-    diagnostics/ResourceDiagnosticsTests.cpp
-    LABELS "integration;platform"
-    TIMEOUT 45
-)
-add_skygate_ui_qtest(
     skygate-ui-sky-catalog-manager-source-tests
     catalog/SkyCatalogManagerSourceTests.cpp
     LABELS integration

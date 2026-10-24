@@ -362,12 +362,6 @@ QString SkyLogging::configurationSummary(const SkyLoggingConfiguration& configur
     return summary;
 }
 
-bool SkyLogging::isInstalled()
-{
-    QMutexLocker locker(&s_mutex);
-    return s_installed;
-}
-
 void SkyLogging::install(const SkyLoggingConfiguration& configuration)
 {
     configure(configuration);

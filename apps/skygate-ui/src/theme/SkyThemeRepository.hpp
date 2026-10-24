@@ -1,7 +1,6 @@
 #pragma once
 
 #include "SkyThemeDefinition.hpp"
-#include "SkyThemeDescriptor.hpp"
 #include "SkyThemeOption.hpp"
 
 #include <QString>
@@ -25,7 +24,6 @@ private:
     void ensureDefaultTheme();
 
 private:
-    std::vector<SkyThemeDescriptor> m_descriptors;
     std::vector<SkyThemeDefinition> m_themes;
     SkyThemeDefinition m_fallbackTheme;
     qsizetype m_defaultThemeIndex = 0;

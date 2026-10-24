@@ -121,7 +121,6 @@ qt_add_library(skygate-ui-lib STATIC
     src/render/SkyConstellationRenderBuilder.hpp
     src/theme/SkyThemeDefinition.cpp
     src/theme/SkyThemeDefinition.hpp
-    src/theme/SkyThemeDescriptor.hpp
     src/theme/SkyThemeJsonCodec.cpp
     src/theme/SkyThemeJsonCodec.hpp
     src/theme/SkyThemeOption.hpp

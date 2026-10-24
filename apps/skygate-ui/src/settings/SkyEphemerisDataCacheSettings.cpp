@@ -14,28 +14,17 @@ namespace {
 
 Q_LOGGING_CATEGORY(skygateEphemerisDataCacheLog, "skygate.ephemeris.cache")
 
-QString ephemerisDataCacheKey(const char* name)
-{
-    return SkySettingsKeyBuilder::key(QStringLiteral("ephemerisData/%1").arg(QString::fromUtf8(name)));
-}
-
 // Reads the range stored alongside the installed kernel. Settings written
 // before the range was recorded have no value here, which leaves that case to
 // the kernel metadata. An unreadable value is reported and treated the same.
 std::optional<bool> readInstalledKernelLongRange(QSettings& settings)
 {
-    const QString key = ephemerisDataCacheKey("installedKernelLongRange");
-    if (!settings.contains(key)) {
-        return std::nullopt;
-    }
-
-    if (const std::optional<bool> storedRange = SkySettingsValueCodecs::boolFromSettingValue(settings.value(key))) {
-        return storedRange;
-    }
-    qCWarning(skygateEphemerisDataCacheLog).noquote()
-        << "Invalid boolean setting" << key << "value" << settings.value(key).toString()
-        << "- reading the range from the installed kernel metadata";
-    return std::nullopt;
+    return SkySettingsValueCodecs::readOptionalBoolSetting(
+        settings,
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedKernelLongRange"),
+        skygateEphemerisDataCacheLog,
+        "reading the range from the installed kernel metadata"
+    );
 }
 
 }  // namespace
@@ -44,34 +33,60 @@ bool SkyEphemerisDataCacheSettings::save(const SkyEphemerisDataCacheSnapshot& sn
 {
     QSettings settings;
     settings.setValue(SkySettingsKeyBuilder::key("version"), SkyPersistedStateSnapshot::kSettingsVersion);
-    settings.setValue(ephemerisDataCacheKey("installedKernelAssetId"), snapshot.installedKernelAssetId);
-    settings.setValue(ephemerisDataCacheKey("installedKernelProfileId"), snapshot.installedKernelProfileId);
-    settings.setValue(ephemerisDataCacheKey("installedKernelPath"), snapshot.installedKernelPath);
-    settings.setValue(ephemerisDataCacheKey("installedKernelVersion"), snapshot.installedKernelVersion);
+    settings.setValue(
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedKernelAssetId"), snapshot.installedKernelAssetId
+    );
+    settings.setValue(
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedKernelProfileId"), snapshot.installedKernelProfileId
+    );
+    settings.setValue(
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedKernelPath"), snapshot.installedKernelPath
+    );
+    settings.setValue(
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedKernelVersion"), snapshot.installedKernelVersion
+    );
     if (snapshot.installedKernelLongRange.has_value()) {
-        settings.setValue(ephemerisDataCacheKey("installedKernelLongRange"), *snapshot.installedKernelLongRange);
+        settings.setValue(
+            SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedKernelLongRange"),
+            *snapshot.installedKernelLongRange
+        );
     } else {
-        settings.remove(ephemerisDataCacheKey("installedKernelLongRange"));
+        settings.remove(SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedKernelLongRange"));
     }
-    settings.setValue(ephemerisDataCacheKey("installedEarthOrientationPath"), snapshot.installedEarthOrientationPath);
     settings.setValue(
-        ephemerisDataCacheKey("installedEarthOrientationVersion"), snapshot.installedEarthOrientationVersion
-    );
-    settings.setValue(ephemerisDataCacheKey("installedLeapSecondTablePath"), snapshot.installedLeapSecondTablePath);
-    settings.setValue(
-        ephemerisDataCacheKey("installedLeapSecondTableVersion"), snapshot.installedLeapSecondTableVersion
-    );
-    settings.setValue(ephemerisDataCacheKey("installedDeltaTDataPath"), snapshot.installedDeltaTDataPath);
-    settings.setValue(ephemerisDataCacheKey("installedDeltaTDataVersion"), snapshot.installedDeltaTDataVersion);
-    settings.setValue(
-        ephemerisDataCacheKey("dataRevisionToken"),
-        snapshot.dataRevisionToken.trimmed().isEmpty() ? SkyEphemerisDataCacheSnapshot{}.dataRevisionToken
-                                                       : snapshot.dataRevisionToken.trimmed()
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedEarthOrientationPath"),
+        snapshot.installedEarthOrientationPath
     );
     settings.setValue(
-        ephemerisDataCacheKey("lastUpdateResult"),
-        snapshot.lastUpdateResult.trimmed().isEmpty() ? SkyEphemerisDataCacheSnapshot{}.lastUpdateResult
-                                                      : snapshot.lastUpdateResult.trimmed()
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedEarthOrientationVersion"),
+        snapshot.installedEarthOrientationVersion
+    );
+    settings.setValue(
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedLeapSecondTablePath"),
+        snapshot.installedLeapSecondTablePath
+    );
+    settings.setValue(
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedLeapSecondTableVersion"),
+        snapshot.installedLeapSecondTableVersion
+    );
+    settings.setValue(
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedDeltaTDataPath"), snapshot.installedDeltaTDataPath
+    );
+    settings.setValue(
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedDeltaTDataVersion"),
+        snapshot.installedDeltaTDataVersion
+    );
+    SkySettingsValueCodecs::writeNonBlankStringSetting(
+        settings,
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "dataRevisionToken"),
+        snapshot.dataRevisionToken,
+        SkyEphemerisDataCacheSnapshot{}.dataRevisionToken
+    );
+    SkySettingsValueCodecs::writeNonBlankStringSetting(
+        settings,
+        SkySettingsKeyBuilder::nestedKey("ephemerisData", "lastUpdateResult"),
+        snapshot.lastUpdateResult,
+        SkyEphemerisDataCacheSnapshot{}.lastUpdateResult
     );
     settings.sync();
     if (settings.status() != QSettings::NoError) {
@@ -85,30 +100,36 @@ SkyEphemerisDataCacheSnapshot SkyEphemerisDataCacheSettings::load()
 {
     QSettings settings;
     SkyEphemerisDataCacheSnapshot snapshot;
-    snapshot.installedKernelAssetId = settings.value(ephemerisDataCacheKey("installedKernelAssetId")).toString();
-    snapshot.installedKernelProfileId = settings.value(ephemerisDataCacheKey("installedKernelProfileId")).toString();
-    snapshot.installedKernelPath = settings.value(ephemerisDataCacheKey("installedKernelPath")).toString();
-    snapshot.installedKernelVersion = settings.value(ephemerisDataCacheKey("installedKernelVersion")).toString();
+    snapshot.installedKernelAssetId =
+        settings.value(SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedKernelAssetId")).toString();
+    snapshot.installedKernelProfileId =
+        settings.value(SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedKernelProfileId")).toString();
+    snapshot.installedKernelPath =
+        settings.value(SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedKernelPath")).toString();
+    snapshot.installedKernelVersion =
+        settings.value(SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedKernelVersion")).toString();
     snapshot.installedKernelLongRange = readInstalledKernelLongRange(settings);
     if (!snapshot.installedKernelLongRange.has_value()) {
         snapshot.installedKernelLongRange = SkyEphemerisDataCacheSnapshot::legacyKernelLongRange(snapshot);
     }
     snapshot.installedEarthOrientationPath =
-        settings.value(ephemerisDataCacheKey("installedEarthOrientationPath")).toString();
+        settings.value(SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedEarthOrientationPath")).toString();
     snapshot.installedEarthOrientationVersion =
-        settings.value(ephemerisDataCacheKey("installedEarthOrientationVersion")).toString();
+        settings.value(SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedEarthOrientationVersion"))
+            .toString();
     snapshot.installedLeapSecondTablePath =
-        settings.value(ephemerisDataCacheKey("installedLeapSecondTablePath")).toString();
+        settings.value(SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedLeapSecondTablePath")).toString();
     snapshot.installedLeapSecondTableVersion =
-        settings.value(ephemerisDataCacheKey("installedLeapSecondTableVersion")).toString();
-    snapshot.installedDeltaTDataPath = settings.value(ephemerisDataCacheKey("installedDeltaTDataPath")).toString();
+        settings.value(SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedLeapSecondTableVersion")).toString();
+    snapshot.installedDeltaTDataPath =
+        settings.value(SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedDeltaTDataPath")).toString();
     snapshot.installedDeltaTDataVersion =
-        settings.value(ephemerisDataCacheKey("installedDeltaTDataVersion")).toString();
+        settings.value(SkySettingsKeyBuilder::nestedKey("ephemerisData", "installedDeltaTDataVersion")).toString();
     snapshot.dataRevisionToken = SkySettingsValueCodecs::readNonBlankStringSetting(
-        settings, ephemerisDataCacheKey("dataRevisionToken"), snapshot.dataRevisionToken
+        settings, SkySettingsKeyBuilder::nestedKey("ephemerisData", "dataRevisionToken"), snapshot.dataRevisionToken
     );
     snapshot.lastUpdateResult = SkySettingsValueCodecs::readNonBlankStringSetting(
-        settings, ephemerisDataCacheKey("lastUpdateResult"), snapshot.lastUpdateResult
+        settings, SkySettingsKeyBuilder::nestedKey("ephemerisData", "lastUpdateResult"), snapshot.lastUpdateResult
     );
     return snapshot;
 }
