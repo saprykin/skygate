@@ -4,6 +4,7 @@
 #include "time/CalendarTime.hpp"
 
 #include <algorithm>
+#include <array>
 #include <string>
 
 namespace skygate::ephemeris {
@@ -71,44 +72,15 @@ std::string_view TextParsingUtilities::fixedColumn(
 
 std::optional<int> TextParsingUtilities::parseEnglishMonthAbbreviation(const std::string_view text) noexcept
 {
-    if (text == "Jan") {
-        return 1;
-    }
-    if (text == "Feb") {
-        return 2;
-    }
-    if (text == "Mar") {
-        return 3;
-    }
-    if (text == "Apr") {
-        return 4;
-    }
-    if (text == "May") {
-        return 5;
-    }
-    if (text == "Jun") {
-        return 6;
-    }
-    if (text == "Jul") {
-        return 7;
-    }
-    if (text == "Aug") {
-        return 8;
-    }
-    if (text == "Sep") {
-        return 9;
-    }
-    if (text == "Oct") {
-        return 10;
-    }
-    if (text == "Nov") {
-        return 11;
-    }
-    if (text == "Dec") {
-        return 12;
+    constexpr std::array<std::string_view, 12> kMonthAbbreviations{
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    };
+    const auto monthIt = std::find(kMonthAbbreviations.begin(), kMonthAbbreviations.end(), text);
+    if (monthIt == kMonthAbbreviations.end()) {
+        return std::nullopt;
     }
 
-    return std::nullopt;
+    return static_cast<int>(monthIt - kMonthAbbreviations.begin()) + 1;
 }
 
 std::optional<skygate::core::CivilDateTime> TextParsingUtilities::parseUtcDate(std::string_view text) noexcept

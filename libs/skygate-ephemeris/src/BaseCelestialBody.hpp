@@ -72,6 +72,9 @@ public:
     Kind kind = Kind::Star;
     double visualMagnitude = 0.0;
     CatalogObjectIdentity identity;
+    // Catalog coordinate, present when the catalog carries a fixed position for
+    // the body. Both storage domains keep it here.
+    std::optional<skygate::core::EquatorialCoordinate> fixedEquatorial;
 };
 
 }  // namespace skygate::ephemeris

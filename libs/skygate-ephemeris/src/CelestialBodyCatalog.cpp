@@ -1,6 +1,5 @@
 #include "CelestialBodyCatalog.hpp"
 #include "DeepSkyObjectInfo.hpp"
-#include "EquatorialCoordinate.hpp"
 #include "catalog/CatalogStarAstrometry.hpp"
 
 #include <utility>
@@ -11,9 +10,6 @@ OwnGalaxyCelestialBody CelestialBodyCatalog::copyOwnGalaxyBody(const BaseCelesti
 {
     OwnGalaxyCelestialBody ownGalaxyBody;
     body.copySharedFieldsTo(ownGalaxyBody);
-    if (const skygate::core::EquatorialCoordinate* fixedEquatorial = body.fixedEquatorialCoordinate()) {
-        ownGalaxyBody.fixedEquatorial = *fixedEquatorial;
-    }
     if (const CatalogStarAstrometry* starAstrometry = body.catalogStarAstrometry()) {
         ownGalaxyBody.starAstrometry = *starAstrometry;
     }
@@ -24,9 +20,6 @@ DistantCelestialBody CelestialBodyCatalog::copyDistantBody(const BaseCelestialBo
 {
     DistantCelestialBody distantBody;
     body.copySharedFieldsTo(distantBody);
-    if (const skygate::core::EquatorialCoordinate* fixedEquatorial = body.fixedEquatorialCoordinate()) {
-        distantBody.fixedEquatorial = *fixedEquatorial;
-    }
     if (const DeepSkyObjectInfo* deepSkyObject = body.deepSkyObjectInfo()) {
         distantBody.deepSkyObject = *deepSkyObject;
     }

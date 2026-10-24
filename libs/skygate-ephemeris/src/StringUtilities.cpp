@@ -1,18 +1,42 @@
 #include "StringUtilities.hpp"
+#include "AsciiText.hpp"
 
 #include <algorithm>
 #include <cctype>
+#include <utility>
 
 namespace skygate::ephemeris {
+namespace {
+
+template <typename SameValue>
+bool appendUniqueValue(std::vector<std::string>& values, std::string value, SameValue sameValue)
+{
+    if (value.empty()) {
+        return false;
+    }
+
+    const bool alreadyPresent =
+        std::any_of(values.begin(), values.end(), [&value, &sameValue](const std::string& existing) {
+            return sameValue(existing, value);
+        });
+    if (alreadyPresent) {
+        return false;
+    }
+
+    values.push_back(std::move(value));
+    return true;
+}
+
+}  // namespace
 
 bool StringUtilities::isAsciiWhitespace(const char character) noexcept
 {
-    return std::isspace(static_cast<unsigned char>(character)) != 0;
+    return skygate::core::AsciiText::isWhitespace(character);
 }
 
 char StringUtilities::toLowerAscii(const char character) noexcept
 {
-    return character >= 'A' && character <= 'Z' ? static_cast<char>(character - 'A' + 'a') : character;
+    return skygate::core::AsciiText::toLower(character);
 }
 
 std::string StringUtilities::toLowerAscii(const std::string_view value)
@@ -26,14 +50,7 @@ std::string StringUtilities::toLowerAscii(const std::string_view value)
 
 std::string_view StringUtilities::trimAsciiWhitespace(const std::string_view value) noexcept
 {
-    std::string_view trimmed = value;
-    while (!trimmed.empty() && isAsciiWhitespace(trimmed.front())) {
-        trimmed.remove_prefix(1U);
-    }
-    while (!trimmed.empty() && isAsciiWhitespace(trimmed.back())) {
-        trimmed.remove_suffix(1U);
-    }
-    return trimmed;
+    return skygate::core::AsciiText::trimWhitespace(value);
 }
 
 std::string_view StringUtilities::takeLine(std::string_view& remaining) noexcept
@@ -49,17 +66,7 @@ std::string_view StringUtilities::takeLine(std::string_view& remaining) noexcept
 
 bool StringUtilities::equalsIgnoreAsciiCase(const std::string_view lhs, const std::string_view rhs) noexcept
 {
-    if (lhs.size() != rhs.size()) {
-        return false;
-    }
-
-    for (std::size_t index = 0; index < lhs.size(); ++index) {
-        if (toLowerAscii(lhs[index]) != toLowerAscii(rhs[index])) {
-            return false;
-        }
-    }
-
-    return true;
+    return skygate::core::AsciiText::equalsIgnoreCase(lhs, rhs);
 }
 
 bool StringUtilities::containsIgnoreAsciiCase(const std::string_view value, const std::string_view token)
@@ -105,29 +112,16 @@ std::vector<std::string_view> StringUtilities::splitView(const std::string_view 
 
 bool StringUtilities::appendUnique(std::vector<std::string>& values, std::string value)
 {
-    if (value.empty() || std::find(values.begin(), values.end(), value) != values.end()) {
-        return false;
-    }
-
-    values.push_back(std::move(value));
-    return true;
+    return appendUniqueValue(values, std::move(value), [](const std::string& existing, const std::string& candidate) {
+        return existing == candidate;
+    });
 }
 
 bool StringUtilities::appendUniqueIgnoreAsciiCase(std::vector<std::string>& values, std::string value)
 {
-    if (value.empty()) {
-        return false;
-    }
-
-    const auto existingIt = std::find_if(values.begin(), values.end(), [&value](const std::string& existing) {
-        return equalsIgnoreAsciiCase(existing, value);
+    return appendUniqueValue(values, std::move(value), [](const std::string& existing, const std::string& candidate) {
+        return skygate::core::AsciiText::equalsIgnoreCase(existing, candidate);
     });
-    if (existingIt != values.end()) {
-        return false;
-    }
-
-    values.push_back(std::move(value));
-    return true;
 }
 
 }  // namespace skygate::ephemeris

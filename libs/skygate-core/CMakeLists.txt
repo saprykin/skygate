@@ -1,4 +1,5 @@
 add_library(skygate-core STATIC
+    src/AsciiText.hpp
     src/PreparedProjection.hpp
     src/ITimeSource.hpp
     src/EquatorialCoordinate.hpp
