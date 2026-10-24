@@ -37,18 +37,14 @@ signals:
     void filterTextChanged();
 
 private:
-    struct Row final {
-        TimeZoneCatalogEntry entry;
-    };
-
-private:
     void rebuildRows();
+    [[nodiscard]] QDateTime referenceUtcDateTime() const;
     [[nodiscard]] QString detailText(const TimeZoneCatalogEntry& entry) const;
     [[nodiscard]] bool matchesFilter(const TimeZoneCatalogEntry& entry) const;
 
 private:
     QVector<TimeZoneCatalogEntry> m_entries;
-    QVector<Row> m_rows;
+    QVector<TimeZoneCatalogEntry> m_rows;
     QString m_filterText;
     QDateTime m_referenceUtcDateTime;
 };

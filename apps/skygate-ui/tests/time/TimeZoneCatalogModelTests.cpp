@@ -112,6 +112,11 @@ void TimeZoneCatalogModelTests::filtersByIanaIdLabelAndOffset()
     model.setFilterText(QStringLiteral("CST"));
     QVERIFY(containsTimeZoneId(model, QStringLiteral("America/Chicago")));
     QVERIFY(containsTimeZoneId(model, QStringLiteral("Asia/Shanghai")));
+
+    // Filters are trimmed and ASCII case folded through the shared lookup key.
+    model.setFilterText(QStringLiteral("  ZURICH  "));
+    QCOMPARE(model.rowCount(), 1);
+    QCOMPARE(model.index(0, 0).data(TimeZoneCatalogModel::TimeZoneIdRole).toString(), QStringLiteral("Europe/Zurich"));
 }
 
 void TimeZoneCatalogModelTests::filteredRowsFollowReferenceInstant()
