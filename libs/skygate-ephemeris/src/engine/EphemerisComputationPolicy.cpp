@@ -14,7 +14,8 @@ EphemerisRequest EphemerisComputationPolicy::correctionFlagsFor(
     }
 
     switch (policy) {
-    case EphemerisPrecisionPolicy::SceneRender: {
+    case EphemerisPrecisionPolicy::SceneRender:
+    case EphemerisPrecisionPolicy::Trail: {
         EphemerisCorrectionFlags corrections = EphemerisCorrectionFlags::precessionNutation()
                                                | EphemerisCorrectionFlags::earthOrientation()
                                                | EphemerisCorrectionFlags::diurnalParallax();
@@ -25,18 +26,6 @@ EphemerisRequest EphemerisComputationPolicy::correctionFlagsFor(
             corrections |= EphemerisCorrectionFlags::atmosphericRefraction();
         }
         request.options.setCorrectionFlags(corrections);
-        return request;
-    }
-    case EphemerisPrecisionPolicy::Trail: {
-        // A trail is one body sampled along time, so each altitude term it
-        // applies also shapes the drawn path. The refraction model ends at the
-        // lower edge of its altitude band, where its correction drops to zero,
-        // and a trail that crosses that edge gains a step of that size. The
-        // rendered body keeps its refracted place; the trail stays geometric.
-        request.options.setCorrectionFlags(
-            EphemerisCorrectionFlags::precessionNutation() | EphemerisCorrectionFlags::earthOrientation()
-            | EphemerisCorrectionFlags::diurnalParallax()
-        );
         return request;
     }
     case EphemerisPrecisionPolicy::SelectionDetail:

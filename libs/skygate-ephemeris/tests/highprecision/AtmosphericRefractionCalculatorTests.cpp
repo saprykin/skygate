@@ -5,6 +5,7 @@
 
 #include <QtTest/QtTest>
 
+#include <cmath>
 #include <cstdint>
 #include <limits>
 
@@ -67,6 +68,20 @@ using namespace skygate::core;
     return result;
 }
 
+// The correction is tapered across the band below the altitude where the
+// Bennett fit still holds. Under the test atmosphere (1010 hPa, 10 degrees
+// Celsius) the fit yields 38.8 arcmin there.
+constexpr double kRefractionBandTopDeg = -1.0;
+constexpr double kRefractionBandBottomDeg = -2.0;
+constexpr double kFullCorrectionDeg = 0.6466;
+constexpr double kCorrectionToleranceDeg = 1.0e-4;
+constexpr double kAltitudeToleranceDeg = 1.0e-9;
+constexpr double kSampleStepDeg = 0.05;
+// The tapered correction moves by well under one degree per degree of
+// altitude. A hard cut at a band edge would move it by the full correction
+// between two adjacent samples.
+constexpr double kMaxCorrectionSlope = 1.0;
+
 void verifyRefractionUnavailable(const HighPrecisionCalculatorResult& result, const double expectedAltitudeDeg)
 {
     QVERIFY(result.horizontal.has_value());
@@ -100,6 +115,7 @@ private slots:
     void reportsInvalidAtmosphereInputs();
     void skipsRefractionBelowModelAltitude();
     void appliesRefractionAtModelAltitudeBoundaries();
+    void keepsCorrectionContinuousAcrossTaperBand();
     void appliesSmallCorrectionNearZenith();
 };
 
@@ -276,6 +292,51 @@ void AtmosphericRefractionCalculatorTests::appliesRefractionAtModelAltitudeBound
 
     const HighPrecisionCalculatorResult zenithResult = calculator.apply(makeInput(request), makeCalculatorResult(90.0));
     verifyRefractionUnavailable(zenithResult, 90.0);
+}
+
+void AtmosphericRefractionCalculatorTests::keepsCorrectionContinuousAcrossTaperBand()
+{
+    const AtmosphericRefractionCalculator calculator;
+    const EphemerisRequest request = makeRequest();
+
+    constexpr int kSampleCount = 41;
+    constexpr double kFirstSampleAltitudeDeg = -2.4;
+    double previousCorrectionDeg = 0.0;
+    for (int sampleIndex = 0; sampleIndex < kSampleCount; ++sampleIndex) {
+        const double altitudeDeg = kFirstSampleAltitudeDeg + (static_cast<double>(sampleIndex) * kSampleStepDeg);
+        const HighPrecisionCalculatorResult result =
+            calculator.apply(makeInput(request), makeCalculatorResult(altitudeDeg));
+        QVERIFY(result.horizontal.has_value());
+
+        const double correctionDeg = result.horizontal->altitudeDeg - altitudeDeg;
+        const bool hasAppliedFlag = skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
+        );
+
+        if (altitudeDeg <= kRefractionBandBottomDeg + kAltitudeToleranceDeg) {
+            QCOMPARE(correctionDeg, 0.0);
+            QVERIFY(!hasAppliedFlag);
+        } else {
+            QVERIFY(hasAppliedFlag);
+            if (altitudeDeg < kRefractionBandTopDeg - kAltitudeToleranceDeg) {
+                QVERIFY(correctionDeg > 0.0);
+                QVERIFY(correctionDeg < kFullCorrectionDeg);
+            }
+            if (std::abs(altitudeDeg - kRefractionBandTopDeg) <= kAltitudeToleranceDeg) {
+                QVERIFY(std::abs(correctionDeg - kFullCorrectionDeg) <= kCorrectionToleranceDeg);
+            }
+        }
+
+        if (sampleIndex > 0) {
+            QVERIFY2(
+                std::abs(correctionDeg - previousCorrectionDeg) <= kMaxCorrectionSlope * kSampleStepDeg,
+                qPrintable(QStringLiteral("correction steps by %1 deg at altitude %2 deg")
+                               .arg(correctionDeg - previousCorrectionDeg)
+                               .arg(altitudeDeg))
+            );
+        }
+        previousCorrectionDeg = correctionDeg;
+    }
 }
 
 void AtmosphericRefractionCalculatorTests::appliesSmallCorrectionNearZenith()

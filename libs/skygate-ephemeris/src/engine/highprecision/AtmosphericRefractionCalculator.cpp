@@ -12,7 +12,13 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-constexpr double kMinimumModelAltitudeDeg = -1.0;
+// The Bennett fit holds its shape down to kFullCorrectionAltitudeDeg and is
+// unusable below it. Instead of cutting the correction off there, the model
+// fades it linearly to zero across the band between that altitude and
+// kMinimumModelAltitudeDeg, so the correction stays continuous and no path
+// that samples altitude across the edge gains a step.
+constexpr double kMinimumModelAltitudeDeg = -2.0;
+constexpr double kFullCorrectionAltitudeDeg = -1.0;
 constexpr double kMaximumModelAltitudeDeg = 89.9;
 constexpr double kMinimumPressureHpa = 0.0;
 constexpr double kMaximumPressureHpa = 1200.0;
@@ -59,7 +65,16 @@ constexpr double kCelsiusToKelvinOffset = 273.0;
 
 [[nodiscard]] bool isBelowModelAltitude(const double altitudeDeg) noexcept
 {
-    return std::isfinite(altitudeDeg) && altitudeDeg < kMinimumModelAltitudeDeg;
+    return std::isfinite(altitudeDeg) && altitudeDeg <= kMinimumModelAltitudeDeg;
+}
+
+// One at kFullCorrectionAltitudeDeg, zero at kMinimumModelAltitudeDeg, and
+// flat outside that band.
+[[nodiscard]] double refractionTaperFactor(const double altitudeDeg) noexcept
+{
+    return std::clamp(
+        (altitudeDeg - kMinimumModelAltitudeDeg) / (kFullCorrectionAltitudeDeg - kMinimumModelAltitudeDeg), 0.0, 1.0
+    );
 }
 
 [[nodiscard]] double pressureScale(const EphemerisEngineOptions& options) noexcept
@@ -115,6 +130,7 @@ HighPrecisionCalculatorResult AtmosphericRefractionCalculator::apply(
         skygate::core::HorizontalCoordinate::kAltitudeMaxDeg,
         result.horizontal->altitudeDeg
             + refractionCorrectionDegrees(result.horizontal->altitudeDeg, input.request.options)
+                  * refractionTaperFactor(result.horizontal->altitudeDeg)
     );
     EphemerisMetadataMerger::markCorrectionApplied(result.metadata, EphemerisCorrectionFlags::atmosphericRefraction());
     return result;
