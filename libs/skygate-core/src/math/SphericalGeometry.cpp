@@ -1,5 +1,6 @@
 #include "SphericalGeometry.hpp"
 #include "AngleMath.hpp"
+#include "MathConstants.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -113,15 +114,32 @@ SphericalGeometry::angularSeparationDegrees(const HorizontalCoordinate& lhs, con
     return AngleMath::toDegrees(angularSeparationRad(lhsVector, rhsVector));
 }
 
+Vector3d SphericalGeometry::interpolateUnitVector(
+    const Vector3d& start, const Vector3d& end, const double angularDistanceRad, const double fraction
+) noexcept
+{
+    const double sinAngularDistance = std::sin(angularDistanceRad);
+    if (!std::isfinite(sinAngularDistance) || std::abs(sinAngularDistance) <= MathConstants::kEpsilon) {
+        // The sine weights degenerate for collinear directions, so the chord
+        // between the vectors is the only usable interpolation.
+        const Vector3d chord = start + ((end - start) * fraction);
+        return chord.normalized().value_or(kZenithFallbackDirection);
+    }
+
+    const double startWeight = std::sin((1.0 - fraction) * angularDistanceRad) / sinAngularDistance;
+    const double endWeight = std::sin(fraction * angularDistanceRad) / sinAngularDistance;
+    const Vector3d interpolated = (start * startWeight) + (end * endWeight);
+    return interpolated.normalized().value_or(kZenithFallbackDirection);
+}
+
 HorizontalCoordinate SphericalGeometry::interpolateHorizontalCoordinate(
     const HorizontalCoordinate& previous, const HorizontalCoordinate& next, const double fraction
 ) noexcept
 {
-    // Interpolates along the chord between the unit vectors and renormalizes.
     const Vector3d previousVector = horizontalToUnitVector(previous);
     const Vector3d nextVector = horizontalToUnitVector(next);
-    const Vector3d interpolated = previousVector + ((nextVector - previousVector) * fraction);
-    return horizontalFromUnitVector(interpolated.normalized().value_or(kZenithFallbackDirection));
+    const double angularDistance = angularSeparationRad(previousVector, nextVector);
+    return horizontalFromUnitVector(interpolateUnitVector(previousVector, nextVector, angularDistance, fraction));
 }
 
 bool SphericalGeometry::tryBuildProjectionBasis(

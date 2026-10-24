@@ -1,5 +1,6 @@
 #include "RectOccupancyGrid.hpp"
 #include "Geometry2d.hpp"
+#include "GridCellBuckets.hpp"
 #include "GridCellRange.hpp"
 
 namespace skygate::core {
@@ -12,12 +13,13 @@ bool RectOccupancyGrid::collides(const Rect2d& rect) const
 
     for (std::int32_t cellY = cellRange.minY; cellY <= cellRange.maxY; ++cellY) {
         for (std::int32_t cellX = cellRange.minX; cellX <= cellRange.maxX; ++cellX) {
-            const auto cellIt = m_rectIndicesByCell.find(Geometry2d::packedGridCellKey(cellX, cellY));
-            if (cellIt == m_rectIndicesByCell.end()) {
+            const std::vector<std::size_t>* rectIndices =
+                GridCellBuckets::bucketAtCell(m_rectIndicesByCell, cellX, cellY);
+            if (rectIndices == nullptr) {
                 continue;
             }
 
-            for (const std::size_t rectIndex : cellIt->second) {
+            for (const std::size_t rectIndex : *rectIndices) {
                 if (Geometry2d::intersects(rect, m_rects.at(rectIndex))) {
                     return true;
                 }
@@ -32,20 +34,13 @@ void RectOccupancyGrid::add(const Rect2d& rect)
 {
     const std::size_t rectIndex = m_rects.size();
     m_rects.push_back(rect);
-
-    const GridCellRange cellRange = Geometry2d::gridCellRange(rect, m_cellSize);
-
-    for (std::int32_t cellY = cellRange.minY; cellY <= cellRange.maxY; ++cellY) {
-        for (std::int32_t cellX = cellRange.minX; cellX <= cellRange.maxX; ++cellX) {
-            m_rectIndicesByCell[Geometry2d::packedGridCellKey(cellX, cellY)].push_back(rectIndex);
-        }
-    }
+    GridCellBuckets::insert(m_rectIndicesByCell, rect, m_cellSize, rectIndex);
 }
 
 void RectOccupancyGrid::clear()
 {
     m_rects.clear();
-    m_rectIndicesByCell.clear();
+    GridCellBuckets::clear(m_rectIndicesByCell);
 }
 
 }  // namespace skygate::core

@@ -26,6 +26,13 @@ public:
     [[nodiscard]] static double angularSeparationRad(const Vector3d& lhs, const Vector3d& rhs) noexcept;
     [[nodiscard]] static double
     angularSeparationDegrees(const HorizontalCoordinate& lhs, const HorizontalCoordinate& rhs) noexcept;
+    // Interpolates along the great circle between two unit vectors, using the
+    // angular distance between them to space the result by arc length. Near
+    // collinear directions and non-finite angular distances fall back to a
+    // normalized chord interpolation.
+    [[nodiscard]] static Vector3d interpolateUnitVector(
+        const Vector3d& start, const Vector3d& end, double angularDistanceRad, double fraction
+    ) noexcept;
     [[nodiscard]] static HorizontalCoordinate interpolateHorizontalCoordinate(
         const HorizontalCoordinate& previous, const HorizontalCoordinate& next, double fraction
     ) noexcept;

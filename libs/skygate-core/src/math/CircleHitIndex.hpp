@@ -1,11 +1,11 @@
 #pragma once
 
 #include "CircleHitTarget.hpp"
+#include "GridCellBuckets.hpp"
 
 #include <cstdint>
 #include <optional>
 #include <span>
-#include <unordered_map>
 #include <vector>
 
 namespace skygate::core {
@@ -21,7 +21,7 @@ public:
 private:
     double m_cellSize = 24.0;
     std::vector<CircleHitTarget> m_targets;
-    std::unordered_map<std::uint64_t, std::vector<std::size_t>> m_targetIndicesByCell;
+    GridCellBuckets::CellIndices m_targetIndicesByCell;
 };
 
 }  // namespace skygate::core

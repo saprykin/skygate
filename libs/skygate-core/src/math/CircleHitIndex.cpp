@@ -1,6 +1,6 @@
 #include "CircleHitIndex.hpp"
 #include "Geometry2d.hpp"
-#include "GridCellRange.hpp"
+#include "GridCellBuckets.hpp"
 #include "Rect2d.hpp"
 
 #include <cmath>
@@ -12,8 +12,7 @@ CircleHitIndex::CircleHitIndex(const double cellSize) : m_cellSize(cellSize) {}
 
 void CircleHitIndex::rebuild(const std::span<const CircleHitTarget> targets)
 {
-    m_targets.clear();
-    m_targetIndicesByCell.clear();
+    clear();
     m_targets.reserve(targets.size());
     m_targetIndicesByCell.reserve((targets.size() / 4U) + 1U);
 
@@ -32,20 +31,14 @@ void CircleHitIndex::rebuild(const std::span<const CircleHitTarget> targets)
             .right = target.x + target.radius,
             .bottom = target.y + target.radius,
         };
-        const GridCellRange cellRange = Geometry2d::gridCellRange(bounds, m_cellSize);
-
-        for (std::int32_t cellY = cellRange.minY; cellY <= cellRange.maxY; ++cellY) {
-            for (std::int32_t cellX = cellRange.minX; cellX <= cellRange.maxX; ++cellX) {
-                m_targetIndicesByCell[Geometry2d::packedGridCellKey(cellX, cellY)].push_back(targetIndex);
-            }
-        }
+        GridCellBuckets::insert(m_targetIndicesByCell, bounds, m_cellSize, targetIndex);
     }
 }
 
 void CircleHitIndex::clear()
 {
     m_targets.clear();
-    m_targetIndicesByCell.clear();
+    GridCellBuckets::clear(m_targetIndicesByCell);
 }
 
 std::optional<std::uint32_t> CircleHitIndex::nearestPayloadAt(const double x, const double y) const
@@ -54,17 +47,15 @@ std::optional<std::uint32_t> CircleHitIndex::nearestPayloadAt(const double x, co
         return std::nullopt;
     }
 
-    double bestDistanceSquared = std::numeric_limits<double>::infinity();
-    std::size_t bestTargetIndex = m_targets.size();
-    const std::int32_t cellX = Geometry2d::gridCellIndex(x, m_cellSize);
-    const std::int32_t cellY = Geometry2d::gridCellIndex(y, m_cellSize);
-
-    const auto cellIt = m_targetIndicesByCell.find(Geometry2d::packedGridCellKey(cellX, cellY));
-    if (cellIt == m_targetIndicesByCell.end()) {
+    const std::vector<std::size_t>* targetIndices =
+        GridCellBuckets::bucketAtPoint(m_targetIndicesByCell, x, y, m_cellSize);
+    if (targetIndices == nullptr) {
         return std::nullopt;
     }
 
-    for (const std::size_t targetIndex : cellIt->second) {
+    double bestDistanceSquared = std::numeric_limits<double>::infinity();
+    std::size_t bestTargetIndex = m_targets.size();
+    for (const std::size_t targetIndex : *targetIndices) {
         const auto& target = m_targets[targetIndex];
         const double distanceSquared = Geometry2d::squaredDistance2d(x, y, target.x, target.y);
         if (distanceSquared > (target.radius * target.radius)) {
