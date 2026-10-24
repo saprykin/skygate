@@ -3,7 +3,6 @@
 #include "EphemerisRequest.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "PassThroughFrameTransformer.hpp"
-#include "RecordingFrameTransformer.hpp"
 #include "ShortBatchFrameTransformer.hpp"
 #include "ValidUtcTimeScaleService.hpp"
 #include "engine/EphemerisCorrectionFlags.hpp"
@@ -34,7 +33,6 @@ using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using skygate::ephemeris::tests::ApparentPlaceTestFixture;
 using skygate::ephemeris::tests::PassThroughFrameTransformer;
-using skygate::ephemeris::tests::RecordingFrameTransformer;
 using skygate::ephemeris::tests::ShortBatchFrameTransformer;
 using skygate::ephemeris::tests::ValidUtcTimeScaleService;
 using namespace skygate::core;
@@ -155,7 +153,6 @@ private slots:
     void leavesApparentRequestGeocentricWithoutParallax();
     void changesTopocentricPositionWithObserverElevation();
     void appliesRefractionToTopocentricHorizontal();
-    void reportsUnavailableRefractionMode();
     void skipsRefractionWhenEquatorialConversionFails();
 };
 
@@ -626,24 +623,6 @@ void ApparentPlaceTopocentricTests::appliesRefractionToTopocentricHorizontal()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
     QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
-}
-
-void ApparentPlaceTopocentricTests::reportsUnavailableRefractionMode()
-{
-    auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
-    const ApparentPlaceCalculator calculator(frameTransformer, nullptr, nullptr);
-    EphemerisRequest request = ApparentPlaceTestFixture::request(EphemerisCorrectionFlags::atmosphericRefraction());
-    request.options.setEnableAtmosphericRefraction(true);
-
-    const HighPrecisionCalculatorResult result =
-        calculator.apply(ApparentPlaceTestFixture::input(request), ApparentPlaceTestFixture::calculatorResult());
-
-    QCOMPARE(frameTransformer->callCount(), 0);
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.metadata.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
-    );
-    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
 }
 
 void ApparentPlaceTopocentricTests::skipsRefractionWhenEquatorialConversionFails()

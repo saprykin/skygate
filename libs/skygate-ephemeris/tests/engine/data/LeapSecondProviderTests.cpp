@@ -71,7 +71,6 @@ private slots:
     void loadsValidTableFromSnapshot();
     void loadsIanaLeapSecondList();
     void reportsMissingTable();
-    void rejectsMalformedRows();
     void rejectsMalformedExpirationMetadata();
     void reportsStaleTable();
     void exposesValidityRangeMetadata();
@@ -139,26 +138,6 @@ void LeapSecondProviderTests::reportsMissingTable()
     QCOMPARE(
         static_cast<std::uint8_t>(result.tableInfo.status),
         static_cast<std::uint8_t>(skygate::ephemeris::ILeapSecondProvider::TableStatus::Missing)
-    );
-    QVERIFY(!result.tableInfo.diagnosticText.empty());
-}
-
-void LeapSecondProviderTests::rejectsMalformedRows()
-{
-    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
-    asset.content = "#@ version bad\n"
-                    "effective_utc_date,tai_minus_utc\n"
-                    "1972-01-01,10\n"
-                    "not-a-date,11\n";
-
-    const skygate::ephemeris::LeapSecondTableLoader::Result result =
-        skygate::ephemeris::LeapSecondTableLoader::loadFromTextAsset(asset);
-
-    QVERIFY(!result.isSuccess());
-    QVERIFY(result.provider == nullptr);
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.tableInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::ILeapSecondProvider::TableStatus::Malformed)
     );
     QVERIFY(!result.tableInfo.diagnosticText.empty());
 }

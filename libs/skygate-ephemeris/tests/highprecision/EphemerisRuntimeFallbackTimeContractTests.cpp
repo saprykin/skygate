@@ -64,15 +64,14 @@ using skygate::ephemeris::tests::ValidUtcTimeScaleService;
     return context;
 }
 
-[[nodiscard]] EphemerisRequest
-makeRequest(const AstronomicalEpoch& epoch, const UtcTimePoint& staleUtcTime, const bool fallbackToSimpleEngine = true)
+[[nodiscard]] EphemerisRequest makeRequest(const AstronomicalEpoch& epoch, const UtcTimePoint& staleUtcTime)
 {
     EphemerisRequest request;
     request.epoch = epoch;
     request.context = makeContext(staleUtcTime);
     request.options.setEngineKind(EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::geometric());
-    request.options.setFallbackToSimpleEngine(fallbackToSimpleEngine);
+    request.options.setFallbackToSimpleEngine(true);
     return request;
 }
 
@@ -186,7 +185,6 @@ private slots:
     void fallbackUsesEpochNotStaleUtcForUtcEpoch();
     void fallbackFailsWhenTimeScaleServiceIsMissing();
     void fallbackFailsWhenTimeScaleConversionFails();
-    void disabledFallbackPreservesOutOfRangeResult();
 };
 
 void EphemerisRuntimeFallbackTimeContractTests::fallbackUsesEpochNotStaleUtcForTdbEpoch()
@@ -284,28 +282,6 @@ void EphemerisRuntimeFallbackTimeContractTests::fallbackFailsWhenTimeScaleConver
 
     QVERIFY(state.has_value());
     assertFailedFallbackMetadata(*state);
-}
-
-void EphemerisRuntimeFallbackTimeContractTests::disabledFallbackPreservesOutOfRangeResult()
-{
-    const AstronomicalEpoch epoch = makeEpoch(TimeScale::Tdb);
-    const EphemerisRequest request = makeRequest(epoch, UtcTimePoint(std::chrono::seconds(1'704'067'200)), false);
-
-    const HighPrecisionEphemerisEngine engine(
-        makeSunCatalog(), request.options, makeDependencies(std::make_shared<ValidUtcTimeScaleService>())
-    );
-
-    const auto state = engine.computeBodyState(request, std::size_t{0});
-
-    QVERIFY(state.has_value());
-    QCOMPARE(
-        static_cast<std::uint8_t>(state->metadata.status),
-        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::OutOfRange)
-    );
-    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
-    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
-    QVERIFY(!std::isfinite(state->equatorial.rightAscensionHours));
-    QVERIFY(!std::isfinite(state->equatorial.declinationDeg));
 }
 
 QTEST_APPLESS_MAIN(EphemerisRuntimeFallbackTimeContractTests)

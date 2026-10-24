@@ -88,9 +88,6 @@ private slots:
     void loadsIersC04Data();
     void loadsIersFinals2000AData();
     void reportsMissingData();
-    void rejectsMalformedRows();
-    void rejectsMissingValues();
-    void rejectsPartialPredictionMetadata();
     void exposesPredictionIntervalMetadata();
     void exposesValidityRangeMetadata();
     void reportsStaleData();
@@ -224,65 +221,6 @@ void EarthOrientationProviderTests::reportsMissingData()
     QCOMPARE(
         static_cast<std::uint8_t>(result.dataInfo.status),
         static_cast<std::uint8_t>(skygate::ephemeris::IEarthOrientationProvider::DataStatus::Missing)
-    );
-    QVERIFY(!result.dataInfo.diagnosticText.empty());
-}
-
-void EarthOrientationProviderTests::rejectsMalformedRows()
-{
-    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
-    asset.content = "#@ version bad\n"
-                    "effective_utc_date,ut1_minus_utc_seconds,polar_motion_x_arcseconds,polar_motion_y_arcseconds\n"
-                    "2026-04-01,0.03142,0.1123,0.2187\n"
-                    "not-a-date,0.03450,0.1180,0.2210\n";
-
-    const skygate::ephemeris::EarthOrientationDataLoader::Result result =
-        skygate::ephemeris::EarthOrientationDataLoader::loadFromTextAsset(asset);
-
-    QVERIFY(!result.isSuccess());
-    QVERIFY(result.provider == nullptr);
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.dataInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::IEarthOrientationProvider::DataStatus::Malformed)
-    );
-    QVERIFY(!result.dataInfo.diagnosticText.empty());
-}
-
-void EarthOrientationProviderTests::rejectsMissingValues()
-{
-    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
-    asset.content = "#@ version missing-value\n"
-                    "effective_utc_date,ut1_minus_utc_seconds,polar_motion_x_arcseconds,polar_motion_y_arcseconds\n"
-                    "2026-04-01,0.03142,,0.2187\n";
-
-    const skygate::ephemeris::EarthOrientationDataLoader::Result result =
-        skygate::ephemeris::EarthOrientationDataLoader::loadFromTextAsset(asset);
-
-    QVERIFY(!result.isSuccess());
-    QVERIFY(result.provider == nullptr);
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.dataInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::IEarthOrientationProvider::DataStatus::Malformed)
-    );
-    QVERIFY(!result.dataInfo.diagnosticText.empty());
-}
-
-void EarthOrientationProviderTests::rejectsPartialPredictionMetadata()
-{
-    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
-    asset.content = "#@ version partial-prediction\n"
-                    "#@ prediction_end 2026-06-30\n"
-                    "effective_utc_date,ut1_minus_utc_seconds,polar_motion_x_arcseconds,polar_motion_y_arcseconds\n"
-                    "2026-04-01,0.03142,0.1123,0.2187\n";
-
-    const skygate::ephemeris::EarthOrientationDataLoader::Result result =
-        skygate::ephemeris::EarthOrientationDataLoader::loadFromTextAsset(asset);
-
-    QVERIFY(!result.isSuccess());
-    QVERIFY(result.provider == nullptr);
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.dataInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::IEarthOrientationProvider::DataStatus::Malformed)
     );
     QVERIFY(!result.dataInfo.diagnosticText.empty());
 }

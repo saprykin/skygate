@@ -1,5 +1,4 @@
 #include "EphemerisFixtureSupport.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
@@ -69,12 +68,6 @@ constexpr std::string_view kDe432sSha256 = "363f32e14f5255359ac32c4d38080cf28ab5
     body.displayName = "Unsupported Test";
     body.kind = BaseCelestialBody::Kind::Constellation;
     return body;
-}
-
-template <typename BodyRange>
-[[nodiscard]] std::shared_ptr<const CelestialBodyCatalog> makeCatalogHandle(const BodyRange& bodies)
-{
-    return std::make_shared<const CelestialBodyCatalog>(std::span<const OwnGalaxyCelestialBody>{bodies});
 }
 
 [[nodiscard]] ObservationContext makeContext()
@@ -500,22 +493,6 @@ private:
     mutable bool m_sawTopocentricState = false;
 };
 
-class DegradedSolarSystemCalculator final : public ISolarSystemStateCalculator {
-public:
-    [[nodiscard]] HighPrecisionCalculatorResult calculate(const HighPrecisionComputationInput&) const override
-    {
-        HighPrecisionCalculatorResult result;
-        result.equatorial = EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
-        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
-        result.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
-        result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
-        result.metadata.dataSourceProvenance = "missing DE441 long-range kernel; bundled modern fallback";
-        result.metadata.effectiveDataValidityRange =
-            makeRange("de440-modern", "Bundled modern range", 2'300'000.5, 2'700'000.5);
-        return result;
-    }
-};
-
 [[nodiscard]] HighPrecisionEphemerisEngine makeHighPrecisionEngine(
     std::vector<OwnGalaxyCelestialBody> bodies,
     EphemerisEngineOptions options,
@@ -534,77 +511,13 @@ class EphemerisAcceptanceMatrixTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void factoryStrictFailureAndFallbackRemainExplicit();
     void calcephBackedSolarSystemRaDecSupportsCorrections();
     void realCalcephRuntimeComputesFixtureRaDec();
     void correctionMatrixRoutesEachCorrectionSet();
-    void absentLongRangeKernelProducesDegradedMetadata();
     void bundledAndOptionalProfilesDriveProviderSelection();
     void deterministicSelfDerivedFixturesRemainReadable();
     void fullFrameCacheAvoidsPerObjectRecompute();
 };
-
-void EphemerisAcceptanceMatrixTests::factoryStrictFailureAndFallbackRemainExplicit()
-{
-    const std::array bodies{makeMarsBody()};
-
-    EphemerisEngineFactoryRequest simpleRequest;
-    simpleRequest.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
-    simpleRequest.catalog = makeCatalogHandle(bodies);
-    simpleRequest.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
-    const EphemerisEngineFactoryResult simpleResult = skygate::ephemeris::EphemerisEngineFactory::create(simpleRequest);
-    QVERIFY(simpleResult.isSuccess());
-    QVERIFY(simpleResult.engine != nullptr);
-    QCOMPARE(
-        static_cast<std::uint8_t>(simpleResult.engine->kind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
-    );
-
-    EphemerisEngineFactoryRequest strictRequest;
-    strictRequest.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    strictRequest.catalog = makeCatalogHandle(bodies);
-    strictRequest.options = makeOptions(EphemerisCorrectionFlags::apparentTopocentric());
-    strictRequest.options.setFallbackToSimpleEngine(false);
-    strictRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
-    const EphemerisEngineFactoryResult strictResult = skygate::ephemeris::EphemerisEngineFactory::create(strictRequest);
-    QVERIFY(strictResult.isFailure());
-    QVERIFY(strictResult.engine == nullptr);
-    QCOMPARE(
-        static_cast<std::uint8_t>(strictResult.requestedKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
-    );
-    QCOMPARE(
-        static_cast<std::uint8_t>(strictResult.effectiveKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
-    );
-    QVERIFY(strictResult.hasErrors());
-    QVERIFY(!strictResult.diagnostics.empty());
-    QVERIFY(!strictResult.diagnostics.front().displayText().empty());
-
-    EphemerisEngineFactoryRequest fallbackRequest = strictRequest;
-    fallbackRequest.options.setFallbackToSimpleEngine(true);
-    fallbackRequest.fallbackPolicy =
-        skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::AllowSimpleEngineFallback;
-    const EphemerisEngineFactoryResult fallbackResult =
-        skygate::ephemeris::EphemerisEngineFactory::create(fallbackRequest);
-    QVERIFY(fallbackResult.isSuccess());
-    QVERIFY(fallbackResult.usedSimpleEngineFallback());
-    QVERIFY(fallbackResult.engine != nullptr);
-    QCOMPARE(
-        static_cast<std::uint8_t>(fallbackResult.requestedKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
-    );
-    QCOMPARE(
-        static_cast<std::uint8_t>(fallbackResult.effectiveKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
-    );
-    QCOMPARE(
-        static_cast<std::uint8_t>(fallbackResult.engine->kind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
-    );
-    QVERIFY(fallbackResult.hasDiagnostics());
-    QVERIFY(!fallbackResult.hasErrors());
-}
 
 void EphemerisAcceptanceMatrixTests::calcephBackedSolarSystemRaDecSupportsCorrections()
 {
@@ -753,33 +666,6 @@ void EphemerisAcceptanceMatrixTests::correctionMatrixRoutesEachCorrectionSet()
             QVERIFY(std::isfinite(state->horizontal.azimuthDeg));
         }
     }
-}
-
-void EphemerisAcceptanceMatrixTests::absentLongRangeKernelProducesDegradedMetadata()
-{
-    HighPrecisionEphemerisEngine::Dependencies dependencies;
-    dependencies.solarSystemStateCalculator = std::make_shared<DegradedSolarSystemCalculator>();
-    dependencies.dataSetInfo = makeDataSetInfo(false);
-
-    const HighPrecisionEphemerisEngine engine =
-        makeHighPrecisionEngine({makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::geometric()), dependencies);
-
-    EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::geometric());
-    request.epoch = makeEpoch(-1'000'000.5);
-
-    const auto state = engine.computeBodyState(request, "mars");
-    QVERIFY(state.has_value());
-    QCOMPARE(
-        static_cast<std::uint8_t>(state->metadata.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
-    );
-    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
-    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
-    QCOMPARE(
-        state->metadata.dataSourceProvenance, std::string{"missing DE441 long-range kernel; bundled modern fallback"}
-    );
-    QVERIFY(state->metadata.effectiveDataValidityRange.has_value());
-    QCOMPARE(state->metadata.effectiveDataValidityRange->id, std::string{"de440-modern"});
 }
 
 void EphemerisAcceptanceMatrixTests::bundledAndOptionalProfilesDriveProviderSelection()

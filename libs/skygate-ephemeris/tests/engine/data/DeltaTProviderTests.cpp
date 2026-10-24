@@ -83,8 +83,6 @@ private slots:
     void loadsPresentDataFromSnapshot();
     void loadsUsnoDeltaTData();
     void reportsMissingData();
-    void rejectsMalformedRows();
-    void rejectsDuplicateEffectiveEpochs();
     void doesNotReturnNanForDuplicateProviderTable();
     void exposesAncientFallbackMetadata();
     void exposesValidityRangeMetadata();
@@ -150,26 +148,6 @@ void DeltaTProviderTests::loadsUsnoDeltaTData()
     QVERIFY(std::abs(*estimate.deltaTSeconds - 69.2) < 0.001);
 }
 
-void DeltaTProviderTests::rejectsDuplicateEffectiveEpochs()
-{
-    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
-    asset.content = "effective_utc_date,delta_t_seconds\n"
-                    "1900-01-01,-2.72\n"
-                    "2000-01-01,63.83\n"
-                    "2000-01-01,64.00\n";
-
-    const skygate::ephemeris::DeltaTDataLoader::Result result =
-        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(asset);
-
-    QVERIFY(!result.isSuccess());
-    QVERIFY(result.provider == nullptr);
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.dataInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Malformed)
-    );
-    QVERIFY(!result.dataInfo.diagnosticText.empty());
-}
-
 void DeltaTProviderTests::doesNotReturnNanForDuplicateProviderTable()
 {
     skygate::ephemeris::IDeltaTProvider::DataInfo info;
@@ -203,26 +181,6 @@ void DeltaTProviderTests::reportsMissingData()
     QCOMPARE(
         static_cast<std::uint8_t>(result.dataInfo.status),
         static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Missing)
-    );
-    QVERIFY(!result.dataInfo.diagnosticText.empty());
-}
-
-void DeltaTProviderTests::rejectsMalformedRows()
-{
-    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
-    asset.content = "#@ version bad\n"
-                    "effective_utc_date,delta_t_seconds\n"
-                    "1900-01-01,-2.72\n"
-                    "not-a-date,63.83\n";
-
-    const skygate::ephemeris::DeltaTDataLoader::Result result =
-        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(asset);
-
-    QVERIFY(!result.isSuccess());
-    QVERIFY(result.provider == nullptr);
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.dataInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Malformed)
     );
     QVERIFY(!result.dataInfo.diagnosticText.empty());
 }

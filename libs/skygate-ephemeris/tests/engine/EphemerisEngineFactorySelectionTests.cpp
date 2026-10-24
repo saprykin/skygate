@@ -267,6 +267,13 @@ void EphemerisEngineFactorySelectionTests::defaultHighPrecisionRequestFallsBackT
     QVERIFY(result.diagnostics.size() >= std::size_t{1});
     QVERIFY(!result.diagnostics.front().isError());
     QVERIFY(!result.diagnostics.front().displayText().empty());
+    for (const skygate::ephemeris::EphemerisFactoryCreationDiagnostic& diagnostic : result.diagnostics) {
+        QCOMPARE(
+            static_cast<std::uint8_t>(diagnostic.severity),
+            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationDiagnosticSeverity::Warning)
+        );
+        QVERIFY(!diagnostic.displayText().empty());
+    }
 }
 
 void EphemerisEngineFactorySelectionTests::strictHighPrecisionRequestFailsWhenUnavailable()
@@ -305,6 +312,10 @@ void EphemerisEngineFactorySelectionTests::strictHighPrecisionRequestFailsWhenUn
     QVERIFY(result.diagnostics.size() >= std::size_t{1});
     QVERIFY(result.diagnostics.front().isError());
     QVERIFY(!result.diagnostics.front().displayText().empty());
+    for (const skygate::ephemeris::EphemerisFactoryCreationDiagnostic& diagnostic : result.diagnostics) {
+        QVERIFY(diagnostic.isError());
+        QVERIFY(!diagnostic.displayText().empty());
+    }
 }
 
 void EphemerisEngineFactorySelectionTests::allowPolicyStillFallsBackWhenRuntimeDisabled()

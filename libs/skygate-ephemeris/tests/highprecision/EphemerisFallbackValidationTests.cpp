@@ -4,7 +4,6 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
 #include "engine/simple/SimpleEphemerisFallbackStrategy.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
 #include "StaticSolarSystemCalculator.hpp"
 #include "ValidUtcTimeScaleService.hpp"
 
@@ -117,9 +116,6 @@ class EphemerisFallbackValidationTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void simpleFactoryCreationSucceeds();
-    void highPrecisionUnavailableFallbackProducesWarnings();
-    void strictHighPrecisionUnavailableProducesErrors();
     void missingLongRangeKernelFallbackIsDegraded();
     void staleDataWarningsRemainVisible();
     void unsupportedBodyReturnsStructuredWarning();
@@ -128,93 +124,6 @@ private slots:
     void outOfRangeRequestWithoutFallbackStaysOutOfRange();
     void failedRequestReturnsFailedStatus();
 };
-
-void EphemerisFallbackValidationTests::simpleFactoryCreationSucceeds()
-{
-    EphemerisEngineFactoryRequest request;
-    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
-    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
-
-    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
-
-    QVERIFY(result.isSuccess());
-    QVERIFY(result.engine != nullptr);
-    QVERIFY(!result.usedSimpleEngineFallback());
-    QVERIFY(!result.hasDiagnostics());
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.engine->kind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
-    );
-}
-
-void EphemerisFallbackValidationTests::highPrecisionUnavailableFallbackProducesWarnings()
-{
-    EphemerisEngineFactoryRequest request;
-    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
-    request.options.setFallbackToSimpleEngine(true);
-    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::AllowSimpleEngineFallback;
-
-    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
-
-    QVERIFY(result.isSuccess());
-    QVERIFY(result.usedSimpleEngineFallback());
-    QVERIFY(result.engine != nullptr);
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.requestedKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
-    );
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.effectiveKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
-    );
-    QVERIFY(result.hasDiagnostics());
-    QVERIFY(!result.hasErrors());
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.status),
-        static_cast<std::uint8_t>(EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback)
-    );
-    for (const EphemerisFactoryCreationDiagnostic& diagnostic : result.diagnostics) {
-        QCOMPARE(
-            static_cast<std::uint8_t>(diagnostic.severity),
-            static_cast<std::uint8_t>(EphemerisFactoryCreationDiagnosticSeverity::Warning)
-        );
-        QVERIFY(!diagnostic.displayText().empty());
-    }
-}
-
-void EphemerisFallbackValidationTests::strictHighPrecisionUnavailableProducesErrors()
-{
-    EphemerisEngineFactoryRequest request;
-    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
-    request.options.setFallbackToSimpleEngine(false);
-    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::Type::StrictHighPrecision;
-
-    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
-
-    QVERIFY(result.isFailure());
-    QVERIFY(result.engine == nullptr);
-    QVERIFY(!result.usedSimpleEngineFallback());
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.requestedKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
-    );
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.effectiveKind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
-    );
-    QVERIFY(result.hasDiagnostics());
-    QVERIFY(result.hasErrors());
-    QCOMPARE(
-        static_cast<std::uint8_t>(result.status),
-        static_cast<std::uint8_t>(EphemerisFactoryCreationStatus::Type::FailedStrictHighPrecisionUnavailable)
-    );
-    for (const EphemerisFactoryCreationDiagnostic& diagnostic : result.diagnostics) {
-        QVERIFY(diagnostic.isError());
-        QVERIFY(!diagnostic.displayText().empty());
-    }
-}
 
 void EphemerisFallbackValidationTests::missingLongRangeKernelFallbackIsDegraded()
 {
@@ -301,6 +210,7 @@ void EphemerisFallbackValidationTests::outOfRangeRequestWithoutFallbackStaysOutO
     HighPrecisionCalculatorResult calculatorResult;
     calculatorResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
     calculatorResult.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+    calculatorResult.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
     calculatorResult.metadata.dataSourceProvenance = "kernel out of range";
 
     const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(std::move(calculatorResult));
@@ -314,6 +224,7 @@ void EphemerisFallbackValidationTests::outOfRangeRequestWithoutFallbackStaysOutO
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange)
     );
     QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
     QCOMPARE(state->metadata.dataSourceProvenance, std::string{"kernel out of range"});
     QVERIFY(std::isnan(state->equatorial.rightAscensionHours));
     QVERIFY(std::isnan(state->equatorial.declinationDeg));

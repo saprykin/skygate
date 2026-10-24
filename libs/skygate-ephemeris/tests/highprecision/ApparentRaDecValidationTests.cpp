@@ -1,3 +1,4 @@
+#include "ApparentPlaceTestFixture.hpp"
 #include "EphemerisFixtureSupport.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "TestCalcephKernel.hpp"
@@ -16,13 +17,11 @@
 #include <QJsonObject>
 #include <QtTest/QtTest>
 
-#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace {
 
@@ -30,29 +29,10 @@ using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using namespace skygate::core;
 using skygate::ephemeris::tests::angularSeparationDegrees;
+using skygate::ephemeris::tests::ApparentPlaceTestFixture;
 using skygate::ephemeris::tests::EphemerisRaDecExpectation;
 using skygate::ephemeris::tests::EphemerisRaDecFixture;
 using skygate::ephemeris::tests::loadRaDecFixture;
-
-[[nodiscard]] CelestialFrameTransformResult transformSingleVector(
-    const IFrameTransformer& transformer,
-    const CelestialReferenceFrame::Type sourceFrame,
-    const CelestialReferenceFrame::Type targetFrame,
-    const skygate::core::AstronomicalEpoch& epoch,
-    const Vector3d& vector
-)
-{
-    const std::array<Vector3d, 1U> vectors{vector};
-    const std::vector<CelestialFrameTransformResult> results = transformer.transform(
-        CelestialFrameTransformRequest{
-            .sourceFrame = sourceFrame,
-            .targetFrame = targetFrame,
-            .epoch = epoch,
-            .vectors = vectors,
-        }
-    );
-    return results.front();
-}
 
 [[nodiscard]] QString apparentFixturePath()
 {
@@ -229,7 +209,7 @@ void ApparentRaDecValidationTests::geocentricApparentRaDecAgainstHorizonsFixture
     const SolarSystemStateCalculator solarSystemCalculator(fixture.provider);
     const auto timeScaleService = std::make_shared<SameInstantTimeScaleService>();
     const auto frameTransformer = std::make_shared<ErfaFrameTransformer>(timeScaleService);
-    const CelestialFrameTransformResult availabilityResult = transformSingleVector(
+    const CelestialFrameTransformResult availabilityResult = ApparentPlaceTestFixture::transformSingleVector(
         *frameTransformer,
         CelestialReferenceFrame::Type::Gcrs,
         CelestialReferenceFrame::Type::TrueEquatorAndEquinox,
