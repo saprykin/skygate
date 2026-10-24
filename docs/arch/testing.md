@@ -4,8 +4,9 @@ Tests stay close to each module.
 
 ## libs/skygate-core/tests
 
-Angle/projection math, viewport math, type validation, projection factory
-behavior, prepared projections, and concrete projection strategies.
+Angle and projection math, viewport math, type validation, projection
+codec behavior, prepared projections, and the per-projection formulas in
+`ProjectionAlgorithms`.
 
 ## libs/skygate-ephemeris/tests
 

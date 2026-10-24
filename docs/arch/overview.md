@@ -9,8 +9,8 @@ direction:
 - `libs/skygate-ephemeris`: star catalog loading and parsing, identity-based
   composition, catalog normalization, constellation data, astronomical
   coordinate calculation, and snapshot generation.
-- `libs/skygate-core`: UI-independent domain types, projection contracts and
-  implementations, viewport math, and time abstractions.
+- `libs/skygate-core`: UI-independent domain types, prepared projections,
+  viewport math, and time abstractions.
 
 ```mermaid
 flowchart LR
@@ -72,9 +72,8 @@ The codebase reuses a small set of patterns:
 - Layered modules: `skygate-ui` for application and presentation concerns,
   `skygate-ephemeris` for astronomy and data, `skygate-core` for reusable
   domain and math concerns.
-- Strategy plus factory: `IProjection` with `createProjection(...)`,
-  `IEphemerisEngine` with `EphemerisEngineFactory`, `IStarCatalog` with the
-  catalog construction helpers.
+- Strategy plus factory: `IEphemerisEngine` with `EphemerisEngineFactory`,
+  `IStarCatalog` with the catalog construction helpers.
 - Read model: `SkySceneModel` derives render data from controller state and
   caches the results instead of mixing rendering logic into the controller.
 - Coordinator plus services: `SkyCatalogManager` owns the configured source
