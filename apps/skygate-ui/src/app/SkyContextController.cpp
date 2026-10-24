@@ -3,7 +3,6 @@
 #include "SkyContextLocationSourceCodec.hpp"
 #include "SkyContextProjectionTypeCodec.hpp"
 #include "SkyContextTextFormatter.hpp"
-#include "SkyContextTimeCodec.hpp"
 #include "SkyContextUtcDateTimeTextCodec.hpp"
 #include "SkySelectedCityChange.hpp"
 #include "catalog/SkyCatalogManager.hpp"
@@ -18,7 +17,6 @@
 #include "location/LocationCatalogModel.hpp"
 #include "location/SkyDeviceLocationAcquisition.hpp"
 #include "location/SkyLocationStatusText.hpp"
-#include "projections/ProjectionTypeCodec.hpp"
 #include "search/SkyObjectSearchModel.hpp"
 #include "settings/SkySettingsStore.hpp"
 #include "theme/SkyOverlayLayerSettings.hpp"
@@ -214,7 +212,6 @@ SkyContextController::SkyContextController(
     connect(m_ephemerisDataManager.get(), &SkyEphemerisDataManager::activeDataChanged, this, [this] {
         rebuildEphemerisEngine();
         emit ephemerisDataStatusTextChanged();
-        emit ephemerisDataChanged();
         emit skyContextChanged();
     });
 
@@ -374,12 +371,12 @@ const SkyThemeRenderPalette& SkyContextController::renderTheme() const noexcept
 
 QString SkyContextController::utcTimeText() const
 {
-    return SkyQtTimeCodec::formatTimeText(SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()));
+    return SkyQtTimeCodec::formatTimeText(SkyQtTimeCodec::toQDateTimeUtc(m_location.utcTime()));
 }
 
 QString SkyContextController::utcDateText() const
 {
-    return SkyContextUtcDateTimeTextCodec::formatDate(SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()));
+    return SkyContextUtcDateTimeTextCodec::formatDate(SkyQtTimeCodec::toQDateTimeUtc(m_location.utcTime()));
 }
 
 QString SkyContextController::latitudeText() const

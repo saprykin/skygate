@@ -140,11 +140,6 @@ class SkyContextController final : public QObject {
         NOTIFY ephemerisDataStatusTextChanged
     )
     Q_PROPERTY(
-        QString ephemerisLongRangeKernelStatusText
-        READ ephemerisLongRangeKernelStatusText
-        NOTIFY ephemerisDataStatusTextChanged
-    )
-    Q_PROPERTY(
         QString ephemerisKernelDisplayText
         READ ephemerisKernelDisplayText
         NOTIFY ephemerisDataStatusTextChanged
@@ -177,12 +172,6 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(
         QString ephemerisSupportDataCacheSizeText
         READ ephemerisSupportDataCacheSizeText
-        NOTIFY ephemerisDataStatusTextChanged
-    )
-    Q_PROPERTY(
-        bool ephemerisDataOnlineUpdatesEnabled
-        READ ephemerisDataOnlineUpdatesEnabled
-        WRITE setEphemerisDataOnlineUpdatesEnabled
         NOTIFY ephemerisDataStatusTextChanged
     )
     Q_PROPERTY(
@@ -339,7 +328,6 @@ public:
     [[nodiscard]] QString ephemerisDataStatusText() const;
     [[nodiscard]] QString ephemerisEngineStatusText() const;
     [[nodiscard]] QString ephemerisShortRangeKernelStatusText() const;
-    [[nodiscard]] QString ephemerisLongRangeKernelStatusText() const;
     [[nodiscard]] QString ephemerisKernelDisplayText() const;
     [[nodiscard]] QString ephemerisEarthOrientationStatusText() const;
     [[nodiscard]] QString ephemerisLeapSecondStatusText() const;
@@ -347,7 +335,6 @@ public:
     [[nodiscard]] QString ephemerisDataLastUpdateResultText() const;
     [[nodiscard]] QString ephemerisPlanetaryKernelCacheSizeText() const;
     [[nodiscard]] QString ephemerisSupportDataCacheSizeText() const;
-    [[nodiscard]] bool ephemerisDataOnlineUpdatesEnabled() const noexcept;
     [[nodiscard]] bool ephemerisDataUpdateEnabled() const noexcept;
     [[nodiscard]] bool ephemerisDataUpdateInProgress() const noexcept;
     [[nodiscard]] double ephemerisDataUpdateProgress() const noexcept;
@@ -385,7 +372,6 @@ public:
     [[nodiscard]] QHash<QString, QString> catalogSourceTitles() const;
     [[nodiscard]] std::span<const QString> catalogSourceIds() const noexcept;
     [[nodiscard]] const std::vector<QStringList>& catalogSourceContributorIds() const noexcept;
-    [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
     [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> resolvedConstellationLineRefs() const;
     [[nodiscard]] std::span<const ConstellationAnchorGroup> resolvedConstellationAnchorGroups() const;
@@ -427,12 +413,8 @@ public:
     Q_INVOKABLE void setEphemerisWavelengthText(const QString& wavelengthText);
     Q_INVOKABLE bool saveSettings() const;
     Q_INVOKABLE bool loadSettings();
-    Q_INVOKABLE bool clearCatalogCache();
-    Q_INVOKABLE bool clearDeepSkyCatalogCache();
-    Q_INVOKABLE bool clearEphemerisDataCache();
     Q_INVOKABLE bool clearPlanetaryKernelCache();
     Q_INVOKABLE bool clearSupportDataCache();
-    Q_INVOKABLE bool updateEphemerisData();
     Q_INVOKABLE bool updateEphemerisDataProfile(const QString& profileId);
     Q_INVOKABLE bool checkEphemerisSupportDataUpdates();
     Q_INVOKABLE void cancelActiveDownload();
@@ -474,8 +456,6 @@ signals:
     void stepSecondsChanged();
     void magnitudeCutoffChanged();
     void viewDirectionChanged();
-    void utcDateTextChanged();
-    void utcTimeTextChanged();
     void latitudeTextChanged();
     void longitudeTextChanged();
     void elevationTextChanged();
@@ -491,7 +471,6 @@ signals:
     void catalogStatusTextChanged();
     void ephemerisDataStatusTextChanged();
     void ephemerisEngineStatusTextChanged();
-    void ephemerisDataChanged();
     void catalogDatasetInfoTextChanged();
     void catalogParticipationSummaryChanged();
     void deepSkyCatalogInfoTextChanged();

@@ -109,12 +109,6 @@ const std::vector<QStringList>& SkyContextController::catalogSourceContributorId
     return m_catalogManager != nullptr ? m_catalogManager->contributorSourceIds() : kEmptyContributors;
 }
 
-std::span<const SkyContextController::ConstellationLineRef> SkyContextController::constellationLineRefs() const noexcept
-{
-    return m_catalogManager != nullptr ? m_catalogManager->constellationLineRefs()
-                                       : std::span<const ConstellationLineRef>{};
-}
-
 std::span<const SkyContextController::ConstellationAnchorGroup>
 SkyContextController::constellationAnchorGroups() const noexcept
 {

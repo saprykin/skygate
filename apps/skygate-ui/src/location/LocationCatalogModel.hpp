@@ -26,8 +26,6 @@ public:
         DisplayTextRole,
         DetailTextRole,
         CityIdRole,
-        CountryNameRole,
-        CityNameRole,
         LatitudeDegRole,
         LongitudeDegRole,
         SelectableRole,
