@@ -12,6 +12,7 @@
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <string>
 
 namespace skygate::ephemeris::tests {
 
@@ -83,6 +84,17 @@ angularSeparationDegrees(const EphemerisRaDecExpectation& lhs, const EphemerisRa
 [[nodiscard]] inline bool isGitLfsPointerPayload(const QByteArray& payload)
 {
     return payload.startsWith("version https://git-lfs.github.com/spec/v1\n");
+}
+
+// Reads only the pointer header prefix so a large kernel file is never loaded
+// just to decide whether Git LFS fetched its content.
+[[nodiscard]] inline bool isLfsPointerKernel(const std::string& path)
+{
+    QFile file(QString::fromStdString(path));
+    if (!file.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    return isGitLfsPointerPayload(file.read(256));
 }
 
 [[nodiscard]] inline std::optional<EphemerisRaDecFixture>

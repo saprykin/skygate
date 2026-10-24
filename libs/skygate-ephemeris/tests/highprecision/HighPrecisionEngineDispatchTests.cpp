@@ -4,6 +4,7 @@
 #include "HighPrecisionEngineFixture.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "PassThroughApparentPlaceCalculator.hpp"
+#include "ValidUtcTimeScaleService.hpp"
 #include "engine/EphemerisCapabilities.hpp"
 #include "engine/EphemerisCorrectionFlags.hpp"
 #include "engine/EphemerisEngineKind.hpp"
@@ -42,6 +43,7 @@
 
 using skygate::ephemeris::tests::HighPrecisionEngineFixture;
 using skygate::ephemeris::tests::PassThroughApparentPlaceCalculator;
+using skygate::ephemeris::tests::ValidUtcTimeScaleService;
 
 namespace {
 
@@ -305,41 +307,6 @@ private:
 
     mutable int m_batchCallCount = 0;
     mutable std::size_t m_lastBatchSize = 0U;
-};
-
-class BatchValidTimeScaleService final : public ITimeScaleService {
-public:
-    [[nodiscard]] TimeScaleConversionResult
-    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
-    {
-        ++m_callCount;
-        TimeScaleConversionResult result;
-        result.epoch = epoch;
-        result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Type::Valid;
-        return result;
-    }
-
-    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
-        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
-    ) const override
-    {
-        static_cast<void>(dateTime);
-
-        TimeScaleConversionResult result;
-        result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Type::Failed;
-        result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
-        return result;
-    }
-
-    [[nodiscard]] int callCount() const noexcept
-    {
-        return m_callCount;
-    }
-
-private:
-    mutable int m_callCount = 0;
 };
 
 class RecordingResultBuilder final : public IEphemerisResultBuilder {
@@ -786,7 +753,7 @@ void HighPrecisionEngineDispatchTests::batchesTopocentricApparentPlaceRequestWid
         );
     }
 
-    auto timeScaleService = std::make_shared<BatchValidTimeScaleService>();
+    auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
     auto starAstrometryCalculator = std::make_shared<StarAstrometryCalculator>();
     auto frameTransformer = std::make_shared<BatchRecordingFrameTransformer>();
     auto apparentPlaceCalculator = std::make_shared<ApparentPlaceCalculator>(
@@ -804,7 +771,7 @@ void HighPrecisionEngineDispatchTests::batchesTopocentricApparentPlaceRequestWid
     const EphemerisSnapshot snapshot = engine.compute(request);
 
     QCOMPARE(snapshot.states.size(), kRepresentativeCatalogSize);
-    QCOMPARE(timeScaleService->callCount(), 1);
+    QCOMPARE(timeScaleService->convertCallCount(), 1);
     QCOMPARE(frameTransformer->batchCallCount(), 3);
     QCOMPARE(frameTransformer->lastBatchSize(), kRepresentativeCatalogSize);
     QCOMPARE(frameTransformer->singleCallCount(), 0);

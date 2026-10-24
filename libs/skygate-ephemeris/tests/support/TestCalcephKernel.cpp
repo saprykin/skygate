@@ -10,7 +10,7 @@ TestCalcephKernel::TestCalcephKernel(Info info) : m_kernelInfo(std::move(info)) 
 
 TestCalcephKernel::Status TestCalcephKernel::status() const noexcept
 {
-    return m_status;
+    return Status::Ready;
 }
 
 const std::vector<std::string>& TestCalcephKernel::diagnostics() const noexcept
@@ -26,8 +26,8 @@ const std::optional<TestCalcephKernel::Info>& TestCalcephKernel::kernelInfo() co
 TestCalcephKernel::Status
 TestCalcephKernel::statusForEpoch(const skygate::core::AstronomicalEpoch& epoch) const noexcept
 {
-    if (m_status != Status::Ready || !m_validateEpochRange || !m_kernelInfo.has_value()) {
-        return m_status;
+    if (!m_kernelInfo.has_value()) {
+        return Status::Ready;
     }
     if (!epoch.isFinite() || epoch.sortKey() < m_kernelInfo->validityRange.start.sortKey()
         || epoch.sortKey() > m_kernelInfo->validityRange.end.sortKey()) {
@@ -71,39 +71,14 @@ skygate::ephemeris::highprecision::ICalcephKernel::StateResult TestCalcephKernel
     return m_defaultResult;
 }
 
-void TestCalcephKernel::setStatus(const Status status) noexcept
-{
-    m_status = status;
-}
-
 void TestCalcephKernel::setDiagnostics(std::vector<std::string> diagnostics)
 {
     m_diagnostics = std::move(diagnostics);
 }
 
-void TestCalcephKernel::setKernelInfo(Info info)
-{
-    m_kernelInfo = std::move(info);
-}
-
-void TestCalcephKernel::clearKernelInfo() noexcept
-{
-    m_kernelInfo = std::nullopt;
-}
-
 void TestCalcephKernel::setRequiredTimeScale(const skygate::core::TimeScale timeScale)
 {
     m_requiredTimeScale = timeScale;
-}
-
-void TestCalcephKernel::clearRequiredTimeScale() noexcept
-{
-    m_requiredTimeScale = std::nullopt;
-}
-
-void TestCalcephKernel::setValidateEpochRange(const bool validateEpochRange) noexcept
-{
-    m_validateEpochRange = validateEpochRange;
 }
 
 void TestCalcephKernel::setDefaultResult(skygate::ephemeris::highprecision::ICalcephKernel::StateResult result)

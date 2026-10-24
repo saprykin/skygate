@@ -15,6 +15,7 @@
 #include "ObservationContext.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "UtcTimePoint.hpp"
+#include "ValidUtcTimeScaleService.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/TimeScale.hpp"
 
@@ -34,6 +35,7 @@ namespace {
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using namespace skygate::core;
+using skygate::ephemeris::tests::ValidUtcTimeScaleService;
 
 [[nodiscard]] OwnGalaxyCelestialBody makeSunBody()
 {
@@ -94,31 +96,6 @@ public:
         result.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
         result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
         result.metadata.dataSourceProvenance = "data-out-of-range fake";
-        return result;
-    }
-};
-
-class IdentityUtcTimeScaleService final : public ITimeScaleService {
-public:
-    [[nodiscard]] TimeScaleConversionResult
-    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
-    {
-        TimeScaleConversionResult result;
-        result.epoch = epoch.normalized();
-        result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Type::Valid;
-        return result;
-    }
-
-    [[nodiscard]] TimeScaleConversionResult
-    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
-    {
-        static_cast<void>(dateTime);
-
-        TimeScaleConversionResult result;
-        result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Type::Failed;
-        result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
         return result;
     }
 };
@@ -221,7 +198,7 @@ void EphemerisRuntimeFallbackTimeContractTests::fallbackUsesEpochNotStaleUtcForT
     const EphemerisRequest secondRequest = makeRequest(epoch, secondStaleUtc);
 
     const HighPrecisionEphemerisEngine engine(
-        makeSunCatalog(), firstRequest.options, makeDependencies(std::make_shared<IdentityUtcTimeScaleService>())
+        makeSunCatalog(), firstRequest.options, makeDependencies(std::make_shared<ValidUtcTimeScaleService>())
     );
 
     const auto firstState = engine.computeBodyState(firstRequest, std::size_t{0});
@@ -244,7 +221,7 @@ void EphemerisRuntimeFallbackTimeContractTests::fallbackUsesEpochNotStaleUtcForT
     const EphemerisRequest secondRequest = makeRequest(epoch, secondStaleUtc);
 
     const HighPrecisionEphemerisEngine engine(
-        makeSunCatalog(), firstRequest.options, makeDependencies(std::make_shared<IdentityUtcTimeScaleService>())
+        makeSunCatalog(), firstRequest.options, makeDependencies(std::make_shared<ValidUtcTimeScaleService>())
     );
 
     const auto firstState = engine.computeBodyState(firstRequest, std::size_t{0});
@@ -267,7 +244,7 @@ void EphemerisRuntimeFallbackTimeContractTests::fallbackUsesEpochNotStaleUtcForU
     const EphemerisRequest secondRequest = makeRequest(epoch, secondStaleUtc);
 
     const HighPrecisionEphemerisEngine engine(
-        makeSunCatalog(), firstRequest.options, makeDependencies(std::make_shared<IdentityUtcTimeScaleService>())
+        makeSunCatalog(), firstRequest.options, makeDependencies(std::make_shared<ValidUtcTimeScaleService>())
     );
 
     const auto firstState = engine.computeBodyState(firstRequest, std::size_t{0});
@@ -315,7 +292,7 @@ void EphemerisRuntimeFallbackTimeContractTests::disabledFallbackPreservesOutOfRa
     const EphemerisRequest request = makeRequest(epoch, UtcTimePoint(std::chrono::seconds(1'704'067'200)), false);
 
     const HighPrecisionEphemerisEngine engine(
-        makeSunCatalog(), request.options, makeDependencies(std::make_shared<IdentityUtcTimeScaleService>())
+        makeSunCatalog(), request.options, makeDependencies(std::make_shared<ValidUtcTimeScaleService>())
     );
 
     const auto state = engine.computeBodyState(request, std::size_t{0});

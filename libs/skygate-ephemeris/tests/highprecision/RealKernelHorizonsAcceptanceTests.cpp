@@ -15,7 +15,6 @@
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 
 #include <QDebug>
-#include <QFile>
 #include <QtTest/QtTest>
 
 #include <array>
@@ -32,6 +31,7 @@ using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using skygate::ephemeris::tests::angularSeparationDegrees;
 using skygate::ephemeris::tests::EphemerisRaDecExpectation;
+using skygate::ephemeris::tests::isLfsPointerKernel;
 
 constexpr std::string_view kDe432sSha256 = "363f32e14f5255359ac32c4d38080cf28ab55564a5e16696a75f63394b666e9b";
 constexpr double kHoursToDegrees = 15.0;
@@ -206,15 +206,6 @@ private:
         .rightAscensionHours = raDeg / kHoursToDegrees,
         .declinationDegrees = decDeg,
     };
-}
-
-[[nodiscard]] bool isLfsPointerKernel(const std::string& path)
-{
-    QFile file(QString::fromStdString(path));
-    if (!file.open(QIODevice::ReadOnly)) {
-        return false;
-    }
-    return skygate::ephemeris::tests::isGitLfsPointerPayload(file.read(256));
 }
 
 }  // namespace

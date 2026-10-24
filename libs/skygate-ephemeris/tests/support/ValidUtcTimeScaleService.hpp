@@ -4,7 +4,9 @@
 
 namespace skygate::ephemeris::tests {
 
-// Converts epochs between time scales while keeping the same instant.
+// Converts epochs between time scales while keeping the same instant. Civil
+// date/time conversion is explicitly unsupported, matching every engine path
+// that only ever needs an epoch-based conversion.
 class ValidUtcTimeScaleService final : public skygate::ephemeris::ITimeScaleService {
 public:
     [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult

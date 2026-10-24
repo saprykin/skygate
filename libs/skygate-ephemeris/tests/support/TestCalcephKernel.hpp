@@ -11,6 +11,8 @@
 
 namespace skygate::ephemeris::tests {
 
+// Fake kernel whose status is always Ready. A kernel Info tightens
+// statusForEpoch so epochs outside its validity range report OutOfRange.
 class TestCalcephKernel final : public skygate::ephemeris::highprecision::ICalcephKernel {
 public:
     struct Call {
@@ -29,13 +31,8 @@ public:
     [[nodiscard]] skygate::ephemeris::highprecision::ICalcephKernel::StateResult
     compute(const skygate::core::AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const override;
 
-    void setStatus(Status status) noexcept;
     void setDiagnostics(std::vector<std::string> diagnostics);
-    void setKernelInfo(Info info);
-    void clearKernelInfo() noexcept;
     void setRequiredTimeScale(skygate::core::TimeScale timeScale);
-    void clearRequiredTimeScale() noexcept;
-    void setValidateEpochRange(bool validateEpochRange) noexcept;
     void setDefaultResult(skygate::ephemeris::highprecision::ICalcephKernel::StateResult result);
     [[nodiscard]] skygate::ephemeris::highprecision::ICalcephKernel::StateResult& defaultResult() noexcept;
     [[nodiscard]] skygate::ephemeris::highprecision::ICalcephKernel::StateResult&
@@ -60,11 +57,9 @@ private:
 
     [[nodiscard]] ResponseKey responseKey(int targetNaifId, int centerNaifId) const noexcept;
 
-    Status m_status = Status::Ready;
     std::vector<std::string> m_diagnostics;
     std::optional<Info> m_kernelInfo;
     std::optional<skygate::core::TimeScale> m_requiredTimeScale;
-    bool m_validateEpochRange = true;
     skygate::ephemeris::highprecision::ICalcephKernel::StateResult m_defaultResult;
     std::map<ResponseKey, skygate::ephemeris::highprecision::ICalcephKernel::StateResult> m_responses;
     std::map<ResponseKey, std::vector<skygate::ephemeris::highprecision::ICalcephKernel::StateResult>>

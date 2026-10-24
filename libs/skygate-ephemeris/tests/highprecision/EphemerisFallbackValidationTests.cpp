@@ -3,10 +3,10 @@
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
-#include "engine/ITimeScaleService.hpp"
-#include "engine/TimeScaleConversionResult.hpp"
 #include "engine/simple/SimpleEphemerisFallbackStrategy.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
+#include "StaticSolarSystemCalculator.hpp"
+#include "ValidUtcTimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 
@@ -26,6 +26,8 @@ namespace {
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using namespace skygate::core;
+using skygate::ephemeris::tests::StaticSolarSystemCalculator;
+using skygate::ephemeris::tests::ValidUtcTimeScaleService;
 
 [[nodiscard]] OwnGalaxyCelestialBody makeSunBody()
 {
@@ -77,37 +79,12 @@ template <typename BodyRange>
     return request;
 }
 
-class IdentityUtcTimeScaleService final : public ITimeScaleService {
-public:
-    [[nodiscard]] TimeScaleConversionResult
-    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
-    {
-        TimeScaleConversionResult result;
-        result.epoch = epoch.normalized();
-        result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Type::Valid;
-        return result;
-    }
-
-    [[nodiscard]] TimeScaleConversionResult
-    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
-    {
-        static_cast<void>(dateTime);
-
-        TimeScaleConversionResult result;
-        result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Type::Failed;
-        result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
-        return result;
-    }
-};
-
 [[nodiscard]] HighPrecisionEphemerisEngine::Dependencies
 makeDependencies(std::shared_ptr<ISolarSystemStateCalculator> solarSystemCalculator = {})
 {
     HighPrecisionEphemerisEngine::Dependencies dependencies;
     dependencies.solarSystemStateCalculator = std::move(solarSystemCalculator);
-    dependencies.timeScaleService = std::make_shared<IdentityUtcTimeScaleService>();
+    dependencies.timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
     dependencies.fallbackStrategy = std::make_shared<SimpleEphemerisFallbackStrategy>();
     dependencies.dataSetInfo.id = "fallback-validation";
     dependencies.dataSetInfo.displayName = "Fallback validation";
@@ -124,26 +101,6 @@ makeDependencies(std::shared_ptr<ISolarSystemStateCalculator> solarSystemCalcula
     );
     return dependencies;
 }
-
-class StaticSolarSystemCalculator final : public ISolarSystemStateCalculator {
-public:
-    explicit StaticSolarSystemCalculator(HighPrecisionCalculatorResult result) : m_result(std::move(result)) {}
-
-    [[nodiscard]] HighPrecisionCalculatorResult calculate(const HighPrecisionComputationInput&) const override
-    {
-        ++m_callCount;
-        return m_result;
-    }
-
-    [[nodiscard]] int callCount() const noexcept
-    {
-        return m_callCount;
-    }
-
-private:
-    HighPrecisionCalculatorResult m_result;
-    mutable int m_callCount = 0;
-};
 
 [[nodiscard]] HighPrecisionEphemerisEngine makeHighPrecisionEngine(HighPrecisionCalculatorResult calculatorResult)
 {

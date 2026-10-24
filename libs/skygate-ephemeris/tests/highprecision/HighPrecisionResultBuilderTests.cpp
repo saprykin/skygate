@@ -2,6 +2,7 @@
 #include "EphemerisRequest.hpp"
 #include "HighPrecisionEngineFixture.hpp"
 #include "PassThroughApparentPlaceCalculator.hpp"
+#include "StaticSolarSystemCalculator.hpp"
 #include "engine/DeltaTDataLoader.hpp"
 #include "engine/EphemerisCorrectionFlags.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
@@ -47,6 +48,7 @@
 
 using skygate::ephemeris::tests::HighPrecisionEngineFixture;
 using skygate::ephemeris::tests::PassThroughApparentPlaceCalculator;
+using skygate::ephemeris::tests::StaticSolarSystemCalculator;
 
 namespace {
 
@@ -142,33 +144,6 @@ makeLeapSecondProvider(const std::optional<skygate::core::AstronomicalEpoch>& re
     Q_ASSERT(result.isSuccess());
     return result.provider;
 }
-
-class StaticSolarSystemCalculator final : public ISolarSystemStateCalculator {
-public:
-    explicit StaticSolarSystemCalculator(HighPrecisionCalculatorResult result) : m_result(std::move(result)) {}
-
-    [[nodiscard]] HighPrecisionCalculatorResult calculate(const HighPrecisionComputationInput& input) const override
-    {
-        ++m_callCount;
-        m_lastBodyId = input.body.id;
-        return m_result;
-    }
-
-    [[nodiscard]] int callCount() const noexcept
-    {
-        return m_callCount;
-    }
-
-    [[nodiscard]] std::string lastBodyId() const
-    {
-        return m_lastBodyId;
-    }
-
-private:
-    HighPrecisionCalculatorResult m_result;
-    mutable int m_callCount = 0;
-    mutable std::string m_lastBodyId;
-};
 
 void mergeConversionMetadata(EphemerisEngineQueryResult& metadata, const TimeScaleConversionResult& conversion) noexcept
 {
