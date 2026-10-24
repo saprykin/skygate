@@ -4,7 +4,7 @@
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogPayloadParser.hpp"
 #include "skygate/testsupport/PerformanceBudget.hpp"
-#include "catalog/io/zip/ZipCodec.hpp"
+#include "catalog/io/CatalogZipEntrySelector.hpp"
 
 #include <QtTest/QtTest>
 
@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -243,11 +244,12 @@ void CatalogPerformanceGuardTests::scansZipWithManyEntriesWithinGuardrail()
 
     QElapsedTimer timer;
     timer.start();
-    const auto extracted = skygate::ephemeris::ZipCodec{}.extractFirstCsvEntry(zipData);
+    const skygate::ephemeris::CatalogZipEntrySelection extracted =
+        skygate::ephemeris::CatalogZipEntrySelector::select(zipData, std::nullopt);
     const qint64 elapsedMs = timer.elapsed();
 
-    QVERIFY(extracted.has_value());
-    QVERIFY(extracted->find("Target") != std::string::npos);
+    QVERIFY(extracted.status == skygate::ephemeris::CatalogZipEntrySelection::Status::Selected);
+    QVERIFY(extracted.payload.find("Target") != std::string::npos);
     verifyElapsedBelow(elapsedMs, kZipScanBudgetMs, "large ZIP entry scan");
 }
 

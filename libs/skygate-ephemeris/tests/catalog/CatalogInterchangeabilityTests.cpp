@@ -666,7 +666,6 @@ void CatalogInterchangeabilityTests::largeFixtureIndexesAndResolvesReferences()
     const CatalogCompositionResult semanticLast = compose(true);
     QVERIFY(semanticLast.isSuccess());
     QCOMPARE(semanticLast.bodyCount, std::size_t{static_cast<std::size_t>(kStarCount)});
-    QCOMPARE(semanticLast.starCount, std::size_t{static_cast<std::size_t>(kStarCount)});
 
     // Reference resolution through the shared identity index returns the
     // surviving canonical ID even though the semantic schema renamed the star.

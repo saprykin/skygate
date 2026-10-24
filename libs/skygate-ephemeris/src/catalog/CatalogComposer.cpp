@@ -12,7 +12,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <iterator>
 #include <optional>
 #include <span>
 #include <string>
@@ -22,55 +21,17 @@
 namespace skygate::ephemeris {
 namespace {
 
-void assignCompositionCounts(
-    CatalogCompositionResult& result,
-    const std::span<const BaseCelestialBody* const> bodies,
-    const std::size_t currentConstellationCount
-)
+void assignCompositionSummary(CatalogCompositionResult& result, const std::span<const BaseCelestialBody* const> bodies)
 {
-    std::size_t catalogConstellationCount = 0;
-    for (const BaseCelestialBody* body : bodies) {
-        if (body == nullptr) {
-            continue;
-        }
-        switch (body->kind) {
-        case BaseCelestialBody::Kind::Star:
-            ++result.starCount;
-            break;
-        case BaseCelestialBody::Kind::Planet:
-            ++result.planetCount;
-            break;
-        case BaseCelestialBody::Kind::Moon:
-            ++result.moonCount;
-            break;
-        case BaseCelestialBody::Kind::Sun:
-            ++result.sunCount;
-            break;
-        case BaseCelestialBody::Kind::Constellation:
-            ++catalogConstellationCount;
-            break;
-        case BaseCelestialBody::Kind::DeepSkyObject:
-            ++result.deepSkyObjectCount;
-            break;
-        }
-    }
-
     result.bodyCount = bodies.size();
-    result.constellationCount = std::max(catalogConstellationCount, currentConstellationCount);
+    result.deepSkyObjectCount = CatalogIdentity::countDeepSkyObjects(bodies);
 
     result.sourceOrder.clear();
-    result.sourceRowCounts.clear();
     result.sourceOrder.reserve(result.sourceIds.size());
-    result.sourceRowCounts.reserve(result.sourceIds.size());
     for (const std::string& sourceId : result.sourceIds) {
-        const auto existing = std::find(result.sourceOrder.begin(), result.sourceOrder.end(), sourceId);
-        if (existing == result.sourceOrder.end()) {
+        if (std::find(result.sourceOrder.begin(), result.sourceOrder.end(), sourceId) == result.sourceOrder.end()) {
             result.sourceOrder.push_back(sourceId);
-            result.sourceRowCounts.push_back(1U);
-            continue;
         }
-        const std::size_t index = static_cast<std::size_t>(std::distance(result.sourceOrder.begin(), existing));
-        ++result.sourceRowCounts[index];
     }
 }
 
@@ -127,7 +88,7 @@ CatalogCompositionResult CatalogComposer::composeCollection(const CatalogComposi
 
     result.sourceIds = std::move(merged.sourceIds);
     result.contributorSourceIds = std::move(merged.contributorSourceIds);
-    assignCompositionCounts(result, result.catalog->bodies(), request.currentConstellationCount);
+    assignCompositionSummary(result, result.catalog->bodies());
 
     result.foundDeepSkyObjectCount = request.knownDeepSkyObjectCount;
     if (result.foundDeepSkyObjectCount == 0U) {

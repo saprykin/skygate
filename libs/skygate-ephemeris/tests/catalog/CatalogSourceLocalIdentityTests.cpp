@@ -121,7 +121,6 @@ void CatalogSourceLocalIdentityTests::keepsAnonymousHygPayloadsDistinctAcrossSou
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.bodyCount, std::size_t{2});
-    QCOMPARE(result.starCount, std::size_t{2});
 
     const auto bodies = result.catalog->bodies();
     const BaseCelestialBody* first = skygate::ephemeris::tests::findBodyById(bodies, "hyg_auto_1@payload-a");
@@ -265,7 +264,6 @@ void CatalogSourceLocalIdentityTests::mergesMatchingHipIdentifiersAcrossSources(
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.bodyCount, std::size_t{1});
-    QCOMPARE(result.starCount, std::size_t{1});
 
     const BaseCelestialBody* merged = skygate::ephemeris::tests::findBodyById(result.catalog->bodies(), "hip_123");
     QVERIFY(merged != nullptr);

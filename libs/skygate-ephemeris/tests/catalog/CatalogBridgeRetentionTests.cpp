@@ -84,7 +84,6 @@ void CatalogBridgeRetentionTests::bridgesIdentifiersAcquiredEarlierInSourcePass(
     QVERIFY(result.isSuccess());
     const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
     QCOMPARE(result.bodyCount, std::size_t{1});
-    QCOMPARE(result.starCount, std::size_t{1});
     QCOMPARE(CatalogMergeTestSupport::countBodiesById(bodies, "a_hip1_hd2"), std::size_t{0});
     QCOMPARE(CatalogMergeTestSupport::countBodiesById(bodies, "b_hd2"), std::size_t{0});
 
@@ -203,7 +202,6 @@ void CatalogBridgeRetentionTests::keepsIncompatibleKindsDistinctWhenBridging()
     QVERIFY(result.isSuccess());
     const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
     QCOMPARE(result.bodyCount, std::size_t{2});
-    QCOMPARE(result.starCount, std::size_t{1});
     QCOMPARE(result.deepSkyObjectCount, std::size_t{1});
     QCOMPARE(CatalogMergeTestSupport::countBodiesById(bodies, "star_a"), std::size_t{0});
 

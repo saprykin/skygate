@@ -41,6 +41,11 @@ finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionO
         return result;
     }
 
+    // Brightest-N truncation happens only when a caller enables
+    // CatalogSelectionOptions. No production caller does: the app forwards the
+    // default Disabled option through CatalogParseRequest and CatalogSourceRequest
+    // unchanged. The branch stays part of the parse contract and is covered by
+    // loaderSelectionPreservesAstrometry, so it goes away only with the option.
     if (selectionOptions.isEnabled() && selectionOptions.mode == CatalogSelectionMode::BrightestByVisualMagnitude
         && selectionOptions.maxBodyCount < parsedBodyCount) {
         CelestialBodyCatalog sourceCatalog(

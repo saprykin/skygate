@@ -453,7 +453,6 @@ void CatalogIdentityMatchTests::keepsFallbackIncompatibleKindDistinct()
 
     QVERIFY(result.isSuccess());
     const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
-    QCOMPARE(result.starCount, std::size_t{1});
     QCOMPARE(result.deepSkyObjectCount, std::size_t{1});
     QCOMPARE(CatalogMergeTestSupport::countBodiesById(bodies, "hip_123"), std::size_t{1});
     QCOMPARE(CatalogMergeTestSupport::countBodiesById(bodies, "fallback_shared_hip"), std::size_t{1});
