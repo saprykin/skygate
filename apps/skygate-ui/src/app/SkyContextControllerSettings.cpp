@@ -122,13 +122,3 @@ bool SkyContextController::loadSettings()
     }
     return stateSnapshot.has_value();
 }
-
-bool SkyContextController::clearCatalogCache()
-{
-    return m_catalogManager != nullptr && m_catalogManager->clearCatalogCache();
-}
-
-bool SkyContextController::clearDeepSkyCatalogCache()
-{
-    return m_catalogManager != nullptr && m_catalogManager->clearDeepSkyCatalogCache();
-}

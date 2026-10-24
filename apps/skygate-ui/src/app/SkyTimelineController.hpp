@@ -14,7 +14,6 @@ public:
     [[nodiscard]] bool toolbarCollapsed() const noexcept;
     [[nodiscard]] double speedMultiplier() const noexcept;
     [[nodiscard]] int stepSeconds() const noexcept;
-    [[nodiscard]] bool catchingUpToCurrentUtc() const noexcept;
 
     [[nodiscard]] std::optional<SkyTimelineCatchUpResult> computeCatchUpAdvancement(
         const skygate::core::UtcTimePoint& timelineUtc,

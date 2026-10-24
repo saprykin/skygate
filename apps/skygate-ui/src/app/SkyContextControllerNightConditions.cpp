@@ -1,6 +1,5 @@
 #include "SkyContextController.hpp"
 #include "SkyContextTextFormatter.hpp"
-#include "SkyContextTimeCodec.hpp"
 #include "SkyNightConditionSunRow.hpp"
 #include "SkyNightConditionsAdapter.hpp"
 #include "SkyNightConditionsData.hpp"
@@ -84,9 +83,7 @@ private:
             if (event.utcTime.has_value()) {
                 return m_timeController != nullptr
                            ? m_timeController->formatUtcTime(*event.utcTime, false)
-                           : SkyQtTimeCodec::formatTimeText(
-                                 skygate::ui::internal::SkyContextTimeCodec::toQDateTimeUtc(*event.utcTime), false
-                             );
+                           : SkyQtTimeCodec::formatTimeText(SkyQtTimeCodec::toQDateTimeUtc(*event.utcTime), false);
             }
             return "--";
         case ObservationEventStatus::Type::AlwaysAbove:

@@ -4,7 +4,7 @@
 #include "ITimeSource.hpp"
 #include "SettingsTestFixture.hpp"
 #include "app/SkyContextController.hpp"
-#include "app/SkyContextTimeCodec.hpp"
+#include "time/SkyQtTimeCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "diagnostics/SkyLogging.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
@@ -37,7 +37,7 @@ public:
 
     [[nodiscard]] skygate::core::UtcTimePoint nowUtc() const noexcept override
     {
-        return skygate::ui::internal::SkyContextTimeCodec::toUtcTimePoint(m_nowUtc);
+        return SkyQtTimeCodec::toUtcTimePoint(m_nowUtc);
     }
 
     void setNowUtc(const QDateTime& nowUtc)
@@ -159,7 +159,7 @@ createControllerWithOptions(SkyContextController::InitializationOptions initiali
 
 QDateTime controllerUtcTime(const SkyContextController& controller)
 {
-    return skygate::ui::internal::SkyContextTimeCodec::toQDateTimeUtc(controller.skyContext().utcTime);
+    return SkyQtTimeCodec::toQDateTimeUtc(controller.skyContext().utcTime);
 }
 
 const skygate::ephemeris::CelestialBodyState*

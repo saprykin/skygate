@@ -1,10 +1,10 @@
 #include "SkyContextController.hpp"
 #include "SkyContextProjectionTypeCodec.hpp"
-#include "SkyContextTimeCodec.hpp"
 #include "SkyContextUtcDateTimeTextCodec.hpp"
 #include "engine/EphemerisComputationPolicy.hpp"
 #include "math/NumericTolerance.hpp"
 #include "math/ViewportMath.hpp"
+#include "time/SkyQtTimeCodec.hpp"
 #include "time/SkyTimeController.hpp"
 
 #include <chrono>
@@ -23,7 +23,7 @@ constexpr double kWheelZoomStepScale = 0.90;
 
 QDateTime SkyContextController::currentUtcDateTime() const
 {
-    return SkyContextTimeCodec::toQDateTimeUtc(currentUtcTime());
+    return SkyQtTimeCodec::toQDateTimeUtc(currentUtcTime());
 }
 
 skygate::core::UtcTimePoint SkyContextController::currentUtcTime() const
@@ -285,7 +285,7 @@ void SkyContextController::stepBySeconds(const int stepSeconds)
 
 void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
 {
-    setCurrentUtcTime(SkyContextTimeCodec::toUtcTimePoint(utcTime.toUTC()));
+    setCurrentUtcTime(SkyQtTimeCodec::toUtcTimePoint(utcTime.toUTC()));
 }
 
 void SkyContextController::setCurrentUtcTime(const skygate::core::UtcTimePoint& utcTime)
@@ -296,8 +296,6 @@ void SkyContextController::setCurrentUtcTime(const skygate::core::UtcTimePoint& 
 
     m_location.setUtcTime(utcTime);
     m_timeController->setUtcTimePoint(utcTime);
-    emit utcDateTextChanged();
-    emit utcTimeTextChanged();
     emit nightConditionsChanged();
     if (!recenterTrackedTarget(true)) {
         emit skyContextChanged();

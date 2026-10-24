@@ -92,10 +92,6 @@ QVariant LocationCatalogModel::data(const QModelIndex& index, const int role) co
         return row.detailText;
     case CityIdRole:
         return row.kind == RowKind::City ? row.entry.id : QString();
-    case CountryNameRole:
-        return row.kind == RowKind::City ? row.entry.countryName : row.displayText;
-    case CityNameRole:
-        return row.kind == RowKind::City ? row.entry.cityName : QString();
     case LatitudeDegRole:
         return row.kind == RowKind::City ? QVariant(row.entry.latitudeDeg) : QVariant();
     case LongitudeDegRole:
@@ -114,8 +110,6 @@ QHash<int, QByteArray> LocationCatalogModel::roleNames() const
         {DisplayTextRole, "displayText"},
         {DetailTextRole, "detailText"},
         {CityIdRole, "cityId"},
-        {CountryNameRole, "countryName"},
-        {CityNameRole, "cityName"},
         {LatitudeDegRole, "latitudeDeg"},
         {LongitudeDegRole, "longitudeDeg"},
         {SelectableRole, "selectable"},

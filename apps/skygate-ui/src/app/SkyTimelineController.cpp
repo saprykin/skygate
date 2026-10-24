@@ -27,11 +27,6 @@ int SkyTimelineController::stepSeconds() const noexcept
     return m_state.stepSeconds;
 }
 
-bool SkyTimelineController::catchingUpToCurrentUtc() const noexcept
-{
-    return m_state.catchingUpToCurrentUtc;
-}
-
 std::optional<SkyTimelineCatchUpResult> SkyTimelineController::computeCatchUpAdvancement(
     const skygate::core::UtcTimePoint& timelineUtc,
     const skygate::core::UtcTimePoint& clockUtc,

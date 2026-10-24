@@ -2,7 +2,7 @@
 
 #include "ITimeSource.hpp"
 #include "app/SkyContextController.hpp"
-#include "app/SkyContextTimeCodec.hpp"
+#include "time/SkyQtTimeCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "scene/SkySceneModel.hpp"
@@ -38,7 +38,7 @@ public:
 
     [[nodiscard]] skygate::core::UtcTimePoint nowUtc() const noexcept override
     {
-        return skygate::ui::internal::SkyContextTimeCodec::toUtcTimePoint(defaultUtc());
+        return SkyQtTimeCodec::toUtcTimePoint(defaultUtc());
     }
 };
 

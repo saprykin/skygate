@@ -158,11 +158,6 @@ QString SkyContextController::ephemerisShortRangeKernelStatusText() const
     return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->shortRangeKernelStatusText() : QString();
 }
 
-QString SkyContextController::ephemerisLongRangeKernelStatusText() const
-{
-    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->longRangeKernelStatusText() : QString();
-}
-
 QString SkyContextController::ephemerisKernelDisplayText() const
 {
     return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->kernelDisplayText() : QString();
@@ -198,11 +193,6 @@ QString SkyContextController::ephemerisPlanetaryKernelCacheSizeText() const
 QString SkyContextController::ephemerisSupportDataCacheSizeText() const
 {
     return cacheSizeText(m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->supportDataCacheSizeBytes() : 0U);
-}
-
-bool SkyContextController::ephemerisDataOnlineUpdatesEnabled() const noexcept
-{
-    return m_ephemerisUserSettings.onlineUpdatesEnabled;
 }
 
 bool SkyContextController::ephemerisDataUpdateEnabled() const noexcept
@@ -428,11 +418,6 @@ const skygate::ephemeris::EphemerisDataManifest* SkyContextController::activeEph
     return m_ephemerisUpdateWorkflow->activeManifest();
 }
 
-bool SkyContextController::clearEphemerisDataCache()
-{
-    return m_ephemerisUpdateWorkflow->clearInstalledDataCache();
-}
-
 bool SkyContextController::clearPlanetaryKernelCache()
 {
     return m_ephemerisUpdateWorkflow->clearPlanetaryKernelCache();
@@ -454,11 +439,6 @@ void SkyContextController::cancelActiveDownload()
     if (m_catalogManager != nullptr && m_catalogManager->downloadingCatalog()) {
         m_catalogManager->cancelCatalogDownload();
     }
-}
-
-bool SkyContextController::updateEphemerisData()
-{
-    return updateEphemerisDataProfile(m_ephemerisUserSettings.preferredDataProfileId);
 }
 
 bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdText)

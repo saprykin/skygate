@@ -234,8 +234,6 @@ qt_add_library(skygate-ui-lib STATIC
     src/settings/SkyTimelineViewDefaultsPolicy.hpp
     src/app/SkyContextTextFormatter.cpp
     src/app/SkyContextTextFormatter.hpp
-    src/app/SkyContextTimeCodec.cpp
-    src/app/SkyContextTimeCodec.hpp
     src/app/SkyContextUtcDateTimeTextCodec.cpp
     src/app/SkyContextUtcDateTimeTextCodec.hpp
     src/app/SkyLocationController.cpp
