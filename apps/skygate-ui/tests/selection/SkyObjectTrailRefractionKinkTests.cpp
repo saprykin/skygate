@@ -6,6 +6,9 @@
 #include "PreparedProjection.hpp"
 #include "engine/EphemerisCorrectionFlags.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
+#include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
+#include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "math/ViewportMath.hpp"
 #include "render/SkyRenderLine.hpp"
 #include "selection/SkyObjectTrailBuilder.hpp"
@@ -37,56 +40,102 @@ constexpr double kFieldOfViewDeg = 60.0;
 constexpr double kViewCenterAltitudeDeg = -1.5;
 constexpr double kViewCenterAzimuthDeg = 205.0;
 constexpr double kTrailStepMinutes = 10.0;
-constexpr double kPresentAltitudeDeg = 0.55;
-constexpr double kPresentAzimuthDeg = 180.0;
-// The body moves mostly in azimuth, so its own motion turns the trail by only
-// a few degrees per vertex. A correction that steps across the model edge
-// becomes a corner of tens of degrees; a tapered one adds a few more degrees.
-constexpr double kAltitudeStepPerTrailStepDeg = 0.04;
-constexpr double kAzimuthStepPerTrailStepDeg = 0.5;
-// The model applies its full correction at the band top and fades it linearly
-// to zero at the band bottom. Under the test atmosphere (1010 hPa, 10 degrees
-// Celsius) the Bennett fit is 38.8 arcmin at the band top.
+// The band the refraction model tapers its correction across, from the full
+// Bennett fit at the top to nothing at the bottom.
 constexpr double kRefractionBandTopDeg = -1.0;
 constexpr double kRefractionBandBottomDeg = -2.0;
-constexpr double kFullCorrectionDeg = 0.6466;
-constexpr double kMaxSmoothTurnDeg = 5.0;
 constexpr double kEndpointTolerancePx = 1.0e-6;
 
-[[nodiscard]] double taperedCorrectionDeg(const double geometricAltitudeDeg)
-{
-    if (geometricAltitudeDeg <= kRefractionBandBottomDeg) {
-        return 0.0;
-    }
-    if (geometricAltitudeDeg >= kRefractionBandTopDeg) {
-        return kFullCorrectionDeg;
-    }
+// Where the drawn body sits at the selected time and how far it travels in
+// altitude and azimuth between two render samples.
+struct TrailGeometry final {
+    double startAltitudeDeg = 0.0;
+    double startAzimuthDeg = 180.0;
+    double altitudeStepDeg = 0.0;
+    double azimuthStepDeg = 0.5;
+};
 
-    return kFullCorrectionDeg * (geometricAltitudeDeg - kRefractionBandBottomDeg)
-           / (kRefractionBandTopDeg - kRefractionBandBottomDeg);
+// The reported steep trail: 0.3 degrees of altitude and 0.5 degrees of azimuth
+// every ten minutes, about 31 degrees away from the azimuth axis. Only three
+// or four samples fall inside the one-degree band, so the taper's own bend
+// already turns this trail by about 14 degrees at its worst vertex. A
+// correction cut off at the band top turns it by 35.
+constexpr TrailGeometry kSteepTrail{
+    .startAltitudeDeg = 0.55,
+    .startAzimuthDeg = 180.0,
+    .altitudeStepDeg = 0.3,
+    .azimuthStepDeg = 0.5,
+};
+// A shallow trail crosses the same band over four hours, which gives the
+// taper twenty-five vertices to bend across and drops the worst turn to under
+// a degree. The steep crossing samples the band too coarsely to show that
+// difference, so both crossings are drawn.
+constexpr TrailGeometry kShallowTrail{
+    .startAltitudeDeg = 0.55,
+    .startAzimuthDeg = 180.0,
+    .altitudeStepDeg = 0.04,
+    .azimuthStepDeg = 0.5,
+};
+
+[[nodiscard]] skygate::ephemeris::OwnGalaxyCelestialBody makeTrailStar()
+{
+    skygate::ephemeris::OwnGalaxyCelestialBody star;
+    star.id = "trail-refraction-star";
+    star.displayName = "Trail refraction star";
+    star.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
+    star.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.0, .declinationDeg = 0.0};
+    return star;
 }
 
-[[nodiscard]] double offsetMinutesAtAltitude(const double geometricAltitudeDeg)
+// Runs the production refraction model on a single geometric altitude, so the
+// sampled trail carries the correction shape the renderer actually sees. The
+// model leaves azimuth alone, so the azimuth handed to it is a placeholder.
+[[nodiscard]] double
+refractedAltitudeDeg(const skygate::ephemeris::EphemerisRequest& request, const double geometricAltitudeDeg)
 {
-    return (kPresentAltitudeDeg - geometricAltitudeDeg) / kAltitudeStepPerTrailStepDeg * kTrailStepMinutes;
+    static const skygate::ephemeris::OwnGalaxyCelestialBody kBody = makeTrailStar();
+    skygate::ephemeris::highprecision::HighPrecisionCalculatorResult geometricResult;
+    geometricResult.horizontal = skygate::core::HorizontalCoordinate{
+        .altitudeDeg = geometricAltitudeDeg,
+        .azimuthDeg = 0.0,
+    };
+    const skygate::ephemeris::highprecision::AtmosphericRefractionCalculator calculator;
+    const skygate::ephemeris::highprecision::HighPrecisionCalculatorResult refractedResult = calculator.apply(
+        skygate::ephemeris::highprecision::HighPrecisionComputationInput{
+            .request = request,
+            .body = kBody,
+            .bodyIndex = 0U,
+        },
+        geometricResult
+    );
+    return refractedResult.horizontal->altitudeDeg;
 }
 
-[[nodiscard]] skygate::core::HorizontalCoordinate trailCoordinateAt(const double offsetMinutes)
+[[nodiscard]] double offsetMinutesAtAltitude(const TrailGeometry& geometry, const double geometricAltitudeDeg)
+{
+    return (geometry.startAltitudeDeg - geometricAltitudeDeg) / geometry.altitudeStepDeg * kTrailStepMinutes;
+}
+
+[[nodiscard]] skygate::core::HorizontalCoordinate trailCoordinateAt(
+    const skygate::ephemeris::EphemerisRequest& request, const TrailGeometry& geometry, const double offsetMinutes
+)
 {
     const double trailSteps = offsetMinutes / kTrailStepMinutes;
-    const double geometricAltitudeDeg = kPresentAltitudeDeg - (kAltitudeStepPerTrailStepDeg * trailSteps);
+    const double geometricAltitudeDeg = geometry.startAltitudeDeg - (geometry.altitudeStepDeg * trailSteps);
     return skygate::core::HorizontalCoordinate{
-        .altitudeDeg = geometricAltitudeDeg + taperedCorrectionDeg(geometricAltitudeDeg),
-        .azimuthDeg = kPresentAzimuthDeg + (kAzimuthStepPerTrailStepDeg * trailSteps)
+        .altitudeDeg = refractedAltitudeDeg(request, geometricAltitudeDeg),
+        .azimuthDeg = geometry.startAzimuthDeg + (geometry.azimuthStepDeg * trailSteps)
     };
 }
 
-// Samples an altitude and azimuth ramp and applies the correction the
-// high-precision refraction model adds across its lower altitude band, so the
-// sampled path shows exactly what the taper does to a trail.
+// Samples an altitude and azimuth ramp and applies the production refraction
+// model to it, so the drawn path shows exactly what the taper does to a trail.
 class RefractionTaperTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    explicit RefractionTaperTrailEngine(const skygate::core::UtcTimePoint baseUtcTime) : m_baseUtcTime(baseUtcTime) {}
+    RefractionTaperTrailEngine(const skygate::core::UtcTimePoint baseUtcTime, const TrailGeometry& geometry)
+        : m_baseUtcTime(baseUtcTime), m_geometry(geometry)
+    {
+    }
 
     [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
@@ -121,7 +170,7 @@ public:
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
     {
         noteRequestedCorrections(request);
-        return stateAt(request.context.utcTime, bodyIndex, request.options.requestsAtmosphericRefraction());
+        return stateAt(request.context.utcTime, bodyIndex, &request);
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
@@ -140,7 +189,7 @@ public:
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::core::ObservationContext& context, const std::size_t bodyIndex) const override
     {
-        return stateAt(context.utcTime, bodyIndex, false);
+        return stateAt(context.utcTime, bodyIndex, nullptr);
     }
 
     [[nodiscard]] bool sawRefractionRequest() const noexcept
@@ -148,21 +197,22 @@ public:
         return m_sawRefractionRequest;
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    stateAt(const skygate::core::UtcTimePoint utcTime, const std::size_t bodyIndex, const bool applyRefraction) const
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> stateAt(
+        const skygate::core::UtcTimePoint utcTime,
+        const std::size_t bodyIndex,
+        const skygate::ephemeris::EphemerisRequest* request
+    ) const
     {
         const double offsetMinutes = std::chrono::duration<double, std::ratio<60>>(utcTime - m_baseUtcTime).count();
         const double trailSteps = offsetMinutes / kTrailStepMinutes;
-        const double geometricAltitudeDeg = kPresentAltitudeDeg - (kAltitudeStepPerTrailStepDeg * trailSteps);
-        const double refractedAltitudeDeg = applyRefraction && geometricAltitudeDeg > kRefractionBandBottomDeg
-                                                ? geometricAltitudeDeg + taperedCorrectionDeg(geometricAltitudeDeg)
-                                                : geometricAltitudeDeg;
+        const double geometricAltitudeDeg = m_geometry.startAltitudeDeg - (m_geometry.altitudeStepDeg * trailSteps);
 
         return skygate::ephemeris::CelestialBodyState{
             .bodyIndex = static_cast<std::uint32_t>(bodyIndex),
             .horizontal = {
-                .altitudeDeg = refractedAltitudeDeg,
-                .azimuthDeg = kPresentAzimuthDeg + (kAzimuthStepPerTrailStepDeg * trailSteps)
+                .altitudeDeg =
+                    request != nullptr ? refractedAltitudeDeg(*request, geometricAltitudeDeg) : geometricAltitudeDeg,
+                .azimuthDeg = m_geometry.startAzimuthDeg + (m_geometry.azimuthStepDeg * trailSteps)
             }
         };
     }
@@ -176,6 +226,7 @@ private:
     }
 
     skygate::core::UtcTimePoint m_baseUtcTime;
+    TrailGeometry m_geometry;
     mutable bool m_sawRefractionRequest = false;
 };
 
@@ -245,16 +296,10 @@ struct DrawnTrailExtent final {
     return extent;
 }
 
-}  // namespace
-
-class SkyObjectTrailRefractionKinkTests final : public QObject {
-    Q_OBJECT
-
-private slots:
-    void starTrailStaysSmoothAcrossRefractionTaperBand();
-};
-
-void SkyObjectTrailRefractionKinkTests::starTrailStaysSmoothAcrossRefractionTaperBand()
+// Draws one trail through the model band and checks that it stays connected
+// across the whole crossing and never turns by a visible corner. A failing
+// check records the failure and leaves this helper.
+void trailStaysSmooth(const TrailGeometry& geometry, const double maxTurnDeg)
 {
     const auto projection = skygate::core::PreparedProjection::create(
         skygate::core::ProjectionType::Stereographic,
@@ -273,22 +318,18 @@ void SkyObjectTrailRefractionKinkTests::starTrailStaysSmoothAcrossRefractionTape
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric());
     request.options.setEnableAtmosphericRefraction(true);
 
-    const RefractionTaperTrailEngine engine(baseUtcTime);
-    const std::optional<skygate::ephemeris::CelestialBodyState> presentState = engine.stateAt(baseUtcTime, 0U, true);
-    QVERIFY(presentState.has_value());
-
-    skygate::ephemeris::OwnGalaxyCelestialBody star;
-    star.id = "trail-refraction-star";
-    star.displayName = "Trail refraction star";
-    star.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
-    star.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.0, .declinationDeg = 0.0};
-    const skygate::ephemeris::CelestialBodyCatalog catalog(
-        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{star}
-    );
+    const RefractionTaperTrailEngine engine(baseUtcTime, geometry);
 
     SkyObjectTrailInput input = skygate::ui::tests::TrailBuilderTestScenario::makeInput(engine, *projection);
     input.ephemerisRequest = skygate::ephemeris::EphemerisRequest::fromPrecisionPolicy(
         request, skygate::ephemeris::EphemerisPrecisionPolicy::Trail, engine
+    );
+    const std::optional<skygate::ephemeris::CelestialBodyState> presentState =
+        engine.stateAt(baseUtcTime, 0U, &*input.ephemerisRequest);
+    QVERIFY(presentState.has_value());
+
+    const skygate::ephemeris::CelestialBodyCatalog catalog(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{makeTrailStar()}
     );
     input.targetBody = &catalog.bodyAt(0U);
     input.targetState = &*presentState;
@@ -303,10 +344,12 @@ void SkyObjectTrailRefractionKinkTests::starTrailStaysSmoothAcrossRefractionTape
     QVERIFY(!frame.lines.empty());
     QVERIFY(engine.sawRefractionRequest());
 
-    const skygate::core::ScreenPoint bandTopPoint =
-        projection->project(trailCoordinateAt(offsetMinutesAtAltitude(kRefractionBandTopDeg)));
-    const skygate::core::ScreenPoint bandBottomPoint =
-        projection->project(trailCoordinateAt(offsetMinutesAtAltitude(kRefractionBandBottomDeg)));
+    const skygate::core::ScreenPoint bandTopPoint = projection->project(
+        trailCoordinateAt(*input.ephemerisRequest, geometry, offsetMinutesAtAltitude(geometry, kRefractionBandTopDeg))
+    );
+    const skygate::core::ScreenPoint bandBottomPoint = projection->project(trailCoordinateAt(
+        *input.ephemerisRequest, geometry, offsetMinutesAtAltitude(geometry, kRefractionBandBottomDeg)
+    ));
     QVERIFY(bandTopPoint.isVisible());
     QVERIFY(bandBottomPoint.isVisible());
 
@@ -317,9 +360,35 @@ void SkyObjectTrailRefractionKinkTests::starTrailStaysSmoothAcrossRefractionTape
 
     const double largestTurnDeg = largestInteriorTurnDegrees(frame.lines);
     QVERIFY2(
-        largestTurnDeg < kMaxSmoothTurnDeg,
-        qPrintable(QStringLiteral("largest interior trail turn is %1 deg").arg(largestTurnDeg))
+        largestTurnDeg < maxTurnDeg,
+        qPrintable(
+            QStringLiteral("largest interior trail turn is %1 deg, allowed %2 deg").arg(largestTurnDeg).arg(maxTurnDeg)
+        )
     );
+}
+
+}  // namespace
+
+class SkyObjectTrailRefractionKinkTests final : public QObject {
+    Q_OBJECT
+
+private slots:
+    void steepTrailStaysSmoothAcrossTaperBand();
+    void shallowTrailStaysSmoothAcrossTaperBand();
+};
+
+void SkyObjectTrailRefractionKinkTests::steepTrailStaysSmoothAcrossTaperBand()
+{
+    // Three or four samples across the band leave the fade turning this trail
+    // by about 14 degrees; a correction cut off at the band top turns it by 35.
+    trailStaysSmooth(kSteepTrail, 16.0);
+}
+
+void SkyObjectTrailRefractionKinkTests::shallowTrailStaysSmoothAcrossTaperBand()
+{
+    // The fade turns this trail by less than a degree. A ramp across the band
+    // turns it by two and a half and a hard edge by fifty.
+    trailStaysSmooth(kShallowTrail, 1.5);
 }
 
 QTEST_APPLESS_MAIN(SkyObjectTrailRefractionKinkTests)

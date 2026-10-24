@@ -68,19 +68,22 @@ using namespace skygate::core;
     return result;
 }
 
-// The correction is tapered across the band below the altitude where the
-// Bennett fit still holds. Under the test atmosphere (1010 hPa, 10 degrees
-// Celsius) the fit yields 38.8 arcmin there.
+// The model applies the Bennett fit unweighted down to the band top and fades
+// it to zero across the band below. Under the test atmosphere (1010 hPa,
+// 10 degrees Celsius) the fit gives 38.8 arcmin at the band top and 44.5
+// arcmin at the band bottom.
 constexpr double kRefractionBandTopDeg = -1.0;
 constexpr double kRefractionBandBottomDeg = -2.0;
 constexpr double kFullCorrectionDeg = 0.6466;
+constexpr double kBandBottomCorrectionDeg = 0.7423;
 constexpr double kCorrectionToleranceDeg = 1.0e-4;
 constexpr double kAltitudeToleranceDeg = 1.0e-9;
-constexpr double kSampleStepDeg = 0.05;
-// The tapered correction moves by well under one degree per degree of
-// altitude. A hard cut at a band edge would move it by the full correction
-// between two adjacent samples.
-constexpr double kMaxCorrectionSlope = 1.0;
+constexpr int kSampleStepHundredthsDeg = 5;
+constexpr double kSampleStepDeg = static_cast<double>(kSampleStepHundredthsDeg) / 100.0;
+// The tapered correction moves by at most about 1.03 degrees per degree of
+// altitude, just under the band middle. A hard cut at a band edge would move
+// it by the full correction between two adjacent samples.
+constexpr double kMaxCorrectionSlope = 1.2;
 
 void verifyRefractionUnavailable(const HighPrecisionCalculatorResult& result, const double expectedAltitudeDeg)
 {
@@ -299,11 +302,14 @@ void AtmosphericRefractionCalculatorTests::keepsCorrectionContinuousAcrossTaperB
     const AtmosphericRefractionCalculator calculator;
     const EphemerisRequest request = makeRequest();
 
+    // Integer hundredths of a degree keep both band edges on exact sample
+    // points, so their classification never depends on how a step accumulates.
     constexpr int kSampleCount = 41;
-    constexpr double kFirstSampleAltitudeDeg = -2.4;
+    constexpr int kFirstSampleHundredthsDeg = -240;
     double previousCorrectionDeg = 0.0;
     for (int sampleIndex = 0; sampleIndex < kSampleCount; ++sampleIndex) {
-        const double altitudeDeg = kFirstSampleAltitudeDeg + (static_cast<double>(sampleIndex) * kSampleStepDeg);
+        const double altitudeDeg =
+            static_cast<double>(kFirstSampleHundredthsDeg + (sampleIndex * kSampleStepHundredthsDeg)) / 100.0;
         const HighPrecisionCalculatorResult result =
             calculator.apply(makeInput(request), makeCalculatorResult(altitudeDeg));
         QVERIFY(result.horizontal.has_value());
@@ -312,17 +318,22 @@ void AtmosphericRefractionCalculatorTests::keepsCorrectionContinuousAcrossTaperB
         const bool hasAppliedFlag = skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.appliedCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
         );
+        const bool belowBand = altitudeDeg < kRefractionBandBottomDeg - kAltitudeToleranceDeg;
+        const bool atBandBottom = std::abs(altitudeDeg - kRefractionBandBottomDeg) <= kAltitudeToleranceDeg;
+        const bool insideBand = altitudeDeg > kRefractionBandBottomDeg + kAltitudeToleranceDeg
+                                && altitudeDeg < kRefractionBandTopDeg - kAltitudeToleranceDeg;
+        const bool atBandTop = std::abs(altitudeDeg - kRefractionBandTopDeg) <= kAltitudeToleranceDeg;
 
-        if (altitudeDeg <= kRefractionBandBottomDeg + kAltitudeToleranceDeg) {
-            QCOMPARE(correctionDeg, 0.0);
+        if (belowBand || atBandBottom) {
+            QVERIFY(std::abs(correctionDeg) <= kAltitudeToleranceDeg);
             QVERIFY(!hasAppliedFlag);
         } else {
             QVERIFY(hasAppliedFlag);
-            if (altitudeDeg < kRefractionBandTopDeg - kAltitudeToleranceDeg) {
+            if (insideBand) {
                 QVERIFY(correctionDeg > 0.0);
-                QVERIFY(correctionDeg < kFullCorrectionDeg);
+                QVERIFY(correctionDeg < kBandBottomCorrectionDeg);
             }
-            if (std::abs(altitudeDeg - kRefractionBandTopDeg) <= kAltitudeToleranceDeg) {
+            if (atBandTop) {
                 QVERIFY(std::abs(correctionDeg - kFullCorrectionDeg) <= kCorrectionToleranceDeg);
             }
         }
