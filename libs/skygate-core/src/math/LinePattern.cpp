@@ -1,4 +1,5 @@
 #include "LinePattern.hpp"
+#include "Geometry2d.hpp"
 #include "MathConstants.hpp"
 
 #include <algorithm>
@@ -12,7 +13,7 @@ DashedLineBuilder::build(const LineSegment2d& segment, const double dashLength, 
     std::vector<LineSegment2d> segments;
     const double deltaX = segment.x2 - segment.x1;
     const double deltaY = segment.y2 - segment.y1;
-    const double length = std::hypot(deltaX, deltaY);
+    const double length = Geometry2d::length2d(deltaX, deltaY);
     if (length <= MathConstants::kMinSegmentLengthPx || !std::isfinite(length) || dashLength <= 0.0
         || gapLength < 0.0) {
         return segments;

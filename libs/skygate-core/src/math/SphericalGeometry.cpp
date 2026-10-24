@@ -4,23 +4,53 @@
 
 #include <algorithm>
 #include <cmath>
-#include <numbers>
 
 namespace skygate::core {
 namespace {
 
-// Direction used when a rotated or interpolated vector collapses to zero length.
-constexpr Vector3d kZenithFallbackDirection{.x = 0.0, .y = 0.0, .z = 1.0};
+struct HorizontalTrigonometry final {
+    double sinAltitude = 0.0;
+    double cosAltitude = 0.0;
+    double sinAzimuth = 0.0;
+    double cosAzimuth = 0.0;
+};
 
-// Reference directions that resolve a rotation axis for collinear inputs, tried
-// in this order.
-constexpr Vector3d kPolarReferenceDirection{.x = 0.0, .y = 0.0, .z = 1.0};
-constexpr Vector3d kEquinoxReferenceDirection{.x = 1.0, .y = 0.0, .z = 0.0};
+// Direction used when a rotated or interpolated vector collapses to zero
+// length, and as the polar reference that resolves a rotation axis for
+// collinear inputs.
+constexpr Vector3d kPoleDirection{.x = 0.0, .y = 0.0, .z = 1.0};
+constexpr Vector3d kEquinoxDirection{.x = 1.0, .y = 0.0, .z = 0.0};
 
 // For two unit vectors the cross-product length is the sine of the angle
 // between them. Below this value the rotation axis is unresolved and the
 // directions are treated as collinear.
 constexpr double kCollinearSinTolerance = 1e-9;
+
+[[nodiscard]] HorizontalTrigonometry horizontalTrigonometry(const HorizontalCoordinate& coordinate) noexcept
+{
+    const double altitudeRad = AngleMath::toRadians(coordinate.altitudeDeg);
+    const double azimuthRad = AngleMath::toRadians(coordinate.azimuthDeg);
+    return {
+        .sinAltitude = std::sin(altitudeRad),
+        .cosAltitude = std::cos(altitudeRad),
+        .sinAzimuth = std::sin(azimuthRad),
+        .cosAzimuth = std::cos(azimuthRad),
+    };
+}
+
+[[nodiscard]] Vector3d unitVectorFromTrigonometry(const HorizontalTrigonometry& trigonometry) noexcept
+{
+    return {
+        .x = trigonometry.cosAltitude * trigonometry.sinAzimuth,
+        .y = trigonometry.cosAltitude * trigonometry.cosAzimuth,
+        .z = trigonometry.sinAltitude,
+    };
+}
+
+[[nodiscard]] Vector3d normalizedOrPole(const Vector3d& vector) noexcept
+{
+    return vector.normalized().value_or(kPoleDirection);
+}
 
 }  // namespace
 
@@ -46,15 +76,7 @@ EquatorialCoordinate SphericalGeometry::equatorialFromUnitVector(const Vector3d&
 
 Vector3d SphericalGeometry::horizontalToUnitVector(const HorizontalCoordinate& coordinate) noexcept
 {
-    const double altitudeRad = AngleMath::toRadians(coordinate.altitudeDeg);
-    const double azimuthRad = AngleMath::toRadians(coordinate.azimuthDeg);
-
-    const double cosAltitude = std::cos(altitudeRad);
-    return {
-        .x = cosAltitude * std::sin(azimuthRad),
-        .y = cosAltitude * std::cos(azimuthRad),
-        .z = std::sin(altitudeRad),
-    };
+    return unitVectorFromTrigonometry(horizontalTrigonometry(coordinate));
 }
 
 HorizontalCoordinate SphericalGeometry::horizontalFromUnitVector(const Vector3d& vector) noexcept
@@ -74,19 +96,19 @@ SphericalGeometry::rotatedAroundAxis(const Vector3d& vector, const Vector3d& axi
     const double axisDotVector = axis.dot(vector);
     const Vector3d rotated =
         (vector * cosAngle) + (axisCrossVector * sinAngle) + (axis * (axisDotVector * (1.0 - cosAngle)));
-    return rotated.normalized().value_or(kZenithFallbackDirection);
+    return normalizedOrPole(rotated);
 }
 
 Vector3d SphericalGeometry::rotationAxisBetween(const Vector3d& from, const Vector3d& to) noexcept
 {
     Vector3d axis = from.cross(to);
     if (axis.length() <= kCollinearSinTolerance) {
-        axis = from.cross(kPolarReferenceDirection);
+        axis = from.cross(kPoleDirection);
         if (axis.length() <= kCollinearSinTolerance) {
-            axis = from.cross(kEquinoxReferenceDirection);
+            axis = from.cross(kEquinoxDirection);
         }
     }
-    return axis.normalized().value_or(kZenithFallbackDirection);
+    return normalizedOrPole(axis);
 }
 
 double SphericalGeometry::rotationAngleBetween(const Vector3d& from, const Vector3d& to, const Vector3d& axis) noexcept
@@ -96,7 +118,7 @@ double SphericalGeometry::rotationAngleBetween(const Vector3d& from, const Vecto
     if (std::abs(sinAngle) <= kCollinearSinTolerance) {
         // Collinear directions leave the sine component unresolved, so the dot
         // product alone decides between no turn and a half turn.
-        return cosAngle > 0.0 ? 0.0 : std::numbers::pi;
+        return cosAngle > 0.0 ? 0.0 : MathConstants::kPi;
     }
     return std::atan2(sinAngle, cosAngle);
 }
@@ -123,13 +145,13 @@ Vector3d SphericalGeometry::interpolateUnitVector(
         // The sine weights degenerate for collinear directions, so the chord
         // between the vectors is the only usable interpolation.
         const Vector3d chord = start + ((end - start) * fraction);
-        return chord.normalized().value_or(kZenithFallbackDirection);
+        return normalizedOrPole(chord);
     }
 
     const double startWeight = std::sin((1.0 - fraction) * angularDistanceRad) / sinAngularDistance;
     const double endWeight = std::sin(fraction * angularDistanceRad) / sinAngularDistance;
     const Vector3d interpolated = (start * startWeight) + (end * endWeight);
-    return interpolated.normalized().value_or(kZenithFallbackDirection);
+    return normalizedOrPole(interpolated);
 }
 
 HorizontalCoordinate SphericalGeometry::interpolateHorizontalCoordinate(
@@ -151,17 +173,15 @@ bool SphericalGeometry::tryBuildProjectionBasis(
     }
 
     const HorizontalCoordinate normalizedCoordinate = centerCoordinate.normalizedAzimuth();
-    const double altitudeRad = AngleMath::toRadians(normalizedCoordinate.altitudeDeg);
-    const double azimuthRad = AngleMath::toRadians(normalizedCoordinate.azimuthDeg);
+    const HorizontalTrigonometry trigonometry = horizontalTrigonometry(normalizedCoordinate);
 
-    const double sinAltitude = std::sin(altitudeRad);
-    const double cosAltitude = std::cos(altitudeRad);
-    const double sinAzimuth = std::sin(azimuthRad);
-    const double cosAzimuth = std::cos(azimuthRad);
-
-    center = horizontalToUnitVector(normalizedCoordinate);
-    right = {.x = -cosAzimuth, .y = sinAzimuth, .z = 0.0};
-    up = {.x = -sinAltitude * sinAzimuth, .y = -sinAltitude * cosAzimuth, .z = cosAltitude};
+    center = unitVectorFromTrigonometry(trigonometry);
+    right = {.x = -trigonometry.cosAzimuth, .y = trigonometry.sinAzimuth, .z = 0.0};
+    up = {
+        .x = -trigonometry.sinAltitude * trigonometry.sinAzimuth,
+        .y = -trigonometry.sinAltitude * trigonometry.cosAzimuth,
+        .z = trigonometry.cosAltitude,
+    };
     return true;
 }
 

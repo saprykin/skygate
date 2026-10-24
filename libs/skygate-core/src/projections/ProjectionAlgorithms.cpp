@@ -41,9 +41,9 @@ bool ProjectionAlgorithms::prepareFrame(
         return false;
     }
 
+    const double halfFovRad = AngleMath::toRadians(frame.params.fovDeg) * 0.5;
     switch (projectionType) {
     case ProjectionType::Stereographic: {
-        const double halfFovRad = AngleMath::toRadians(frame.params.fovDeg) * 0.5;
         const double maxRadius = 2.0 * std::tan(halfFovRad * 0.5);
         if (!isFinite(maxRadius) || maxRadius <= MathConstants::kEpsilon) {
             return false;
@@ -52,16 +52,14 @@ bool ProjectionAlgorithms::prepareFrame(
         break;
     }
     case ProjectionType::AzimuthalEquidistant: {
-        const double maxRadius = AngleMath::toRadians(frame.params.fovDeg) * 0.5;
-        if (!isFinite(maxRadius) || maxRadius <= MathConstants::kEpsilon) {
+        if (!isFinite(halfFovRad) || halfFovRad <= MathConstants::kEpsilon) {
             return false;
         }
-        frame.circularMaxRadius = maxRadius;
+        frame.circularMaxRadius = halfFovRad;
         break;
     }
     case ProjectionType::Perspective: {
-        const double halfVerticalFovRad = AngleMath::toRadians(frame.params.fovDeg) * 0.5;
-        const double tanHalfVerticalFov = std::tan(halfVerticalFovRad);
+        const double tanHalfVerticalFov = std::tan(halfFovRad);
         if (!isFinite(tanHalfVerticalFov) || tanHalfVerticalFov <= MathConstants::kEpsilon) {
             return false;
         }

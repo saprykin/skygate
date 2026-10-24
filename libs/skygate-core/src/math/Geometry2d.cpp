@@ -44,8 +44,7 @@ Vector2d Geometry2d::ellipseOffsetPoint2d(
         return Vector2d{.x = radiusX, .y = 0.0};
     }
 
-    const double angle =
-        (2.0 * MathConstants::kPi * static_cast<double>(sampleIndex)) / static_cast<double>(sampleCount);
+    const double angle = (MathConstants::kTwoPi * static_cast<double>(sampleIndex)) / static_cast<double>(sampleCount);
     return Vector2d{.x = std::cos(angle) * radiusX, .y = std::sin(angle) * radiusY};
 }
 

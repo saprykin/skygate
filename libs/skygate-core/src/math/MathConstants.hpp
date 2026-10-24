@@ -12,10 +12,10 @@ public:
     static constexpr double kRadiansToDegrees = 180.0 / kPi;
     static constexpr double kDegreesPerTurn = 360.0;
     static constexpr double kHoursPerTurn = 24.0;
-    static constexpr double kPolarAngleDeg = 90.0;
-    static constexpr double kDegreesPerHour = 15.0;
-    static constexpr double kRadiansPerHour = kPi / 12.0;
-    static constexpr double kHoursPerRadian = 12.0 / kPi;
+    static constexpr double kPolarAngleDeg = kDegreesPerTurn / 4.0;
+    static constexpr double kDegreesPerHour = kDegreesPerTurn / kHoursPerTurn;
+    static constexpr double kRadiansPerHour = kTwoPi / kHoursPerTurn;
+    static constexpr double kHoursPerRadian = kHoursPerTurn / kTwoPi;
     static constexpr double kMilliarcsecondsPerArcsecond = 1'000.0;
     static constexpr double kArcminutesPerDegree = 60.0;
     static constexpr double kArcsecondsToRadians = kPi / (180.0 * 3600.0);

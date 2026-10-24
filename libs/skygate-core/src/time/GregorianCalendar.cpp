@@ -7,6 +7,14 @@
 #include <optional>
 
 namespace skygate::core {
+namespace {
+
+// Day count between the Unix epoch and the start of a Gregorian era, and the
+// number of days in one 400-year era.
+constexpr std::int64_t kUnixEpochCivilDayOffset = 719'468LL;
+constexpr std::int64_t kDaysPerGregorianEra = 146'097LL;
+
+}  // namespace
 
 using skygate::core::TimeConstants;
 
@@ -47,14 +55,15 @@ std::int64_t GregorianCalendar::daysFromCivilDate(const int astronomicalYear, co
     const unsigned monthPrime = static_cast<unsigned>(month + (month > 2 ? -3 : 9));
     const unsigned dayOfYear = (153U * monthPrime + 2U) / 5U + static_cast<unsigned>(day) - 1U;
     const unsigned dayOfEra = yearOfEra * 365U + yearOfEra / 4U - yearOfEra / 100U + dayOfYear;
-    return static_cast<std::int64_t>(era) * 146'097LL + static_cast<std::int64_t>(dayOfEra) - 719'468LL;
+    return static_cast<std::int64_t>(era) * kDaysPerGregorianEra + static_cast<std::int64_t>(dayOfEra)
+           - kUnixEpochCivilDayOffset;
 }
 
 CivilDateTime GregorianCalendar::civilDateFromDays(const std::int64_t daysSinceUnixEpoch) noexcept
 {
-    const std::int64_t z = daysSinceUnixEpoch + 719'468LL;
-    const std::int64_t era = (z >= 0 ? z : z - 146'096LL) / 146'097LL;
-    const unsigned dayOfEra = static_cast<unsigned>(z - era * 146'097LL);
+    const std::int64_t z = daysSinceUnixEpoch + kUnixEpochCivilDayOffset;
+    const std::int64_t era = (z >= 0 ? z : z - (kDaysPerGregorianEra - 1)) / kDaysPerGregorianEra;
+    const unsigned dayOfEra = static_cast<unsigned>(z - era * kDaysPerGregorianEra);
     const unsigned yearOfEra = (dayOfEra - dayOfEra / 1'460U + dayOfEra / 36'524U - dayOfEra / 146'096U) / 365U;
     const int year = static_cast<int>(yearOfEra) + static_cast<int>(era) * 400;
     const unsigned dayOfYear = dayOfEra - (365U * yearOfEra + yearOfEra / 4U - yearOfEra / 100U);

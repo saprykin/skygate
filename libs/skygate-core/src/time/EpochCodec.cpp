@@ -26,8 +26,10 @@ AstronomicalEpoch EpochCodec::epochFromUtcTime(const UtcTimePoint& utcTime) noex
 
 AstronomicalEpoch EpochCodec::epochFromUtcTimeExact(const UtcTimePoint& utcTime) noexcept
 {
+    constexpr std::int64_t kMicrosecondsPerSecond = static_cast<std::int64_t>(TimeConstants::kMicrosecondsPerSecond);
     const std::int64_t epochSeconds = UtcTimeCodec::toEpochSecondsFloor(utcTime);
-    const std::int64_t remainingMicroseconds = UtcTimeCodec::toEpochMicros(utcTime) - epochSeconds * 1'000'000;
+    const std::int64_t remainingMicroseconds =
+        UtcTimeCodec::toEpochMicros(utcTime) - epochSeconds * kMicrosecondsPerSecond;
     const std::int64_t secondsPerDay = static_cast<std::int64_t>(TimeConstants::kSecondsPerDay);
     const std::int64_t daysSinceUnix =
         std::chrono::floor<std::chrono::days>(std::chrono::seconds(epochSeconds)).count();

@@ -7,7 +7,6 @@ public:
     static constexpr int kSolarSystemBarycenter = 0;
     static constexpr int kMercuryBarycenter = 1;
     static constexpr int kVenusBarycenter = 2;
-    static constexpr int kEarthMoonBarycenter = 3;
     static constexpr int kMarsBarycenter = 4;
     static constexpr int kJupiterBarycenter = 5;
     static constexpr int kSaturnBarycenter = 6;
