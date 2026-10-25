@@ -85,11 +85,6 @@
             "name": "core-debug-linux-vcpkg",
             "inherits": "linux-vcpkg-base",
             "displayName": "Core Debug (Linux vcpkg)",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Linux"
-            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
@@ -100,11 +95,6 @@
             "name": "core-debug-highprecision-linux-vcpkg",
             "inherits": "linux-vcpkg-base",
             "displayName": "Core Debug High Precision (Linux vcpkg)",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Linux"
-            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
@@ -116,11 +106,6 @@
             "name": "ci-core-debug",
             "inherits": "ci-linux-base",
             "displayName": "CI Core Debug",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Linux"
-            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
@@ -154,11 +139,6 @@
             "name": "core-debug-windows-vcpkg",
             "inherits": "windows-vcpkg-base",
             "displayName": "Core Debug (Windows vcpkg)",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
@@ -169,11 +149,6 @@
             "name": "core-debug-highprecision-windows-vcpkg",
             "inherits": "windows-vcpkg-base",
             "displayName": "Core Debug High Precision (Windows vcpkg)",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
@@ -185,11 +160,6 @@
             "name": "ui-debug-windows-vcpkg",
             "inherits": "windows-vcpkg-base",
             "displayName": "UI Debug (Windows vcpkg)",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "ON",
@@ -200,11 +170,6 @@
             "name": "ui-release-windows-vcpkg",
             "inherits": "windows-vcpkg-base",
             "displayName": "UI Release High Precision (Windows vcpkg)",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
@@ -218,11 +183,6 @@
             "name": "core-debug-macos-vcpkg",
             "inherits": "macos-vcpkg-base",
             "displayName": "Core Debug (macOS vcpkg zlib)",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Darwin"
-            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
@@ -233,11 +193,6 @@
             "name": "core-debug-highprecision-macos-vcpkg",
             "inherits": "macos-vcpkg-base",
             "displayName": "Core Debug High Precision (macOS vcpkg)",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Darwin"
-            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
@@ -249,11 +204,6 @@
             "name": "ui-debug-macos-vcpkg",
             "inherits": "macos-vcpkg-base",
             "displayName": "UI Debug (macOS vcpkg zlib)",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Darwin"
-            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "ON",
@@ -264,11 +214,6 @@
             "name": "ui-release-macos-vcpkg",
             "inherits": "macos-vcpkg-base",
             "displayName": "UI Release High Precision (macOS vcpkg)",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Darwin"
-            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
@@ -282,11 +227,6 @@
             "name": "ui-release-linux-vcpkg",
             "inherits": "linux-vcpkg-base",
             "displayName": "UI Release High Precision (Linux vcpkg)",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Linux"
-            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",

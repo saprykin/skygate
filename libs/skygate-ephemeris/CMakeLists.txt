@@ -80,21 +80,15 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/IFrameTransformer.hpp
     src/engine/highprecision/IStarAstrometryCalculator.hpp
     src/engine/highprecision/ISolarSystemStateCalculator.hpp
-    src/engine/DeltaTDataLoader.hpp
     src/engine/DeltaTDataLoader.cpp
     src/engine/DeltaTDataParser.hpp
     src/engine/DeltaTDataParser.cpp
     src/engine/EphemerisEpochParsing.hpp
     src/engine/EphemerisTableLoading.hpp
     src/engine/EphemerisTableParsing.hpp
-    src/engine/IEarthOrientationProvider.hpp
-    src/engine/TableBackedEarthOrientationProvider.hpp
     src/engine/TableBackedEarthOrientationProvider.cpp
-    src/engine/EarthOrientationDataParser.hpp
     src/engine/EarthOrientationDataParser.cpp
-    src/engine/EarthOrientationDataLoader.hpp
     src/engine/EarthOrientationDataLoader.cpp
-    src/engine/EarthOrientationSampler.hpp
     src/engine/EarthOrientationSampler.cpp
     src/engine/EphemerisDataActivation.cpp
     src/engine/EphemerisDataActivationResult.cpp
@@ -128,7 +122,6 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/FrameTransformMatrixCache.hpp
     src/engine/highprecision/FrameTransformMatrixCache.cpp
     src/engine/highprecision/FrameTransformStageCatalog.hpp
-    src/engine/IDeltaTProvider.hpp
     src/engine/ILeapSecondProvider.hpp
     src/engine/LeapSecondTableLoader.hpp
     src/engine/LeapSecondTableLoader.cpp
