@@ -29,12 +29,12 @@ namespace skygate::ephemeris {
 namespace {
 
 constexpr std::uint32_t kBinaryCatalogMagic = 0x53474243U;  // "SGBC"
-constexpr std::uint64_t kMaxBodyCount = 5'000'000ULL;
-constexpr std::uint64_t kMaxOrderEntryCount = 10'000'000ULL;
+constexpr quint64 kMaxBodyCount = 5'000'000ULL;
+constexpr quint64 kMaxOrderEntryCount = 10'000'000ULL;
 
 // Reads an element count and rejects a value above `limit`, so a corrupt
 // payload cannot reserve more than the codec is willing to hold.
-[[nodiscard]] bool readCount(QDataStream& stream, std::uint64_t& count, const std::uint64_t limit)
+[[nodiscard]] bool readCount(QDataStream& stream, quint64& count, const quint64 limit)
 {
     stream >> count;
     return stream.status() == QDataStream::Ok && count <= limit;
@@ -58,7 +58,7 @@ void writeString(QDataStream& stream, const std::string& value)
 
 void writeStringList(QDataStream& stream, const std::vector<std::string>& values)
 {
-    stream << static_cast<std::uint64_t>(values.size());
+    stream << static_cast<quint64>(values.size());
     for (const std::string& value : values) {
         writeString(stream, value);
     }
@@ -69,13 +69,13 @@ void writeStringList(QDataStream& stream, const std::vector<std::string>& values
 [[nodiscard]] bool readStringList(QDataStream& stream, std::vector<std::string>& values, const bool rejectEmpty)
 {
     values.clear();
-    std::uint64_t count = 0U;
+    quint64 count = 0U;
     if (!readCount(stream, count, kMaxBodyCount)) {
         return false;
     }
 
     values.reserve(static_cast<std::size_t>(count));
-    for (std::uint64_t index = 0; index < count; ++index) {
+    for (quint64 index = 0; index < count; ++index) {
         std::string value;
         if (!readString(stream, value) || (rejectEmpty && value.empty())) {
             return false;
@@ -132,7 +132,7 @@ void writeOptionalDouble(QDataStream& stream, const std::optional<double>& value
 
 void writeIdentifiers(QDataStream& stream, const std::vector<CatalogIdentifier>& identifiers)
 {
-    stream << static_cast<std::uint64_t>(identifiers.size());
+    stream << static_cast<quint64>(identifiers.size());
     for (const CatalogIdentifier& identifier : identifiers) {
         writeString(stream, identifier.namespaceName);
         writeString(stream, identifier.value);
@@ -142,13 +142,13 @@ void writeIdentifiers(QDataStream& stream, const std::vector<CatalogIdentifier>&
 [[nodiscard]] bool readIdentifiers(QDataStream& stream, std::vector<CatalogIdentifier>& identifiers)
 {
     identifiers.clear();
-    std::uint64_t identifierCount = 0U;
+    quint64 identifierCount = 0U;
     if (!readCount(stream, identifierCount, kMaxBodyCount)) {
         return false;
     }
 
     identifiers.reserve(static_cast<std::size_t>(identifierCount));
-    for (std::uint64_t index = 0; index < identifierCount; ++index) {
+    for (quint64 index = 0; index < identifierCount; ++index) {
         CatalogIdentifier identifier;
         if (!readString(stream, identifier.namespaceName) || !readString(stream, identifier.value)
             || identifier.namespaceName.empty() || identifier.value.empty()) {
@@ -334,7 +334,7 @@ QByteArray CatalogBinaryCodec::serialize(const CelestialBodyCatalog& catalog)
     stream << kBinaryCatalogMagic << kSchemaVersion;
 
     const auto ownGalaxyBodies = catalog.ownGalaxyBodies();
-    stream << static_cast<std::uint64_t>(ownGalaxyBodies.size());
+    stream << static_cast<quint64>(ownGalaxyBodies.size());
     for (const OwnGalaxyCelestialBody& body : ownGalaxyBodies) {
         writeBodyHeader(stream, body, body.fixedEquatorial);
         writeOptional(stream, body.starAstrometry, [&stream](const CatalogStarAstrometry& astrometry) {
@@ -343,7 +343,7 @@ QByteArray CatalogBinaryCodec::serialize(const CelestialBodyCatalog& catalog)
     }
 
     const auto distantBodies = catalog.distantBodies();
-    stream << static_cast<std::uint64_t>(distantBodies.size());
+    stream << static_cast<quint64>(distantBodies.size());
     for (const DistantCelestialBody& body : distantBodies) {
         writeBodyHeader(stream, body, body.fixedEquatorial);
         writeOptional(stream, body.deepSkyObject, [&stream](const DeepSkyObjectInfo& info) {
@@ -352,9 +352,9 @@ QByteArray CatalogBinaryCodec::serialize(const CelestialBodyCatalog& catalog)
     }
 
     const auto orderedIndexes = catalog.orderedBodyIndexes();
-    stream << static_cast<std::uint64_t>(orderedIndexes.size());
+    stream << static_cast<quint64>(orderedIndexes.size());
     for (const CelestialBodyCatalog::OrderEntry& entry : orderedIndexes) {
-        stream << static_cast<std::uint8_t>(entry.domain) << static_cast<std::uint64_t>(entry.bodyIndex);
+        stream << static_cast<std::uint8_t>(entry.domain) << static_cast<quint64>(entry.bodyIndex);
     }
 
     return buffer;
@@ -373,13 +373,13 @@ std::unique_ptr<IStarCatalog> CatalogBinaryCodec::deserialize(const QByteArray& 
         return nullptr;
     }
 
-    std::uint64_t ownGalaxyCount = 0U;
+    quint64 ownGalaxyCount = 0U;
     if (!readCount(stream, ownGalaxyCount, kMaxBodyCount)) {
         return nullptr;
     }
     std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies;
     ownGalaxyBodies.reserve(static_cast<std::size_t>(ownGalaxyCount));
-    for (std::uint64_t index = 0; index < ownGalaxyCount; ++index) {
+    for (quint64 index = 0; index < ownGalaxyCount; ++index) {
         OwnGalaxyCelestialBody body;
         if (!readBodyHeader(stream, body, body.fixedEquatorial)
             || !readOptional(stream, body.starAstrometry, [&stream](CatalogStarAstrometry& astrometry) {
@@ -390,13 +390,13 @@ std::unique_ptr<IStarCatalog> CatalogBinaryCodec::deserialize(const QByteArray& 
         ownGalaxyBodies.push_back(std::move(body));
     }
 
-    std::uint64_t distantCount = 0U;
+    quint64 distantCount = 0U;
     if (!readCount(stream, distantCount, kMaxBodyCount)) {
         return nullptr;
     }
     std::vector<DistantCelestialBody> distantBodies;
     distantBodies.reserve(static_cast<std::size_t>(distantCount));
-    for (std::uint64_t index = 0; index < distantCount; ++index) {
+    for (quint64 index = 0; index < distantCount; ++index) {
         DistantCelestialBody body;
         if (!readBodyHeader(stream, body, body.fixedEquatorial)
             || !readOptional(stream, body.deepSkyObject, [&stream](DeepSkyObjectInfo& info) {
@@ -407,15 +407,15 @@ std::unique_ptr<IStarCatalog> CatalogBinaryCodec::deserialize(const QByteArray& 
         distantBodies.push_back(std::move(body));
     }
 
-    std::uint64_t orderEntryCount = 0U;
+    quint64 orderEntryCount = 0U;
     if (!readCount(stream, orderEntryCount, kMaxOrderEntryCount)) {
         return nullptr;
     }
     std::vector<CelestialBodyCatalog::OrderEntry> orderedIndexes;
     orderedIndexes.reserve(static_cast<std::size_t>(orderEntryCount));
-    for (std::uint64_t index = 0; index < orderEntryCount; ++index) {
+    for (quint64 index = 0; index < orderEntryCount; ++index) {
         std::uint8_t domain = 0U;
-        std::uint64_t bodyIndex = 0U;
+        quint64 bodyIndex = 0U;
         stream >> domain >> bodyIndex;
         if (stream.status() != QDataStream::Ok) {
             return nullptr;
