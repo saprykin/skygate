@@ -22,12 +22,8 @@ struct AstronomicalEpoch {
     // operator== treats them as equal.
     [[nodiscard]] bool isIdenticalTo(const AstronomicalEpoch& other) const noexcept;
 
-    [[nodiscard]] AstronomicalEpoch addSeconds(double offsetSeconds) const noexcept;
     [[nodiscard]] AstronomicalEpoch addSeconds(double offsetSeconds, TimeScale resultScale) const noexcept;
-    [[nodiscard]] AstronomicalEpoch addMinutes(double offsetMinutes) const noexcept;
-    [[nodiscard]] AstronomicalEpoch addMinutes(double offsetMinutes, TimeScale resultScale) const noexcept;
     [[nodiscard]] AstronomicalEpoch addDays(double offsetDays) const noexcept;
-    [[nodiscard]] AstronomicalEpoch addDays(double offsetDays, TimeScale resultScale) const noexcept;
 
     friend bool operator==(const AstronomicalEpoch&, const AstronomicalEpoch&) = default;
 };

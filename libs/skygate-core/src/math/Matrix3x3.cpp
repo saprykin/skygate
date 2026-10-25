@@ -32,15 +32,6 @@ Matrix3x3::Matrix3x3(const Vector3d& firstRow, const Vector3d& secondRow, const 
 {
 }
 
-Matrix3x3 Matrix3x3::identity() noexcept
-{
-    return {
-        {.x = 1.0, .y = 0.0, .z = 0.0},
-        {.x = 0.0, .y = 1.0, .z = 0.0},
-        {.x = 0.0, .y = 0.0, .z = 1.0},
-    };
-}
-
 Matrix3x3 Matrix3x3::rotationZ(const double radians) noexcept
 {
     // Positive radians turn clockwise in the xy-plane seen from +Z, the
@@ -51,17 +42,6 @@ Matrix3x3 Matrix3x3::rotationZ(const double radians) noexcept
         {.x = cosine, .y = sine, .z = 0.0},
         {.x = -sine, .y = cosine, .z = 0.0},
         {.x = 0.0, .y = 0.0, .z = 1.0},
-    };
-}
-
-Vector3d Matrix3x3::row(const std::size_t rowIndex) const noexcept
-{
-    assert(rowIndex < kDimension);
-    const std::size_t offset = rowIndex * kDimension;
-    return {
-        .x = m_values[offset],
-        .y = m_values[offset + 1U],
-        .z = m_values[offset + 2U],
     };
 }
 
@@ -85,15 +65,6 @@ Vector3d Matrix3x3::transposeMultiplied(const Vector3d& vector) const noexcept
         .x = value(0U, 0U) * vector.x + value(1U, 0U) * vector.y + value(2U, 0U) * vector.z,
         .y = value(0U, 1U) * vector.x + value(1U, 1U) * vector.y + value(2U, 1U) * vector.z,
         .z = value(0U, 2U) * vector.x + value(1U, 2U) * vector.y + value(2U, 2U) * vector.z,
-    };
-}
-
-Matrix3x3 Matrix3x3::transposed() const noexcept
-{
-    return {
-        {.x = value(0U, 0U), .y = value(1U, 0U), .z = value(2U, 0U)},
-        {.x = value(0U, 1U), .y = value(1U, 1U), .z = value(2U, 1U)},
-        {.x = value(0U, 2U), .y = value(1U, 2U), .z = value(2U, 2U)},
     };
 }
 

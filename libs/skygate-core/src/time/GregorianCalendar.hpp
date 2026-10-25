@@ -3,7 +3,6 @@
 #include "CivilDateTime.hpp"
 
 #include <cstdint>
-#include <optional>
 
 namespace skygate::core {
 
@@ -15,7 +14,6 @@ public:
     [[nodiscard]] static CivilDateTime civilDateFromDays(std::int64_t daysSinceUnixEpoch) noexcept;
     [[nodiscard]] static CivilDateTime civilDateFromDecimalYear(double decimalYear) noexcept;
 
-    [[nodiscard]] static std::optional<int> astronomicalYearFromHistoricalYear(int historicalYear) noexcept;
     [[nodiscard]] static int historicalYearFromAstronomicalYear(int astronomicalYear) noexcept;
 };
 

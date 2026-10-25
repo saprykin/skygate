@@ -8,11 +8,6 @@ constexpr std::uint64_t kComponentSeparator = 0xffU;
 
 }  // namespace
 
-std::uint64_t Fnv1a64Hasher::hash(const std::string_view value) noexcept
-{
-    return hashFrom(HashConstants::kFnv1a64OffsetBasis, value);
-}
-
 std::uint64_t Fnv1a64Hasher::hashFrom(std::uint64_t state, const std::string_view value) noexcept
 {
     for (const char character : value) {

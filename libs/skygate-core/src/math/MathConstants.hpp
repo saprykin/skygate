@@ -19,7 +19,7 @@ public:
     static constexpr double kMilliarcsecondsPerArcsecond = 1'000.0;
     static constexpr double kArcminutesPerDegree = 60.0;
     static constexpr double kArcsecondsToRadians = kPi / (180.0 * 3600.0);
-    static constexpr double kMilliarcsecondsToRadians = kPi / (180.0 * 3'600'000.0);
+    static constexpr double kMilliarcsecondsToRadians = kArcsecondsToRadians / kMilliarcsecondsPerArcsecond;
     static constexpr double kEpsilon = 1e-12;
     // Screen-space tolerance for line building. It is separate from kEpsilon,
     // the unit-sphere guard, because pixel lengths are not bounded by one.

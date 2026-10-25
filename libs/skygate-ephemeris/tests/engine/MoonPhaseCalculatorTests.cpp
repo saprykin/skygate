@@ -1,4 +1,5 @@
 #include "MoonPhaseCalculator.hpp"
+#include "math/TimeConstants.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/CalendarTime.hpp"
 
@@ -117,7 +118,9 @@ void MoonPhaseCalculatorTests::phaseNamesCoverAllEightBuckets()
     // clang-format on
 
     for (const auto& [daysOffset, expectedName] : expected) {
-        const auto epoch = baseEpoch.addMinutes(static_cast<int>(daysOffset * 24.0 * 60.0));
+        const auto minutesOffset = static_cast<double>(static_cast<int>(daysOffset * 24.0 * 60.0));
+        const auto epoch =
+            baseEpoch.addSeconds(minutesOffset * skygate::core::TimeConstants::kSecondsPerMinute, baseEpoch.timeScale);
         const auto phase = calculator.compute(epoch);
         QCOMPARE(QString::fromStdString(phase.phaseName), expectedName);
         QVERIFY(phase.illuminationPercent >= 0.0);
@@ -143,7 +146,9 @@ void MoonPhaseCalculatorTests::illuminationClampedBetweenZeroAndOneHundred()
     // Sample many epochs across a wide range to ensure clamping.
     const auto baseEpoch = epochFromCivil(1950, 1, 1, 0, 0);
     for (int day = 0; day < 365 * 5; day += 37) {
-        const auto epoch = baseEpoch.addMinutes(day * 24 * 60);
+        const auto epoch = baseEpoch.addSeconds(
+            static_cast<double>(day * 24 * 60) * skygate::core::TimeConstants::kSecondsPerMinute, baseEpoch.timeScale
+        );
         const auto phase = calculator.compute(epoch);
         QVERIFY2(
             phase.illuminationPercent >= 0.0 && phase.illuminationPercent <= 100.0,

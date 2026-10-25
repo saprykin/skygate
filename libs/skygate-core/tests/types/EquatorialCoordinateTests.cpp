@@ -13,7 +13,6 @@ private slots:
     void rightAscensionUpperBoundIsExclusive();
     void outOfRangeDeclinationIsInvalid();
     void nonFiniteValuesAreInvalid();
-    void equalsComparesBothFields();
 };
 
 void EquatorialCoordinateTests::defaultCoordinateIsValid()
@@ -68,21 +67,6 @@ void EquatorialCoordinateTests::nonFiniteValuesAreInvalid()
     coordinate = {};
     coordinate.declinationDeg = std::numeric_limits<double>::infinity();
     QVERIFY(!coordinate.isValid());
-}
-
-void EquatorialCoordinateTests::equalsComparesBothFields()
-{
-    const skygate::core::EquatorialCoordinate coordinate{.rightAscensionHours = 5.5, .declinationDeg = -12.25};
-    QVERIFY(coordinate.equals(coordinate));
-    QVERIFY(coordinate.equals({.rightAscensionHours = 5.5, .declinationDeg = -12.25}));
-
-    skygate::core::EquatorialCoordinate other = coordinate;
-    other.rightAscensionHours += 1e-12;
-    QVERIFY(!coordinate.equals(other));
-
-    other = coordinate;
-    other.declinationDeg -= 1e-12;
-    QVERIFY(!coordinate.equals(other));
 }
 
 QTEST_APPLESS_MAIN(EquatorialCoordinateTests)

@@ -15,9 +15,4 @@ bool EquatorialCoordinate::isValid() const noexcept
            && declinationDeg >= kDeclinationMinDeg && declinationDeg <= kDeclinationMaxDeg;
 }
 
-bool EquatorialCoordinate::equals(const EquatorialCoordinate& other) const noexcept
-{
-    return rightAscensionHours == other.rightAscensionHours && declinationDeg == other.declinationDeg;
-}
-
 }  // namespace skygate::core

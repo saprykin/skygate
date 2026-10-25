@@ -250,14 +250,14 @@ void EphemerisApiModelTests::constructsAndNormalizesAstronomicalTimes()
         .julianDatePart2 = 0.25,
         .timeScale = skygate::core::TimeScale::Utc,
     };
-    const auto plusSeconds = utcEpoch.addSeconds(43'200.0);
+    const auto plusSeconds = utcEpoch.addSeconds(43'200.0, utcEpoch.timeScale);
     QCOMPARE(plusSeconds.julianDatePart1, 2'451'545.0);
     QCOMPARE(plusSeconds.julianDatePart2, 0.75);
     QCOMPARE(
         static_cast<std::uint8_t>(plusSeconds.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Utc)
     );
 
-    const auto plusMinutesInTai = utcEpoch.addMinutes(720.0, skygate::core::TimeScale::Tai);
+    const auto plusMinutesInTai = utcEpoch.addSeconds(43'200.0, skygate::core::TimeScale::Tai);
     QCOMPARE(plusMinutesInTai.julianDatePart1, 2'451'545.0);
     QCOMPARE(plusMinutesInTai.julianDatePart2, 0.75);
     QCOMPARE(
@@ -413,13 +413,6 @@ void EphemerisApiModelTests::convertsCivilDatesAndDefinesNoYearZeroPolicy()
     QCOMPARE(yearZeroRoundTrip->month, 1);
     QCOMPARE(yearZeroRoundTrip->day, 1);
 
-    const auto astronomicalFromOneBce = skygate::core::GregorianCalendar::astronomicalYearFromHistoricalYear(-1);
-    QVERIFY(astronomicalFromOneBce.has_value());
-    QCOMPARE(*astronomicalFromOneBce, 0);
-    const auto astronomicalFromFortyFourBce = skygate::core::GregorianCalendar::astronomicalYearFromHistoricalYear(-44);
-    QVERIFY(astronomicalFromFortyFourBce.has_value());
-    QCOMPARE(*astronomicalFromFortyFourBce, -43);
-    QVERIFY(!skygate::core::GregorianCalendar::astronomicalYearFromHistoricalYear(0).has_value());
     QCOMPARE(skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(0), -1);
     QCOMPARE(skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(-43), -44);
     QCOMPARE(skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(2026), 2026);

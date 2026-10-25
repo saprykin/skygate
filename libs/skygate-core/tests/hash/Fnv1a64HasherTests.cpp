@@ -26,14 +26,27 @@ private slots:
 
 void Fnv1a64HasherTests::emptyInputReturnsOffsetBasis()
 {
-    QCOMPARE(skygate::core::Fnv1a64Hasher::hash(std::string_view{}), kEmptyHash);
+    QCOMPARE(
+        skygate::core::Fnv1a64Hasher::hashFrom(skygate::core::HashConstants::kFnv1a64OffsetBasis, std::string_view{}),
+        kEmptyHash
+    );
     QCOMPARE(skygate::core::HashConstants::kFnv1a64OffsetBasis, kEmptyHash);
 }
 
 void Fnv1a64HasherTests::matchesKnownFnv1aVectors()
 {
-    QCOMPARE(skygate::core::Fnv1a64Hasher::hash(std::string_view{"a"}), kLetterAHash);
-    QCOMPARE(skygate::core::Fnv1a64Hasher::hash(std::string_view{"foobar"}), kFoobarHash);
+    QCOMPARE(
+        skygate::core::Fnv1a64Hasher::hashFrom(
+            skygate::core::HashConstants::kFnv1a64OffsetBasis, std::string_view{"a"}
+        ),
+        kLetterAHash
+    );
+    QCOMPARE(
+        skygate::core::Fnv1a64Hasher::hashFrom(
+            skygate::core::HashConstants::kFnv1a64OffsetBasis, std::string_view{"foobar"}
+        ),
+        kFoobarHash
+    );
 }
 
 void Fnv1a64HasherTests::hashFromContinuesExistingState()
@@ -43,12 +56,16 @@ void Fnv1a64HasherTests::hashFromContinuesExistingState()
         skygate::core::Fnv1a64Hasher::hashFrom(skygate::core::HashConstants::kFnv1a64OffsetBasis, value.substr(0, 3));
     const std::uint64_t continuedHash = skygate::core::Fnv1a64Hasher::hashFrom(prefixHash, value.substr(3));
 
-    QCOMPARE(continuedHash, skygate::core::Fnv1a64Hasher::hash(value));
+    QCOMPARE(
+        continuedHash, skygate::core::Fnv1a64Hasher::hashFrom(skygate::core::HashConstants::kFnv1a64OffsetBasis, value)
+    );
 }
 
 void Fnv1a64HasherTests::combineAndAppendComponentMixState()
 {
-    const std::uint64_t state = skygate::core::Fnv1a64Hasher::hash(std::string_view{"seed"});
+    const std::uint64_t state = skygate::core::Fnv1a64Hasher::hashFrom(
+        skygate::core::HashConstants::kFnv1a64OffsetBasis, std::string_view{"seed"}
+    );
     const std::uint64_t appended = skygate::core::Fnv1a64Hasher::appendComponent(state, std::string_view{"first"});
     const std::uint64_t combined = skygate::core::Fnv1a64Hasher::combine(appended, 7U);
 

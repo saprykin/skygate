@@ -223,7 +223,7 @@ void TimeCodecTests::epochCodecMapsNtpTimestamps()
 void TimeCodecTests::astronomicalEpochAddsSecondsAndNormalizes()
 {
     const skygate::core::AstronomicalEpoch epoch = makeEpoch(2000, 1, 1, 23, 59, 30);
-    const skygate::core::AstronomicalEpoch shifted = epoch.addSeconds(45.0);
+    const skygate::core::AstronomicalEpoch shifted = epoch.addSeconds(45.0, epoch.timeScale);
     const auto date = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(shifted);
 
     QVERIFY(date.has_value());

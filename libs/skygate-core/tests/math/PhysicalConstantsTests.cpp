@@ -1,4 +1,5 @@
 #include "math/PhysicalConstants.hpp"
+#include "math/TimeConstants.hpp"
 
 #include <QtTest/QtTest>
 
@@ -17,7 +18,7 @@ class PhysicalConstantsTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void kSpeedOfLightKms_hasExpectedValue();
+    void kSpeedOfLightAuPerDay_matchesKilometersPerSecond();
     void kSpeedOfLightAuPerDay_hasExpectedValue();
     void kAstronomicalUnitMeters_hasExpectedValue();
     void kAstronomicalUnitKilometers_hasExpectedValue();
@@ -28,9 +29,18 @@ private slots:
     void kAstronomicalUnit_isConsistentMetersToKilometers();
 };
 
-void PhysicalConstantsTests::kSpeedOfLightKms_hasExpectedValue()
+void PhysicalConstantsTests::kSpeedOfLightAuPerDay_matchesKilometersPerSecond()
 {
-    QCOMPARE(skygate::core::PhysicalConstants::kSpeedOfLightKms, 299'792.458);
+    constexpr double kExpectedSpeedOfLightKms = 299'792.458;
+    // The tabulated light travel distance per day is rounded to fifteen
+    // significant digits, so the derived speed carries that rounding.
+    constexpr double kToleranceKms = 1e-6;
+    const double lightKilometersPerDay = skygate::core::PhysicalConstants::kSpeedOfLightAuPerDay
+                                         * skygate::core::PhysicalConstants::kAstronomicalUnitKilometers;
+
+    QVERIFY(isNear(
+        lightKilometersPerDay / skygate::core::TimeConstants::kSecondsPerDay, kExpectedSpeedOfLightKms, kToleranceKms
+    ));
 }
 
 void PhysicalConstantsTests::kSpeedOfLightAuPerDay_hasExpectedValue()

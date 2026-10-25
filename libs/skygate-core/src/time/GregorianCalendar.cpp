@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <optional>
 
 namespace skygate::core {
 namespace {
@@ -76,19 +75,6 @@ CivilDateTime GregorianCalendar::civilDateFromDays(const std::int64_t daysSinceU
         .month = month,
         .day = static_cast<int>(day),
     };
-}
-
-std::optional<int> GregorianCalendar::astronomicalYearFromHistoricalYear(const int historicalYear) noexcept
-{
-    if (historicalYear == 0) {
-        return std::nullopt;
-    }
-
-    if (historicalYear < 0) {
-        return historicalYear + 1;
-    }
-
-    return historicalYear;
 }
 
 int GregorianCalendar::historicalYearFromAstronomicalYear(const int astronomicalYear) noexcept

@@ -7,7 +7,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <optional>
 
 using skygate::core::CivilDateTime;
 using skygate::core::GregorianCalendar;
@@ -65,9 +64,8 @@ private slots:
     void decimalYearRoundsToNearestDay();
     void decimalYearClampsToLastDayOfYear();
     void decimalYearUsesFloorForNegativeYears();
-    void astronomicalYearFromHistoricalYearMapsYears();
     void historicalYearFromAstronomicalYearMapsYears();
-    void historicalAndAstronomicalYearsRoundTrip();
+    void historicalYearsCoverFullRangeWithoutYearZero();
 };
 
 void GregorianCalendarTests::leapYearFollowsGregorianRules()
@@ -333,29 +331,6 @@ void GregorianCalendarTests::decimalYearUsesFloorForNegativeYears()
     QVERIFY2(hasCivilDate(midThirdMillenniumBce, -2001, 7, 3), qPrintable(civilDateText(midThirdMillenniumBce)));
 }
 
-void GregorianCalendarTests::astronomicalYearFromHistoricalYearMapsYears()
-{
-    const std::optional<int> firstYearBce = GregorianCalendar::astronomicalYearFromHistoricalYear(-1);
-    QVERIFY(firstYearBce.has_value());
-    QCOMPARE(*firstYearBce, 0);
-
-    const std::optional<int> fortyFourBce = GregorianCalendar::astronomicalYearFromHistoricalYear(-44);
-    QVERIFY(fortyFourBce.has_value());
-    QCOMPARE(*fortyFourBce, -43);
-
-    const std::optional<int> julianDateZeroYear = GregorianCalendar::astronomicalYearFromHistoricalYear(-4713);
-    QVERIFY(julianDateZeroYear.has_value());
-    QCOMPARE(*julianDateZeroYear, -4712);
-
-    const std::optional<int> firstYear = GregorianCalendar::astronomicalYearFromHistoricalYear(1);
-    QVERIFY(firstYear.has_value());
-    QCOMPARE(*firstYear, 1);
-
-    const std::optional<int> currentYear = GregorianCalendar::astronomicalYearFromHistoricalYear(2026);
-    QVERIFY(currentYear.has_value());
-    QCOMPARE(*currentYear, 2026);
-}
-
 void GregorianCalendarTests::historicalYearFromAstronomicalYearMapsYears()
 {
     QCOMPARE(GregorianCalendar::historicalYearFromAstronomicalYear(0), -1);
@@ -366,29 +341,28 @@ void GregorianCalendarTests::historicalYearFromAstronomicalYearMapsYears()
     QCOMPARE(GregorianCalendar::historicalYearFromAstronomicalYear(2026), 2026);
 }
 
-void GregorianCalendarTests::historicalAndAstronomicalYearsRoundTrip()
+void GregorianCalendarTests::historicalYearsCoverFullRangeWithoutYearZero()
 {
     constexpr int kFirstYear = -5000;
     constexpr int kLastYear = 5000;
 
-    for (int historicalYear = kFirstYear; historicalYear <= kLastYear; ++historicalYear) {
-        const std::optional<int> astronomicalYear =
-            GregorianCalendar::astronomicalYearFromHistoricalYear(historicalYear);
-        if (historicalYear == 0) {
-            QVERIFY(!astronomicalYear.has_value());
-            continue;
-        }
+    QCOMPARE(GregorianCalendar::historicalYearFromAstronomicalYear(kFirstYear), -5001);
+    QCOMPARE(GregorianCalendar::historicalYearFromAstronomicalYear(0), -1);
+    QCOMPARE(GregorianCalendar::historicalYearFromAstronomicalYear(1), 1);
+    QCOMPARE(GregorianCalendar::historicalYearFromAstronomicalYear(kLastYear), 5000);
 
-        QVERIFY2(astronomicalYear.has_value(), qPrintable(QStringLiteral("historical year %1").arg(historicalYear)));
-        QCOMPARE(GregorianCalendar::historicalYearFromAstronomicalYear(*astronomicalYear), historicalYear);
-    }
-
-    for (int astronomicalYear = kFirstYear; astronomicalYear <= kLastYear; ++astronomicalYear) {
+    for (int astronomicalYear = kFirstYear; astronomicalYear < kLastYear; ++astronomicalYear) {
         const int historicalYear = GregorianCalendar::historicalYearFromAstronomicalYear(astronomicalYear);
-        const std::optional<int> roundTrip = GregorianCalendar::astronomicalYearFromHistoricalYear(historicalYear);
+        const int nextHistoricalYear = GregorianCalendar::historicalYearFromAstronomicalYear(astronomicalYear + 1);
+        // Historical numbering has no year zero, so astronomical year zero is
+        // the only step that skips a value.
+        const int expectedStep = astronomicalYear == 0 ? 2 : 1;
 
-        QVERIFY2(roundTrip.has_value(), qPrintable(QStringLiteral("astronomical year %1").arg(astronomicalYear)));
-        QCOMPARE(*roundTrip, astronomicalYear);
+        QVERIFY2(historicalYear != 0, qPrintable(QStringLiteral("astronomical year %1").arg(astronomicalYear)));
+        QVERIFY2(
+            nextHistoricalYear - historicalYear == expectedStep,
+            qPrintable(QStringLiteral("astronomical year %1").arg(astronomicalYear))
+        );
     }
 }
 

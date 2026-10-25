@@ -183,16 +183,14 @@ private slots:
 
 void LeapSecondTimeScaleServiceTests::roundTripsBceCivilDatesWithHistoricalYearHelpers()
 {
-    const std::optional<int> oneBceAstronomicalYear =
-        skygate::core::GregorianCalendar::astronomicalYearFromHistoricalYear(-1);
-    QVERIFY(oneBceAstronomicalYear.has_value());
-    QCOMPARE(*oneBceAstronomicalYear, 0);
-    QCOMPARE(skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(*oneBceAstronomicalYear), -1);
+    // 1 BCE is astronomical year zero, and historical numbering skips from
+    // 1 BCE straight to 1 CE.
+    constexpr int oneBceAstronomicalYear = 0;
+    QCOMPARE(skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(oneBceAstronomicalYear), -1);
     QCOMPARE(skygate::core::GregorianCalendar::historicalYearFromAstronomicalYear(-1), -2);
-    QVERIFY(!skygate::core::GregorianCalendar::astronomicalYearFromHistoricalYear(0).has_value());
 
     const skygate::core::AstronomicalEpoch oneBce =
-        makeEpoch(skygate::core::TimeScale::Tt, *oneBceAstronomicalYear, 12, 31, 12, 0, 0);
+        makeEpoch(skygate::core::TimeScale::Tt, oneBceAstronomicalYear, 12, 31, 12, 0, 0);
     const std::optional<skygate::core::CivilDateTime> roundTrip =
         skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(oneBce);
 

@@ -52,11 +52,6 @@ bool AstronomicalEpoch::isIdenticalTo(const AstronomicalEpoch& other) const noex
            && timeScale == other.timeScale;
 }
 
-AstronomicalEpoch AstronomicalEpoch::addSeconds(const double offsetSeconds) const noexcept
-{
-    return addSeconds(offsetSeconds, timeScale);
-}
-
 AstronomicalEpoch AstronomicalEpoch::addSeconds(const double offsetSeconds, const TimeScale resultScale) const noexcept
 {
     return AstronomicalEpoch{
@@ -67,30 +62,10 @@ AstronomicalEpoch AstronomicalEpoch::addSeconds(const double offsetSeconds, cons
         .normalized();
 }
 
-AstronomicalEpoch AstronomicalEpoch::addMinutes(const double offsetMinutes) const noexcept
-{
-    return addMinutes(offsetMinutes, timeScale);
-}
-
-AstronomicalEpoch AstronomicalEpoch::addMinutes(const double offsetMinutes, const TimeScale resultScale) const noexcept
-{
-    return AstronomicalEpoch{
-        .julianDatePart1 = julianDatePart1,
-        .julianDatePart2 = julianDatePart2 + offsetMinutes / TimeConstants::kMinutesPerDay,
-        .timeScale = resultScale
-    }
-        .normalized();
-}
-
 AstronomicalEpoch AstronomicalEpoch::addDays(const double offsetDays) const noexcept
 {
-    return addDays(offsetDays, timeScale);
-}
-
-AstronomicalEpoch AstronomicalEpoch::addDays(const double offsetDays, const TimeScale resultScale) const noexcept
-{
     return AstronomicalEpoch{
-        .julianDatePart1 = julianDatePart1, .julianDatePart2 = julianDatePart2 + offsetDays, .timeScale = resultScale
+        .julianDatePart1 = julianDatePart1, .julianDatePart2 = julianDatePart2 + offsetDays, .timeScale = timeScale
     }
         .normalized();
 }

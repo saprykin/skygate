@@ -19,17 +19,6 @@ projectPoint(const skygate::core::HorizontalCoordinate& coordinate, const skygat
     return std::abs(value - expected) <= tolerance;
 }
 
-[[nodiscard]] skygate::core::ProjectionParams makeDefaultAzimuthalParams()
-{
-    return {
-        .center = {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
-        .fovDeg = 90.0,
-        .rollDeg = 0.0,
-        .viewportWidth = 1100.0,
-        .viewportHeight = 760.0,
-    };
-}
-
 }  // namespace
 
 class AzimuthalEquidistantProjectionTests final : public QObject {
@@ -37,9 +26,6 @@ class AzimuthalEquidistantProjectionTests final : public QObject {
 
 private slots:
     void radialDistanceIsLinearWithAngularDistance();
-    void oppositeDirectionIsHidden();
-    void directionAtCircularFovEdgeIsVisible();
-    void directionOutsideFovIsHidden();
     void zenithCenterIsSupported();
 };
 
@@ -61,49 +47,6 @@ void AzimuthalEquidistantProjectionTests::radialDistanceIsLinearWithAngularDista
     const double projectedRadius = std::hypot(projectedPoint.x - centerX, projectedPoint.y - centerY);
     const double expectedRadius = 0.5 * params.viewportWidth * (30.0 / (params.fovDeg * 0.5));
     QVERIFY(isNear(projectedRadius, expectedRadius, 1e-4));
-}
-
-void AzimuthalEquidistantProjectionTests::oppositeDirectionIsHidden()
-{
-    const skygate::core::ProjectionParams params = makeDefaultAzimuthalParams();
-    const auto oppositePoint = projectPoint({.altitudeDeg = -45.0, .azimuthDeg = 0.0}, params);
-
-    QVERIFY(!oppositePoint.isVisible());
-    QCOMPARE(oppositePoint.status, skygate::core::ProjectionStatus::Culled);
-}
-
-void AzimuthalEquidistantProjectionTests::directionAtCircularFovEdgeIsVisible()
-{
-    const skygate::core::ProjectionParams params{
-        .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
-        .fovDeg = 60.0,
-        .rollDeg = 0.0,
-        .viewportWidth = 1000.0,
-        .viewportHeight = 1000.0,
-    };
-
-    const auto edgePoint = projectPoint({.altitudeDeg = 0.0, .azimuthDeg = 30.0}, params);
-    QVERIFY(edgePoint.isVisible());
-    QCOMPARE(edgePoint.status, skygate::core::ProjectionStatus::Visible);
-
-    const auto outsidePoint = projectPoint({.altitudeDeg = 0.0, .azimuthDeg = 30.25}, params);
-    QVERIFY(!outsidePoint.isVisible());
-    QCOMPARE(outsidePoint.status, skygate::core::ProjectionStatus::Culled);
-}
-
-void AzimuthalEquidistantProjectionTests::directionOutsideFovIsHidden()
-{
-    const skygate::core::ProjectionParams params{
-        .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
-        .fovDeg = 20.0,
-        .rollDeg = 0.0,
-        .viewportWidth = 1000.0,
-        .viewportHeight = 1000.0,
-    };
-
-    const auto outsideFovPoint = projectPoint({.altitudeDeg = 0.0, .azimuthDeg = 50.0}, params);
-    QVERIFY(!outsideFovPoint.isVisible());
-    QCOMPARE(outsideFovPoint.status, skygate::core::ProjectionStatus::Culled);
 }
 
 void AzimuthalEquidistantProjectionTests::zenithCenterIsSupported()
