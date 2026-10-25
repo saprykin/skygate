@@ -273,7 +273,6 @@ SkyEphemerisDataManager::StagedUpdateActivationRequest stagedActivationRequest(
     return request;
 }
 
-
 }  // namespace
 
 class SkyEphemerisActivationTests final : public QObject {

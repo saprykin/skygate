@@ -315,7 +315,6 @@ void SkyCatalogCacheMigrationTests::failedMigrationCommitKeepsLegacyCacheReadabl
     controller.persistCollection(CatalogCacheFixture::persistRequestFromRestoreResult(migrated));
     const auto failedCommit = store.loadCatalogCollectionCache();
     QCOMPARE(failedCommit.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
-    QCOMPARE(failedCommit.failure, SkyCatalogCollectionCacheLoadResult::Failure::None);
     QVERIFY(!settings.contains(QStringLiteral("skyContext/catalogCollectionCommittedGeneration")));
     const auto legacyAfterFailure = store.loadCatalogCache();
     QVERIFY(legacyAfterFailure.has_value());

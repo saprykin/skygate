@@ -26,7 +26,8 @@ constexpr int kObjectTrailAdaptiveRenderStepMinutes = 10;
         return false;
     }
 
-    return !lhs.has_value() || lhs->equals(*rhs);
+    return !lhs.has_value()
+           || (lhs->rightAscensionHours == rhs->rightAscensionHours && lhs->declinationDeg == rhs->declinationDeg);
 }
 
 [[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample>

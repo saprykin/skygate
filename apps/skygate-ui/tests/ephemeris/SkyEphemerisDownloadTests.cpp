@@ -401,7 +401,12 @@ void SkyEphemerisDownloadTests::cancelDuringDownloadKeepsStagingAndActiveData()
     // second download, and the completed asset still leaves the active data
     // untouched until it is activated.
     request.cancellationRequested = {};
-    const SkyEphemerisDataManager::StagedUpdateDownloadResult restarted = manager.stageEphemerisUpdateAsset(request);
+    SkyEphemerisDataManager::StagedUpdateDownloadResult restarted;
+    manager.stageEphemerisUpdateAssetAsync(
+        request, [&restarted](SkyEphemerisDataManager::StagedUpdateDownloadResult stagedResult) {
+            restarted = std::move(stagedResult);
+        }
+    );
 
     const QByteArray failureMessage =
         restarted.diagnostics.empty() ? QByteArray{} : restarted.diagnostics.front().toUtf8();
