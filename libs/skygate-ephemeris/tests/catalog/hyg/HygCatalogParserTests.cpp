@@ -18,6 +18,7 @@ private slots:
     void keepsWholeCatalogByDefault();
     void rejectsMalformedInput();
     void skipsNonNumericHipValues();
+    void keepsLargeHipNumbersExact();
 };
 
 void HygCatalogParserTests::parsesBasicRows()
@@ -209,6 +210,27 @@ void HygCatalogParserTests::skipsNonNumericHipValues()
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 1U);
     QVERIFY(bodies[0]->id == "hip_77");
+}
+
+void HygCatalogParserTests::keepsLargeHipNumbersExact()
+{
+    // 2^53 + 1 is the first whole number a double cannot represent, and
+    // UINT64_MAX is the largest number the column parser accepts, so both ids
+    // survive only while the hip column keeps its whole-number type.
+    auto result = skygate::ephemeris::CatalogLoader::load(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
+        "hip,id,proper,ra,dec,mag\n"
+        "9007199254740993,,Odd,1.0,2.0,3.0\n"
+        "18446744073709551615,,Max,4.0,5.0,6.0\n"
+    );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
+    QVERIFY(catalog != nullptr);
+
+    const auto bodies = catalog->bodies();
+    QVERIFY(bodies.size() == 2U);
+    QVERIFY(bodies[0]->id == "hip_9007199254740993");
+    QVERIFY(bodies[1]->id == "hip_18446744073709551615");
 }
 
 QTEST_APPLESS_MAIN(HygCatalogParserTests)

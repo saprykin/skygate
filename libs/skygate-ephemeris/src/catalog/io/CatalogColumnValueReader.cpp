@@ -7,14 +7,20 @@
 
 #include <cstdint>
 #include <optional>
+#include <type_traits>
 
 namespace skygate::ephemeris {
 namespace {
 
+// The optional a `parse` callable yields. The reader returns exactly this type,
+// so a whole-number column never round-trips through the double path.
+template <typename Parse>
+using ParsedValue = std::invoke_result_t<Parse, const QString&>;
+
 // Decodes one column and applies `parse` to its text. An empty column is an
 // absent value, so the domain checks never see the absent marker.
 template <typename Parse>
-[[nodiscard]] std::optional<double> parseColumn(const DelimitedCatalogRow& row, const QString& column, Parse parse)
+[[nodiscard]] ParsedValue<Parse> parseColumn(const DelimitedCatalogRow& row, const QString& column, Parse parse)
 {
     const QString text = row.decodeColumn(column);
     if (text.isEmpty()) {
