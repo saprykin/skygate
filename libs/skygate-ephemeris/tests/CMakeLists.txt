@@ -15,6 +15,7 @@ add_library(skygate-ephemeris-test-support STATIC
     support/ShortBatchFrameTransformer.cpp
     support/StaticCalcephKernelProvider.cpp
     support/StaticSolarSystemCalculator.cpp
+    support/TdbApproximationTimeScaleService.cpp
     support/TestCalcephKernel.cpp
     support/ValidUtcTimeScaleService.cpp
 )

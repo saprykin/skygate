@@ -1,5 +1,6 @@
 #include "CelestialBodyCatalog.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
+#include "TdbApproximationTimeScaleService.hpp"
 #include "TestCalcephKernel.hpp"
 #include "ValidUtcTimeScaleService.hpp"
 #include "math/MathConstants.hpp"
@@ -24,6 +25,7 @@ namespace {
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using namespace skygate::core;
+using skygate::ephemeris::tests::TdbApproximationTimeScaleService;
 using skygate::ephemeris::tests::ValidUtcTimeScaleService;
 
 [[nodiscard]] skygate::core::AstronomicalEpoch epochForYearOffset(const double years) noexcept
@@ -211,39 +213,6 @@ makeFixedEarthKernel(std::optional<Vector3d> earthPositionAu, const bool require
     }
     return kernel;
 }
-
-class TdbApproximationTimeScaleService final : public ITimeScaleService {
-public:
-    [[nodiscard]] TimeScaleConversionResult
-    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
-    {
-        ++m_callCount;
-
-        TimeScaleConversionResult result;
-        result.epoch = epoch;
-        result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Type::Degraded;
-        result.addWarning(TimeScaleConversionWarningCode::Type::TdbApproximationApplied);
-        return result;
-    }
-
-    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
-        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
-    ) const override
-    {
-        static_cast<void>(dateTime);
-        static_cast<void>(targetScale);
-        return {};
-    }
-
-    [[nodiscard]] int callCount() const noexcept
-    {
-        return m_callCount;
-    }
-
-private:
-    mutable int m_callCount = 0;
-};
 
 }  // namespace
 
@@ -532,7 +501,7 @@ void StarAstrometryCalculatorTests::batchSilencesTdbApproximationOnlyConversion(
     const std::vector<StarAstrometryBatchResult> batchResults = calculator.calculateBatch(request, arrays);
 
     QCOMPARE(batchResults.size(), 2U);
-    QCOMPARE(timeScaleService->callCount(), 1);
+    QCOMPARE(timeScaleService->convertCallCount(), 1);
     QCOMPARE(kernel->callCount(), 1);
     QCOMPARE(kernel->lastEpoch().timeScale, skygate::core::TimeScale::Tdb);
     for (const StarAstrometryBatchResult& batchResult : batchResults) {

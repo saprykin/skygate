@@ -92,6 +92,39 @@ private:
     mutable int m_contextSampleCount = 0;
 };
 
+// Primary engine for guided-search trust tests: it reports guided-search support
+// and an altitude sweep with a +5 degree offset so guided and direct samples
+// disagree, and it counts every requested body state so tests can observe
+// whether the calculator verified the guidance result against the primary.
+class TrustOptOutPrimaryEngine final : public IEphemerisEngine {
+public:
+    TrustOptOutPrimaryEngine(std::shared_ptr<int> primaryCall, bool trustGuidance);
+
+    [[nodiscard]] EphemerisEngineKind::Type kind() const noexcept override;
+    [[nodiscard]] std::string_view name() const noexcept override;
+    [[nodiscard]] EphemerisEngineTraits traits() const noexcept override;
+
+    [[nodiscard]] EphemerisSnapshot compute(const EphemerisRequest& request) const override;
+
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const EphemerisRequest& request, std::string_view bodyId) const override;
+
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const EphemerisRequest& request, std::size_t bodyIndex) const override;
+
+    [[nodiscard]] EphemerisSnapshot compute(const skygate::core::ObservationContext& context) const override;
+
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext& context, std::string_view bodyId) const override;
+
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext& context, std::size_t bodyIndex) const override;
+
+private:
+    std::shared_ptr<int> m_primaryCall;
+    bool m_trustGuidance;
+};
+
 class NonEnumeratedHighPrecisionTraitsEngine final : public IEphemerisEngine {
 public:
     [[nodiscard]] EphemerisEngineKind::Type kind() const noexcept override;

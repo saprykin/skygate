@@ -1,9 +1,10 @@
+#include "EphemerisEngineTestDoubles.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "MarkerGuidanceEngine.hpp"
 #include "MarkerGuidanceStrategy.hpp"
 #include "ObservationEventCalculator.hpp"
+#include "ObservationEventTestSupport.hpp"
 #include "UtcTimeCodec.hpp"
-#include "engine/IEphemerisEngine.hpp"
 
 #include <QtTest/QtTest>
 
@@ -18,32 +19,14 @@
 
 namespace {
 
-constexpr double kPi = 3.14159265358979323846;
-
-skygate::core::ObservationContext makeContext(const double latitudeDeg = 47.0, const double longitudeDeg = 8.0)
-{
-    skygate::core::ObservationContext context;
-    context.observer = {.latitudeDeg = latitudeDeg, .longitudeDeg = longitudeDeg, .elevationMeters = 400.0};
-    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'717'276'800));
-    return context;
-}
-
-skygate::ephemeris::OwnGalaxyCelestialBody makeFixedBody(const skygate::core::EquatorialCoordinate& equatorial)
-{
-    skygate::ephemeris::OwnGalaxyCelestialBody body;
-    body.id = "target";
-    body.displayName = "Target";
-    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
-    body.visualMagnitude = 1.0;
-    body.fixedEquatorial = equatorial;
-    return body;
-}
-
-skygate::ephemeris::EphemerisRequest
-makeRequest(const skygate::core::ObservationContext& context, const skygate::ephemeris::IEphemerisEngine& engine)
-{
-    return skygate::ephemeris::EphemerisRequestFactory::requestFromContext(context, engine.options());
-}
+using skygate::ephemeris::tests::kPi;
+using skygate::ephemeris::tests::makeContext;
+using skygate::ephemeris::tests::makeFixedBody;
+using skygate::ephemeris::tests::makeRequest;
+using skygate::ephemeris::tests::MarkerGuidanceEngine;
+using skygate::ephemeris::tests::MarkerGuidanceStrategy;
+using skygate::ephemeris::tests::TrustOptOutPrimaryEngine;
+using SearchMode = skygate::ephemeris::ObservationEventCalculator::SearchMode;
 
 void verifyPrimaryCrossingAltitude(
     const skygate::ephemeris::IEphemerisEngine& engine,
@@ -132,95 +115,6 @@ private:
     double m_offsetDeg;
 };
 
-class TrustOptOutEngine final : public skygate::ephemeris::IEphemerisEngine {
-public:
-    TrustOptOutEngine(std::shared_ptr<int> primaryCall, const bool trustGuidance)
-        : m_primaryCall(std::move(primaryCall)), m_trustGuidance(trustGuidance)
-    {
-    }
-
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
-    {
-        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
-    }
-
-    [[nodiscard]] std::string_view name() const noexcept override
-    {
-        return "Trust opt-out primary test engine";
-    }
-
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
-    {
-        skygate::ephemeris::EphemerisEngineTraits traits = skygate::ephemeris::EphemerisEngineTraits::noTraits();
-        traits.supportsGuidedEventSearch = true;
-        traits.trustsGuidedSearchResult = m_trustGuidance;
-        return traits;
-    }
-
-    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
-    compute(const skygate::ephemeris::EphemerisRequest& request) const override
-    {
-        return compute(request.context);
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
-    {
-        return computeBodyState(request, std::size_t{0U});
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
-    {
-        if (bodyIndex != 0U) {
-            return std::nullopt;
-        }
-
-        ++*m_primaryCall;
-        return altitudeState(static_cast<std::uint32_t>(bodyIndex), request.context.utcTime);
-    }
-
-    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
-    compute(const skygate::core::ObservationContext& context) const override
-    {
-        skygate::ephemeris::EphemerisSnapshot snapshot;
-        snapshot.context = context;
-        return snapshot;
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, const std::string_view) const override
-    {
-        return std::nullopt;
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, const std::size_t) const override
-    {
-        return std::nullopt;
-    }
-
-private:
-    [[nodiscard]] static skygate::ephemeris::CelestialBodyState
-    altitudeState(const std::uint32_t bodyIndex, const skygate::core::UtcTimePoint& utcTime) noexcept
-    {
-        const double seconds = skygate::core::UtcTimeCodec::secondsSinceEpochDouble(utcTime);
-        const double phase = std::fmod(seconds, 86400.0) / 86400.0;
-        return skygate::ephemeris::CelestialBodyState{
-            .bodyIndex = bodyIndex,
-            .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
-            .horizontal = {.altitudeDeg = 35.0 * std::sin(2.0 * kPi * (phase - 0.25)) + 5.0, .azimuthDeg = 180.0}
-        };
-    }
-
-    std::shared_ptr<int> m_primaryCall;
-    bool m_trustGuidance;
-};
-
-using skygate::ephemeris::tests::MarkerGuidanceEngine;
-using skygate::ephemeris::tests::MarkerGuidanceStrategy;
-using SearchMode = skygate::ephemeris::ObservationEventCalculator::SearchMode;
-
 }  // namespace
 
 class ObservationEventPrimaryEngineTests final : public QObject {
@@ -243,7 +137,7 @@ void ObservationEventPrimaryEngineTests::untrustedFixedStarGuidedSearchVerifiesP
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
     const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0});
     auto primaryCall = std::make_shared<int>(0);
-    const TrustOptOutEngine engine(primaryCall, false);
+    const TrustOptOutPrimaryEngine engine(primaryCall, false);
 
     const auto request = makeRequest(makeContext(), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
@@ -265,7 +159,7 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateVerifiesPrima
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
     const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0});
     auto primaryCall = std::make_shared<int>(0);
-    const TrustOptOutEngine engine(primaryCall, false);
+    const TrustOptOutPrimaryEngine engine(primaryCall, false);
 
     const auto request = makeRequest(makeContext(), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::GuidedApproximate);
@@ -287,7 +181,7 @@ void ObservationEventPrimaryEngineTests::trustedFixedStarGuidedSkipsPrimaryVerif
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
     const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0});
     auto primaryCall = std::make_shared<int>(0);
-    const TrustOptOutEngine engine(primaryCall, true);
+    const TrustOptOutPrimaryEngine engine(primaryCall, true);
 
     const auto request = makeRequest(makeContext(), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
@@ -310,7 +204,7 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedAlwaysAboveFallsBackToPr
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
     const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 42.7});
     auto primaryCall = std::make_shared<int>(0);
-    const TrustOptOutEngine engine(primaryCall, false);
+    const TrustOptOutPrimaryEngine engine(primaryCall, false);
 
     const auto request = makeRequest(makeContext(47.3769), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
@@ -330,7 +224,7 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateAlwaysAboveFa
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
     const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 42.7});
     auto primaryCall = std::make_shared<int>(0);
-    const TrustOptOutEngine engine(primaryCall, false);
+    const TrustOptOutPrimaryEngine engine(primaryCall, false);
 
     const auto request = makeRequest(makeContext(47.3769), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::GuidedApproximate);
@@ -350,7 +244,7 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedAlwaysBelowFallsBackToPr
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
     const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = -42.7});
     auto primaryCall = std::make_shared<int>(0);
-    const TrustOptOutEngine engine(primaryCall, false);
+    const TrustOptOutPrimaryEngine engine(primaryCall, false);
 
     const auto request = makeRequest(makeContext(47.3769), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
@@ -370,7 +264,7 @@ void ObservationEventPrimaryEngineTests::untrustedGuidedApproximateWindowMissFal
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
     const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0});
     auto primaryCall = std::make_shared<int>(0);
-    const TrustOptOutEngine engine(primaryCall, false);
+    const TrustOptOutPrimaryEngine engine(primaryCall, false);
 
     const auto request = makeRequest(makeContext(), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::GuidedApproximate);
@@ -390,7 +284,7 @@ void ObservationEventPrimaryEngineTests::trustedGuidedApproximateFixedBodySkipsP
     const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
     const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 42.7});
     auto primaryCall = std::make_shared<int>(0);
-    const TrustOptOutEngine engine(primaryCall, true);
+    const TrustOptOutPrimaryEngine engine(primaryCall, true);
 
     const auto request = makeRequest(makeContext(47.3769), engine);
     const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::GuidedApproximate);

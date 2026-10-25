@@ -1,7 +1,7 @@
 #include "EphemerisEngineTestDoubles.hpp"
 #include "EphemerisRequestFactory.hpp"
+#include "MarkerGuidanceStrategy.hpp"
 #include "NightConditionsCalculator.hpp"
-#include "UtcTimeCodec.hpp"
 #include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "engine/SimpleEphemerisGuidanceStrategy.hpp"
 #include "catalog/CatalogFactory.hpp"
@@ -124,164 +124,8 @@ makeGuidedNightEngine(std::shared_ptr<const skygate::ephemeris::CelestialBodyCat
     );
 }
 
-class MarkerNightGuidanceEngine final : public skygate::ephemeris::IEphemerisEngine {
-public:
-    explicit MarkerNightGuidanceEngine(std::shared_ptr<int> sampleCount) : m_sampleCount(std::move(sampleCount)) {}
-
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
-    {
-        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
-    }
-
-    [[nodiscard]] std::string_view name() const noexcept override
-    {
-        return "Marker night guidance test engine";
-    }
-
-    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
-    compute(const skygate::ephemeris::EphemerisRequest&) const override
-    {
-        return {};
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
-    {
-        return computeBodyState(request, std::size_t{0U});
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t) const override
-    {
-        ++*m_sampleCount;
-        const auto seconds =
-            std::chrono::duration_cast<std::chrono::seconds>(request.context.utcTime.time_since_epoch()).count();
-        const double phase = std::fmod(static_cast<double>(seconds), 86400.0) / 86400.0;
-        return skygate::ephemeris::CelestialBodyState{
-            .bodyIndex = 0U,
-            .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
-            .horizontal = {
-                .altitudeDeg = 35.0 * std::sin(2.0 * 3.14159265358979323846 * (phase - 0.25)), .azimuthDeg = 180.0
-            }
-        };
-    }
-
-    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot compute(const skygate::core::ObservationContext&) const override
-    {
-        return {};
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, const std::string_view) const override
-    {
-        return std::nullopt;
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
-    {
-        return std::nullopt;
-    }
-
-private:
-    std::shared_ptr<int> m_sampleCount;
-};
-
-class MarkerNightGuidanceStrategy final : public skygate::ephemeris::IEphemerisGuidanceStrategy {
-public:
-    [[nodiscard]] std::unique_ptr<skygate::ephemeris::IEphemerisEngine>
-    createGuidanceEngine(const skygate::ephemeris::CelestialBodyCatalog&) const override
-    {
-        ++createCount;
-        return std::make_unique<MarkerNightGuidanceEngine>(m_sampleCount);
-    }
-
-    mutable int createCount = 0;
-    std::shared_ptr<int> m_sampleCount = std::make_shared<int>(0);
-};
-
-class TrustOptOutNightEngine final : public skygate::ephemeris::IEphemerisEngine {
-public:
-    TrustOptOutNightEngine(std::shared_ptr<int> primaryCall, const bool trustGuidance)
-        : m_primaryCall(std::move(primaryCall)), m_trustGuidance(trustGuidance)
-    {
-    }
-
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
-    {
-        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
-    }
-
-    [[nodiscard]] std::string_view name() const noexcept override
-    {
-        return "Trust opt-out night primary test engine";
-    }
-
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
-    {
-        skygate::ephemeris::EphemerisEngineTraits traits = skygate::ephemeris::EphemerisEngineTraits::noTraits();
-        traits.supportsGuidedEventSearch = true;
-        traits.trustsGuidedSearchResult = m_trustGuidance;
-        return traits;
-    }
-
-    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
-    compute(const skygate::ephemeris::EphemerisRequest& request) const override
-    {
-        return compute(request.context);
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
-    {
-        return computeBodyState(request, std::size_t{0U});
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
-    {
-        ++*m_primaryCall;
-        return altitudeState(static_cast<std::uint32_t>(bodyIndex), request.context.utcTime);
-    }
-
-    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
-    compute(const skygate::core::ObservationContext& context) const override
-    {
-        skygate::ephemeris::EphemerisSnapshot snapshot;
-        snapshot.context = context;
-        return snapshot;
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, const std::string_view) const override
-    {
-        return std::nullopt;
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, const std::size_t) const override
-    {
-        return std::nullopt;
-    }
-
-private:
-    [[nodiscard]] static skygate::ephemeris::CelestialBodyState
-    altitudeState(const std::uint32_t bodyIndex, const skygate::core::UtcTimePoint& utcTime) noexcept
-    {
-        const double seconds = skygate::core::UtcTimeCodec::secondsSinceEpochDouble(utcTime);
-        const double phase = std::fmod(seconds, 86400.0) / 86400.0;
-        return skygate::ephemeris::CelestialBodyState{
-            .bodyIndex = bodyIndex,
-            .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
-            .horizontal = {
-                .altitudeDeg = 35.0 * std::sin(2.0 * 3.14159265358979323846 * (phase - 0.25)) + 5.0, .azimuthDeg = 180.0
-            }
-        };
-    }
-
-    std::shared_ptr<int> m_primaryCall;
-    bool m_trustGuidance;
-};
+using skygate::ephemeris::tests::MarkerGuidanceStrategy;
+using skygate::ephemeris::tests::TrustOptOutPrimaryEngine;
 
 }  // namespace
 
@@ -469,7 +313,7 @@ void NightConditionsCalculatorTests::guidanceStrategyInjectionIsHonored()
         skygate::ephemeris::tests::makeFixedAltitudeBody("moon", 14.0, -8.0),
     });
     const auto engine = makeGuidedNightEngine(bodies);
-    const auto strategy = std::make_shared<MarkerNightGuidanceStrategy>();
+    const auto strategy = std::make_shared<MarkerGuidanceStrategy>();
     const skygate::ephemeris::NightConditionsCalculator calculator(strategy);
     const skygate::ephemeris::EphemerisRequest request =
         skygate::ephemeris::EphemerisRequestFactory::requestFromContext(makeZurichContext(), engine.options());
@@ -508,8 +352,8 @@ void NightConditionsCalculatorTests::untrustedApproximateVerifiesAgainstPrimary(
         skygate::ephemeris::tests::makeFixedAltitudeBody("moon", 14.0, -8.0),
     });
     auto primaryCall = std::make_shared<int>(0);
-    const TrustOptOutNightEngine engine(primaryCall, false);
-    const auto strategy = std::make_shared<MarkerNightGuidanceStrategy>();
+    const TrustOptOutPrimaryEngine engine(primaryCall, false);
+    const auto strategy = std::make_shared<MarkerGuidanceStrategy>();
     const skygate::ephemeris::NightConditionsCalculator calculator(strategy);
     const auto request =
         skygate::ephemeris::EphemerisRequestFactory::requestFromContext(makeZurichContext(), engine.options());
@@ -535,8 +379,8 @@ void NightConditionsCalculatorTests::trustedApproximateSkipPrimaryVerification()
         skygate::ephemeris::tests::makeFixedAltitudeBody("moon", 14.0, -8.0),
     });
     auto primaryCall = std::make_shared<int>(0);
-    const TrustOptOutNightEngine engine(primaryCall, true);
-    const auto strategy = std::make_shared<MarkerNightGuidanceStrategy>();
+    const TrustOptOutPrimaryEngine engine(primaryCall, true);
+    const auto strategy = std::make_shared<MarkerGuidanceStrategy>();
     const skygate::ephemeris::NightConditionsCalculator calculator(strategy);
     const auto request =
         skygate::ephemeris::EphemerisRequestFactory::requestFromContext(makeZurichContext(), engine.options());

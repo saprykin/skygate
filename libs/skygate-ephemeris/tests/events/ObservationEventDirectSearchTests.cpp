@@ -1,9 +1,7 @@
 #include "EphemerisEngineTestDoubles.hpp"
-#include "EphemerisRequestFactory.hpp"
 #include "ObservationEventCalculator.hpp"
+#include "ObservationEventTestSupport.hpp"
 #include "UtcTimeCodec.hpp"
-#include "catalog/CatalogFactory.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
 #include "math/AngleMath.hpp"
 #include "time/AstronomicalTime.hpp"
 #include "time/CalendarTime.hpp"
@@ -20,42 +18,12 @@
 
 namespace {
 
-constexpr double kPi = 3.14159265358979323846;
-
-skygate::core::ObservationContext makeContext(const double latitudeDeg = 47.0, const double longitudeDeg = 8.0)
-{
-    skygate::core::ObservationContext context;
-    context.observer = {.latitudeDeg = latitudeDeg, .longitudeDeg = longitudeDeg, .elevationMeters = 400.0};
-    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'717'276'800));
-    return context;
-}
-
-skygate::ephemeris::OwnGalaxyCelestialBody makeFixedBody(const skygate::core::EquatorialCoordinate& equatorial)
-{
-    skygate::ephemeris::OwnGalaxyCelestialBody body;
-    body.id = "target";
-    body.displayName = "Target";
-    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
-    body.visualMagnitude = 1.0;
-    body.fixedEquatorial = equatorial;
-    return body;
-}
-
-skygate::ephemeris::EphemerisRequest
-makeRequest(const skygate::core::ObservationContext& context, const skygate::ephemeris::IEphemerisEngine& engine)
-{
-    return skygate::ephemeris::EphemerisRequestFactory::requestFromContext(context, engine.options());
-}
-
-std::unique_ptr<skygate::ephemeris::IEphemerisEngine>
-makeEngineForBody(const skygate::ephemeris::OwnGalaxyCelestialBody& body)
-{
-    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(
-        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{body}
-    );
-    Q_ASSERT(catalog != nullptr);
-    return std::move(skygate::ephemeris::EphemerisEngineFactory::create(*catalog).engine);
-}
+using skygate::ephemeris::tests::kPi;
+using skygate::ephemeris::tests::makeContext;
+using skygate::ephemeris::tests::makeEngineForBody;
+using skygate::ephemeris::tests::makeFixedBody;
+using skygate::ephemeris::tests::makeRequest;
+using SearchMode = skygate::ephemeris::ObservationEventCalculator::SearchMode;
 
 double currentLocalSiderealHours(const skygate::core::ObservationContext& context)
 {
@@ -257,8 +225,6 @@ public:
     mutable bool sawNoCorrectionsRequest = false;
     mutable bool sawSampleEpochUpdate = false;
 };
-
-using SearchMode = skygate::ephemeris::ObservationEventCalculator::SearchMode;
 
 }  // namespace
 

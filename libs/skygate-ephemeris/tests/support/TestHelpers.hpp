@@ -44,6 +44,15 @@ findStateById(const EphemerisSnapshot& snapshot, const std::string_view id)
     return nullptr;
 }
 
+[[nodiscard]] inline OwnGalaxyCelestialBody makeSunBody()
+{
+    OwnGalaxyCelestialBody body;
+    body.id = "sun";
+    body.displayName = "Sun";
+    body.kind = BaseCelestialBody::Kind::Sun;
+    return body;
+}
+
 [[nodiscard]] inline skygate::core::CivilDateTime dateFromEpoch(const skygate::core::AstronomicalEpoch& epoch)
 {
     const auto date = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);

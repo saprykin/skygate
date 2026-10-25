@@ -1,12 +1,11 @@
 #include "EphemerisEngineTestDoubles.hpp"
 #include "MarkerGuidanceStrategy.hpp"
 #include "ObservationEventCalculator.hpp"
+#include "ObservationEventTestSupport.hpp"
 #include "UtcTimeCodec.hpp"
-#include "catalog/CatalogFactory.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "engine/SimpleEphemerisGuidanceStrategy.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <QtTest/QtTest>
@@ -17,40 +16,14 @@
 #include <optional>
 #include <string_view>
 #include <utility>
-#include <vector>
 
 namespace {
 
-constexpr double kPi = 3.14159265358979323846;
-
-skygate::core::ObservationContext makeContext(const double latitudeDeg = 47.0, const double longitudeDeg = 8.0)
-{
-    skygate::core::ObservationContext context;
-    context.observer = {.latitudeDeg = latitudeDeg, .longitudeDeg = longitudeDeg, .elevationMeters = 400.0};
-    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'717'276'800));
-    return context;
-}
-
-skygate::ephemeris::OwnGalaxyCelestialBody makeFixedBody(const skygate::core::EquatorialCoordinate& equatorial)
-{
-    skygate::ephemeris::OwnGalaxyCelestialBody body;
-    body.id = "target";
-    body.displayName = "Target";
-    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
-    body.visualMagnitude = 1.0;
-    body.fixedEquatorial = equatorial;
-    return body;
-}
-
-std::unique_ptr<skygate::ephemeris::IEphemerisEngine>
-makeEngineForBody(const skygate::ephemeris::OwnGalaxyCelestialBody& body)
-{
-    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(
-        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{body}
-    );
-    Q_ASSERT(catalog != nullptr);
-    return std::move(skygate::ephemeris::EphemerisEngineFactory::create(*catalog).engine);
-}
+using skygate::ephemeris::tests::makeContext;
+using skygate::ephemeris::tests::makeEngineForBody;
+using skygate::ephemeris::tests::makeFixedBody;
+using skygate::ephemeris::tests::MarkerGuidanceStrategy;
+using SearchMode = skygate::ephemeris::ObservationEventCalculator::SearchMode;
 
 class LinearAltitudeGuidanceEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
@@ -140,9 +113,6 @@ private:
     skygate::core::UtcTimePoint m_crossingTime;
     double m_slopeDegPerSecond;
 };
-
-using skygate::ephemeris::tests::MarkerGuidanceStrategy;
-using SearchMode = skygate::ephemeris::ObservationEventCalculator::SearchMode;
 
 }  // namespace
 

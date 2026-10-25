@@ -38,6 +38,7 @@ namespace {
 
 using namespace skygate::core;
 using namespace skygate::ephemeris;
+using skygate::ephemeris::tests::makeSunBody;
 
 [[nodiscard]] UtcTimePoint utcTime(const std::int64_t seconds)
 {
@@ -52,15 +53,6 @@ using namespace skygate::ephemeris;
     context.observer.longitudeDeg = -122.4194;
     context.observer.elevationMeters = 10.0;
     return context;
-}
-
-[[nodiscard]] OwnGalaxyCelestialBody makeSunBody()
-{
-    OwnGalaxyCelestialBody body;
-    body.id = "sun";
-    body.displayName = "Sun";
-    body.kind = BaseCelestialBody::Kind::Sun;
-    return body;
 }
 
 [[nodiscard]] OwnGalaxyCelestialBody makeFixedStarBody()

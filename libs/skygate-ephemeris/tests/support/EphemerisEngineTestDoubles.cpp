@@ -1,8 +1,18 @@
 #include "EphemerisEngineTestDoubles.hpp"
 
+#include "UtcTimeCodec.hpp"
+
+#include <cmath>
+#include <cstdint>
 #include <utility>
 
 namespace skygate::ephemeris::tests {
+
+namespace {
+
+constexpr double kPi = 3.14159265358979323846;
+
+}  // namespace
 
 [[nodiscard]] OwnGalaxyCelestialBody
 makeFixedAltitudeBody(std::string id, const double rightAscensionHours, const double declinationDeg)
@@ -280,6 +290,72 @@ std::optional<CelestialBodyState> NonEnumeratedHighPrecisionTraitsEngine::comput
 std::optional<CelestialBodyState> NonEnumeratedHighPrecisionTraitsEngine::computeBodyState(
     const skygate::core::ObservationContext&, const std::size_t
 ) const
+{
+    return std::nullopt;
+}
+
+TrustOptOutPrimaryEngine::TrustOptOutPrimaryEngine(std::shared_ptr<int> primaryCall, const bool trustGuidance)
+    : m_primaryCall(std::move(primaryCall)), m_trustGuidance(trustGuidance)
+{
+}
+
+EphemerisEngineKind::Type TrustOptOutPrimaryEngine::kind() const noexcept
+{
+    return EphemerisEngineKind::Type::Simple;
+}
+
+std::string_view TrustOptOutPrimaryEngine::name() const noexcept
+{
+    return "Trust opt-out primary test engine";
+}
+
+EphemerisEngineTraits TrustOptOutPrimaryEngine::traits() const noexcept
+{
+    EphemerisEngineTraits traits = EphemerisEngineTraits::noTraits();
+    traits.supportsGuidedEventSearch = true;
+    traits.trustsGuidedSearchResult = m_trustGuidance;
+    return traits;
+}
+
+EphemerisSnapshot TrustOptOutPrimaryEngine::compute(const EphemerisRequest& request) const
+{
+    return compute(request.context);
+}
+
+std::optional<CelestialBodyState>
+TrustOptOutPrimaryEngine::computeBodyState(const EphemerisRequest& request, const std::string_view) const
+{
+    return computeBodyState(request, std::size_t{0U});
+}
+
+std::optional<CelestialBodyState>
+TrustOptOutPrimaryEngine::computeBodyState(const EphemerisRequest& request, const std::size_t bodyIndex) const
+{
+    ++*m_primaryCall;
+    const double seconds = skygate::core::UtcTimeCodec::secondsSinceEpochDouble(request.context.utcTime);
+    const double phase = std::fmod(seconds, 86400.0) / 86400.0;
+    return CelestialBodyState{
+        .bodyIndex = static_cast<std::uint32_t>(bodyIndex),
+        .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
+        .horizontal = {.altitudeDeg = 35.0 * std::sin(2.0 * kPi * (phase - 0.25)) + 5.0, .azimuthDeg = 180.0}
+    };
+}
+
+EphemerisSnapshot TrustOptOutPrimaryEngine::compute(const skygate::core::ObservationContext& context) const
+{
+    EphemerisSnapshot snapshot;
+    snapshot.context = context;
+    return snapshot;
+}
+
+std::optional<CelestialBodyState>
+TrustOptOutPrimaryEngine::computeBodyState(const skygate::core::ObservationContext&, const std::string_view) const
+{
+    return std::nullopt;
+}
+
+std::optional<CelestialBodyState>
+TrustOptOutPrimaryEngine::computeBodyState(const skygate::core::ObservationContext&, const std::size_t) const
 {
     return std::nullopt;
 }

@@ -1,3 +1,4 @@
+#include "TestHelpers.hpp"
 #include "CelestialBodyCatalog.hpp"
 #include "EphemerisFixtureSupport.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
@@ -28,6 +29,7 @@ namespace {
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using namespace skygate::core;
+using skygate::ephemeris::tests::makeSunBody;
 
 [[nodiscard]] EphemerisRequest makeRequest()
 {
@@ -48,15 +50,6 @@ using namespace skygate::core;
     body.id = std::move(id);
     body.displayName = "Planet";
     body.kind = BaseCelestialBody::Kind::Planet;
-    return body;
-}
-
-[[nodiscard]] OwnGalaxyCelestialBody makeSunBody()
-{
-    OwnGalaxyCelestialBody body;
-    body.id = "sun";
-    body.displayName = "Sun";
-    body.kind = BaseCelestialBody::Kind::Sun;
     return body;
 }
 

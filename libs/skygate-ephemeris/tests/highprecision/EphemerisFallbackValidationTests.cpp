@@ -1,3 +1,5 @@
+#include "TestHelpers.hpp"
+#include "engine/EphemerisDataSourceProvenance.hpp"
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
@@ -24,17 +26,9 @@ namespace {
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using namespace skygate::core;
+using skygate::ephemeris::tests::makeSunBody;
 using skygate::ephemeris::tests::StaticSolarSystemCalculator;
 using skygate::ephemeris::tests::ValidUtcTimeScaleService;
-
-[[nodiscard]] OwnGalaxyCelestialBody makeSunBody()
-{
-    OwnGalaxyCelestialBody body;
-    body.id = "sun";
-    body.displayName = "Sun";
-    body.kind = BaseCelestialBody::Kind::Sun;
-    return body;
-}
 
 [[nodiscard]] OwnGalaxyCelestialBody makeUnsupportedBody()
 {

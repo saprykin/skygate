@@ -1,3 +1,4 @@
+#include "TdbApproximationTimeScaleService.hpp"
 #include "engine/EphemerisCorrectionFlags.hpp"
 #include "engine/EphemerisEngineKind.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
@@ -19,6 +20,7 @@ namespace {
 
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
+using skygate::ephemeris::tests::TdbApproximationTimeScaleService;
 
 [[nodiscard]] EphemerisRequest makeKernelEpochRequest()
 {
@@ -69,38 +71,6 @@ public:
         result.epoch.timeScale = targetScale;
         result.status = TimeScaleConversionStatus::Type::Failed;
         return result;
-    }
-
-    [[nodiscard]] int convertCallCount() const noexcept
-    {
-        return m_convertCallCount;
-    }
-
-private:
-    mutable int m_convertCallCount = 0;
-};
-
-class TdbApproximationTimeScaleService final : public ITimeScaleService {
-public:
-    [[nodiscard]] TimeScaleConversionResult
-    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
-    {
-        ++m_convertCallCount;
-        TimeScaleConversionResult result;
-        result.epoch = epoch;
-        result.epoch.timeScale = targetScale;
-        result.status = TimeScaleConversionStatus::Type::Degraded;
-        result.addWarning(TimeScaleConversionWarningCode::Type::TdbApproximationApplied);
-        return result;
-    }
-
-    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
-        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
-    ) const override
-    {
-        static_cast<void>(dateTime);
-        static_cast<void>(targetScale);
-        return {};
     }
 
     [[nodiscard]] int convertCallCount() const noexcept
