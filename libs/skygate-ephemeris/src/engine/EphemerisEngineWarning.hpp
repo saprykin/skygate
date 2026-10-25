@@ -2,7 +2,10 @@
 
 #include "TimeScaleConversionDiagnostics.hpp"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -35,7 +38,10 @@ public:
         DeltaTFallbackApplied,
         DeltaTUnavailable,
         EarthOrientationDataEstimated,
-        EarthOrientationInvalidInput
+        EarthOrientationInvalidInput,
+        // One past the last canonical code; keeps the inventory below in sync
+        // with the enum through the static assertion.
+        Last = EarthOrientationInvalidInput + 1
     };
 
     struct Detail {
@@ -55,6 +61,15 @@ public:
     [[nodiscard]] constexpr std::string_view displayText() const noexcept
     {
         return text(m_code);
+    }
+
+    // Canonical inventory in declaration order. Consumers that render or
+    // serialize the whole vocabulary iterate this list instead of restating
+    // the codes, so a code added to the enum cannot be silently dropped by a
+    // stale copy.
+    [[nodiscard]] static constexpr std::span<const Code> allCodes() noexcept
+    {
+        return std::span<const Code>(kAllCodes);
     }
 
     [[nodiscard]] static constexpr std::string_view text(const Code code) noexcept
@@ -134,6 +149,8 @@ public:
             );
         case Code::EarthOrientationInvalidInput:
             return "Earth-orientation data input is invalid.";
+        case Code::Last:
+            break;
         }
 
         return "Ephemeris warning.";
@@ -179,6 +196,39 @@ public:
     }
 
 private:
+    inline static constexpr std::array<Code, 25U> kAllCodes{
+        Code::AccuracyDegraded,
+        Code::UnsupportedBody,
+        Code::DataOutOfRange,
+        Code::MissingEphemerisData,
+        Code::MissingObserver,
+        Code::TimeScaleDataUnavailable,
+        Code::CorrectionUnavailable,
+        Code::ComputationFailed,
+        Code::BarycenterFallback,
+        Code::LeapSecondTableMissing,
+        Code::LeapSecondTableStale,
+        Code::EpochOutsideLeapSecondTable,
+        Code::LeapSecondFallbackApplied,
+        Code::UnsupportedTimeScaleConversion,
+        Code::InvalidExplicitEpoch,
+        Code::InvalidTimeScaleInput,
+        Code::TdbApproximationApplied,
+        Code::EarthOrientationDataMissing,
+        Code::EarthOrientationDataStale,
+        Code::EarthOrientationDataPredicted,
+        Code::EpochOutsideEarthOrientationData,
+        Code::DeltaTFallbackApplied,
+        Code::DeltaTUnavailable,
+        Code::EarthOrientationDataEstimated,
+        Code::EarthOrientationInvalidInput,
+    };
+
+    static_assert(
+        kAllCodes.size() == static_cast<std::size_t>(Code::Last),
+        "EphemerisEngineWarning::allCodes() must list every canonical code."
+    );
+
     Code m_code = Code::AccuracyDegraded;
 };
 

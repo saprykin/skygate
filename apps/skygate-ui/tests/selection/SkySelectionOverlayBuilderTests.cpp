@@ -8,6 +8,7 @@
 #include "math/ViewportMath.hpp"
 #include "scene/SkySelectedObjectInspector.hpp"
 #include "scene/SkySelectionMarker.hpp"
+#include "selection/SkyObjectInspectorFormatters.hpp"
 #include "selection/SkySelectionOverlayBuilder.hpp"
 #include "selection/SkySelectionOverlayInput.hpp"
 #include "selection/SkySelectionTargetKind.hpp"
@@ -17,12 +18,14 @@
 
 #include <QtTest/QtTest>
 
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -430,6 +433,7 @@ private slots:
     void constellationMarkerKeepsCancelResidue();
     void inspectorFormatsSourceAliasesAndFallbacks();
     void inspectorSurfacesEphemerisMetadataAndWarnings();
+    void inspectorFormatsEveryCanonicalEphemerisWarning();
     void inspectorUsesHighPrecisionStateForSelectedObject();
     void inspectorIncludesObservationEventsAndFallbacks();
     void inspectorObservationEventsUseRequestOptions();
@@ -648,6 +652,7 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
     metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded;
     metadata.addWarning(skygate::ephemeris::EphemerisEngineWarning::Code::MissingEphemerisData);
     metadata.addWarning(skygate::ephemeris::EphemerisEngineWarning::Code::DataOutOfRange);
+    metadata.addWarning(skygate::ephemeris::EphemerisEngineWarning::Code::LeapSecondTableStale);
     metadata.dataSourceProvenance = "JPL DE440s smoke fixture";
     metadata.effectiveDataValidityRange = skygate::ephemeris::EphemerisDateRange{
         .displayName = "DE440s short-range kernel",
@@ -693,12 +698,74 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
     const QString ephemerisWarningText = overlayInspectorFieldTooltip(inspector, "Ephemeris");
     QVERIFY(ephemerisWarningText.contains("Required ephemeris data is unavailable."));
     QVERIFY(ephemerisWarningText.contains("outside the effective date range"));
+    QVERIFY(ephemerisWarningText.contains("Leap-second table data is stale for this conversion."));
     QCOMPARE(overlayInspectorFieldValue(inspector, "Provenance"), QString("JPL DE440s smoke fixture"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Data range").contains("DE440s short-range kernel"));
     QCOMPARE(overlayInspectorFieldValue(inspector, "Uncertainty"), QString("0.42 arcsec"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Applied: light-time"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Unavailable: atmospheric refraction"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Skipped: precession/nutation"));
+}
+
+void SkySelectionOverlayBuilderTests::inspectorFormatsEveryCanonicalEphemerisWarning()
+{
+    using Code = skygate::ephemeris::EphemerisEngineWarning::Code;
+
+    // The nine codes the inspector rendered before the canonical inventory
+    // existed keep their exact order and text.
+    constexpr std::array legacyCodes{
+        Code::AccuracyDegraded,
+        Code::UnsupportedBody,
+        Code::DataOutOfRange,
+        Code::MissingEphemerisData,
+        Code::MissingObserver,
+        Code::TimeScaleDataUnavailable,
+        Code::CorrectionUnavailable,
+        Code::ComputationFailed,
+        Code::BarycenterFallback,
+    };
+
+    skygate::ephemeris::EphemerisEngineQueryResult metadata;
+    for (const Code code : legacyCodes) {
+        metadata.addWarning(code);
+    }
+
+    const QString legacyText = skygate::ui::internal::SkyObjectInspectorFormatters::formatEphemerisWarnings(metadata);
+    QCOMPARE(
+        legacyText,
+        QString(
+            "Result accuracy is degraded for this request.\n"
+            "This body is not supported by the selected ephemeris engine.\n"
+            "The request is outside the effective date range of the available ephemeris data.\n"
+            "Required ephemeris data is unavailable.\n"
+            "Observer information is missing or invalid, so topocentric coordinates are unavailable.\n"
+            "Required time-scale data is unavailable.\n"
+            "One or more requested correction terms could not be applied.\n"
+            "The ephemeris computation failed.\n"
+            "A planetary-system barycenter was used because the requested body center is unavailable."
+        )
+    );
+
+    // Codes added after that list surface too, appended in canonical order.
+    metadata.addWarning(Code::LeapSecondTableStale);
+    metadata.addWarning(Code::EarthOrientationDataPredicted);
+    QCOMPARE(
+        skygate::ui::internal::SkyObjectInspectorFormatters::formatEphemerisWarnings(metadata),
+        legacyText + "\nLeap-second table data is stale for this conversion."
+            + "\nEarth-orientation data uses a prediction for this conversion."
+    );
+
+    // Every canonical code renders on its own, so the formatter inventory
+    // cannot drift away from the enum again.
+    for (const Code code : skygate::ephemeris::EphemerisEngineWarning::allCodes()) {
+        skygate::ephemeris::EphemerisEngineQueryResult singleWarning;
+        singleWarning.addWarning(code);
+        const std::string_view codeText = skygate::ephemeris::EphemerisEngineWarning::text(code);
+        QCOMPARE(
+            skygate::ui::internal::SkyObjectInspectorFormatters::formatEphemerisWarnings(singleWarning),
+            QString::fromUtf8(codeText.data(), static_cast<qsizetype>(codeText.size()))
+        );
+    }
 }
 
 void SkySelectionOverlayBuilderTests::inspectorUsesHighPrecisionStateForSelectedObject()

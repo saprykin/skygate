@@ -285,22 +285,8 @@ SkyObjectInspectorFormatters::formatEphemerisStatus(const skygate::ephemeris::Ep
 QString
 SkyObjectInspectorFormatters::formatEphemerisWarnings(const skygate::ephemeris::EphemerisEngineQueryResult& metadata)
 {
-    using Code = skygate::ephemeris::EphemerisEngineWarning::Code;
-
-    constexpr std::array warningCodes{
-        Code::AccuracyDegraded,
-        Code::UnsupportedBody,
-        Code::DataOutOfRange,
-        Code::MissingEphemerisData,
-        Code::MissingObserver,
-        Code::TimeScaleDataUnavailable,
-        Code::CorrectionUnavailable,
-        Code::ComputationFailed,
-        Code::BarycenterFallback,
-    };
-
     QStringList warnings;
-    for (const Code code : warningCodes) {
+    for (const auto code : skygate::ephemeris::EphemerisEngineWarning::allCodes()) {
         if (metadata.hasWarning(code)) {
             const std::string_view warningText = skygate::ephemeris::EphemerisEngineWarning::text(code);
             warnings.push_back(QString::fromUtf8(warningText.data(), static_cast<qsizetype>(warningText.size())));
