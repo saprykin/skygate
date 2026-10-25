@@ -61,7 +61,7 @@ template <typename BodyRange>
 [[nodiscard]] std::shared_ptr<const skygate::ephemeris::CelestialBodyCatalog> makeCatalogHandle(const BodyRange& bodies)
 {
     return std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
-        std::span<const skygate::ephemeris::OwnGalaxyCelestialBody>{bodies}
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>(bodies.begin(), bodies.end())
     );
 }
 

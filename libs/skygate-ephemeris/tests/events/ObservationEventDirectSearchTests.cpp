@@ -280,7 +280,7 @@ private slots:
 
 void ObservationEventDirectSearchTests::normalObjectFindsOrderedRefinedCrossings()
 {
-    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const skygate::ephemeris::ObservationEventCalculator calculator(nullptr);
     const auto context = makeContext();
     const auto engine = makeEngineForBody(makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0}));
     QVERIFY(engine != nullptr);
@@ -306,7 +306,7 @@ void ObservationEventDirectSearchTests::normalObjectFindsOrderedRefinedCrossings
 
 void ObservationEventDirectSearchTests::circumpolarNeverRisingFallbacksWithCulmination()
 {
-    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const skygate::ephemeris::ObservationEventCalculator calculator(nullptr);
 
     const auto circumpolarContext = makeContext(60.0, 0.0);
     const auto circumpolarBody = makeFixedBody({.rightAscensionHours = 3.0, .declinationDeg = 80.0});
@@ -333,7 +333,7 @@ void ObservationEventDirectSearchTests::circumpolarNeverRisingFallbacksWithCulmi
 
 void ObservationEventDirectSearchTests::currentAboveHorizonSetsBeforeItRisesAgain()
 {
-    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const skygate::ephemeris::ObservationEventCalculator calculator(nullptr);
     const auto context = makeContext(0.0, 0.0);
     const auto engine = makeEngineForBody(
         makeFixedBody({.rightAscensionHours = currentLocalSiderealHours(context), .declinationDeg = 0.0})
@@ -351,7 +351,7 @@ void ObservationEventDirectSearchTests::currentAboveHorizonSetsBeforeItRisesAgai
 
 void ObservationEventDirectSearchTests::currentBelowHorizonRisesBeforeItSetsAgain()
 {
-    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const skygate::ephemeris::ObservationEventCalculator calculator(nullptr);
     const auto context = makeContext(0.0, 0.0);
     const auto engine = makeEngineForBody(makeFixedBody(
         {.rightAscensionHours = skygate::core::AngleMath::normalizeHours(currentLocalSiderealHours(context) + 12.0),
@@ -370,7 +370,7 @@ void ObservationEventDirectSearchTests::currentBelowHorizonRisesBeforeItSetsAgai
 
 void ObservationEventDirectSearchTests::configurableThresholdFindsDifferentCrossings()
 {
-    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const skygate::ephemeris::ObservationEventCalculator calculator(nullptr);
     const auto context = makeContext(0.0, 0.0);
     const auto engine = makeEngineForBody(makeFixedBody(
         {.rightAscensionHours = skygate::core::AngleMath::normalizeHours(currentLocalSiderealHours(context) + 12.0),
@@ -402,7 +402,7 @@ void ObservationEventDirectSearchTests::configurableThresholdFindsDifferentCross
 
 void ObservationEventDirectSearchTests::invalidAndUnresolvedInputsReturnExplicitStatuses()
 {
-    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const skygate::ephemeris::ObservationEventCalculator calculator(nullptr);
     auto context = makeContext();
     auto engine = makeEngineForBody(makeFixedBody({.rightAscensionHours = 1.0, .declinationDeg = 10.0}));
 
@@ -428,7 +428,7 @@ void ObservationEventDirectSearchTests::invalidAndUnresolvedInputsReturnExplicit
 
 void ObservationEventDirectSearchTests::unprovenWindowMissDoesNotReportAlwaysAboveBelow()
 {
-    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const skygate::ephemeris::ObservationEventCalculator calculator(nullptr);
     const skygate::ephemeris::tests::FixedAltitudeEngine belowHorizonEngine(-20.0);
     const skygate::ephemeris::tests::FixedAltitudeEngine aboveHorizonEngine(20.0);
     const auto context = makeContext(70.0, 0.0);
@@ -448,7 +448,7 @@ void ObservationEventDirectSearchTests::unprovenWindowMissDoesNotReportAlwaysAbo
 
 void ObservationEventDirectSearchTests::movingBodySamplesThroughEphemerisEngine()
 {
-    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const skygate::ephemeris::ObservationEventCalculator calculator(nullptr);
     const MovingBodyEngine engine;
     auto context = makeContext(0.0, 0.0);
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
@@ -467,7 +467,7 @@ void ObservationEventDirectSearchTests::movingBodySamplesThroughEphemerisEngine(
 
 void ObservationEventDirectSearchTests::requestOverloadPropagatesOptionsAndSampleEpochs()
 {
-    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const skygate::ephemeris::ObservationEventCalculator calculator(nullptr);
     RequestSensitiveMovingEngine engine;
     skygate::ephemeris::EphemerisRequest request;
     request.context = makeContext(0.0, 0.0);
@@ -503,7 +503,7 @@ void ObservationEventDirectSearchTests::requestOverloadPropagatesOptionsAndSampl
 
 void ObservationEventDirectSearchTests::contextOverloadSeedsRequestOptionsFromEngine()
 {
-    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const skygate::ephemeris::ObservationEventCalculator calculator(nullptr);
     RequestSensitiveMovingEngine engine;
     engine.engineOptions.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     engine.engineOptions.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());

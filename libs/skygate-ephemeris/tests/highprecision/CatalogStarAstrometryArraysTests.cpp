@@ -19,7 +19,6 @@
 
 #include <limits>
 #include <memory>
-#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -134,7 +133,7 @@ using namespace skygate::core;
 
 [[nodiscard]] CatalogStarAstrometryArrays makeArrays(const std::vector<OwnGalaxyCelestialBody>& bodies)
 {
-    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    const CelestialBodyCatalog catalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
     return CatalogStarAstrometryArrays(catalog.bodies());
 }
 

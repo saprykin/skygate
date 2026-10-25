@@ -31,7 +31,6 @@
 #include <cstdlib>
 #include <limits>
 #include <memory>
-#include <span>
 #include <utility>
 #include <vector>
 
@@ -170,7 +169,7 @@ void EphemerisRequestTimeContractTests::simpleEngineRejectsExplicitNonUtcEpoch()
         TimeScale::Ut1,
     };
     const std::array<OwnGalaxyCelestialBody, 1> bodies{makeSunBody()};
-    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    const CelestialBodyCatalog catalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
     const SimpleEphemerisEngine engine(catalog, SimpleEphemerisEngine::defaultOptions());
 
     const UtcTimePoint epochUtcTime = utcTime(1'704'067'200);
@@ -216,7 +215,7 @@ void EphemerisRequestTimeContractTests::simpleEngineRejectsExplicitNonUtcEpoch()
 void EphemerisRequestTimeContractTests::simpleEngineRejectsNonFiniteExplicitEpoch()
 {
     const std::array<OwnGalaxyCelestialBody, 1> bodies{makeSunBody()};
-    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    const CelestialBodyCatalog catalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
     const SimpleEphemerisEngine engine(catalog, SimpleEphemerisEngine::defaultOptions());
 
     const UtcTimePoint staleUtcTime = utcTime(0);
@@ -277,7 +276,7 @@ void EphemerisRequestTimeContractTests::simpleEngineRejectsNonFiniteExplicitEpoc
 void EphemerisRequestTimeContractTests::simpleEngineUsesExplicitUtcEpochOverStaleContext()
 {
     const std::array<OwnGalaxyCelestialBody, 1> bodies{makeSunBody()};
-    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    const CelestialBodyCatalog catalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
     const SimpleEphemerisEngine engine(catalog, SimpleEphemerisEngine::defaultOptions());
 
     const UtcTimePoint epochUtcTime = utcTime(1'704'067'200);
@@ -322,7 +321,7 @@ void EphemerisRequestTimeContractTests::simpleEngineUsesExplicitUtcEpochOverStal
 void EphemerisRequestTimeContractTests::simpleEngineOverloadMatchesExplicitUtcRequest()
 {
     const std::array<OwnGalaxyCelestialBody, 1> bodies{makeSunBody()};
-    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    const CelestialBodyCatalog catalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
     const SimpleEphemerisEngine engine(catalog, SimpleEphemerisEngine::defaultOptions());
 
     const ObservationContext context = makeContext(utcTime(1'704'067'200));
@@ -360,7 +359,7 @@ void EphemerisRequestTimeContractTests::simpleEngineOverloadMatchesExplicitUtcRe
 void EphemerisRequestTimeContractTests::simpleEngineZeroEpochRemainsContextOnly()
 {
     const std::array<OwnGalaxyCelestialBody, 1> bodies{makeSunBody()};
-    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    const CelestialBodyCatalog catalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
     const SimpleEphemerisEngine engine(catalog, SimpleEphemerisEngine::defaultOptions());
 
     const ObservationContext context = makeContext(utcTime(1'704'067'200));
@@ -408,7 +407,7 @@ void EphemerisRequestTimeContractTests::simpleEngineZeroEpochRemainsContextOnly(
 void EphemerisRequestTimeContractTests::highPrecisionEngineUsesExplicitUtcEpoch()
 {
     const std::array<OwnGalaxyCelestialBody, 1> bodies{makeFixedStarBody()};
-    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    const CelestialBodyCatalog catalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
     auto calculator = std::make_shared<RecordingStarAstrometryCalculator>();
     const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(catalog, calculator);
 
@@ -434,7 +433,7 @@ void EphemerisRequestTimeContractTests::highPrecisionEngineUsesExplicitUtcEpoch(
 void EphemerisRequestTimeContractTests::highPrecisionEngineUsesExplicitTdbEpoch()
 {
     const std::array<OwnGalaxyCelestialBody, 1> bodies{makeFixedStarBody()};
-    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    const CelestialBodyCatalog catalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
     auto calculator = std::make_shared<RecordingStarAstrometryCalculator>();
     const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(catalog, calculator);
 
@@ -461,7 +460,7 @@ void EphemerisRequestTimeContractTests::highPrecisionEngineUsesExplicitTdbEpoch(
 void EphemerisRequestTimeContractTests::highPrecisionEngineOverloadBuildsUtcEpoch()
 {
     const std::array<OwnGalaxyCelestialBody, 1> bodies{makeFixedStarBody()};
-    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    const CelestialBodyCatalog catalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
     auto calculator = std::make_shared<RecordingStarAstrometryCalculator>();
     const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(catalog, calculator);
 
@@ -485,7 +484,7 @@ void EphemerisRequestTimeContractTests::highPrecisionEngineOverloadBuildsUtcEpoc
 void EphemerisRequestTimeContractTests::highPrecisionEngineRejectsNonExplicitEpoch()
 {
     const std::array<OwnGalaxyCelestialBody, 1> bodies{makeFixedStarBody()};
-    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    const CelestialBodyCatalog catalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
     auto calculator = std::make_shared<RecordingStarAstrometryCalculator>();
     const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(catalog, calculator);
 

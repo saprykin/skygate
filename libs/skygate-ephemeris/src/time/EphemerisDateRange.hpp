@@ -16,8 +16,6 @@ struct EphemerisDateRange {
     [[nodiscard]] bool isValid() const noexcept;
     [[nodiscard]] bool contains(const skygate::core::AstronomicalEpoch& epoch) const noexcept;
     [[nodiscard]] skygate::core::AstronomicalEpochRange interval() const noexcept;
-
-    friend bool operator==(const EphemerisDateRange&, const EphemerisDateRange&) = default;
 };
 
 }  // namespace skygate::ephemeris

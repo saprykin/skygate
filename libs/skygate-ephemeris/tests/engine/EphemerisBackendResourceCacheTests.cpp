@@ -222,7 +222,9 @@ private slots:
 void EphemerisBackendResourceCacheTests::reusesProvidersWhenRevisionAndManifestUnchanged()
 {
     const std::shared_ptr<const TestEphemerisDataSnapshot> snapshot = makeSnapshot();
-    skygate::ephemeris::EphemerisBackendResourceCache cache;
+    skygate::ephemeris::EphemerisBackendResourceCache cache(
+        skygate::ephemeris::EphemerisBackendResourceCache::InitialProviders{}
+    );
     cache.refresh(snapshot, nullptr, 7U);
 
     const skygate::ephemeris::EphemerisEngineFactoryRequest firstFields = providerFields(cache);
@@ -239,7 +241,9 @@ void EphemerisBackendResourceCacheTests::reusesProvidersWhenRevisionAndManifestU
 void EphemerisBackendResourceCacheTests::invalidatesAndReloadsProvidersOnRevisionChange()
 {
     const std::shared_ptr<const TestEphemerisDataSnapshot> snapshot = makeSnapshot();
-    skygate::ephemeris::EphemerisBackendResourceCache cache;
+    skygate::ephemeris::EphemerisBackendResourceCache cache(
+        skygate::ephemeris::EphemerisBackendResourceCache::InitialProviders{}
+    );
     cache.refresh(snapshot, nullptr, 7U);
 
     const skygate::ephemeris::EphemerisEngineFactoryRequest firstFields = providerFields(cache);

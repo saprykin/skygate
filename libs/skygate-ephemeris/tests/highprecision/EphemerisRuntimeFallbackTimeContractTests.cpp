@@ -27,8 +27,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <span>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -49,7 +49,7 @@ using skygate::ephemeris::tests::ValidUtcTimeScaleService;
 [[nodiscard]] CelestialBodyCatalog makeSunCatalog()
 {
     const std::array bodies{makeSunBody()};
-    return CelestialBodyCatalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    return CelestialBodyCatalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
 }
 
 [[nodiscard]] ObservationContext makeContext(const UtcTimePoint& utcTime)

@@ -16,9 +16,9 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <span>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -49,7 +49,7 @@ using skygate::ephemeris::tests::ValidUtcTimeScaleService;
 template <typename BodyRange>
 [[nodiscard]] CelestialBodyCatalog makeCatalog(const BodyRange& bodies)
 {
-    return CelestialBodyCatalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    return CelestialBodyCatalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
 }
 
 [[nodiscard]] ObservationContext makeContext()

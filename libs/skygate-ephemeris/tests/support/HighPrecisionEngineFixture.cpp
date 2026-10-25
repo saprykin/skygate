@@ -16,6 +16,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace skygate::ephemeris::tests {
 
@@ -79,7 +80,7 @@ HighPrecisionEngineFixture::fixedStarBody(std::string id, const double rightAsce
 
 CelestialBodyCatalog HighPrecisionEngineFixture::catalog(std::span<const OwnGalaxyCelestialBody> bodies)
 {
-    return CelestialBodyCatalog(bodies);
+    return CelestialBodyCatalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
 }
 
 skygate::core::ObservationContext HighPrecisionEngineFixture::context()

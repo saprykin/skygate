@@ -4,6 +4,7 @@
 #include "FixedBodyAltitudeRange.hpp"
 #include "UtcTimeCodec.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "math/TimeConstants.hpp"
 
 #include <algorithm>
 #include <array>
@@ -20,6 +21,8 @@ namespace {
 using AltitudeSample = ObservationEventSearch::AltitudeSample;
 
 constexpr int kSampleStepSeconds = static_cast<int>(10.0 * skygate::core::TimeConstants::kSecondsPerMinute);
+constexpr int kSearchHorizonSeconds =
+    ObservationEventSearch::kSearchHorizonHours * static_cast<int>(skygate::core::TimeConstants::kSecondsPerHour);
 constexpr auto kRefinementTolerance = std::chrono::seconds(1);
 constexpr auto kGuidedRefinementTolerance = std::chrono::seconds(60);
 constexpr double kAltitudeClassificationToleranceDeg = 1e-9;

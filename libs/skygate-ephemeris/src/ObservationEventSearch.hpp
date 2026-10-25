@@ -4,7 +4,6 @@
 #include "ObservationEventStatus.hpp"
 #include "ObservationEventSummary.hpp"
 #include "UtcTimePoint.hpp"
-#include "math/TimeConstants.hpp"
 
 #include <array>
 #include <cstdint>
@@ -79,8 +78,6 @@ public:
 
     // Longest search window used when a crossing event is not found earlier.
     static constexpr int kSearchHorizonHours = 72;
-    static constexpr int kSearchHorizonSeconds =
-        kSearchHorizonHours * static_cast<int>(skygate::core::TimeConstants::kSecondsPerHour);
 
 private:
     [[nodiscard]] std::optional<double> altitudeAt(const skygate::core::UtcTimePoint& utcTime);

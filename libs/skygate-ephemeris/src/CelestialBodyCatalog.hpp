@@ -55,11 +55,7 @@ public:
     ~CelestialBodyCatalog();
 
     explicit CelestialBodyCatalog(std::span<const BaseCelestialBody* const> bodies);
-    explicit CelestialBodyCatalog(std::span<const OwnGalaxyCelestialBody> ownGalaxyBodies);
     explicit CelestialBodyCatalog(std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies);
-    CelestialBodyCatalog(
-        std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies, std::vector<DistantCelestialBody> distantBodies
-    );
     CelestialBodyCatalog(
         std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies,
         std::vector<DistantCelestialBody> distantBodies,

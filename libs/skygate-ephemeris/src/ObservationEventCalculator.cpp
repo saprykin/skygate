@@ -48,8 +48,6 @@ using SampleRole = ObservationEventSearch::SampleRole;
 
 }  // namespace
 
-ObservationEventCalculator::ObservationEventCalculator() = default;
-
 ObservationEventCalculator::ObservationEventCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy)
     : m_guidanceStrategy(std::move(guidanceStrategy))
 {
@@ -74,8 +72,7 @@ ObservationEventSummary ObservationEventCalculator::compute(
     SampleRole sampleRole = SampleRole::Direct;
     std::vector<AltitudeSample> samples;
 
-    if (m_guidanceStrategy != nullptr
-        && ObservationEventSearchPolicy::shouldUseGuidanceEngine(ephemerisEngine, body, searchMode)) {
+    if (m_guidanceStrategy != nullptr && ObservationEventSearchPolicy::shouldUseGuidanceEngine(ephemerisEngine, body)) {
         if (auto guidanceSamples = sampleGuidanceAltitudes(search, *body, request, *m_guidanceStrategy);
             guidanceSamples.has_value()) {
             samples = std::move(*guidanceSamples);

@@ -15,15 +15,12 @@ class ObservationEventSearchPolicy final {
 public:
     ObservationEventSearchPolicy() = delete;
 
-    // Guidance sampling needs a mode that asks for it, a body to build the
-    // guidance catalog from, and an engine that advertises guided event search.
-    [[nodiscard]] static bool shouldUseGuidanceEngine(
-        const IEphemerisEngine& engine, const BaseCelestialBody* body, ObservationEventCalculator::SearchMode searchMode
-    ) noexcept
+    // Guidance sampling needs a body to build the guidance catalog from and
+    // an engine that advertises guided event search.
+    [[nodiscard]] static bool
+    shouldUseGuidanceEngine(const IEphemerisEngine& engine, const BaseCelestialBody* body) noexcept
     {
-        return (searchMode == ObservationEventCalculator::SearchMode::Guided
-                || searchMode == ObservationEventCalculator::SearchMode::GuidedApproximate)
-               && body != nullptr && engine.traits().supportsGuidedEventSearch;
+        return body != nullptr && engine.traits().supportsGuidedEventSearch;
     }
 
     // A guided answer may be reported directly only when the engine trusts it

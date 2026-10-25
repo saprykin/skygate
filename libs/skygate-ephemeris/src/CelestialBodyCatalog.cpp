@@ -99,24 +99,8 @@ CelestialBodyCatalog::CelestialBodyCatalog(const std::span<const BaseCelestialBo
     rebuildOrderedBodies();
 }
 
-CelestialBodyCatalog::CelestialBodyCatalog(const std::span<const OwnGalaxyCelestialBody> ownGalaxyBodies)
-    : m_ownGalaxyBodies(ownGalaxyBodies.begin(), ownGalaxyBodies.end())
-{
-    rebuildSequentialOrder();
-    rebuildOrderedBodies();
-}
-
 CelestialBodyCatalog::CelestialBodyCatalog(std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies)
     : m_ownGalaxyBodies(std::move(ownGalaxyBodies))
-{
-    rebuildSequentialOrder();
-    rebuildOrderedBodies();
-}
-
-CelestialBodyCatalog::CelestialBodyCatalog(
-    std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies, std::vector<DistantCelestialBody> distantBodies
-)
-    : m_ownGalaxyBodies(std::move(ownGalaxyBodies)), m_distantBodies(std::move(distantBodies))
 {
     rebuildSequentialOrder();
     rebuildOrderedBodies();

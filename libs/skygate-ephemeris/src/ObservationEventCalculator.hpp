@@ -15,10 +15,6 @@ class IEphemerisEngine;
 
 class ObservationEventCalculator final {
 public:
-    /// Constructs a calculator with no guidance strategy. `compute` falls back
-    /// to direct sampling whenever guidance is unavailable.
-    ObservationEventCalculator();
-
     /// Constructs a calculator with the supplied guidance strategy. Passing
     /// nullptr is equivalent to no guidance and also falls back to direct
     /// sampling.
@@ -31,11 +27,9 @@ public:
     /// - GuidedApproximate: the guidance answer may be returned directly only
     ///   when the engine grants `trustsGuidedSearchResult`; otherwise it is
     ///   refined like Guided.
-    /// - Direct: primary engine only.
     enum class SearchMode : std::uint8_t {
         Guided,
-        GuidedApproximate,
-        Direct
+        GuidedApproximate
     };
 
     [[nodiscard]] ObservationEventSummary compute(

@@ -25,7 +25,6 @@ public:
         std::shared_ptr<const highprecision::ICalcephKernelProvider> calcephKernelProvider;
     };
 
-    EphemerisBackendResourceCache() = default;
     explicit EphemerisBackendResourceCache(InitialProviders initialProviders);
     ~EphemerisBackendResourceCache();
 

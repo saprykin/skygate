@@ -99,7 +99,11 @@ FrameFixture makeFixture(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>
 
 FrameFixture makeFixture(std::vector<skygate::ephemeris::DistantCelestialBody> bodies, const double fovDeg = 40.0)
 {
-    return makeFixture(skygate::ephemeris::CelestialBodyCatalog({}, std::move(bodies)), fovDeg);
+    skygate::ephemeris::CelestialBodyCatalog catalog;
+    for (const skygate::ephemeris::DistantCelestialBody& body : bodies) {
+        catalog.appendBody(body);
+    }
+    return makeFixture(std::move(catalog), fovDeg);
 }
 
 SkyRenderFrame buildFrame(

@@ -33,7 +33,7 @@ template <typename BodyRange>
 [[nodiscard]] std::shared_ptr<const skygate::ephemeris::CelestialBodyCatalog> makeCatalogHandle(const BodyRange& bodies)
 {
     return std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
-        std::span<const skygate::ephemeris::OwnGalaxyCelestialBody>{bodies}
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>(bodies.begin(), bodies.end())
     );
 }
 
@@ -400,7 +400,7 @@ void EphemerisEngineFactorySelectionTests::compatibilityOverloadsCreateSimpleEng
     QVERIFY(emptyCatalogEngine->compute(context).states.empty());
 
     const skygate::ephemeris::CelestialBodyCatalog spanCatalog(
-        std::span<const skygate::ephemeris::OwnGalaxyCelestialBody>{behaviorBodies}
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>(behaviorBodies.begin(), behaviorBodies.end())
     );
     auto spanEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(spanCatalog);
     QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(spanEngineResult.status));
@@ -432,7 +432,7 @@ void EphemerisEngineFactorySelectionTests::compatibilityOverloadsCreateSimpleEng
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.catalog = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
-        std::span<const skygate::ephemeris::OwnGalaxyCelestialBody>{behaviorBodies}
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>(behaviorBodies.begin(), behaviorBodies.end())
     );
     const auto requestResult = skygate::ephemeris::EphemerisEngineFactory::create(request);
     QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(requestResult.status));

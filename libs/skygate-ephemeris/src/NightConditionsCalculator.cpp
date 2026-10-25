@@ -14,39 +14,29 @@
 namespace skygate::ephemeris {
 namespace {
 
-[[nodiscard]] ObservationEventCalculator::SearchMode
-observationSearchMode(const NightConditionsCalculator::EventSearchMode mode) noexcept
-{
-    return mode == NightConditionsCalculator::EventSearchMode::Verified
-               ? ObservationEventCalculator::SearchMode::Direct
-               : ObservationEventCalculator::SearchMode::GuidedApproximate;
-}
-
 [[nodiscard]] ObservationEventSummary computeEventSummaryForNightConditions(
     const ObservationEventCalculator& eventCalculator,
     const IEphemerisEngine& ephemerisEngine,
     const EphemerisRequest& request,
     const std::uint32_t bodyIndex,
     const BaseCelestialBody* body,
-    const double crossingAltitudeDeg,
-    const NightConditionsCalculator::EventSearchMode eventSearchMode
+    const double crossingAltitudeDeg
 )
 {
     const EphemerisRequest eventRequest = EphemerisRequest::fromPrecisionPolicy(
-        request,
-        eventSearchMode == NightConditionsCalculator::EventSearchMode::Verified
-            ? EphemerisPrecisionPolicy::NightConditionsVerified
-            : EphemerisPrecisionPolicy::NightConditionsApproximate,
-        ephemerisEngine
+        request, EphemerisPrecisionPolicy::NightConditionsApproximate, ephemerisEngine
     );
     return eventCalculator.compute(
-        ephemerisEngine, eventRequest, bodyIndex, body, crossingAltitudeDeg, observationSearchMode(eventSearchMode)
+        ephemerisEngine,
+        eventRequest,
+        bodyIndex,
+        body,
+        crossingAltitudeDeg,
+        ObservationEventCalculator::SearchMode::GuidedApproximate
     );
 }
 
 }  // namespace
-
-NightConditionsCalculator::NightConditionsCalculator() = default;
 
 NightConditionsCalculator::NightConditionsCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy)
     : m_guidanceStrategy(std::move(guidanceStrategy))
@@ -59,8 +49,7 @@ NightConditions NightConditionsCalculator::compute(
     const std::uint32_t sunBodyIndex,
     const BaseCelestialBody* sunBody,
     const std::uint32_t moonBodyIndex,
-    const BaseCelestialBody* moonBody,
-    const EventSearchMode eventSearchMode
+    const BaseCelestialBody* moonBody
 ) const
 {
     NightConditions conditions;
@@ -83,8 +72,7 @@ NightConditions NightConditionsCalculator::compute(
         request,
         sunBodyIndex,
         sunBody,
-        SolarAltitudeThresholds::kSunriseSunsetAltitudeDeg,
-        eventSearchMode
+        SolarAltitudeThresholds::kSunriseSunsetAltitudeDeg
     );
     const auto civil = computeEventSummaryForNightConditions(
         eventCalculator,
@@ -92,8 +80,7 @@ NightConditions NightConditionsCalculator::compute(
         request,
         sunBodyIndex,
         sunBody,
-        SolarAltitudeThresholds::kCivilTwilightAltitudeDeg,
-        eventSearchMode
+        SolarAltitudeThresholds::kCivilTwilightAltitudeDeg
     );
     const auto nautical = computeEventSummaryForNightConditions(
         eventCalculator,
@@ -101,8 +88,7 @@ NightConditions NightConditionsCalculator::compute(
         request,
         sunBodyIndex,
         sunBody,
-        SolarAltitudeThresholds::kNauticalTwilightAltitudeDeg,
-        eventSearchMode
+        SolarAltitudeThresholds::kNauticalTwilightAltitudeDeg
     );
     const auto astronomical = computeEventSummaryForNightConditions(
         eventCalculator,
@@ -110,12 +96,10 @@ NightConditions NightConditionsCalculator::compute(
         request,
         sunBodyIndex,
         sunBody,
-        SolarAltitudeThresholds::kAstronomicalTwilightAltitudeDeg,
-        eventSearchMode
+        SolarAltitudeThresholds::kAstronomicalTwilightAltitudeDeg
     );
-    const auto moonHorizon = computeEventSummaryForNightConditions(
-        eventCalculator, ephemerisEngine, request, moonBodyIndex, moonBody, 0.0, eventSearchMode
-    );
+    const auto moonHorizon =
+        computeEventSummaryForNightConditions(eventCalculator, ephemerisEngine, request, moonBodyIndex, moonBody, 0.0);
 
     const MoonPhaseCalculator moonPhaseCalculator;
     const MoonPhase moonPhase = moonPhaseCalculator.compute(request.epoch);

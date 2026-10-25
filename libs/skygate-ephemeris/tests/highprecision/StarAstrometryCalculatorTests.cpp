@@ -121,7 +121,7 @@ using skygate::ephemeris::tests::ValidUtcTimeScaleService;
 
 [[nodiscard]] CelestialBodyCatalog makeCatalog(const std::vector<OwnGalaxyCelestialBody>& bodies)
 {
-    return CelestialBodyCatalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    return CelestialBodyCatalog(std::vector<OwnGalaxyCelestialBody>(bodies.begin(), bodies.end()));
 }
 
 [[nodiscard]] HighPrecisionComputationInput makeInput(const BaseCelestialBody& body, const EphemerisRequest& request)

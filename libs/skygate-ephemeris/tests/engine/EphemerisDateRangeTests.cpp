@@ -25,7 +25,6 @@ private slots:
     void containsRejectsEpochsOutsideRange();
     void containsRejectsNonFiniteEpochs();
     void exposesIntervalMatchingMembers();
-    void operatorEqualsComparesAllMembers();
 };
 
 void EphemerisDateRangeTests::acceptsOrderedFiniteEndpoints()
@@ -102,31 +101,6 @@ void EphemerisDateRangeTests::exposesIntervalMatchingMembers()
 
     QVERIFY(range.interval().start == range.start);
     QVERIFY(range.interval().end == range.end);
-}
-
-void EphemerisDateRangeTests::operatorEqualsComparesAllMembers()
-{
-    const skygate::ephemeris::EphemerisDateRange range{
-        .id = "iers-predictions",
-        .displayName = "IERS predictions",
-        .start = epoch(2451545.0),
-        .end = epoch(2451546.0),
-    };
-    const skygate::ephemeris::EphemerisDateRange identical{
-        .id = "iers-predictions",
-        .displayName = "IERS predictions",
-        .start = epoch(2451545.0),
-        .end = epoch(2451546.0),
-    };
-    QVERIFY(range == identical);
-
-    skygate::ephemeris::EphemerisDateRange renamed = range;
-    renamed.displayName = "IERS finals";
-    QVERIFY(range != renamed);
-
-    skygate::ephemeris::EphemerisDateRange extended = range;
-    extended.end = epoch(2451547.0);
-    QVERIFY(range != extended);
 }
 
 QTEST_MAIN(EphemerisDateRangeTests)
