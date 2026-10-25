@@ -302,16 +302,16 @@ void SkySceneCompositionTests::cardinalOverlayItemsFollowCardinalPolicy()
     QVERIFY(result.changed);
 
     int cardinalItemCount = 0;
-    for (const double azimuthDeg : skygate::ui::internal::SkyCardinalDirectionPolicy::kAzimuthsDeg) {
-        const auto projected =
-            projection->project(skygate::core::HorizontalCoordinate{.altitudeDeg = 0.0, .azimuthDeg = azimuthDeg});
+    for (const auto& direction : skygate::ui::internal::SkyCardinalDirectionPolicy::directions()) {
+        const auto projected = projection->project(
+            skygate::core::HorizontalCoordinate{.altitudeDeg = 0.0, .azimuthDeg = direction.azimuthDeg}
+        );
         if (!projected.isVisible()) {
             continue;
         }
 
-        const QString expectedLabel = skygate::ui::internal::SkyCardinalDirectionPolicy::label(azimuthDeg);
-        const QColor expectedColor =
-            skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(azimuthDeg, input.frameInput.renderTheme);
+        const QString expectedLabel = direction.text();
+        const QColor expectedColor = direction.color(input.frameInput.renderTheme);
         const auto cardinalItemIt = std::find_if(
             sceneFrame.overlayItems.begin(),
             sceneFrame.overlayItems.end(),

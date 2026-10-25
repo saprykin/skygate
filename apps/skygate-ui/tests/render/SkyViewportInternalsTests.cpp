@@ -15,7 +15,10 @@
 #include <QtTest/QtTest>
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace {
@@ -158,26 +161,21 @@ void SkyViewportInternalsTests::cardinalDirectionPolicyMapsLabelsAndColors()
     theme.cardinalEastLine = QColor("#020202");
     theme.cardinalSouthLine = QColor("#030303");
     theme.cardinalWestLine = QColor("#040404");
-    theme.gridAzimuthLine = QColor("#050505");
 
-    const auto& azimuths = skygate::ui::internal::SkyCardinalDirectionPolicy::kAzimuthsDeg;
-    QCOMPARE(azimuths.size(), 4U);
-    QCOMPARE(azimuths[0], 0.0);
-    QCOMPARE(azimuths[1], 90.0);
-    QCOMPARE(azimuths[2], 180.0);
-    QCOMPARE(azimuths[3], 270.0);
+    const std::span<const skygate::ui::internal::SkyCardinalDirectionPolicy::Direction> directions =
+        skygate::ui::internal::SkyCardinalDirectionPolicy::directions();
+    QCOMPARE(directions.size(), 4U);
 
-    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::label(0.0), QString("N"));
-    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::label(90.0), QString("E"));
-    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::label(180.0), QString("S"));
-    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::label(270.0), QString("W"));
-    QVERIFY(skygate::ui::internal::SkyCardinalDirectionPolicy::label(45.0).isEmpty());
-
-    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(0.0, theme), theme.cardinalNorthLine);
-    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(90.0, theme), theme.cardinalEastLine);
-    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(180.0, theme), theme.cardinalSouthLine);
-    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(270.0, theme), theme.cardinalWestLine);
-    QCOMPARE(skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(45.0, theme), theme.gridAzimuthLine);
+    const std::array<double, 4> expectedAzimuths{0.0, 90.0, 180.0, 270.0};
+    const std::array<QString, 4> expectedLabels{QString("N"), QString("E"), QString("S"), QString("W")};
+    const std::array<QColor, 4> expectedColors{
+        theme.cardinalNorthLine, theme.cardinalEastLine, theme.cardinalSouthLine, theme.cardinalWestLine
+    };
+    for (std::size_t index = 0; index < directions.size(); ++index) {
+        QCOMPARE(directions[index].azimuthDeg, expectedAzimuths[index]);
+        QCOMPARE(directions[index].text(), expectedLabels[index]);
+        QCOMPARE(directions[index].color(theme), expectedColors[index]);
+    }
 }
 
 void SkyViewportInternalsTests::cardinalGridLinesUsePaletteColors()

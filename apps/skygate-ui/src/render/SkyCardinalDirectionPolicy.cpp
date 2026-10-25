@@ -1,42 +1,23 @@
 #include "SkyCardinalDirectionPolicy.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
 
+#include <array>
+
 namespace skygate::ui::internal {
+namespace {
 
-QColor SkyCardinalDirectionPolicy::lineColor(const double azimuthDeg, const SkyThemeRenderPalette& renderPalette)
+constexpr std::array<SkyCardinalDirectionPolicy::Direction, 4> kDirections{{
+    {.azimuthDeg = 0.0, .label = "N", .lineColor = &SkyThemeRenderPalette::cardinalNorthLine},
+    {.azimuthDeg = 90.0, .label = "E", .lineColor = &SkyThemeRenderPalette::cardinalEastLine},
+    {.azimuthDeg = 180.0, .label = "S", .lineColor = &SkyThemeRenderPalette::cardinalSouthLine},
+    {.azimuthDeg = 270.0, .label = "W", .lineColor = &SkyThemeRenderPalette::cardinalWestLine},
+}};
+
+}  // namespace
+
+std::span<const SkyCardinalDirectionPolicy::Direction> SkyCardinalDirectionPolicy::directions() noexcept
 {
-    if (azimuthDeg == 0.0) {
-        return renderPalette.cardinalNorthLine;
-    }
-    if (azimuthDeg == 90.0) {
-        return renderPalette.cardinalEastLine;
-    }
-    if (azimuthDeg == 180.0) {
-        return renderPalette.cardinalSouthLine;
-    }
-    if (azimuthDeg == 270.0) {
-        return renderPalette.cardinalWestLine;
-    }
-
-    return renderPalette.gridAzimuthLine;
-}
-
-QString SkyCardinalDirectionPolicy::label(const double azimuthDeg)
-{
-    if (azimuthDeg == 0.0) {
-        return QStringLiteral("N");
-    }
-    if (azimuthDeg == 90.0) {
-        return QStringLiteral("E");
-    }
-    if (azimuthDeg == 180.0) {
-        return QStringLiteral("S");
-    }
-    if (azimuthDeg == 270.0) {
-        return QStringLiteral("W");
-    }
-
-    return {};
+    return kDirections;
 }
 
 }  // namespace skygate::ui::internal

@@ -5,20 +5,36 @@
 #include <QColor>
 #include <QString>
 
-#include <array>
+#include <span>
 
 namespace skygate::ui::internal {
 
-// Cardinal directions of the horizon: their azimuths, the label text, and the
-// palette color of the line and label that mark each direction.
+// Cardinal directions of the horizon. One table owns the azimuth of the
+// direction, the label text, and the palette color shared by the line and the
+// label that mark it.
 class SkyCardinalDirectionPolicy final {
 public:
-    static constexpr std::array<double, 4> kAzimuthsDeg{0.0, 90.0, 180.0, 270.0};
+    struct Direction final {
+        double azimuthDeg = 0.0;
+        const char* label = "";
+        // Palette member that colors the direction. Every direction the policy
+        // hands out comes from the table below, which sets all three fields.
+        QColor SkyThemeRenderPalette::* lineColor = nullptr;
+
+        [[nodiscard]] QString text() const
+        {
+            return QString::fromLatin1(label);
+        }
+
+        [[nodiscard]] QColor color(const SkyThemeRenderPalette& renderPalette) const noexcept
+        {
+            return renderPalette.*lineColor;
+        }
+    };
 
     SkyCardinalDirectionPolicy() = delete;
 
-    [[nodiscard]] static QColor lineColor(double azimuthDeg, const SkyThemeRenderPalette& renderPalette);
-    [[nodiscard]] static QString label(double azimuthDeg);
+    [[nodiscard]] static std::span<const Direction> directions() noexcept;
 };
 
 }  // namespace skygate::ui::internal

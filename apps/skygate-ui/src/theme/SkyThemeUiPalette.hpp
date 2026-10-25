@@ -94,9 +94,6 @@ namespace skygate::ui::internal {
     X(quoteBackground)                                                                                                 \
     X(quoteBorder)                                                                                                     \
     X(quoteText)                                                                                                       \
-    X(logoPanelBackground)                                                                                             \
-    X(logoPanelBorder)                                                                                                 \
-    X(logoPanelAccentBorder)                                                                                           \
     X(progressBarTrack)                                                                                                \
     X(progressBarTrackBorder)                                                                                          \
     X(progressBarSweepStart)                                                                                           \

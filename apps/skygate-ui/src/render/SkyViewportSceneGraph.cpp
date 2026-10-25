@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <ranges>
 #include <vector>
 
 namespace {
@@ -146,8 +147,7 @@ void SkyViewportSceneGraph::syncLineNodes(QSGNode* rootNode, const std::span<con
         bucket.coordinates.push_back(endLeftY);
     }
 
-    for (const auto& [bucketKey, bucket] : buckets) {
-        (void)bucketKey;
+    for (const auto& bucket : buckets | std::views::values) {
         appendBucketNode(rootNode, bucket);
     }
 }
@@ -185,8 +185,7 @@ void SkyViewportSceneGraph::syncPointNodes(QSGNode* rootNode, const std::span<co
         bucket.coordinates.push_back(bottom);
     }
 
-    for (const auto& [colorKey, bucket] : buckets) {
-        (void)colorKey;
+    for (const auto& bucket : buckets | std::views::values) {
         appendBucketNode(rootNode, bucket);
     }
 }

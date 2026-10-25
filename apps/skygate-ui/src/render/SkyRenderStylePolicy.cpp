@@ -44,11 +44,6 @@ QColor SkyRenderStylePolicy::colorForBodyType(
     return renderPalette.bodyStar;
 }
 
-QColor SkyRenderStylePolicy::constellationLineColor(const SkyThemeRenderPalette& renderPalette)
-{
-    return renderPalette.constellationLine;
-}
-
 SkyRenderStylePolicy::GlyphRadii SkyRenderStylePolicy::deepSkyGlyphRadiiPx(
     const skygate::ephemeris::BaseCelestialBody& body, const skygate::core::ProjectionParams& projectionParams
 )

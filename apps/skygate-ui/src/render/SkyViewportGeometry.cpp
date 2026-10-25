@@ -125,16 +125,16 @@ void appendCardinalGridLines(
     const double maxSegmentLengthSquared
 )
 {
-    for (const double cardinalAzimuthDeg : skygate::ui::internal::SkyCardinalDirectionPolicy::kAzimuthsDeg) {
+    for (const auto& direction : skygate::ui::internal::SkyCardinalDirectionPolicy::directions()) {
         appendProjectedPolyline(
             sink,
             input.projection,
             kGridAzimuthSampleCount,
             maxSegmentLengthSquared,
-            skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(cardinalAzimuthDeg, input.renderTheme),
+            direction.color(input.renderTheme),
             kCardinalLineWidthPx,
-            [cardinalAzimuthDeg](const int index) {
-                return meridianPoint(cardinalAzimuthDeg, index, kGridAzimuthSampleCount);
+            [azimuthDeg = direction.azimuthDeg](const int index) {
+                return meridianPoint(azimuthDeg, index, kGridAzimuthSampleCount);
             }
         );
     }

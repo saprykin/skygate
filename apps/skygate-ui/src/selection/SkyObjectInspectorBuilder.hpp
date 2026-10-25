@@ -1,6 +1,5 @@
 #pragma once
 
-#include "SkySelectionOverlayBuilder.hpp"
 #include "SkySelectionOverlayInput.hpp"
 #include "scene/SkySelectedObjectInspector.hpp"
 

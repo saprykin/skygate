@@ -64,8 +64,6 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
     if (renderData == nullptr || !renderData->preparedProjection.has_value()) {
         skygate::ui::internal::SkyViewportSceneGraph::clearChildNodes(rootNode->lineRoot());
         skygate::ui::internal::SkyViewportSceneGraph::clearChildNodes(rootNode->pointRoot());
-        skygate::ui::internal::SkyViewportSceneGraph::syncLineNodes(rootNode->lineRoot(), {});
-        skygate::ui::internal::SkyViewportSceneGraph::syncPointNodes(rootNode->pointRoot(), {});
         return rootNode;
     }
 

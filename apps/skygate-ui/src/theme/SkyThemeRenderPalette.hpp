@@ -35,7 +35,6 @@ namespace skygate::ui::internal {
     X(overlayTooltipText)                                                                                              \
     X(overlayLabelBackground)                                                                                          \
     X(overlayCardinalLabelBackground)                                                                                  \
-    X(overlayLabelBorder)                                                                                              \
     X(overlayLabelText)                                                                                                \
     X(selectionMarkerFill)                                                                                             \
     X(selectionMarkerBorder)                                                                                           \

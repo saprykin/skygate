@@ -206,21 +206,17 @@ std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
         return overlayItems;
     }
 
-    for (const double cardinalAzimuthDeg : skygate::ui::internal::SkyCardinalDirectionPolicy::kAzimuthsDeg) {
+    for (const auto& direction : skygate::ui::internal::SkyCardinalDirectionPolicy::directions()) {
         const auto projected = sceneFrame.preparedProjection->project(
-            skygate::core::HorizontalCoordinate{.altitudeDeg = 0.0, .azimuthDeg = cardinalAzimuthDeg}
+            skygate::core::HorizontalCoordinate{.altitudeDeg = 0.0, .azimuthDeg = direction.azimuthDeg}
         );
         if (!projected.isVisible()) {
             continue;
         }
 
-        overlayItems.push_back(overlayEntry(
-            "cardinal",
-            projected.x,
-            projected.y,
-            skygate::ui::internal::SkyCardinalDirectionPolicy::label(cardinalAzimuthDeg),
-            skygate::ui::internal::SkyCardinalDirectionPolicy::lineColor(cardinalAzimuthDeg, renderTheme)
-        ));
+        overlayItems.push_back(
+            overlayEntry("cardinal", projected.x, projected.y, direction.text(), direction.color(renderTheme))
+        );
     }
 
     return overlayItems;

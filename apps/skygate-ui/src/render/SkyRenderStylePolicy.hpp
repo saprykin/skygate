@@ -18,7 +18,6 @@ public:
     [[nodiscard]] static double pointSizeForMagnitude(double magnitude);
     [[nodiscard]] static QColor
     colorForBodyType(skygate::ephemeris::BaseCelestialBody::Kind type, const SkyThemeRenderPalette& renderPalette);
-    [[nodiscard]] static QColor constellationLineColor(const SkyThemeRenderPalette& renderPalette);
     [[nodiscard]] static GlyphRadii deepSkyGlyphRadiiPx(
         const skygate::ephemeris::BaseCelestialBody& body, const skygate::core::ProjectionParams& projectionParams
     );

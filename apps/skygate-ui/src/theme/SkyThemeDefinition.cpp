@@ -97,9 +97,6 @@ SkyThemeDefinition SkyThemeDefinition::builtInDefault()
     theme.ui.quoteBackground = QColor("#232742");
     theme.ui.quoteBorder = QColor("#4c5278");
     theme.ui.quoteText = QColor("#edf0fe");
-    theme.ui.logoPanelBackground = QColor("#151a36");
-    theme.ui.logoPanelBorder = QColor("#6676ab");
-    theme.ui.logoPanelAccentBorder = QColor("#9dafeb");
     theme.ui.progressBarTrack = QColor("#181b2d");
     theme.ui.progressBarTrackBorder = QColor("#3b4060");
     theme.ui.progressBarSweepStart = QColor("#4a82df00");
@@ -149,7 +146,6 @@ SkyThemeDefinition SkyThemeDefinition::builtInDefault()
     theme.render.overlayTooltipText = QColor("#e6f0ff");
     theme.render.overlayLabelBackground = QColor("#aa071328");
     theme.render.overlayCardinalLabelBackground = QColor("#880a1222");
-    theme.render.overlayLabelBorder = QColor("#c9dcff");
     theme.render.overlayLabelText = QColor("#c9dcff");
     theme.render.selectionMarkerFill = QColor("#18ff4d4d");
     theme.render.selectionMarkerBorder = QColor("#ff6b6b");

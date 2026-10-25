@@ -1,7 +1,6 @@
 #include "SkyConstellationRenderBuilder.hpp"
 #include "SkyRenderLabelBuilder.hpp"
 #include "SkyRenderLine.hpp"
-#include "SkyRenderStylePolicy.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
 #include "theme/SkyThemeRenderPalette.hpp"
 
@@ -32,7 +31,7 @@ void SkyConstellationRenderBuilder::appendLines(
         viewportWidth, viewportHeight, kConstellationSegmentLengthViewportFraction
     );
     const skygate::core::ProjectedPolylineBuilder lineBuilder;
-    const QColor lineColor = SkyRenderStylePolicy::constellationLineColor(renderTheme);
+    const QColor lineColor = renderTheme.constellationLine;
 
     for (const auto& lineRef : lineRefs) {
         const auto* startHorizontal = horizontalLookup.findHorizontal(lineRef.first);
