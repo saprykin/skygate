@@ -292,7 +292,7 @@ CelestialBodyState SimpleEphemerisEngine::computeStateForBody(
 {
     CelestialBodyState state = makeSimpleBodyState(bodyIndex);
 
-    const SimpleBodyStateCalculator bodyStateCalculator;
+    SimpleBodyStateCalculator bodyStateCalculator;
     if (const auto equatorial = bodyStateCalculator.computeEquatorial(body, context.utcTime); equatorial.has_value()) {
         state.equatorial = *equatorial;
         if (context.observer.isValid()) {
