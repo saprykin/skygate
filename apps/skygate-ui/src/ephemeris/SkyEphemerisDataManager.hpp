@@ -38,9 +38,7 @@ public:
     ~SkyEphemerisDataManager() override;
 
     [[nodiscard]] QString statusText() const;
-    [[nodiscard]] QString datasetInfoText() const;
     [[nodiscard]] QString shortRangeKernelStatusText() const;
-    [[nodiscard]] QString longRangeKernelStatusText() const;
     [[nodiscard]] QString kernelDisplayText() const;
     [[nodiscard]] QString earthOrientationStatusText() const;
     [[nodiscard]] QString leapSecondStatusText() const;
@@ -48,8 +46,6 @@ public:
     [[nodiscard]] std::uint64_t planetaryKernelCacheSizeBytes() const;
     [[nodiscard]] std::uint64_t supportDataCacheSizeBytes() const;
     [[nodiscard]] QString lastUpdateResultText() const;
-    [[nodiscard]] QString dataRevisionToken() const;
-    [[nodiscard]] bool usingInstalledData() const noexcept;
     [[nodiscard]] std::uint64_t dataRevision() const noexcept;
     [[nodiscard]] SkyEphemerisDataCacheSnapshot activeCacheSnapshot() const;
     [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot() const noexcept;
@@ -65,7 +61,6 @@ public:
     void clearUpdateCancellation() noexcept;
     [[nodiscard]] bool updateCancellationRequested() const noexcept;
 
-    [[nodiscard]] StagedUpdateDownloadResult stageEphemerisUpdateAsset(const StagedUpdateDownloadRequest& request);
     void stageEphemerisUpdateAssetAsync(
         const StagedUpdateDownloadRequest& request, std::function<void(StagedUpdateDownloadResult)> completionHandler
     );

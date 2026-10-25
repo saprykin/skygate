@@ -41,8 +41,7 @@ public:
         const QString& rawPayloadPath,
         const QString& binaryPayloadPath
     );
-    [[nodiscard]] static SkyCatalogSourceCacheRecord
-    loadRecord(QSettings& settings, const QString& group, QStringList& unreadablePayloadInstanceIds);
+    [[nodiscard]] static SkyCatalogSourceCacheRecord loadRecord(QSettings& settings, const QString& group);
     // Drops the payload references and the related dataset they carry while the
     // configuration fields of the record stay durable.
     static void evictPayload(QSettings& settings, const QString& group);

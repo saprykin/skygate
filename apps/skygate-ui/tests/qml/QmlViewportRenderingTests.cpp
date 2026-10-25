@@ -1,4 +1,7 @@
 #include "support/QmlRenderingTestSupport.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
+
+using skygate::ui::tests::setControllerUtcDateTime;
 
 namespace {
 
@@ -44,7 +47,7 @@ void QmlViewportRenderingTests::skyViewportItemRendersNonBlankScene()
     auto controller = makeController();
     QVERIFY(controller != nullptr);
     controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText(QStringLiteral("2024-09-01"), QStringLiteral("22:00:00")));
+    QVERIFY(setControllerUtcDateTime(*controller, QStringLiteral("2024-09-01"), QStringLiteral("22:00:00")));
     controller->setLatitudeText(QStringLiteral("47.3769"));
     controller->setLongitudeText(QStringLiteral("8.5417"));
     controller->setElevationText(QStringLiteral("408.0"));
@@ -169,7 +172,7 @@ void QmlViewportRenderingTests::skyViewportOverlayEditsSkipGeometryRebuild()
     auto controller = makeController();
     QVERIFY(controller != nullptr);
     controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText(QStringLiteral("2024-09-01"), QStringLiteral("22:00:00")));
+    QVERIFY(setControllerUtcDateTime(*controller, QStringLiteral("2024-09-01"), QStringLiteral("22:00:00")));
     controller->setViewCenter(45.0, 180.0);
     auto sceneModel = makeSceneModel(*controller);
     QVERIFY(sceneModel != nullptr);
@@ -227,7 +230,7 @@ void QmlViewportRenderingTests::skyViewportOverlayLayersAddGeometry()
 
     if (propertyName == QStringLiteral("deepSkyObjects")) {
         controller->setLive(false);
-        QVERIFY(controller->setUtcDateTimeText(QStringLiteral("2024-09-01"), QStringLiteral("22:00:00")));
+        QVERIFY(setControllerUtcDateTime(*controller, QStringLiteral("2024-09-01"), QStringLiteral("22:00:00")));
         controller->setLatitudeText(QStringLiteral("47.3769"));
         controller->setLongitudeText(QStringLiteral("8.5417"));
         controller->setElevationText(QStringLiteral("408.0"));
@@ -330,8 +333,10 @@ void QmlViewportRenderingTests::skyViewportAstronomicalLayersAddGeometry()
     QVERIFY(controller != nullptr);
     controller->setLatitudeText(QString::number(latitudeDeg, 'f', 4));
     controller->setLongitudeText(QString::number(longitudeDeg, 'f', 4));
-    QVERIFY(controller->setUtcDateTimeText(
-        utcTime.date().toString(QStringLiteral("yyyy-MM-dd")), utcTime.time().toString(QStringLiteral("HH:mm:ss"))
+    QVERIFY(setControllerUtcDateTime(
+        *controller,
+        utcTime.date().toString(QStringLiteral("yyyy-MM-dd")),
+        utcTime.time().toString(QStringLiteral("HH:mm:ss"))
     ));
     controller->setViewCenter(centerAltitudeDeg, centerAzimuthDeg);
     auto sceneModel = makeSceneModel(*controller);

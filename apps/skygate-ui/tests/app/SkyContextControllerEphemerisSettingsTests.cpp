@@ -5,6 +5,7 @@
 #include "support/SkyContextControllerTestSupport.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 
 #include <QCryptographicHash>
 #include <QDir>
@@ -18,6 +19,8 @@
 #include <memory>
 #include <utility>
 #include <vector>
+
+using skygate::ui::tests::setControllerUtcDateTime;
 
 namespace {
 
@@ -529,7 +532,7 @@ void SkyContextControllerEphemerisSettingsTests::requestContextCombinesObserverT
 void SkyContextControllerEphemerisSettingsTests::requestContextConvertsBceUtcToAstronomicalEpoch()
 {
     const auto controller = createController(false);
-    QVERIFY(controller->setUtcDateTimeText("0044-03-15 BCE", "12:00:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "0044-03-15 BCE", "12:00:00"));
 
     const auto requestContext = controller->ephemerisRequestContext();
 

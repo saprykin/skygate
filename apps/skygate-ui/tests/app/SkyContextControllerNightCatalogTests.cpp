@@ -2,7 +2,9 @@
 #include "catalog/SkyCatalogCollectionStore.hpp"
 #include "catalog/SkyCatalogPresets.hpp"
 #include "settings/SkySettingsStore.hpp"
+#include "support/CatalogCacheTestSupport.hpp"
 #include "support/SkyContextControllerTestSupport.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 
 #include <cmath>
 #include <memory>
@@ -10,6 +12,8 @@
 #include <optional>
 #include <string_view>
 #include <vector>
+
+using skygate::ui::tests::setControllerUtcDateTime;
 
 namespace {
 
@@ -242,7 +246,7 @@ void SkyContextControllerNightCatalogTests::nightConditionsPopulateAndRefreshFor
     const auto controller = createController();
     configureFocusTestContext(*controller);
     QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("Asia/Bishkek")));
-    QVERIFY(controller->setUtcDateTimeText("2024-03-21", "12:00:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2024-03-21", "12:00:00"));
 
     controller->refreshNightConditions();
     const QVariantMap initialConditions = controller->nightConditions();
@@ -261,7 +265,7 @@ void SkyContextControllerNightCatalogTests::nightConditionsPopulateAndRefreshFor
     QVERIFY(!utcConditions.value("locationText").toString().contains("UTC+06:00"));
     QVERIFY(utcConditions != initialConditions);
 
-    QVERIFY(controller->setUtcDateTimeText("2024-03-22", "12:00:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2024-03-22", "12:00:00"));
     controller->refreshNightConditions();
     const QVariantMap refreshedConditions = controller->nightConditions();
     QVERIFY(refreshedConditions.value("valid").toBool());
@@ -273,7 +277,7 @@ void SkyContextControllerNightCatalogTests::nightConditionsUseSelectedEngineRequ
     RequestSensitiveNightEngine* engine = nullptr;
     const auto controller = createRequestSensitiveNightController(engine);
     QVERIFY(engine != nullptr);
-    QVERIFY(controller->setUtcDateTimeText("2024-03-21", "22:00:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2024-03-21", "22:00:00"));
 
     QCOMPARE(controller->nightConditionsIconKind(), QString("moon"));
     controller->refreshNightConditions();
@@ -336,7 +340,7 @@ void SkyContextControllerNightCatalogTests::restoresCachedCatalogConstellationCo
     cacheSnapshot.constellationLineSchemaVersion =
         skygate::ui::internal::SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
     cacheSnapshot.constellationCount = 88;
-    QVERIFY(store.saveCatalogCache(cacheSnapshot));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(cacheSnapshot));
 
     const auto controller = createController(true);
 

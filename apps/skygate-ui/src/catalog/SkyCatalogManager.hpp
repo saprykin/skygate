@@ -103,15 +103,12 @@ public:
     // Presentation summary of the active collection's participation, derived
     // from the enabled sources and the provenance of the active snapshot.
     [[nodiscard]] QString participationSummary() const;
-    [[nodiscard]] std::size_t bodyCount() const noexcept;
     [[nodiscard]] std::size_t constellationCount() const noexcept;
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IStarCatalog* starCatalog() const noexcept;
     [[nodiscard]] std::size_t sourceCount() const noexcept;
     [[nodiscard]] QStringList sourceInstanceIds() const;
-    [[nodiscard]] bool isSourceEnabled(const QString& instanceId) const;
     [[nodiscard]] QHash<QString, QString> sourceTitles() const;
-    [[nodiscard]] QString sourceTitle(const QString& instanceId) const;
     [[nodiscard]] QVector<SourceViewEntry> sourceViewEntries() const;
     [[nodiscard]] std::span<const QString> sourceIds() const noexcept;
     [[nodiscard]] const std::vector<QStringList>& contributorSourceIds() const noexcept;

@@ -1,5 +1,6 @@
 #include "support/ConstellationTestSupport.hpp"
 #include "support/SkySceneModelTestSupport.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 
 #include <QtTest>
 
@@ -7,6 +8,8 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+
+using skygate::ui::tests::setControllerUtcDateTime;
 
 using skygate::ui::tests::makeFixedBody;
 using skygate::ui::tests::restoreSeededCatalogCache;
@@ -122,7 +125,7 @@ void SkySceneModelViewportSnapshotTests::viewAndTimeChangesBumpViewportSnapshot(
     const std::uint64_t viewGeneration = sceneModel.viewportSnapshot()->generation;
     QVERIFY(viewGeneration > baselineGeneration);
 
-    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("2024-06-02"), QStringLiteral("22:00:00")));
+    QVERIFY(setControllerUtcDateTime(controller, QStringLiteral("2024-06-02"), QStringLiteral("22:00:00")));
     QVERIFY(sceneModel.viewportSnapshot()->generation > viewGeneration);
 }
 

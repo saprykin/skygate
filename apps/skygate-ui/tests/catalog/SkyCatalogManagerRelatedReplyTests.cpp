@@ -15,6 +15,7 @@
 #include "support/FakeReplyQuery.hpp"
 #include "support/RelatedDatasetFixture.hpp"
 #include "support/SettingsTestFixture.hpp"
+#include "support/CatalogSourceStateQuery.hpp"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -28,6 +29,8 @@
 
 #include <algorithm>
 #include <string>
+
+using skygate::ui::tests::isCatalogSourceEnabled;
 
 using skygate::ui::tests::CatalogBodyQuery;
 using skygate::ui::tests::CatalogSourceFactsQuery;
@@ -453,7 +456,7 @@ void SkyCatalogManagerRelatedReplyTests::relatedDatasetsStayOwnedByTheirSources(
     QVERIFY(ConstellationAnchorGroupLookup::find(manager, "Lyra") != nullptr);
     QCOMPARE(manager.resolvedConstellationLineRefs().size(), std::size_t{2});
     QCOMPARE(manager.resolvedConstellationAnchorGroups().size(), std::size_t{1});
-    QVERIFY(manager.isSourceEnabled(sourceBId));
+    QVERIFY(isCatalogSourceEnabled(manager, sourceBId));
 }
 
 void SkyCatalogManagerRelatedReplyTests::overlappingDatasetsFollowSourceOrder()
@@ -740,7 +743,7 @@ void SkyCatalogManagerRelatedReplyTests::disablingOwnerSupersedesPendingRelatedR
     QVERIFY(!relatedReply->isFinished());
 
     manager.disableSource(sourceId);
-    QVERIFY(!manager.isSourceEnabled(sourceId));
+    QVERIFY(!isCatalogSourceEnabled(manager, sourceId));
 
     const auto revisionAfterDisable = manager.catalogRevision();
     const int catalogChangesAfterDisable = catalogSpy.count();
@@ -765,7 +768,7 @@ void SkyCatalogManagerRelatedReplyTests::disablingOwnerSupersedesPendingRelatedR
 
     // Re-enabling restores only data that completed before the disable.
     manager.enableSource(sourceId);
-    QVERIFY(manager.isSourceEnabled(sourceId));
+    QVERIFY(isCatalogSourceEnabled(manager, sourceId));
     QVERIFY(manager.constellationLineRefs().empty());
     QVERIFY(manager.constellationAnchorGroups().empty());
     QCOMPARE(manager.constellationCount(), std::size_t{0});

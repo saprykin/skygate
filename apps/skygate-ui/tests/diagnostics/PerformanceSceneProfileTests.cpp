@@ -12,6 +12,7 @@
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "skygate/testsupport/PerformanceBudget.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 
 #include <QElapsedTimer>
 #include <QtTest>
@@ -19,6 +20,8 @@
 #include <memory>
 #include <optional>
 #include <vector>
+
+using skygate::ui::tests::setControllerUtcDateTime;
 
 using skygate::ui::tests::PerformanceGuardChecks;
 using skygate::ui::tests::PerformanceGuardScenario;
@@ -99,7 +102,7 @@ void PerformanceSceneProfileTests::buildsLargeSceneWithinGuardrail()
     );
     controller.setLatitudeText(QStringLiteral("47.4"));
     controller.setLongitudeText(QStringLiteral("8.5"));
-    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("2026-05-03"), QStringLiteral("21:00:00")));
+    QVERIFY(setControllerUtcDateTime(controller, QStringLiteral("2026-05-03"), QStringLiteral("21:00:00")));
     controller.setMagnitudeCutoff(12.0);
     controller.setViewCenter(45.0, 180.0);
 
@@ -151,7 +154,7 @@ void PerformanceSceneProfileTests::buildsHighPrecisionLargeCatalogWithinGuardrai
     SkyContextController controller(std::move(catalog), std::move(engine), initializationOptions, nullptr);
     controller.setLatitudeText(QStringLiteral("47.4"));
     controller.setLongitudeText(QStringLiteral("8.5"));
-    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("2026-05-03"), QStringLiteral("21:00:00")));
+    QVERIFY(setControllerUtcDateTime(controller, QStringLiteral("2026-05-03"), QStringLiteral("21:00:00")));
     controller.setMagnitudeCutoff(12.0);
     controller.setViewCenter(45.0, 180.0);
 
@@ -192,7 +195,7 @@ void PerformanceSceneProfileTests::buildsHighPrecisionLargeCatalogWithinGuardrai
     );
 
     timer.restart();
-    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("2026-05-03"), QStringLiteral("21:00:10")));
+    QVERIFY(setControllerUtcDateTime(controller, QStringLiteral("2026-05-03"), QStringLiteral("21:00:10")));
     const qint64 timeUpdateElapsedMs = timer.elapsed();
 
     QCOMPARE(starAstrometryCalculator->batchCallCount(), 2);
@@ -236,7 +239,7 @@ void PerformanceSceneProfileTests::profilesHighPrecisionLargeFixedCatalogSelecti
     SkyContextController controller(std::move(catalog), std::move(engine), initializationOptions, nullptr);
     controller.setLatitudeText(QStringLiteral("47.4"));
     controller.setLongitudeText(QStringLiteral("8.5"));
-    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("2026-05-03"), QStringLiteral("21:00:00")));
+    QVERIFY(setControllerUtcDateTime(controller, QStringLiteral("2026-05-03"), QStringLiteral("21:00:00")));
     controller.setMagnitudeCutoff(12.0);
     controller.setViewCenter(45.0, 180.0);
 

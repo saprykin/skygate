@@ -1,4 +1,5 @@
 #include "support/QmlTestSupport.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 #include "time/SkyTimeController.hpp"
 
 using namespace skygate::ui::tests;
@@ -31,7 +32,7 @@ void QmlNightConditionsPopupTests::nightConditionsPopupOpensClosesAndRendersRows
     auto controller = makeController();
     QVERIFY(controller != nullptr);
     QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("Asia/Bishkek")));
-    QVERIFY(controller->setUtcDateTimeText("2024-03-21", "12:00:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2024-03-21", "12:00:00"));
     controller->setLatitudeText("47.3769");
     controller->setLongitudeText("8.5417");
     controller->setElevationText("408.0");

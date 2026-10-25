@@ -30,7 +30,7 @@ void SkyEphemerisCacheSettingsTests::clearingEphemerisCacheKeepsCatalogCache()
 
     SkySettingsStore store;
     const SkyCatalogLegacyCacheSnapshot catalogSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot();
-    QVERIFY(store.saveCatalogCache(catalogSnapshot));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(catalogSnapshot));
 
     SkyEphemerisDataCacheSnapshot ephemerisSnapshot;
     ephemerisSnapshot.installedKernelAssetId = QStringLiteral("de440s-kernel");

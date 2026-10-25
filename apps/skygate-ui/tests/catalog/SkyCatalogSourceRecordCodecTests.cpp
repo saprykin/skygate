@@ -83,7 +83,7 @@ private slots:
     void loadsDefinedDefaultsForMissingFields();
     void unknownPolicyFallsBackToMerge();
     void unknownSchemaHintFallsBackToNoHint();
-    void missingPayloadSidecarReportsInstance();
+    void missingPayloadSidecarLoadsWithoutPayload();
     void emptyPayloadKeepsNoSidecarReference();
     void hasFlatRecordsDistinguishesLayouts();
     void evictPayloadKeepsConfigurationFields();
@@ -146,9 +146,7 @@ void SkyCatalogSourceRecordCodecTests::roundTripsEveryRecordField()
     QCOMPARE(settings.value(recordGroup() + QStringLiteral("/binaryPayloadPath")).toString(), binaryPath);
     QCOMPARE(settings.value(recordGroup() + QStringLiteral("/payload")).toString(), QString());
 
-    QStringList unreadableInstanceIds;
-    const SkyCatalogSourceCacheRecord loaded =
-        SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup(), unreadableInstanceIds);
+    const SkyCatalogSourceCacheRecord loaded = SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup());
 
     compareConfigurationFields(loaded, record);
     QCOMPARE(loaded.payload, record.payload);
@@ -157,7 +155,6 @@ void SkyCatalogSourceRecordCodecTests::roundTripsEveryRecordField()
     QCOMPARE(loaded.constellationAnchorGroupRows, record.constellationAnchorGroupRows);
     QCOMPARE(loaded.constellationLineSchemaVersion, record.constellationLineSchemaVersion);
     QCOMPARE(loaded.constellationCount, record.constellationCount);
-    QVERIFY(unreadableInstanceIds.isEmpty());
 }
 
 void SkyCatalogSourceRecordCodecTests::loadsDefinedDefaultsForMissingFields()
@@ -169,9 +166,7 @@ void SkyCatalogSourceRecordCodecTests::loadsDefinedDefaultsForMissingFields()
 
     // A record written before the parse contract and the payload references
     // existed loads as a configured, enabled, unparsed source.
-    QStringList unreadableInstanceIds;
-    const SkyCatalogSourceCacheRecord loaded =
-        SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup(), unreadableInstanceIds);
+    const SkyCatalogSourceCacheRecord loaded = SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup());
 
     QCOMPARE(loaded.instanceId, QString("custom:alpha"));
     QCOMPARE(loaded.schemaHint, skygate::ephemeris::CatalogSourceType::Unknown);
@@ -184,7 +179,6 @@ void SkyCatalogSourceRecordCodecTests::loadsDefinedDefaultsForMissingFields()
     QVERIFY(loaded.constellationLineRows.isEmpty());
     QCOMPARE(loaded.constellationLineSchemaVersion, 0);
     QCOMPARE(loaded.constellationCount, std::size_t{0});
-    QVERIFY(unreadableInstanceIds.isEmpty());
 }
 
 void SkyCatalogSourceRecordCodecTests::unknownPolicyFallsBackToMerge()
@@ -196,9 +190,7 @@ void SkyCatalogSourceRecordCodecTests::unknownPolicyFallsBackToMerge()
     settings.endGroup();
 
     skygate::testsupport::LogCapture capture;
-    QStringList unreadableInstanceIds;
-    const SkyCatalogSourceCacheRecord loaded =
-        SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup(), unreadableInstanceIds);
+    const SkyCatalogSourceCacheRecord loaded = SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup());
 
     // A policy this build does not know must not reach composition, which
     // could not classify it.
@@ -215,9 +207,7 @@ void SkyCatalogSourceRecordCodecTests::unknownSchemaHintFallsBackToNoHint()
     settings.endGroup();
 
     skygate::testsupport::LogCapture capture;
-    QStringList unreadableInstanceIds;
-    const SkyCatalogSourceCacheRecord loaded =
-        SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup(), unreadableInstanceIds);
+    const SkyCatalogSourceCacheRecord loaded = SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup());
 
     // Detection decides again instead of the source failing on a hint that no
     // schema registry entry backs.
@@ -225,7 +215,7 @@ void SkyCatalogSourceRecordCodecTests::unknownSchemaHintFallsBackToNoHint()
     QVERIFY(capture.joinedMessages().contains(QStringLiteral("Invalid catalog source schema hint")));
 }
 
-void SkyCatalogSourceRecordCodecTests::missingPayloadSidecarReportsInstance()
+void SkyCatalogSourceRecordCodecTests::missingPayloadSidecarLoadsWithoutPayload()
 {
     QSettings settings;
     settings.beginGroup(recordGroup());
@@ -236,14 +226,12 @@ void SkyCatalogSourceRecordCodecTests::missingPayloadSidecarReportsInstance()
     settings.endGroup();
 
     skygate::testsupport::LogCapture capture;
-    QStringList unreadableInstanceIds;
-    const SkyCatalogSourceCacheRecord loaded =
-        SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup(), unreadableInstanceIds);
+    const SkyCatalogSourceCacheRecord loaded = SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup());
 
-    // A referenced payload that is gone is corrupt committed data, so the
-    // caller learns which source lost it.
+    // A referenced payload that is gone is corrupt committed data: the source
+    // still loads as configured, keeps its identity, and reports the loss.
+    QCOMPARE(loaded.instanceId, QString("custom:alpha"));
     QVERIFY(loaded.payload.isEmpty());
-    QCOMPARE(unreadableInstanceIds, QStringList{QStringLiteral("custom:alpha")});
     QVERIFY(capture.joinedMessages().contains(QStringLiteral("Referenced catalog source payload is missing")));
 }
 
@@ -263,12 +251,9 @@ void SkyCatalogSourceRecordCodecTests::emptyPayloadKeepsNoSidecarReference()
     QCOMPARE(settings.value(recordGroup() + QStringLiteral("/payloadPath")).toString(), QString());
     QCOMPARE(settings.value(recordGroup() + QStringLiteral("/binaryPayloadPath")).toString(), QString());
 
-    QStringList unreadableInstanceIds;
-    const SkyCatalogSourceCacheRecord loaded =
-        SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup(), unreadableInstanceIds);
+    const SkyCatalogSourceCacheRecord loaded = SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup());
     QVERIFY(loaded.payload.isEmpty());
     QVERIFY(loaded.binaryPayload.isEmpty());
-    QVERIFY(unreadableInstanceIds.isEmpty());
 }
 
 void SkyCatalogSourceRecordCodecTests::hasFlatRecordsDistinguishesLayouts()
@@ -325,9 +310,7 @@ void SkyCatalogSourceRecordCodecTests::evictPayloadKeepsConfigurationFields()
         QVERIFY2(!settings.contains(recordGroup() + QLatin1Char('/') + key), qPrintable(key));
     }
 
-    QStringList unreadableInstanceIds;
-    const SkyCatalogSourceCacheRecord loaded =
-        SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup(), unreadableInstanceIds);
+    const SkyCatalogSourceCacheRecord loaded = SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup());
     compareConfigurationFields(loaded, record);
     QVERIFY(loaded.payload.isEmpty());
     QVERIFY(loaded.binaryPayload.isEmpty());
@@ -335,7 +318,6 @@ void SkyCatalogSourceRecordCodecTests::evictPayloadKeepsConfigurationFields()
     QVERIFY(loaded.constellationAnchorGroupRows.isEmpty());
     QCOMPARE(loaded.constellationLineSchemaVersion, 0);
     QCOMPARE(loaded.constellationCount, std::size_t{0});
-    QVERIFY(unreadableInstanceIds.isEmpty());
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogSourceRecordCodecTests)

@@ -3,6 +3,7 @@
 #include "render/SkyRenderPoint.hpp"
 #include "support/SkySceneModelTestSupport.hpp"
 #include "time/CalendarTime.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 
 #include <QtTest>
 
@@ -11,6 +12,8 @@
 #include <optional>
 #include <string_view>
 #include <vector>
+
+using skygate::ui::tests::setControllerUtcDateTime;
 
 using skygate::ui::tests::makeFixedBody;
 using skygate::ui::tests::SkySceneModelTestHarness;
@@ -182,7 +185,7 @@ void SkySceneModelFrameTests::reusesSnapshotAcrossViewChanges()
     controller.setViewCenter(40.0, 210.0);
     QCOMPARE(sceneModel.snapshotGeneration(), initialSnapshotGeneration);
 
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:30:00"));
+    QVERIFY(setControllerUtcDateTime(controller, "2024-06-01", "22:30:00"));
     QVERIFY(sceneModel.snapshotGeneration() > initialSnapshotGeneration);
 }
 
@@ -253,7 +256,7 @@ void SkySceneModelFrameTests::degradationReasonsExposeOutOfRangeKernelSupport()
     options.rebuildEphemerisEngineOnStartup = false;
     SkyContextController controller(std::move(starCatalog), std::move(engine), options, nullptr);
     QVERIFY(skygate::ui::tests::configureTestSkyContext(controller));
-    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("10000-01-01 BCE"), QStringLiteral("00:00:00")));
+    QVERIFY(setControllerUtcDateTime(controller, QStringLiteral("10000-01-01 BCE"), QStringLiteral("00:00:00")));
 
     SkySceneModel sceneModel;
     sceneModel.setSkyContextController(&controller);

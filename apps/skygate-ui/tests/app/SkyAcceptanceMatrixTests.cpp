@@ -9,6 +9,7 @@
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
+#include "support/EphemerisDataManagerTestSupport.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -26,6 +27,8 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+using skygate::ui::tests::usesInstalledData;
 
 namespace {
 
@@ -515,7 +518,7 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineShortRangeDataAndClearRevert()
     SkySettingsStore store;
     SkyEphemerisDataManager manager(&store);
     QCOMPARE(manager.statusText(), QString("Ephemeris data: Bundled fallback"));
-    QVERIFY(!manager.usingInstalledData());
+    QVERIFY(!usesInstalledData(manager));
 
     const skygate::ephemeris::EphemerisDataManifest manifest = acceptanceManifest();
     QTemporaryDir bundledResourceRoot;
@@ -558,9 +561,8 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineShortRangeDataAndClearRevert()
 
     const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
     QVERIFY2(result.isSuccess(), failureMessage.constData());
-    QVERIFY(manager.usingInstalledData());
+    QVERIFY(usesInstalledData(manager));
     QCOMPARE(manager.shortRangeKernelStatusText(), QString("Installed: acceptance-de440s-short-range-kernel"));
-    QCOMPARE(manager.longRangeKernelStatusText(), QString("Not installed"));
 
     const auto installedSnapshot = manager.activeDataSnapshot();
     QVERIFY(installedSnapshot != nullptr);
@@ -577,9 +579,9 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineShortRangeDataAndClearRevert()
     verifyDE440sShortRangeBodyState(*installedEngineResult.engine);
 
     QVERIFY(manager.clearInstalledDataCache());
-    QVERIFY(!manager.usingInstalledData());
+    QVERIFY(!usesInstalledData(manager));
     QCOMPARE(manager.statusText(), QString("Ephemeris data: Bundled fallback"));
-    QCOMPARE(manager.dataRevisionToken(), QString("bundled"));
+    QCOMPARE(manager.activeCacheSnapshot().dataRevisionToken, QString("bundled"));
     const auto bundledFallbackSnapshot = manager.activeDataSnapshot();
     QVERIFY(bundledFallbackSnapshot != nullptr);
     QVERIFY(bundledFallbackSnapshot->solarSystemKernelAsset("de440s-kernel").has_value());
@@ -610,9 +612,8 @@ void SkyAcceptanceMatrixTests::optionalLongRangeProfileSelectsDe441Kernel()
 
     const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
     QVERIFY2(result.isSuccess(), failureMessage.constData());
-    QVERIFY(manager.usingInstalledData());
+    QVERIFY(usesInstalledData(manager));
     QCOMPARE(manager.shortRangeKernelStatusText(), QString("Installed: acceptance-de441-kernel"));
-    QCOMPARE(manager.longRangeKernelStatusText(), QString("Installed: acceptance-de441-kernel"));
 
     const auto snapshot = manager.activeDataSnapshot();
     QVERIFY(snapshot != nullptr);
@@ -650,7 +651,7 @@ void SkyAcceptanceMatrixTests::ephemerisDataUpdateLeavesCatalogStateUnchanged()
 {
     SkySettingsStore store;
     const SkyCatalogLegacyCacheSnapshot catalogSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot();
-    QVERIFY(store.saveCatalogCache(catalogSnapshot));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(catalogSnapshot));
 
     const skygate::ephemeris::EphemerisDataManifest manifest = acceptanceManifest();
     QTemporaryDir stagedRoot;
@@ -663,7 +664,7 @@ void SkyAcceptanceMatrixTests::ephemerisDataUpdateLeavesCatalogStateUnchanged()
 
     const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
     QVERIFY2(result.isSuccess(), failureMessage.constData());
-    QCOMPARE(manager.dataRevisionToken(), QString("acceptance-de440s-short-range-rev"));
+    QCOMPARE(manager.activeCacheSnapshot().dataRevisionToken, QString("acceptance-de440s-short-range-rev"));
     QCOMPARE(result.activatedAssetIds.size(), std::size_t{1});
 
     const auto loadedCatalogSnapshot = store.loadCatalogCache();

@@ -8,6 +8,7 @@
 #include "settings/SkySettingsStore.hpp"
 #include "support/EphemerisDataCacheSnapshotFixture.hpp"
 #include "support/SettingsTestFixture.hpp"
+#include "support/EphemerisDataManagerTestSupport.hpp"
 
 #include <QByteArray>
 #include <QDir>
@@ -24,6 +25,8 @@
 #include <string>
 #include <string_view>
 #include <utility>
+
+using skygate::ui::tests::usesInstalledData;
 
 using skygate::ui::internal::SkyEphemerisActiveSource;
 using skygate::ui::internal::SkyEphemerisAssetStatus;
@@ -136,10 +139,9 @@ void SkyEphemerisDataStatusTests::initialBundledStatus()
     SkySettingsStore store;
     SkyEphemerisDataManager manager(&store);
 
-    QVERIFY(!manager.usingInstalledData());
-    QCOMPARE(manager.dataRevisionToken(), QString("bundled"));
+    QVERIFY(!usesInstalledData(manager));
+    QCOMPARE(manager.activeCacheSnapshot().dataRevisionToken, QString("bundled"));
     QCOMPARE(manager.statusText(), QString("Ephemeris data: Bundled fallback"));
-    QCOMPARE(manager.datasetInfoText(), QString("Bundled fallback"));
     QVERIFY(manager.activeDataSnapshot() != nullptr);
     QVERIFY(!manager.activeDataSnapshot()->earthOrientationDataAsset().has_value());
 }
@@ -205,11 +207,9 @@ void SkyEphemerisDataStatusTests::installedDataStatusAndSnapshot()
     ));
 
     SkyEphemerisDataManager manager(&store);
-    QVERIFY(manager.usingInstalledData());
+    QVERIFY(usesInstalledData(manager));
     QCOMPARE(manager.statusText(), QString("Ephemeris data: Installed data active"));
-    QCOMPARE(manager.dataRevisionToken(), QString("installed-rev"));
-    QVERIFY(manager.datasetInfoText().contains(QStringLiteral("Kernel DE-test")));
-    QVERIFY(manager.datasetInfoText().contains(QStringLiteral("EOP EOP-test")));
+    QCOMPARE(manager.activeCacheSnapshot().dataRevisionToken, QString("installed-rev"));
 
     const auto snapshot = manager.activeDataSnapshot();
     QVERIFY(snapshot != nullptr);
@@ -244,7 +244,7 @@ void SkyEphemerisDataStatusTests::legacyShortRangeProfileIdRestoresAsDe440sProfi
     QVERIFY(store.saveEphemerisDataCache(snapshot));
 
     SkyEphemerisDataManager manager(&store);
-    QVERIFY(manager.usingInstalledData());
+    QVERIFY(usesInstalledData(manager));
     QCOMPARE(manager.activeCacheSnapshot().installedKernelProfileId, QString("de440s-short-range"));
 
     const auto activeSnapshot = manager.activeDataSnapshot();
@@ -264,10 +264,9 @@ void SkyEphemerisDataStatusTests::missingInstalledDataFallsBackToBundled()
     ));
 
     SkyEphemerisDataManager manager(&store);
-    QVERIFY(!manager.usingInstalledData());
-    QCOMPARE(manager.dataRevisionToken(), QString("bundled"));
+    QVERIFY(!usesInstalledData(manager));
+    QCOMPARE(manager.activeCacheSnapshot().dataRevisionToken, QString("bundled"));
     QVERIFY(manager.statusText().contains(QStringLiteral("Installed data missing")));
-    QVERIFY(manager.datasetInfoText().contains(QStringLiteral("Bundled fallback")));
     QVERIFY(manager.activeDataSnapshot() != nullptr);
 }
 
@@ -290,7 +289,7 @@ void SkyEphemerisDataStatusTests::kernelDisplayTextForBundledData()
     SkySettingsStore store;
     SkyEphemerisDataManager manager(&store);
 
-    QVERIFY(!manager.usingInstalledData());
+    QVERIFY(!usesInstalledData(manager));
     QCOMPARE(manager.kernelDisplayText(), QString("Bundled"));
 }
 
@@ -305,7 +304,7 @@ void SkyEphemerisDataStatusTests::kernelDisplayTextForMissingInstalledData()
 
     SkyEphemerisDataManager manager(&store);
 
-    QVERIFY(!manager.usingInstalledData());
+    QVERIFY(!usesInstalledData(manager));
     QCOMPARE(manager.kernelDisplayText(), QString("Bundled"));
 }
 
@@ -317,7 +316,7 @@ void SkyEphemerisDataStatusTests::kernelDisplayTextForInstalledKernels()
     QVERIFY(store.saveEphemerisDataCache(EphemerisDataCacheSnapshotFixture::installedSnapshot(de440sPath, QString())));
     {
         SkyEphemerisDataManager manager(&store);
-        QVERIFY(manager.usingInstalledData());
+        QVERIFY(usesInstalledData(manager));
         QCOMPARE(manager.kernelDisplayText(), QString("DE440s"));
     }
 
@@ -332,7 +331,7 @@ void SkyEphemerisDataStatusTests::kernelDisplayTextForInstalledKernels()
 
     SkyEphemerisDataManager manager(&store);
 
-    QVERIFY(manager.usingInstalledData());
+    QVERIFY(usesInstalledData(manager));
     QCOMPARE(manager.kernelDisplayText(), QString("DE441"));
 }
 
@@ -358,7 +357,7 @@ void SkyEphemerisDataStatusTests::kernelDisplayTextForRecordedKernelRange()
         QCOMPARE(restored.installedKernelLongRange.value(), true);
 
         SkyEphemerisDataManager manager(&store);
-        QVERIFY(manager.usingInstalledData());
+        QVERIFY(usesInstalledData(manager));
         QCOMPARE(manager.kernelDisplayText(), QString("DE441"));
     }
 
@@ -370,7 +369,7 @@ void SkyEphemerisDataStatusTests::kernelDisplayTextForRecordedKernelRange()
         QCOMPARE(restored.installedKernelLongRange.value(), false);
 
         SkyEphemerisDataManager manager(&store);
-        QVERIFY(manager.usingInstalledData());
+        QVERIFY(usesInstalledData(manager));
         QCOMPARE(manager.kernelDisplayText(), QString("DE440s"));
     }
 }
@@ -389,7 +388,7 @@ void SkyEphemerisDataStatusTests::kernelDisplayTextForLegacyProfile()
 
     SkyEphemerisDataManager manager(&store);
 
-    QVERIFY(manager.usingInstalledData());
+    QVERIFY(usesInstalledData(manager));
     QCOMPARE(manager.activeCacheSnapshot().installedKernelProfileId, QString("de440s-short-range"));
     QCOMPARE(manager.kernelDisplayText(), QString("DE440s"));
 }
@@ -409,9 +408,8 @@ void SkyEphemerisDataStatusTests::kernelDisplayTextForUnexpectedMetadata()
 
     SkyEphemerisDataManager manager(&store);
 
-    QVERIFY(manager.usingInstalledData());
+    QVERIFY(usesInstalledData(manager));
     QCOMPARE(manager.shortRangeKernelStatusText(), QString("Installed: custom-version"));
-    QCOMPARE(manager.longRangeKernelStatusText(), QString("Not installed"));
     QCOMPARE(manager.kernelDisplayText(), QString("Bundled"));
 }
 
@@ -572,7 +570,6 @@ void SkyEphemerisDataStatusTests::assetStatusViewPresentsSourceAndSnapshot()
     QCOMPARE(installed.shortRangeKernelStatusText(), QString("Installed: DE440s-2026a"));
     QCOMPARE(installed.earthOrientationStatusText(), QString("Installed: EOP-test"));
     QCOMPARE(installed.leapSecondStatusText(), QString("Bundled fallback"));
-    QCOMPARE(installed.dataRevisionToken(), QString("installed-rev"));
     QCOMPARE(installed.lastUpdateResultText(), QString("Installed data active"));
 
     const SkyEphemerisAssetStatusView missing(snapshot, SkyEphemerisActiveSource::MissingInstalledFallback);
@@ -584,7 +581,6 @@ void SkyEphemerisDataStatusTests::assetStatusViewPresentsSourceAndSnapshot()
     QCOMPARE(bundled.statusText(), QString("Ephemeris data: Bundled fallback"));
     QCOMPARE(bundled.datasetInfoText(), QString("Bundled fallback"));
     QCOMPARE(bundled.kernelDisplayText(), QString("Bundled"));
-    QCOMPARE(bundled.dataRevisionToken(), QString("bundled"));
 }
 
 QTEST_GUILESS_MAIN(SkyEphemerisDataStatusTests)

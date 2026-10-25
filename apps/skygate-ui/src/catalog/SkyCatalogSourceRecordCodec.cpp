@@ -83,14 +83,8 @@ skygate::ephemeris::CatalogSourceType readCatalogSourceSchemaHint(QSettings& set
 }
 
 // A referenced sidecar is expected to exist once its path is stored. A missing
-// or unreadable file is corrupt committed data, not a deliberately evicted
-// payload, which keeps no reference at all.
-struct CatalogSourcePayloadReadResult final {
-    QByteArray payload;
-    bool unreadable = false;
-};
-
-CatalogSourcePayloadReadResult readCatalogSourceFile(const QString& path)
+// or unreadable file is reported and loads as a source without a payload.
+QByteArray readCatalogSourceFile(const QString& path)
 {
     if (path.isEmpty()) {
         return {};
@@ -99,14 +93,14 @@ CatalogSourcePayloadReadResult readCatalogSourceFile(const QString& path)
     const SkyCacheFiles::ReadResult result = SkyCacheFiles::readFile(path);
     if (result.state == SkyCacheFiles::ReadState::Absent) {
         qCWarning(skygateCatalogCacheLog).noquote() << "Referenced catalog source payload is missing" << path;
-        return {.unreadable = true};
+        return {};
     }
     if (result.state == SkyCacheFiles::ReadState::Unreadable) {
         qCWarning(skygateCatalogCacheLog).noquote()
             << "Failed to open catalog source cache" << path << result.errorString;
-        return {.unreadable = true};
+        return {};
     }
-    return {.payload = result.payload};
+    return result.payload;
 }
 
 QStringList evictedPayloadKeys()
@@ -207,9 +201,7 @@ void SkyCatalogSourceRecordCodec::saveRecord(
     settings.endGroup();
 }
 
-SkyCatalogSourceCacheRecord SkyCatalogSourceRecordCodec::loadRecord(
-    QSettings& settings, const QString& group, QStringList& unreadablePayloadInstanceIds
-)
+SkyCatalogSourceCacheRecord SkyCatalogSourceRecordCodec::loadRecord(QSettings& settings, const QString& group)
 {
     SkyCatalogSourceCacheRecord record;
     settings.beginGroup(group);
@@ -237,14 +229,8 @@ SkyCatalogSourceCacheRecord SkyCatalogSourceRecordCodec::loadRecord(
     const QString binaryPath = settings.value(binaryPayloadPathKey()).toString();
     settings.endGroup();
 
-    const CatalogSourcePayloadReadResult rawPayload = readCatalogSourceFile(rawPath);
-    const CatalogSourcePayloadReadResult binaryPayload = readCatalogSourceFile(binaryPath);
-    record.payload = rawPayload.payload;
-    record.binaryPayload = binaryPayload.payload;
-    if ((rawPayload.unreadable || binaryPayload.unreadable) && !record.instanceId.isEmpty()
-        && !unreadablePayloadInstanceIds.contains(record.instanceId)) {
-        unreadablePayloadInstanceIds.push_back(record.instanceId);
-    }
+    record.payload = readCatalogSourceFile(rawPath);
+    record.binaryPayload = readCatalogSourceFile(binaryPath);
     return record;
 }
 

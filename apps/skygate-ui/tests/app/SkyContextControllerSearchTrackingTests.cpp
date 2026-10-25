@@ -1,10 +1,13 @@
 #include "search/SkyObjectSearchModel.hpp"
 #include "support/ConstellationTestSupport.hpp"
 #include "support/SkyContextControllerTestSupport.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 
 #include <memory>
 #include <string_view>
 #include <vector>
+
+using skygate::ui::tests::setControllerUtcDateTime;
 
 namespace {
 
@@ -547,7 +550,7 @@ void SkyContextControllerSearchTrackingTests::trackSearchTargetStartsLiveAndCent
     FakeTimeSource timeSource;
     const auto controller = createSingleBodyController("demo_target", "Demo Target", &timeSource);
     controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText("2000-01-01", "00:00:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2000-01-01", "00:00:00"));
     controller->setViewCenter(12.0, 123.0);
 
     QVERIFY(controller->trackSearchTarget("body", "demo_target"));
@@ -613,7 +616,7 @@ void SkyContextControllerSearchTrackingTests::trackSearchTargetPreservesBceTimel
     FakeTimeSource timeSource;
     const auto controller = createSingleBodyController("demo_target", "Demo Target", &timeSource);
     controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText("0044-03-15 BCE", "12:00:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "0044-03-15 BCE", "12:00:00"));
 
     QVERIFY(controller->trackSearchTarget("body", "demo_target"));
 
@@ -631,7 +634,7 @@ void SkyContextControllerSearchTrackingTests::trackedBcePlaybackCatchUpUsesConfi
     const auto controller = createSingleBodyController("demo_target", "Demo Target", &timeSource);
     controller->setLive(false);
     controller->setStepSeconds(3600);
-    QVERIFY(controller->setUtcDateTimeText("0044-03-15 BCE", "12:00:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "0044-03-15 BCE", "12:00:00"));
 
     QSignalSpy skyContextChangedSpy(controller.get(), &SkyContextController::skyContextChanged);
     skyContextChangedSpy.clear();
@@ -656,7 +659,7 @@ void SkyContextControllerSearchTrackingTests::trackSearchTargetUsesSelectedEngin
     const auto controller = createRequestSensitiveController(engine, &timeSource);
     QVERIFY(engine != nullptr);
     controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText("2000-01-01", "00:00:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2000-01-01", "00:00:00"));
 
     QVERIFY(controller->trackSearchTarget("body", "demo_target"));
 
@@ -692,7 +695,7 @@ void SkyContextControllerSearchTrackingTests::trackSearchTargetRejectsInvalidWit
 {
     const auto controller = createSingleBodyController();
     controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText("2024-06-01", "22:00:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2024-06-01", "22:00:00"));
     controller->setViewCenter(12.0, 123.0);
 
     const QDateTime initialUtc = controllerUtcTime(*controller);

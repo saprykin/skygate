@@ -463,7 +463,7 @@ void SkyCatalogManagerRelatedReplacementTests::failedUpdateRemovingDeclarationKe
     QTRY_VERIFY(!manager.downloadingCatalog());
     QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
     QVERIFY(ConstellationAnchorGroupLookup::find(manager, "Orion") != nullptr);
-    const auto starCountBefore = manager.bodyCount();
+    const auto starCountBefore = manager.starCatalog()->bodies().size();
 
     // The update that would have removed the declaration is rejected, so the
     // accepted source and its owned dataset stay coherent and published.
@@ -477,7 +477,7 @@ void SkyCatalogManagerRelatedReplacementTests::failedUpdateRemovingDeclarationKe
 
     QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
     QVERIFY(ConstellationAnchorGroupLookup::find(manager, "Orion") != nullptr);
-    QCOMPARE(manager.bodyCount(), starCountBefore);
+    QCOMPARE(manager.starCatalog()->bodies().size(), starCountBefore);
     QVERIFY(!observations.empty());
     QCOMPARE(observations.back().lineRefCount, std::size_t{2});
     CatalogNotificationRecorder::assertMatchesRuntime(manager, observations.back());

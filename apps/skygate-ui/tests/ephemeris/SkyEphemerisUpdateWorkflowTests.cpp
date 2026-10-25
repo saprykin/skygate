@@ -7,6 +7,7 @@
 #include "support/FakeNetworkAccessManager.hpp"
 #include "support/SettingsTestFixture.hpp"
 #include "support/StagedEphemerisAssetFixture.hpp"
+#include "support/EphemerisDataManagerTestSupport.hpp"
 
 #include <QByteArray>
 #include <QCoreApplication>
@@ -25,6 +26,8 @@
 #include <memory>
 #include <string_view>
 #include <utility>
+
+using skygate::ui::tests::usesInstalledData;
 
 using skygate::ui::tests::EphemerisDataCacheSnapshotFixture;
 using skygate::ui::tests::FakeNetworkAccessManager;
@@ -438,7 +441,7 @@ void SkyEphemerisUpdateWorkflowTests::destroysCleanlyWhileSecondReplyIsPending()
 
     QCOMPARE(fixture.network().finishedUrls().size(), 2);
     QCOMPARE(fixture.manager().statusText(), QString("Ephemeris data: Bundled fallback"));
-    QVERIFY(!fixture.manager().usingInstalledData());
+    QVERIFY(!usesInstalledData(fixture.manager()));
 }
 
 void SkyEphemerisUpdateWorkflowTests::updateIsUnavailableWithoutManifest()
@@ -495,7 +498,7 @@ void SkyEphemerisUpdateWorkflowTests::completesMultiAssetUpdateOnce()
     QVERIFY(fixture.workflow().updateEnabled());
     QCOMPARE(preferredSpy.count(), 1);
     QCOMPARE(preferredSpy.constFirst().constFirst().toString(), QString("de440s-short-range"));
-    QVERIFY(fixture.manager().usingInstalledData());
+    QVERIFY(usesInstalledData(fixture.manager()));
     QVERIFY(fixture.manager().dataRevision() > originalRevision);
     QCOMPARE(fixture.store().loadEphemerisDataCache().installedKernelAssetId, QString("de440s-kernel"));
     QCOMPARE(fixture.store().loadEphemerisDataCache().installedLeapSecondTableVersion, QString("test"));
@@ -534,7 +537,7 @@ void SkyEphemerisUpdateWorkflowTests::completesUpdateWithUnknownAssetSizes()
     QCOMPARE(fixture.workflow().isUpdateInProgress(), false);
     QCOMPARE(fixture.workflow().updateProgress(), 1.0);
     QCOMPARE(preferredSpy.count(), 1);
-    QVERIFY(fixture.manager().usingInstalledData());
+    QVERIFY(usesInstalledData(fixture.manager()));
 }
 
 void SkyEphemerisUpdateWorkflowTests::stopsUpdateWhenSecondAssetFails()
@@ -567,7 +570,7 @@ void SkyEphemerisUpdateWorkflowTests::stopsUpdateWhenSecondAssetFails()
     );
     QCOMPARE(preferredSpy.count(), 0);
     QCOMPARE(fixture.manager().dataRevision(), originalRevision);
-    QVERIFY(!fixture.manager().usingInstalledData());
+    QVERIFY(!usesInstalledData(fixture.manager()));
     QVERIFY(statusSpy.count() > statusCountBeforeFailure);
 
     const int terminalStatusCount = statusSpy.count();
@@ -604,7 +607,7 @@ void SkyEphemerisUpdateWorkflowTests::cancelRetainsStagingUntilNextUpdate()
     QCOMPARE(fixture.workflow().updateProgress(), 0.0);
     QCOMPARE(preferredSpy.count(), 0);
     QCOMPARE(fixture.manager().dataRevision(), originalRevision);
-    QVERIFY(!fixture.manager().usingInstalledData());
+    QVERIFY(!usesInstalledData(fixture.manager()));
 
     const QString kernelPath = fixture.stagedAssetPath("de440s-kernel");
     const QString leapSecondsPath = fixture.stagedAssetPath("leap-seconds");
@@ -633,7 +636,7 @@ void SkyEphemerisUpdateWorkflowTests::activationFailurePreservesInstalledData()
     QVERIFY(seedStore.saveEphemerisDataCache(EphemerisDataCacheSnapshotFixture::installedSnapshot(oldKernelPath, {})));
 
     UpdateWorkflowFixture fixture(m_settings, twoAssetUpdateManifest(), QStringLiteral("activation-failure-cache"));
-    QVERIFY(fixture.manager().usingInstalledData());
+    QVERIFY(usesInstalledData(fixture.manager()));
     const std::uint64_t originalRevision = fixture.manager().dataRevision();
 
     const QByteArray wrongPayload(stagedPayload().size(), 'x');
@@ -667,7 +670,7 @@ void SkyEphemerisUpdateWorkflowTests::activationFailurePreservesInstalledData()
     );
     QCOMPARE(preferredSpy.count(), 0);
     QCOMPARE(fixture.manager().dataRevision(), originalRevision);
-    QVERIFY(fixture.manager().usingInstalledData());
+    QVERIFY(usesInstalledData(fixture.manager()));
     QCOMPARE(fixture.manager().activeCacheSnapshot().installedKernelPath, oldKernelPath);
     QCOMPARE(fixture.store().loadEphemerisDataCache().installedKernelPath, oldKernelPath);
 }
@@ -757,7 +760,7 @@ void SkyEphemerisUpdateWorkflowTests::supportDataCheckReportsUpdatesAvailable()
     ));
 
     SkyEphemerisDataManager manager(&store);
-    QVERIFY(manager.usingInstalledData());
+    QVERIFY(usesInstalledData(manager));
 
     skygate::ephemeris::EphemerisDataManifest fallbackManifest = twoAssetUpdateManifest();
     SkyEphemerisUpdateWorkflow workflow(
@@ -790,7 +793,7 @@ void SkyEphemerisUpdateWorkflowTests::supportDataCheckReportsUpToDate()
     ));
 
     SkyEphemerisDataManager manager(&store);
-    QVERIFY(manager.usingInstalledData());
+    QVERIFY(usesInstalledData(manager));
 
     skygate::ephemeris::EphemerisDataManifest fallbackManifest = twoAssetUpdateManifest();
     SkyEphemerisUpdateWorkflow workflow(

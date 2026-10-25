@@ -58,11 +58,6 @@ bool SkySettingsStore::clearDeepSkyCatalogCache() const
     return SkyLegacyCatalogCacheStore::clearDeepSkyCache();
 }
 
-bool SkySettingsStore::saveCatalogCache(const SkyCatalogLegacyCacheSnapshot& snapshot) const
-{
-    return SkyLegacyCatalogCacheStore::save(snapshot);
-}
-
 std::optional<SkyCatalogLegacyCacheSnapshot> SkySettingsStore::loadCatalogCache() const
 {
     return SkyLegacyCatalogCacheStore::load();

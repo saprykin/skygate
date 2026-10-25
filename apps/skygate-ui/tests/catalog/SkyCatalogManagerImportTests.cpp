@@ -238,7 +238,7 @@ void SkyCatalogManagerImportTests::cancelAbortsOnlyOwnTransfers()
     QVERIFY(otherReply != nullptr);
 
     const auto revisionBeforeCancel = ownedManager.catalogRevision();
-    const std::size_t bodyCountBeforeCancel = ownedManager.bodyCount();
+    const std::size_t bodyCountBeforeCancel = ownedManager.starCatalog()->bodies().size();
     const int changesBeforeCancel = ownedCatalogSpy.count();
 
     ownedManager.cancelCatalogDownload();
@@ -251,7 +251,7 @@ void SkyCatalogManagerImportTests::cancelAbortsOnlyOwnTransfers()
     QCOMPARE(networkAccessManager.requestedUrls(), QStringList({ownedAcceptedUrl, ownedPendingUrl, otherOwnerUrl}));
     QCOMPARE(networkAccessManager.abortedUrls(), QStringList({ownedPendingUrl}));
     QCOMPARE(ownedManager.catalogRevision(), revisionBeforeCancel);
-    QCOMPARE(ownedManager.bodyCount(), bodyCountBeforeCancel);
+    QCOMPARE(ownedManager.starCatalog()->bodies().size(), bodyCountBeforeCancel);
     QCOMPARE(ownedCatalogSpy.count(), changesBeforeCancel);
     QVERIFY(CatalogBodyQuery::containsDisplayName(ownedManager.starCatalog(), QStringLiteral("Scope Accepted Star")));
     QVERIFY(!CatalogBodyQuery::containsDisplayName(ownedManager.starCatalog(), QStringLiteral("Scope Update Star")));
@@ -299,7 +299,7 @@ void SkyCatalogManagerImportTests::cancelWhileParsingIgnoresQueuedCompletion()
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Before Cancel Star")));
 
     const auto revisionBeforeCancel = manager.catalogRevision();
-    const std::size_t bodyCountBeforeCancel = manager.bodyCount();
+    const std::size_t bodyCountBeforeCancel = manager.starCatalog()->bodies().size();
     const skygate::ephemeris::IStarCatalog* const catalogBeforeCancel = manager.starCatalog();
     const QString acceptedTitleBeforeCancel = manager.sourceTitles().value(instanceId);
     const int changesBeforeCancel = catalogSpy.count();
@@ -337,7 +337,7 @@ void SkyCatalogManagerImportTests::cancelWhileParsingIgnoresQueuedCompletion()
 
     QCOMPARE(catalogSpy.count(), changesBeforeCancel);
     QCOMPARE(manager.catalogRevision(), revisionBeforeCancel);
-    QCOMPARE(manager.bodyCount(), bodyCountBeforeCancel);
+    QCOMPARE(manager.starCatalog()->bodies().size(), bodyCountBeforeCancel);
     QCOMPARE(manager.starCatalog(), catalogBeforeCancel);
     QCOMPARE(manager.sourceTitles().value(instanceId), acceptedTitleBeforeCancel);
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Before Cancel Star")));
@@ -377,7 +377,7 @@ void SkyCatalogManagerImportTests::cancelFromStartupNotificationLeavesNoRequest(
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
 
     const auto acceptedRevisionBefore = manager.catalogRevision();
-    const std::size_t acceptedBodiesBefore = manager.bodyCount();
+    const std::size_t acceptedBodiesBefore = manager.starCatalog()->bodies().size();
     const skygate::ephemeris::IStarCatalog* const acceptedCatalogBefore = manager.starCatalog();
 
     bool canceledFromStartup = false;
@@ -402,7 +402,7 @@ void SkyCatalogManagerImportTests::cancelFromStartupNotificationLeavesNoRequest(
     QVERIFY(networkAccessManager.issuedReplies().isEmpty());
     QVERIFY(networkAccessManager.requestedUrls().isEmpty());
     QCOMPARE(manager.catalogRevision(), acceptedRevisionBefore);
-    QCOMPARE(manager.bodyCount(), acceptedBodiesBefore);
+    QCOMPARE(manager.starCatalog()->bodies().size(), acceptedBodiesBefore);
     QCOMPARE(manager.starCatalog(), acceptedCatalogBefore);
     QCOMPARE(catalogSpy.count(), 0);
     QCOMPARE(manager.statusText(), QStringLiteral("Catalog: Download canceled."));
@@ -438,7 +438,7 @@ void SkyCatalogManagerImportTests::cancelFromFirstRowNotificationLeavesNoRequest
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
 
     const auto acceptedRevisionBefore = manager.catalogRevision();
-    const std::size_t acceptedBodiesBefore = manager.bodyCount();
+    const std::size_t acceptedBodiesBefore = manager.starCatalog()->bodies().size();
     const skygate::ephemeris::IStarCatalog* const acceptedCatalogBefore = manager.starCatalog();
 
     bool canceledFromFirstRow = false;
@@ -472,7 +472,7 @@ void SkyCatalogManagerImportTests::cancelFromFirstRowNotificationLeavesNoRequest
     QVERIFY(networkAccessManager.issuedReplies().isEmpty());
     QVERIFY(networkAccessManager.requestedUrls().isEmpty());
     QCOMPARE(manager.catalogRevision(), acceptedRevisionBefore);
-    QCOMPARE(manager.bodyCount(), acceptedBodiesBefore);
+    QCOMPARE(manager.starCatalog()->bodies().size(), acceptedBodiesBefore);
     QCOMPARE(manager.starCatalog(), acceptedCatalogBefore);
     QCOMPARE(catalogSpy.count(), 0);
     QCOMPARE(manager.statusText(), QStringLiteral("Catalog: Download canceled."));
@@ -605,7 +605,7 @@ void SkyCatalogManagerImportTests::failedLoadPreservesPriorDataAndRetrySucceeds(
     // The published snapshot, its provenance, and its presentation stay
     // untouched by a failed publication: only the operation reports the error.
     const skygate::ephemeris::IStarCatalog* const catalogBeforeFailure = manager.starCatalog();
-    const std::size_t bodyCountBeforeFailure = manager.bodyCount();
+    const std::size_t bodyCountBeforeFailure = manager.starCatalog()->bodies().size();
     const QStringList sourceIdsBeforeFailure(manager.sourceIds().begin(), manager.sourceIds().end());
     const std::vector<QStringList> contributorsBeforeFailure = manager.contributorSourceIds();
     const QString summaryBeforeFailure = manager.participationSummary();
@@ -633,7 +633,7 @@ void SkyCatalogManagerImportTests::failedLoadPreservesPriorDataAndRetrySucceeds(
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Retry Source A")));
     QCOMPARE(manager.sourceCount(), std::size_t{2});
     QCOMPARE(manager.starCatalog(), catalogBeforeFailure);
-    QCOMPARE(manager.bodyCount(), bodyCountBeforeFailure);
+    QCOMPARE(manager.starCatalog()->bodies().size(), bodyCountBeforeFailure);
     QCOMPARE(QStringList(manager.sourceIds().begin(), manager.sourceIds().end()), sourceIdsBeforeFailure);
     QCOMPARE(manager.contributorSourceIds().size(), contributorsBeforeFailure.size());
     for (std::size_t index = 0; index < contributorsBeforeFailure.size(); ++index) {

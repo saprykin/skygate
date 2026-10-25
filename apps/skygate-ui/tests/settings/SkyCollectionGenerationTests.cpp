@@ -144,10 +144,8 @@ void SkyCollectionGenerationTests::freshStoreReportsNoCommittedCollection()
     const SkySettingsStore store;
     const auto firstUse = store.loadCatalogCollectionCache();
     QCOMPARE(firstUse.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
-    QCOMPARE(firstUse.failure, SkyCatalogCollectionCacheLoadResult::Failure::None);
     QVERIFY(firstUse.diagnostic.isEmpty());
     QVERIFY(firstUse.snapshot.sources.isEmpty());
-    QVERIFY(firstUse.unreadablePayloadInstanceIds.isEmpty());
 }
 
 void SkyCollectionGenerationTests::emptyCatalogCollectionCacheIsExplicitlyPersisted()
@@ -160,7 +158,7 @@ void SkyCollectionGenerationTests::emptyCatalogCollectionCacheIsExplicitlyPersis
     QDir(m_settings.filePath(QStringLiteral("collection-cache"))).removeRecursively();
 
     SkySettingsStore store;
-    QVERIFY(store.saveCatalogCache(skygate::ui::tests::sampleCatalogCacheSnapshot()));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(skygate::ui::tests::sampleCatalogCacheSnapshot()));
 
     SkyCatalogCollectionCacheSnapshot emptySnapshot;
     emptySnapshot.schemaVersion = skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
@@ -198,7 +196,7 @@ void SkyCollectionGenerationTests::failedCollectionSaveKeepsLegacyCacheUnmigrate
     const auto legacySnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot(
         {.sourceLabel = QStringLiteral("Legacy custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
     );
-    QVERIFY(store.saveCatalogCache(legacySnapshot));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacySnapshot));
 
     // Point the collection cache directory under a regular file so the payload
     // sidecar write fails before any collection metadata is committed.
@@ -218,7 +216,6 @@ void SkyCollectionGenerationTests::failedCollectionSaveKeepsLegacyCacheUnmigrate
     // last readable legacy data.
     const auto failedLoad = store.loadCatalogCollectionCache();
     QCOMPARE(failedLoad.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
-    QCOMPARE(failedLoad.failure, SkyCatalogCollectionCacheLoadResult::Failure::None);
     const auto stillReadable = store.loadCatalogCache();
     QVERIFY(stillReadable.has_value());
     QCOMPARE(stillReadable->sourceLabel, legacySnapshot.sourceLabel);
@@ -463,7 +460,6 @@ void SkyCollectionGenerationTests::missingManifestWithRecordsSkipsEmptyCollectio
     skygate::testsupport::LogCapture capture;
     const auto unreadable = store.loadCatalogCollectionCache();
     QCOMPARE(unreadable.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
-    QCOMPARE(unreadable.failure, SkyCatalogCollectionCacheLoadResult::Failure::LegacyRecordsReplaced);
     QVERIFY(!unreadable.diagnostic.isEmpty());
     const QString messages = capture.joinedMessages();
     QVERIFY(messages.contains(QStringLiteral("Catalog collection manifest is missing")));
@@ -548,7 +544,6 @@ void SkyCollectionGenerationTests::lostManifestAfterCommittedCollectionNotFirstU
 
     const auto lostManifest = store.loadCatalogCollectionCache();
     QCOMPARE(lostManifest.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
-    QCOMPARE(lostManifest.failure, SkyCatalogCollectionCacheLoadResult::Failure::CommittedManifestMissing);
     QVERIFY(lostManifest.diagnostic.contains(QStringLiteral("recorded as committed")));
 
     // The recorded generation is a proven recovery point: restoring the
@@ -590,7 +585,6 @@ void SkyCollectionGenerationTests::stageOnlyGenerationIsNotProofOfCommit()
     SkySettingsStore store;
     const auto firstUse = store.loadCatalogCollectionCache();
     QCOMPARE(firstUse.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
-    QCOMPARE(firstUse.failure, SkyCatalogCollectionCacheLoadResult::Failure::None);
     QVERIFY(!firstUse.diagnostic.isEmpty());
 
     // Once a manifest has committed a generation, losing it is unusable
@@ -599,7 +593,6 @@ void SkyCollectionGenerationTests::stageOnlyGenerationIsNotProofOfCommit()
     QVERIFY(QFile::remove(skygate::ui::tests::catalogCollectionManifestFilePath(directory)));
     const auto lostCommitted = store.loadCatalogCollectionCache();
     QCOMPARE(lostCommitted.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
-    QCOMPARE(lostCommitted.failure, SkyCatalogCollectionCacheLoadResult::Failure::CommittedManifestMissing);
 }
 
 void SkyCollectionGenerationTests::truncatedManifestIsUnusableButRecoverable()
@@ -627,7 +620,6 @@ void SkyCollectionGenerationTests::truncatedManifestIsUnusableButRecoverable()
     skygate::testsupport::LogCapture capture;
     const auto truncated = store.loadCatalogCollectionCache();
     QCOMPARE(truncated.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
-    QCOMPARE(truncated.failure, SkyCatalogCollectionCacheLoadResult::Failure::ManifestUnreadable);
     QVERIFY(!truncated.diagnostic.isEmpty());
     QVERIFY(capture.joinedMessages().contains(QStringLiteral("Unreadable catalog collection manifest")));
 
@@ -663,7 +655,6 @@ void SkyCollectionGenerationTests::missingCommittedGenerationRecordsAreUnusable(
     skygate::testsupport::LogCapture capture;
     const auto missingRecords = store.loadCatalogCollectionCache();
     QCOMPARE(missingRecords.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
-    QCOMPARE(missingRecords.failure, SkyCatalogCollectionCacheLoadResult::Failure::CommittedGenerationMissing);
     QVERIFY(missingRecords.diagnostic.contains(QString::number(committedGeneration)));
     QVERIFY(capture.joinedMessages().contains(QStringLiteral("names a generation without stored records")));
 }
@@ -726,7 +717,6 @@ void SkyCollectionGenerationTests::invalidRecordsStoredMarkerIsUnusable()
     skygate::testsupport::LogCapture capture;
     const auto loaded = store.loadCatalogCollectionCache();
     QCOMPARE(loaded.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
-    QCOMPARE(loaded.failure, SkyCatalogCollectionCacheLoadResult::Failure::CommittedGenerationMissing);
     QVERIFY(capture.joinedMessages().contains(QStringLiteral("Invalid boolean setting")));
 }
 
@@ -871,7 +861,7 @@ void SkyCollectionGenerationTests::failedFirstPublicationKeepsLegacyCacheReadabl
     const auto legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
         {.sourceLabel = QStringLiteral("Legacy custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
     );
-    QVERIFY(store.saveCatalogCache(legacy));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacy));
 
     // Block the generation manifest so the first collection save fails after
     // its payload files and records were staged. No generation was durably
@@ -885,7 +875,6 @@ void SkyCollectionGenerationTests::failedFirstPublicationKeepsLegacyCacheReadabl
     QVERIFY(!store.saveCatalogCollectionCache(firstCollection));
     const auto failedFirstSave = store.loadCatalogCollectionCache();
     QCOMPARE(failedFirstSave.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
-    QCOMPARE(failedFirstSave.failure, SkyCatalogCollectionCacheLoadResult::Failure::None);
     // A failed first publication leaves no commit record behind either.
     {
         QSettings settings;

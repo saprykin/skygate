@@ -51,7 +51,6 @@ public:
     );
     ~SkyEphemerisDownloadService() override;
 
-    [[nodiscard]] StagedUpdateDownloadResult stage(const StagedUpdateDownloadRequest& request);
     void stageAsync(
         const StagedUpdateDownloadRequest& request, std::function<void(StagedUpdateDownloadResult)> completionHandler
     );
@@ -59,8 +58,7 @@ public:
 private:
     void stageInternal(
         const StagedUpdateDownloadRequest& request,
-        const std::function<void(StagedUpdateDownloadResult)>& completionHandler,
-        bool allowNetwork
+        const std::function<void(StagedUpdateDownloadResult)>& completionHandler
     );
     [[nodiscard]] StagedUpdateDownloadResult
     stageLocalFile(const StagedUpdateDownloadRequest& request, const QString& sourcePath);

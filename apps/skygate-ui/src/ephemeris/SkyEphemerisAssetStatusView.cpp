@@ -71,16 +71,6 @@ QString SkyEphemerisAssetStatusView::shortRangeKernelStatusText() const
     return assetStatus(m_snapshot.installedKernelVersion).statusText();
 }
 
-QString SkyEphemerisAssetStatusView::longRangeKernelStatusText() const
-{
-    if (usingInstalledData() && m_snapshot.installedKernelLongRange.value_or(false)) {
-        const QString version = m_snapshot.installedKernelVersion.isEmpty() ? QStringLiteral("installed")
-                                                                            : m_snapshot.installedKernelVersion;
-        return SkyEphemerisAssetStatus::installed(version).statusText();
-    }
-    return QStringLiteral("Not installed");
-}
-
 QString SkyEphemerisAssetStatusView::kernelDisplayText() const
 {
     if (!usingInstalledData()) {
@@ -133,11 +123,6 @@ std::uint64_t SkyEphemerisAssetStatusView::supportDataCacheSizeBytes() const
 QString SkyEphemerisAssetStatusView::lastUpdateResultText() const
 {
     return m_snapshot.lastUpdateResult;
-}
-
-QString SkyEphemerisAssetStatusView::dataRevisionToken() const
-{
-    return m_snapshot.dataRevisionToken;
 }
 
 bool SkyEphemerisAssetStatusView::usingInstalledData() const noexcept

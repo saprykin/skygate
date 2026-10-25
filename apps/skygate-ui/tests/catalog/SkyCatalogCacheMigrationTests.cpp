@@ -128,7 +128,7 @@ void SkyCatalogCacheMigrationTests::migratesLegacyBundledCustomMixedConfiguratio
         const SkyCatalogLegacyCacheSnapshot legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
             {.sourceLabel = QStringLiteral("Custom"), .deepSkySourceLabel = QStringLiteral("OpenNGC")}
         );
-        QVERIFY(store.saveCatalogCache(legacy));
+        QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacy));
 
         const SkyCatalogCacheController controller(&store);
         const QString customUrl = QStringLiteral("https://example.test/custom-stars.csv");
@@ -157,7 +157,7 @@ void SkyCatalogCacheMigrationTests::migratesLegacyBundledCustomMixedConfiguratio
         SkyCatalogLegacyCacheSnapshot legacy;
         legacy.deepSkySourceLabel = QStringLiteral("OpenNGC");
         legacy.deepSkyCatalogPayload = skygate::ui::tests::sampleCompactOpenNgcCsvPayload();
-        QVERIFY(store.saveCatalogCache(legacy));
+        QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacy));
 
         const SkyCatalogCacheController controller(&store);
         const auto result = controller.restoreCollection(0, 1, QString(), QString());
@@ -180,7 +180,7 @@ void SkyCatalogCacheMigrationTests::repeatedMigrationIsIdempotent()
     SkySettingsStore store;
     const SkyCatalogLegacyCacheSnapshot legacy =
         skygate::ui::tests::sampleCatalogCacheSnapshot({.sourceLabel = QStringLiteral("HYG v4.2")});
-    QVERIFY(store.saveCatalogCache(legacy));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacy));
 
     const SkyCatalogCacheController controller(&store);
     const QString customUrl = QStringLiteral("https://example.test/hyg.csv.gz");
@@ -218,7 +218,7 @@ void SkyCatalogCacheMigrationTests::emptyMigratedCollectionDoesNotRestoreLegacy(
     const SkyCatalogLegacyCacheSnapshot legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
         {.sourceLabel = QStringLiteral("Custom"), .deepSkySourceLabel = QStringLiteral("OpenNGC")}
     );
-    QVERIFY(store.saveCatalogCache(legacy));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacy));
 
     const auto migrated = controller.restoreCollection(2, 1, customUrl, QString());
     QVERIFY(migrated.migratedLegacy);
@@ -252,11 +252,13 @@ void SkyCatalogCacheMigrationTests::clearingPayloadCacheDoesNotReAddLegacySource
     SkySettingsStore store;
     QVERIFY(store.saveCatalogCollectionCache(CatalogCacheFixture::makeCollectionSnapshot()));
     // The pre-migration two-slot cache is still on disk.
-    QVERIFY(store.saveCatalogCache(
-        skygate::ui::tests::sampleCatalogCacheSnapshot(
-            {.sourceLabel = QStringLiteral("Legacy custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+    QVERIFY(
+        skygate::ui::tests::seedLegacyCatalogCache(
+            skygate::ui::tests::sampleCatalogCacheSnapshot(
+                {.sourceLabel = QStringLiteral("Legacy custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+            )
         )
-    ));
+    );
 
     const SkyCatalogCacheController controller(&store);
     // Clearing each source's payload evicts its disposable bytes while every
@@ -288,7 +290,7 @@ void SkyCatalogCacheMigrationTests::failedMigrationCommitKeepsLegacyCacheReadabl
     const SkyCatalogLegacyCacheSnapshot legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
         {.sourceLabel = QStringLiteral("Custom"), .deepSkySourceLabel = QStringLiteral("OpenNGC")}
     );
-    QVERIFY(store.saveCatalogCache(legacy));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacy));
 
     // Block collection payload writes so committing the migrated records fails.
     const QString blockerPath = m_settings.filePath(QStringLiteral("migration-blocker"));
@@ -403,11 +405,13 @@ void SkyCatalogCacheMigrationTests::failedCollectionWritePreservesPriorData()
 void SkyCatalogCacheMigrationTests::truncatedCommittedManifestRejectsLegacyMigration()
 {
     SkySettingsStore store;
-    QVERIFY(store.saveCatalogCache(
-        skygate::ui::tests::sampleCatalogCacheSnapshot(
-            {.sourceLabel = QStringLiteral("Legacy Custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+    QVERIFY(
+        skygate::ui::tests::seedLegacyCatalogCache(
+            skygate::ui::tests::sampleCatalogCacheSnapshot(
+                {.sourceLabel = QStringLiteral("Legacy Custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+            )
         )
-    ));
+    );
     QVERIFY(store.saveCatalogCollectionCache(CatalogCacheFixture::makeCollectionSnapshot()));
 
     // The committed manifest exists but is incomplete, so the committed
@@ -473,11 +477,13 @@ void SkyCatalogCacheMigrationTests::missingManifestStagedGenerationRejectsRestor
     SkySettingsStore store;
     // The retired pre-generation two-slot cache stays readable on disk for the
     // whole test, so a restore that fell back to it would return its sources.
-    QVERIFY(store.saveCatalogCache(
-        skygate::ui::tests::sampleCatalogCacheSnapshot(
-            {.sourceLabel = QStringLiteral("Legacy Custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+    QVERIFY(
+        skygate::ui::tests::seedLegacyCatalogCache(
+            skygate::ui::tests::sampleCatalogCacheSnapshot(
+                {.sourceLabel = QStringLiteral("Legacy Custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+            )
         )
-    ));
+    );
 
     const SkyCatalogCacheController controller(&store);
     const QString customUrl = QStringLiteral("https://example.test/legacy-stars.csv");
@@ -574,11 +580,13 @@ void SkyCatalogCacheMigrationTests::interruptedGenerationStagingKeepsFlatCollect
     SkySettingsStore store;
     // The retired pre-generation two-slot cache stays readable on disk, so a
     // restore that fell back to it would return its legacy source.
-    QVERIFY(store.saveCatalogCache(
-        skygate::ui::tests::sampleCatalogCacheSnapshot(
-            {.sourceLabel = QStringLiteral("Legacy Custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+    QVERIFY(
+        skygate::ui::tests::seedLegacyCatalogCache(
+            skygate::ui::tests::sampleCatalogCacheSnapshot(
+                {.sourceLabel = QStringLiteral("Legacy Custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+            )
         )
-    ));
+    );
 
     const QString directory = m_settings.filePath(QStringLiteral("collection-cache"));
     QVERIFY(QDir().mkpath(directory));

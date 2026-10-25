@@ -110,12 +110,10 @@ class SkyContextControllerTimelineTests final : public QObject {
 private slots:
     void initTestCase();
     void init();
-    void setUtcDateTimeTextAppliesAtomically();
-    void setUtcDateTimeTextAcceptsBceInput();
+    void entryAppliesUtcInstantAtomically();
+    void entryAcceptsBceInput();
     void bceAliasesResolveToTheSameInstant();
     void invalidUtcDateTimeInputLeavesTimelineUnchanged();
-    void utcValidationMessagesMatchEachRejection();
-    void utcInputParsingIgnoresDisplayZoneDst();
     void invalidYearZeroUtcDateTimeIsRejected();
     void manualUtcApplyPausesLivePlayback();
     void manualTimelineSteppingStillWorks();
@@ -145,12 +143,12 @@ void SkyContextControllerTimelineTests::init()
     m_settings.resetForCurrentTest();
 }
 
-void SkyContextControllerTimelineTests::setUtcDateTimeTextAppliesAtomically()
+void SkyContextControllerTimelineTests::entryAppliesUtcInstantAtomically()
 {
     const auto controller = createController();
     controller->setLive(false);
 
-    QVERIFY(controller->setUtcDateTimeText("2026-01-02", "03:04:05"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2026-01-02", "03:04:05"));
     QCOMPARE(controller->utcDateText(), QString("2026-01-02"));
     QCOMPARE(controller->utcTimeText(), QString("03:04:05"));
     QCOMPARE(
@@ -159,12 +157,12 @@ void SkyContextControllerTimelineTests::setUtcDateTimeTextAppliesAtomically()
     );
 }
 
-void SkyContextControllerTimelineTests::setUtcDateTimeTextAcceptsBceInput()
+void SkyContextControllerTimelineTests::entryAcceptsBceInput()
 {
     const auto controller = createController();
     controller->setLive(false);
 
-    QVERIFY(controller->setUtcDateTimeText("0044-03-15 BCE", "12:00:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "0044-03-15 BCE", "12:00:00"));
     QCOMPARE(controller->utcDateText(), QString("0044-03-15 BCE"));
     QCOMPARE(controller->utcTimeText(), QString("12:00:00"));
     QCOMPARE(controllerUtcTime(*controller).date(), QDate(-44, 3, 15));
@@ -174,11 +172,11 @@ void SkyContextControllerTimelineTests::bceAliasesResolveToTheSameInstant()
 {
     const auto bcController = createController();
     bcController->setLive(false);
-    QVERIFY(bcController->setUtcDateTimeText("0044-03-15 BC", "12:00:00"));
+    QVERIFY(setControllerUtcDateTime(*bcController, "0044-03-15 BC", "12:00:00"));
 
     const auto bceController = createController();
     bceController->setLive(false);
-    QVERIFY(bceController->setUtcDateTimeText("0044-03-15 BCE", "12:00:00"));
+    QVERIFY(setControllerUtcDateTime(*bceController, "0044-03-15 BCE", "12:00:00"));
 
     QCOMPARE(controllerUtcTime(*bcController).toSecsSinceEpoch(), controllerUtcTime(*bceController).toSecsSinceEpoch());
 }
@@ -187,61 +185,25 @@ void SkyContextControllerTimelineTests::invalidUtcDateTimeInputLeavesTimelineUnc
 {
     const auto controller = createController();
     controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText("2026-01-02", "03:04:05"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2026-01-02", "03:04:05"));
 
     const qint64 beforeSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
-    QVERIFY(!controller->setUtcDateTimeText("2026-02-30", "09:08:07"));
+    QVERIFY(!controller->timeController()->setDateTimeText("2026-02-30", "09:08:07"));
 
     QCOMPARE(controller->utcDateText(), QString("2026-01-02"));
     QCOMPARE(controller->utcTimeText(), QString("03:04:05"));
     QCOMPARE(controllerUtcTime(*controller).toSecsSinceEpoch(), beforeSeconds);
 }
 
-void SkyContextControllerTimelineTests::utcValidationMessagesMatchEachRejection()
-{
-    const auto controller = createController();
-    controller->setLive(false);
-
-    QCOMPARE(
-        controller->validateUtcDateTimeText("2026-5-6", "09:30:30"),
-        QString("Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates.")
-    );
-    QCOMPARE(
-        controller->validateUtcDateTimeText("0000-01-01", "00:00:00"),
-        QString("Year 0000 is invalid. Use 0001 BCE for the year before 0001 CE.")
-    );
-    QCOMPARE(controller->validateUtcDateTimeText("2026-02-30", "09:30:30"), QString("Enter a valid UTC date."));
-    QCOMPARE(controller->validateUtcDateTimeText("2026-05-06", "09:30"), QString("Use HH:mm:ss for the UTC time."));
-
-    QVERIFY(controller->validateUtcDateTimeText(" 2026-05-06 ", " 09:30:30 ").isEmpty());
-    QVERIFY(controller->validateUtcDateTimeText("0044-03-15 bc", "12:00:00").isEmpty());
-}
-
-void SkyContextControllerTimelineTests::utcInputParsingIgnoresDisplayZoneDst()
-{
-    const auto controller = createController();
-    controller->setLive(false);
-    QVERIFY(controller->timeController()->setTimeZoneId(QString("Europe/Zurich")));
-
-    QVERIFY(controller->setUtcDateTimeText("2026-03-29", "02:30:00"));
-
-    QCOMPARE(controller->utcDateText(), QString("2026-03-29"));
-    QCOMPARE(controller->utcTimeText(), QString("02:30:00"));
-    QCOMPARE(controller->timeController()->timeText(), QString("04:30:00"));
-}
-
 void SkyContextControllerTimelineTests::invalidYearZeroUtcDateTimeIsRejected()
 {
     const auto controller = createController();
     controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText("2026-01-02", "03:04:05"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2026-01-02", "03:04:05"));
 
     const qint64 beforeSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
-    QCOMPARE(
-        controller->validateUtcDateTimeText("0000-01-01", "00:00:00"),
-        QString("Year 0000 is invalid. Use 0001 BCE for the year before 0001 CE.")
-    );
-    QVERIFY(!controller->setUtcDateTimeText("0000-01-01", "00:00:00"));
+    // Year zero has no representation in the timeline, so the entry rejects it.
+    QVERIFY(!controller->timeController()->setDateTimeText("0000-01-01", "00:00:00"));
     QCOMPARE(controllerUtcTime(*controller).toSecsSinceEpoch(), beforeSeconds);
 }
 
@@ -250,7 +212,7 @@ void SkyContextControllerTimelineTests::manualUtcApplyPausesLivePlayback()
     const auto controller = createController();
     controller->setLive(true);
 
-    QVERIFY(controller->setUtcDateTimeText("2026-01-09", "09:08:07"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2026-01-09", "09:08:07"));
     QVERIFY(!controller->live());
     QCOMPARE(controller->utcDateText(), QString("2026-01-09"));
     QCOMPARE(controller->utcTimeText(), QString("09:08:07"));
@@ -277,7 +239,7 @@ void SkyContextControllerTimelineTests::manualSteppingCrossesBceBoundaryWithoutY
     const auto controller = createController();
     controller->setLive(false);
     controller->setStepSeconds(60);
-    QVERIFY(controller->setUtcDateTimeText("0001-12-31 BCE", "23:59:30"));
+    QVERIFY(setControllerUtcDateTime(*controller, "0001-12-31 BCE", "23:59:30"));
 
     controller->stepForward();
     QCOMPARE(controller->utcDateText(), QString("0001-01-01"));
@@ -297,7 +259,7 @@ void SkyContextControllerTimelineTests::livePlaybackUsesManualStepWhileCatchingU
     controller->setSpeedMultiplier(2.0);
 
     const QDateTime startUtc = fixedNowUtc().addSecs(-5 * 60);
-    QVERIFY(controller->setUtcDateTimeText(startUtc.toString("yyyy-MM-dd"), startUtc.toString("HH:mm:ss")));
+    QVERIFY(setControllerUtcDateTime(*controller, startUtc.toString("yyyy-MM-dd"), startUtc.toString("HH:mm:ss")));
 
     const qint64 beforeSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
     controller->setLive(true);
@@ -316,7 +278,7 @@ void SkyContextControllerTimelineTests::livePlaybackDoesNotOvershootUtcWhileCatc
     controller->setSpeedMultiplier(2.0);
 
     const QDateTime startUtc = fixedNowUtc().addSecs(-30);
-    QVERIFY(controller->setUtcDateTimeText(startUtc.toString("yyyy-MM-dd"), startUtc.toString("HH:mm:ss")));
+    QVERIFY(setControllerUtcDateTime(*controller, startUtc.toString("yyyy-MM-dd"), startUtc.toString("HH:mm:ss")));
 
     controller->setLive(true);
     QTRY_VERIFY_WITH_TIMEOUT(controllerUtcTime(*controller).toSecsSinceEpoch() > startUtc.toSecsSinceEpoch(), 8000);
@@ -337,7 +299,7 @@ void SkyContextControllerTimelineTests::livePlaybackFallsBackToSecondTicksAfterC
     controller->setSpeedMultiplier(4.0);
 
     const QDateTime startUtc = fixedNowUtc().addSecs(-2);
-    QVERIFY(controller->setUtcDateTimeText(startUtc.toString("yyyy-MM-dd"), startUtc.toString("HH:mm:ss")));
+    QVERIFY(setControllerUtcDateTime(*controller, startUtc.toString("yyyy-MM-dd"), startUtc.toString("HH:mm:ss")));
 
     controller->setLive(true);
     QTRY_VERIFY_WITH_TIMEOUT(controllerUtcTime(*controller).toMSecsSinceEpoch() > startUtc.toMSecsSinceEpoch(), 8000);
@@ -357,7 +319,7 @@ void SkyContextControllerTimelineTests::throttledLivePlaybackAdvancesByElapsedWa
     FakeTimeSource timeSource;
     const auto controller = createControllerWithThrottledLiveEngine(timeSource);
     controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText("2026-05-06", "09:30:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2026-05-06", "09:30:00"));
 
     const qint64 startSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
     controller->setLive(true);
@@ -379,7 +341,7 @@ void SkyContextControllerTimelineTests::throttledLivePlaybackKeepsDisplayedTimeT
     FakeTimeSource timeSource;
     const auto controller = createControllerWithThrottledLiveEngine(timeSource);
     controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText("2026-05-06", "09:30:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2026-05-06", "09:30:00"));
 
     QSignalSpy displayedTimeSpy(controller->timeController(), &SkyTimeController::timeTextChanged);
     displayedTimeSpy.clear();
@@ -408,7 +370,7 @@ void SkyContextControllerTimelineTests::throttledCatchUpRecomputesForLargeSteps(
     controller->setStepSeconds(5 * 60);
 
     const QDateTime startUtc = fixedNowUtc().addSecs(-60 * 60);
-    QVERIFY(controller->setUtcDateTimeText(startUtc.toString("yyyy-MM-dd"), startUtc.toString("HH:mm:ss")));
+    QVERIFY(setControllerUtcDateTime(*controller, startUtc.toString("yyyy-MM-dd"), startUtc.toString("HH:mm:ss")));
 
     const qint64 startCatchUpSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
     controller->setLive(true);
@@ -425,7 +387,7 @@ void SkyContextControllerTimelineTests::fallbackSimpleEngineUsesOneSecondTicks()
     FakeTimeSource timeSource;
     const auto controller = createControllerWithTimeSource(timeSource);
     controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText("2026-05-06", "09:30:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2026-05-06", "09:30:00"));
 
     controller->setEphemerisEngineKindIndex(1);
     QCOMPARE(controller->ephemerisEngineKindIndex(), 1);

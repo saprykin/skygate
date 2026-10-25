@@ -157,7 +157,6 @@ SkyCatalogCollectionCacheLoadResult SkyCatalogCollectionStore::load() const
             qCWarning(skygateCatalogCacheLog).noquote()
                 << "Catalog collection manifest names a generation without stored records" << manifestPath;
             result.state = SkyCatalogCollectionCacheLoadResult::State::Unusable;
-            result.failure = SkyCatalogCollectionCacheLoadResult::Failure::CommittedGenerationMissing;
             result.diagnostic =
                 QStringLiteral(
                     "The committed catalog collection manifest names generation %1, whose stored records "
@@ -176,7 +175,6 @@ SkyCatalogCollectionCacheLoadResult SkyCatalogCollectionStore::load() const
     } else {
         if (manifest.state == SkyCatalogCollectionManifestStore::State::Unreadable) {
             result.state = SkyCatalogCollectionCacheLoadResult::State::Unusable;
-            result.failure = SkyCatalogCollectionCacheLoadResult::Failure::ManifestUnreadable;
             result.diagnostic =
                 QStringLiteral("The committed catalog collection manifest is unreadable: %1").arg(manifestPath);
             const std::optional<quint64> committedGeneration =
@@ -204,7 +202,6 @@ SkyCatalogCollectionCacheLoadResult SkyCatalogCollectionStore::load() const
             qCWarning(skygateCatalogCacheLog).noquote() << "Catalog collection manifest is missing while generation"
                                                         << committedGeneration.value() << "was recorded as committed";
             result.state = SkyCatalogCollectionCacheLoadResult::State::Unusable;
-            result.failure = SkyCatalogCollectionCacheLoadResult::Failure::CommittedManifestMissing;
             result.diagnostic =
                 QStringLiteral(
                     "The committed catalog collection manifest is missing while generation %1 was recorded as "
@@ -247,7 +244,6 @@ SkyCatalogCollectionCacheLoadResult SkyCatalogCollectionStore::load() const
                 << "Ignoring stale catalog collection version marker: generation-format records exist without a "
                    "committed manifest";
             result.state = SkyCatalogCollectionCacheLoadResult::State::Unusable;
-            result.failure = SkyCatalogCollectionCacheLoadResult::Failure::LegacyRecordsReplaced;
             result.diagnostic = QStringLiteral(
                 "The catalog collection version marker outlived its records, which generation-format data replaced"
             );
@@ -271,8 +267,7 @@ SkyCatalogCollectionCacheLoadResult SkyCatalogCollectionStore::load() const
             // sidecar-named groups under the current group are source records.
             continue;
         }
-        SkyCatalogSourceCacheRecord record =
-            SkyCatalogSourceRecordCodec::loadRecord(settings, group, result.unreadablePayloadInstanceIds);
+        SkyCatalogSourceCacheRecord record = SkyCatalogSourceRecordCodec::loadRecord(settings, group);
         if (!record.instanceId.isEmpty()) {
             records.push_back(std::move(record));
         }

@@ -1,4 +1,5 @@
 #include "support/QmlTestSupport.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 #include "time/SkyTimeController.hpp"
 
 using namespace skygate::ui::tests;
@@ -190,7 +191,7 @@ void QmlStatusFooterTests::liveAndTrackingStateUpdateFooterPresentation()
     auto controller = makeController();
     QVERIFY(controller != nullptr);
     QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("Asia/Bishkek")));
-    QVERIFY(controller->setUtcDateTimeText(QStringLiteral("2026-05-06"), QStringLiteral("09:30:30")));
+    QVERIFY(setControllerUtcDateTime(*controller, QStringLiteral("2026-05-06"), QStringLiteral("09:30:30")));
     controller->setLive(false);
 
     QQmlEngine engine;

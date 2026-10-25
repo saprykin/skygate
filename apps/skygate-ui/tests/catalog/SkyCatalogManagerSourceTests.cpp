@@ -13,6 +13,7 @@
 #include "support/FakeNetworkAccessManager.hpp"
 #include "support/RelatedDatasetFixture.hpp"
 #include "support/SettingsTestFixture.hpp"
+#include "support/CatalogSourceStateQuery.hpp"
 
 #include <QDir>
 #include <QLocale>
@@ -23,6 +24,8 @@
 #include <algorithm>
 #include <optional>
 #include <span>
+
+using skygate::ui::tests::isCatalogSourceEnabled;
 
 using skygate::ui::tests::CatalogBodyQuery;
 using skygate::ui::tests::CatalogTestPayloadFile;
@@ -220,13 +223,13 @@ void SkyCatalogManagerSourceTests::sourcesLoadEnableDisableAndRemoveIndependentl
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star C")));
 
     manager.disableSource(sourceAId);
-    QVERIFY(!manager.isSourceEnabled(sourceAId));
+    QVERIFY(!isCatalogSourceEnabled(manager, sourceAId));
     QVERIFY(!CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star A")));
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star B")));
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star C")));
 
     manager.enableSource(sourceAId);
-    QVERIFY(manager.isSourceEnabled(sourceAId));
+    QVERIFY(isCatalogSourceEnabled(manager, sourceAId));
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star A")));
 
     manager.removeSource(sourceAId);
@@ -419,8 +422,8 @@ void SkyCatalogManagerSourceTests::sameDescriptorInstancesCoexistIndependently()
 
     // Each instance participates independently.
     manager.disableSource(firstId);
-    QVERIFY(!manager.isSourceEnabled(firstId));
-    QVERIFY(manager.isSourceEnabled(secondId));
+    QVERIFY(!isCatalogSourceEnabled(manager, firstId));
+    QVERIFY(isCatalogSourceEnabled(manager, secondId));
     QVERIFY(!CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("NGC 991")));
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("NGC 992")));
     manager.enableSource(firstId);
@@ -608,9 +611,9 @@ void SkyCatalogManagerSourceTests::missingConfigurationKeepsFirstUseDefaults()
     // First use has no stored configuration, so the bundled default source is
     // configured and composes the initial snapshot.
     QCOMPARE(manager.sourceInstanceIds(), QStringList{QStringLiteral("primary")});
-    QVERIFY(manager.isSourceEnabled(QStringLiteral("primary")));
+    QVERIFY(isCatalogSourceEnabled(manager, QStringLiteral("primary")));
     QVERIFY(manager.starCatalog() != nullptr);
-    QVERIFY(manager.bodyCount() > 0U);
+    QVERIFY(manager.starCatalog()->bodies().size() > 0U);
     QVERIFY(!store.loadCatalogCollectionCache().isLoaded());
 
     // Nothing was ever stored: restore reports that and keeps the first-use
@@ -624,7 +627,7 @@ void SkyCatalogManagerSourceTests::missingConfigurationKeepsFirstUseDefaults()
     SkyCatalogManager restarted(&store);
     QVERIFY(!restarted.restoreCatalogCache());
     QCOMPARE(restarted.sourceInstanceIds(), QStringList{QStringLiteral("primary")});
-    QVERIFY(restarted.isSourceEnabled(QStringLiteral("primary")));
+    QVERIFY(isCatalogSourceEnabled(restarted, QStringLiteral("primary")));
     QVERIFY(restarted.starCatalog() != nullptr);
     QVERIFY(!store.loadCatalogCollectionCache().isLoaded());
 }
@@ -654,7 +657,7 @@ void SkyCatalogManagerSourceTests::removingSoleSourceLeavesEmptyCollection()
     // core and the bundled deep-sky fallback participate under their own
     // provenance without a configured source row.
     QVERIFY(manager.starCatalog() != nullptr);
-    QVERIFY(manager.bodyCount() > 0U);
+    QVERIFY(manager.starCatalog()->bodies().size() > 0U);
     const auto bodies = manager.starCatalog()->bodies();
     const std::size_t deepSkyBodyCount = static_cast<std::size_t>(
         std::count_if(bodies.begin(), bodies.end(), [](const skygate::ephemeris::BaseCelestialBody* body) {
@@ -749,7 +752,8 @@ void SkyCatalogManagerSourceTests::presentationSummarizesEnabledParticipation()
     QVERIFY(manager.statusText().startsWith(QStringLiteral("Catalog: %1 (").arg(manager.participationSummary())));
     const QLocale locale = QLocale::system();
     QVERIFY(manager.statusText().contains(
-        QStringLiteral("(%1 objects,").arg(locale.toString(static_cast<qulonglong>(manager.bodyCount())))
+        QStringLiteral("(%1 objects,")
+            .arg(locale.toString(static_cast<qulonglong>(manager.starCatalog()->bodies().size())))
     ));
 
     // Disabling one source removes it from the summary and keeps its own state

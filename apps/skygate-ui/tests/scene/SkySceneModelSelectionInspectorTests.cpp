@@ -1,7 +1,10 @@
 #include "render/SkyRenderPoint.hpp"
 #include "support/SkySceneModelTestSupport.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 
 #include <QtTest>
+
+using skygate::ui::tests::setControllerUtcDateTime;
 
 using skygate::ui::tests::inspectorFieldValue;
 using skygate::ui::tests::makeFixedBody;
@@ -184,7 +187,7 @@ void SkySceneModelSelectionInspectorTests::inspectorFollowsObjectUnlessPinned()
     QCOMPARE(pinnedInspector.value("x").toDouble(), 120.0);
     QCOMPARE(pinnedInspector.value("y").toDouble(), 140.0);
 
-    QVERIFY(controller.setUtcDateTimeText("2024-06-02", "22:00:00"));
+    QVERIFY(setControllerUtcDateTime(controller, "2024-06-02", "22:00:00"));
     pinnedInspector = sceneModel.selectedObjectInspector();
     QVERIFY(pinnedInspector.value("pinned").toBool());
     QCOMPARE(pinnedInspector.value("x").toDouble(), 120.0);

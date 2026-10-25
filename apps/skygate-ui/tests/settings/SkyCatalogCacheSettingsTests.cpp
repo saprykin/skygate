@@ -34,7 +34,7 @@ private slots:
     void savesLoadsAndClearsCatalogCachesIndependently();
     void savesLoadsAndClearsCatalogCollectionCache();
     void clearSourceCacheEvictsPayloadKeepsConfiguration();
-    void unreadablePayloadIsReportedDistinctFromEviction();
+    void missingReferencedPayloadLoadsWithoutData();
     void partialCacheSavePreservesConfiguredPeerPath();
     void missingCacheFilesAndMalformedMetadataTolerated();
     void legacyLoaderReportsOnlyUnreadableCaches();
@@ -61,7 +61,7 @@ void SkyCatalogCacheSettingsTests::savesLoadsAndClearsCatalogCachesIndependently
          .constellationCount = 42}
     );
 
-    QVERIFY(store.saveCatalogCache(savedSnapshot));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(savedSnapshot));
     const auto loadedSnapshot = store.loadCatalogCache();
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->sourceLabel, savedSnapshot.sourceLabel);
@@ -121,7 +121,6 @@ void SkyCatalogCacheSettingsTests::savesLoadsAndClearsCatalogCollectionCache()
     QCOMPARE(loadedSnapshot.sources[1].instanceId, savedSnapshot.sources[1].instanceId);
     QCOMPARE(loadedSnapshot.sources[1].payload, savedSnapshot.sources[1].payload);
     QCOMPARE(loadedSnapshot.sources[1].binaryPayload, savedSnapshot.sources[1].binaryPayload);
-    QVERIFY(loaded.unreadablePayloadInstanceIds.isEmpty());
 
     QVERIFY(store.clearCatalogCollectionCache());
     const auto afterClear = store.loadCatalogCollectionCache();
@@ -176,10 +175,9 @@ void SkyCatalogCacheSettingsTests::clearSourceCacheEvictsPayloadKeepsConfigurati
     QCOMPARE(evicted.snapshot.sources[1].instanceId, savedSnapshot.sources[1].instanceId);
     QCOMPARE(evicted.snapshot.sources[1].payload, savedSnapshot.sources[1].payload);
     QCOMPARE(evicted.snapshot.sources[1].binaryPayload, savedSnapshot.sources[1].binaryPayload);
-    QVERIFY(evicted.unreadablePayloadInstanceIds.isEmpty());
 }
 
-void SkyCatalogCacheSettingsTests::unreadablePayloadIsReportedDistinctFromEviction()
+void SkyCatalogCacheSettingsTests::missingReferencedPayloadLoadsWithoutData()
 {
     const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
 
@@ -190,7 +188,8 @@ void SkyCatalogCacheSettingsTests::unreadablePayloadIsReportedDistinctFromEvicti
     QVERIFY(committedGeneration > 0U);
 
     // Remove one source's raw sidecar while its record keeps the reference. The
-    // other record stays intact, so only the corrupt one is reported.
+    // source still loads as configured and only its raw payload is lost, while
+    // the other record stays intact.
     const QString corruptedRawPath = skygate::ui::tests::stagedCatalogSourceSidecarPath(
         directory, committedGeneration, QStringLiteral("preset:hyg_v42"), QStringLiteral(".txt")
     );
@@ -202,16 +201,14 @@ void SkyCatalogCacheSettingsTests::unreadablePayloadIsReportedDistinctFromEvicti
     QVERIFY(corrupted.snapshot.sources[0].payload.isEmpty());
     QCOMPARE(corrupted.snapshot.sources[0].binaryPayload, savedSnapshot.sources[0].binaryPayload);
     QCOMPARE(corrupted.snapshot.sources[1].payload, savedSnapshot.sources[1].payload);
-    QCOMPARE(corrupted.unreadablePayloadInstanceIds, QStringList{QStringLiteral("preset:hyg_v42")});
 
     // A deliberate eviction drops the payload references, so the record stays
-    // readable without being reported as corrupt data.
+    // readable without any referenced file.
     QVERIFY(store.clearCatalogSourceCache(QStringLiteral("preset:open_ngc")));
     const auto evicted = store.loadCatalogCollectionCache();
     QVERIFY(evicted.isLoaded());
     QVERIFY(evicted.snapshot.sources[1].payload.isEmpty());
     QVERIFY(evicted.snapshot.sources[1].binaryPayload.isEmpty());
-    QCOMPARE(evicted.unreadablePayloadInstanceIds, QStringList{QStringLiteral("preset:hyg_v42")});
 }
 
 void SkyCatalogCacheSettingsTests::partialCacheSavePreservesConfiguredPeerPath()
@@ -226,14 +223,14 @@ void SkyCatalogCacheSettingsTests::partialCacheSavePreservesConfiguredPeerPath()
     SkyCatalogLegacyCacheSnapshot starSnapshot;
     starSnapshot.sourceLabel = "Saved";
     starSnapshot.catalogPayload = skygate::ui::tests::sampleHygCsvPayload();
-    QVERIFY(store.saveCatalogCache(starSnapshot));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(starSnapshot));
     QCOMPARE(settings.value("skyContext/catalogCachePath").toString(), starCachePath);
     QCOMPARE(settings.value("skyContext/deepSkyCatalogCachePath").toString(), deepSkyCachePath);
 
     SkyCatalogLegacyCacheSnapshot deepSkySnapshot;
     deepSkySnapshot.deepSkySourceLabel = "Saved OpenNGC";
     deepSkySnapshot.deepSkyCatalogPayload = skygate::ui::tests::sampleCompactOpenNgcCsvPayload();
-    QVERIFY(store.saveCatalogCache(deepSkySnapshot));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(deepSkySnapshot));
     QCOMPARE(settings.value("skyContext/catalogCachePath").toString(), starCachePath);
     QCOMPARE(settings.value("skyContext/deepSkyCatalogCachePath").toString(), deepSkyCachePath);
     QVERIFY(QFileInfo::exists(deepSkyCachePath));

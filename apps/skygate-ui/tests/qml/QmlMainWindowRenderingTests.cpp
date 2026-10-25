@@ -1,4 +1,7 @@
 #include "support/QmlRenderingTestSupport.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
+
+using skygate::ui::tests::setControllerUtcDateTime;
 
 class QmlMainWindowRenderingTests final : public QObject {
     Q_OBJECT
@@ -55,7 +58,8 @@ void QmlMainWindowRenderingTests::mainWindowsRenderNonBlankWithControlsInBounds(
     };
 
     for (const QDateTime& sceneTime : sceneTimes) {
-        QVERIFY(controller->setUtcDateTimeText(
+        QVERIFY(setControllerUtcDateTime(
+            *controller,
             sceneTime.date().toString(QStringLiteral("yyyy-MM-dd")),
             sceneTime.time().toString(QStringLiteral("HH:mm:ss"))
         ));

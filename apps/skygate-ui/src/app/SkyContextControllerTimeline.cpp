@@ -1,6 +1,5 @@
 #include "SkyContextController.hpp"
 #include "SkyContextProjectionTypeCodec.hpp"
-#include "SkyContextUtcDateTimeTextCodec.hpp"
 #include "engine/EphemerisComputationPolicy.hpp"
 #include "math/NumericTolerance.hpp"
 #include "math/ViewportMath.hpp"
@@ -211,23 +210,6 @@ void SkyContextController::stepBackward()
 {
     setLive(false);
     stepBySeconds(-m_timeline.stepSeconds());
-}
-
-QString SkyContextController::validateUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText) const
-{
-    return SkyContextUtcDateTimeTextCodec::parse(utcDateText, utcTimeText).errorText;
-}
-
-bool SkyContextController::setUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText)
-{
-    const auto parseResult = SkyContextUtcDateTimeTextCodec::parse(utcDateText, utcTimeText);
-    if (!parseResult.isValid()) {
-        return false;
-    }
-
-    setCurrentUtc(parseResult.utcDateTime);
-    setLive(false);
-    return true;
 }
 
 void SkyContextController::setProjectionTypeText(const QString& projectionTypeText)

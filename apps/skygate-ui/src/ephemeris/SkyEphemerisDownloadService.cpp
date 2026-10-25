@@ -205,27 +205,15 @@ SkyEphemerisDownloadService::SkyEphemerisDownloadService(QNetworkAccessManager* 
 
 SkyEphemerisDownloadService::~SkyEphemerisDownloadService() = default;
 
-SkyEphemerisDownloadService::StagedUpdateDownloadResult
-SkyEphemerisDownloadService::stage(const StagedUpdateDownloadRequest& request)
-{
-    StagedUpdateDownloadResult result;
-    stageInternal(
-        request, [&result](StagedUpdateDownloadResult stagedResult) { result = std::move(stagedResult); }, false
-    );
-    return result;
-}
-
 void SkyEphemerisDownloadService::stageAsync(
     const StagedUpdateDownloadRequest& request, std::function<void(StagedUpdateDownloadResult)> completionHandler
 )
 {
-    stageInternal(request, std::move(completionHandler), true);
+    stageInternal(request, std::move(completionHandler));
 }
 
 void SkyEphemerisDownloadService::stageInternal(
-    const StagedUpdateDownloadRequest& request,
-    const std::function<void(StagedUpdateDownloadResult)>& completionHandler,
-    const bool allowNetwork
+    const StagedUpdateDownloadRequest& request, const std::function<void(StagedUpdateDownloadResult)>& completionHandler
 )
 {
     const auto isCanceled = [&request] {
@@ -296,13 +284,6 @@ void SkyEphemerisDownloadService::stageInternal(
         completionHandler(std::move(result));
         return;
     }
-    if (!allowNetwork) {
-        StagedUpdateDownloadResult result;
-        addDiagnostic(result, QStringLiteral("Ephemeris update network downloads must be requested asynchronously."));
-        completionHandler(std::move(result));
-        return;
-    }
-
     stageNetworkUrl(request, completionHandler);
 }
 

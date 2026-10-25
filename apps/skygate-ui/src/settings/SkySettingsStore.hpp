@@ -22,7 +22,6 @@ public:
     [[nodiscard]] skygate::ui::internal::SkyLoggingSettingsSnapshot loadLoggingSettings() const;
     [[nodiscard]] bool clearCatalogCache() const;
     [[nodiscard]] bool clearDeepSkyCatalogCache() const;
-    [[nodiscard]] bool saveCatalogCache(const SkyCatalogLegacyCacheSnapshot& snapshot) const;
     [[nodiscard]] std::optional<SkyCatalogLegacyCacheSnapshot> loadCatalogCache() const;
     // Collection persistence is implemented by SkyCatalogCollectionStore;
     // these entry points stay as forwarding methods for existing callers.

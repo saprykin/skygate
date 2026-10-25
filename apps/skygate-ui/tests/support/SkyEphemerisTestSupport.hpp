@@ -178,8 +178,11 @@ inline bool configureTestSkyContext(SkyContextController& controller, const Test
     }
 
     controller.setLive(config.live);
-    if (config.applyUtcDateTime && !controller.setUtcDateTimeText(config.utcDate, config.utcTime)) {
-        return false;
+    if (config.applyUtcDateTime) {
+        controller.timeController()->setInitialTimeZoneId(QStringLiteral("UTC"));
+        if (!controller.timeController()->setDateTimeText(config.utcDate, config.utcTime)) {
+            return false;
+        }
     }
 
     controller.setLatitudeText(config.latitude);

@@ -389,8 +389,6 @@ public:
     Q_INVOKABLE void resetViewDirection();
     Q_INVOKABLE void stepForward();
     Q_INVOKABLE void stepBackward();
-    [[nodiscard]] QString validateUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText) const;
-    [[nodiscard]] bool setUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText);
     Q_INVOKABLE void setLatitudeText(const QString& latitudeText);
     Q_INVOKABLE void setLongitudeText(const QString& longitudeText);
     Q_INVOKABLE void setElevationText(const QString& elevationText);

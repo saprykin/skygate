@@ -3,6 +3,7 @@
 #include "DeviceLocationTestSupport.hpp"
 #include "ITimeSource.hpp"
 #include "SettingsTestFixture.hpp"
+#include "SkyContextTimeTestSupport.hpp"
 #include "SkyEphemerisTestSupport.hpp"
 #include "app/SkyContextController.hpp"
 #include "time/SkyQtTimeCodec.hpp"
@@ -33,6 +34,7 @@ using skygate::ephemeris::tests::findStateById;
 using skygate::ui::tests::createTestEphemerisEngine;
 using skygate::ui::tests::fixedNowUtc;
 using skygate::ui::tests::makeBody;
+using skygate::ui::tests::setControllerUtcDateTime;
 using skygate::ui::tests::testControllerOptions;
 
 class FakeTimeSource final : public skygate::core::ITimeSource {
@@ -134,7 +136,7 @@ QDateTime controllerUtcTime(const SkyContextController& controller)
 void configureFocusTestContext(SkyContextController& controller)
 {
     controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
+    QVERIFY(setControllerUtcDateTime(controller, QStringLiteral("2024-06-01"), QStringLiteral("22:00:00")));
     controller.setLatitudeText("47.3769");
     controller.setLongitudeText("8.5417");
     controller.setElevationText("408.0");

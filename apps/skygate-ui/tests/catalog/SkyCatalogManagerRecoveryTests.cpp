@@ -10,6 +10,7 @@
 #include "support/CatalogTestPayloads.hpp"
 #include "support/FakeNetworkAccessManager.hpp"
 #include "support/SettingsTestFixture.hpp"
+#include "support/CatalogSourceStateQuery.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -20,6 +21,8 @@
 
 #include <algorithm>
 #include <utility>
+
+using skygate::ui::tests::isCatalogSourceEnabled;
 
 using skygate::ui::tests::CatalogBodyQuery;
 using skygate::ui::tests::CatalogTestPayloadFile;
@@ -154,7 +157,7 @@ void SkyCatalogManagerRecoveryTests::legacyMigrationRenamesDuplicateInstanceIds(
     );
 
     SkySettingsStore store;
-    QVERIFY(store.saveCatalogCache(legacy));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacy));
 
     SkyCatalogManager manager(&store);
     manager.setCatalogPresetIndex(2);
@@ -188,7 +191,7 @@ void SkyCatalogManagerRecoveryTests::legacyBundledStarSlotSurvivesMigration()
     legacy.deepSkyCatalogPayload = skygate::ui::tests::sampleCompactOpenNgcCsvPayload();
 
     SkySettingsStore store;
-    QVERIFY(store.saveCatalogCache(legacy));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacy));
 
     // The legacy star slot selected the bundled source. Migration keeps it in
     // first position instead of dropping it once the downloaded deep-sky
@@ -199,7 +202,7 @@ void SkyCatalogManagerRecoveryTests::legacyBundledStarSlotSurvivesMigration()
     QCOMPARE(
         manager.sourceInstanceIds(), QStringList({QStringLiteral("preset:bundled"), QStringLiteral("preset:open_ngc")})
     );
-    QVERIFY(manager.isSourceEnabled(QStringLiteral("preset:bundled")));
+    QVERIFY(isCatalogSourceEnabled(manager, QStringLiteral("preset:bundled")));
 
     const QVector<SkyCatalogManager::SourceViewEntry> view = manager.sourceViewEntries();
     QCOMPARE(view.size(), 2);
@@ -283,7 +286,7 @@ void SkyCatalogManagerRecoveryTests::unreadablePayloadKeepsConfiguredAndSiblings
         manager.sourceInstanceIds(),
         QStringList({QStringLiteral("primary"), QStringLiteral("custom:damaged"), QStringLiteral("custom:healthy")})
     );
-    QVERIFY(manager.isSourceEnabled(QStringLiteral("custom:damaged")));
+    QVERIFY(isCatalogSourceEnabled(manager, QStringLiteral("custom:damaged")));
     QVERIFY(manager.statusText().contains(QStringLiteral("Unavailable sources")));
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Healthy Star")));
 
@@ -342,7 +345,7 @@ void SkyCatalogManagerRecoveryTests::legacySourcesStayRetiredAfterEmptyMigration
     );
 
     SkySettingsStore store;
-    QVERIFY(store.saveCatalogCache(legacy));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacy));
 
     {
         SkyCatalogManager manager(&store);
@@ -412,7 +415,7 @@ void SkyCatalogManagerRecoveryTests::interruptedGenerationUpgradeRestoresFlatSou
     SkySettingsStore store;
     // The retired two-slot cache stays readable on disk, so a restore that
     // migrated it instead of the flat collection would return its source.
-    QVERIFY(store.saveCatalogCache(makeCacheSnapshot()));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(makeCacheSnapshot()));
 
     const QString directory = m_settings.filePath(QStringLiteral("catalog-collection-cache"));
     QVERIFY(QDir().mkpath(directory));
@@ -547,7 +550,7 @@ void SkyCatalogManagerRecoveryTests::unreadableCommittedKeepsActiveCollection()
     committed.sources.push_back(std::move(accepted));
 
     SkySettingsStore store;
-    QVERIFY(store.saveCatalogCache(legacy));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacy));
     QVERIFY(store.saveCatalogCollectionCache(committed));
 
     SkyCatalogManager manager(&store);
@@ -563,7 +566,7 @@ void SkyCatalogManagerRecoveryTests::unreadableCommittedKeepsActiveCollection()
 
     QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
-    const std::size_t bodyCountBefore = manager.bodyCount();
+    const std::size_t bodyCountBefore = manager.starCatalog()->bodies().size();
     const std::uint64_t revisionBefore = manager.catalogRevision();
 
     QVERIFY(!manager.restoreCatalogCache());
@@ -571,7 +574,7 @@ void SkyCatalogManagerRecoveryTests::unreadableCommittedKeepsActiveCollection()
     // The accepted collection stays active: no legacy source returns and no
     // catalog change is published for the rejected restore.
     QCOMPARE(manager.sourceInstanceIds(), QStringList{QStringLiteral("custom:accepted")});
-    QCOMPARE(manager.bodyCount(), bodyCountBefore);
+    QCOMPARE(manager.starCatalog()->bodies().size(), bodyCountBefore);
     QCOMPARE(manager.catalogRevision(), revisionBefore);
     QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Accepted Star")));
     QVERIFY(!CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Legacy Star")));

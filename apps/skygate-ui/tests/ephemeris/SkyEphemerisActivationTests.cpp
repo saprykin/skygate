@@ -4,6 +4,7 @@
 #include "support/EphemerisDataCacheSnapshotFixture.hpp"
 #include "support/SettingsTestFixture.hpp"
 #include "support/StagedEphemerisAssetFixture.hpp"
+#include "support/EphemerisDataManagerTestSupport.hpp"
 
 #include <QByteArray>
 #include <QDir>
@@ -22,6 +23,8 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+using skygate::ui::tests::usesInstalledData;
 
 using skygate::ui::tests::EphemerisDataCacheSnapshotFixture;
 using skygate::ui::tests::SettingsTestFixture;
@@ -338,7 +341,13 @@ public:
         request.stagedResourceRoot = m_stagedRoot.path();
         request.cancellationRequested = std::move(cancellationRequested);
         request.retainPartialStagingOnCancellation = retainPartialStagingOnCancellation;
-        return manager().stageEphemerisUpdateAsset(request);
+        SkyEphemerisDataManager::StagedUpdateDownloadResult result;
+        manager().stageEphemerisUpdateAssetAsync(
+            request, [&result](SkyEphemerisDataManager::StagedUpdateDownloadResult stagedResult) {
+                result = std::move(stagedResult);
+            }
+        );
+        return result;
     }
 
     void verifyActiveDataPreserved() const
@@ -426,8 +435,8 @@ void SkyEphemerisActivationTests::activatesVerifiedStagedUpdateSetAtomically()
     QCOMPARE(activeDataSpy.count(), 1);
     QCOMPARE(revisionSpy.count(), 1);
     QVERIFY(manager.dataRevision() > originalRevision);
-    QVERIFY(manager.usingInstalledData());
-    QCOMPARE(manager.dataRevisionToken(), QString("installed-rev-2"));
+    QVERIFY(usesInstalledData(manager));
+    QCOMPARE(manager.activeCacheSnapshot().dataRevisionToken, QString("installed-rev-2"));
     QCOMPARE(result.activatedAssetIds.size(), std::size_t{4});
 
     const SkyEphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
@@ -500,9 +509,8 @@ void SkyEphemerisActivationTests::activatesFullLongRangeProfileUpdateSet()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Verified)
     );
     QCOMPARE(result.activatedAssetIds.size(), std::size_t{4});
-    QVERIFY(manager.usingInstalledData());
+    QVERIFY(usesInstalledData(manager));
     QCOMPARE(manager.shortRangeKernelStatusText(), QString("Installed: test"));
-    QCOMPARE(manager.longRangeKernelStatusText(), QString("Installed: test"));
 
     const auto snapshot = manager.activeDataSnapshot();
     QVERIFY(snapshot != nullptr);
@@ -530,11 +538,10 @@ void SkyEphemerisActivationTests::activatedCustomProfileRendersDe440s()
 
     const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
     QVERIFY2(result.isSuccess(), failureMessage.constData());
-    QVERIFY(manager.usingInstalledData());
+    QVERIFY(usesInstalledData(manager));
     QVERIFY(manager.activeCacheSnapshot().installedKernelLongRange.has_value());
     QCOMPARE(manager.activeCacheSnapshot().installedKernelLongRange.value(), false);
     QCOMPARE(manager.kernelDisplayText(), QString("DE440s"));
-    QCOMPARE(manager.longRangeKernelStatusText(), QString("Not installed"));
 }
 
 void SkyEphemerisActivationTests::supportDataActivationPreservesInstalledKernel()
@@ -606,7 +613,7 @@ void SkyEphemerisActivationTests::activatesLiveSupportDataUpdateWithDriftedPaylo
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Verified)
     );
     QCOMPARE(result.activatedAssetIds.size(), std::size_t{3});
-    QVERIFY(manager.usingInstalledData());
+    QVERIFY(usesInstalledData(manager));
 
     const SkyEphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
     QCOMPARE(savedSnapshot.installedEarthOrientationVersion, QString("test"));
@@ -801,8 +808,8 @@ void SkyEphemerisActivationTests::metadataPersistenceFailurePreservesActiveData(
         static_cast<std::uint8_t>(SkyEphemerisDataManager::StagedUpdateActivationStatus::PersistenceFailed)
     );
     QCOMPARE(manager.dataRevision(), originalRevision);
-    QVERIFY(!manager.usingInstalledData());
-    QCOMPARE(manager.dataRevisionToken(), QString("bundled"));
+    QVERIFY(!usesInstalledData(manager));
+    QCOMPARE(manager.activeCacheSnapshot().dataRevisionToken, QString("bundled"));
     QVERIFY(!QFileInfo::exists(m_settings.filePath(QStringLiteral("updates/installed-rev-2"))));
 }
 
@@ -994,7 +1001,7 @@ void SkyEphemerisActivationTests::updateFlowHarnessActivatesAndSignalsRevision()
     QCOMPARE(activeDataSpy.count(), 1);
     QCOMPARE(revisionSpy.count(), 1);
     QVERIFY(harness.manager().dataRevision() > harness.originalRevision());
-    QCOMPARE(harness.manager().dataRevisionToken(), QString("installed-rev-2"));
+    QCOMPARE(harness.manager().activeCacheSnapshot().dataRevisionToken, QString("installed-rev-2"));
     QCOMPARE(result.activatedAssetIds.size(), std::size_t{4});
 }
 

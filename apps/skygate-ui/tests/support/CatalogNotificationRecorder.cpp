@@ -14,7 +14,7 @@ void CatalogNotificationRecorder::observe(SkyCatalogManager& manager, std::vecto
                 .lineRefCount = manager.constellationLineRefs().size(),
                 .anchorGroupCount = manager.constellationAnchorGroups().size(),
                 .constellationCount = manager.constellationCount(),
-                .bodyCount = manager.bodyCount(),
+                .bodyCount = manager.starCatalog()->bodies().size(),
             }
         );
     });
@@ -26,7 +26,7 @@ void CatalogNotificationRecorder::assertMatchesRuntime(const SkyCatalogManager& 
     QCOMPARE(observation.lineRefCount, manager.constellationLineRefs().size());
     QCOMPARE(observation.anchorGroupCount, manager.constellationAnchorGroups().size());
     QCOMPARE(observation.constellationCount, manager.constellationCount());
-    QCOMPARE(observation.bodyCount, manager.bodyCount());
+    QCOMPARE(observation.bodyCount, manager.starCatalog()->bodies().size());
 }
 
 }  // namespace skygate::ui::tests

@@ -11,6 +11,7 @@
 #include "support/CatalogTestPayloads.hpp"
 #include "support/FakeNetworkAccessManager.hpp"
 #include "support/SettingsTestFixture.hpp"
+#include "support/CatalogSourceStateQuery.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -23,6 +24,8 @@
 
 #include <algorithm>
 #include <utility>
+
+using skygate::ui::tests::isCatalogSourceEnabled;
 
 using skygate::ui::tests::CatalogArchiveFixture;
 using skygate::ui::tests::CatalogBodyQuery;
@@ -100,7 +103,7 @@ SkyCatalogLegacyCacheSnapshot SkyCatalogManagerPersistenceTests::makeCacheSnapsh
 void SkyCatalogManagerPersistenceTests::restoreCachePathThroughManager()
 {
     SkySettingsStore store;
-    QVERIFY(store.saveCatalogCache(makeCacheSnapshot()));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(makeCacheSnapshot()));
 
     SkyCatalogManager manager(&store);
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
@@ -115,7 +118,7 @@ void SkyCatalogManagerPersistenceTests::restoreCachePathThroughManager()
     QCOMPARE(manager.sourceLabel(), QString("Custom (saved)"));
     QCOMPARE(manager.constellationCount(), 1U);
     QCOMPARE(manager.constellationLineRefs().size(), 1U);
-    QVERIFY(manager.bodyCount() > 0U);
+    QVERIFY(manager.starCatalog()->bodies().size() > 0U);
     QCOMPARE(catalogSpy.count(), 1);
 }
 
@@ -341,7 +344,7 @@ void SkyCatalogManagerPersistenceTests::persistsBundledSourceConfigurationWithou
     QCOMPARE(manager.sourceCount(), std::size_t{1});
     const QString bundledId = manager.sourceInstanceIds().first();
     QCOMPARE(bundledId, QStringLiteral("primary"));
-    QVERIFY(manager.isSourceEnabled(bundledId));
+    QVERIFY(isCatalogSourceEnabled(manager, bundledId));
 
     // Disabling the bundled source persists its configuration alone; no URL,
     // download, or operation record is involved.
@@ -363,7 +366,7 @@ void SkyCatalogManagerPersistenceTests::persistsBundledSourceConfigurationWithou
     SkyCatalogManager restoredManager(&store);
     QVERIFY(restoredManager.restoreCatalogCache());
     QCOMPARE(restoredManager.sourceInstanceIds(), QStringList{bundledId});
-    QVERIFY(!restoredManager.isSourceEnabled(bundledId));
+    QVERIFY(!isCatalogSourceEnabled(restoredManager, bundledId));
     QVERIFY(restoredManager.starCatalog() != nullptr);
     const auto composedIds = restoredManager.sourceIds();
     QVERIFY(std::none_of(composedIds.begin(), composedIds.end(), [&bundledId](const QString& sourceId) {
@@ -517,7 +520,7 @@ void SkyCatalogManagerPersistenceTests::rejectedRestoreKeepsCollectionAndReports
     QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
 
     const QStringList sourcesBefore = manager.sourceInstanceIds();
-    const std::size_t bodyCountBefore = manager.bodyCount();
+    const std::size_t bodyCountBefore = manager.starCatalog()->bodies().size();
     const std::uint64_t revisionBefore = manager.catalogRevision();
     const int sourceRowCountBefore = manager.sourceViewEntries().size();
 
@@ -531,7 +534,7 @@ void SkyCatalogManagerPersistenceTests::rejectedRestoreKeepsCollectionAndReports
     QCOMPARE(datasetSpy.count(), 0);
 
     QCOMPARE(manager.sourceInstanceIds(), sourcesBefore);
-    QCOMPARE(manager.bodyCount(), bodyCountBefore);
+    QCOMPARE(manager.starCatalog()->bodies().size(), bodyCountBefore);
     QCOMPARE(manager.catalogRevision(), revisionBefore);
     QVERIFY(manager.starCatalog() != nullptr);
 

@@ -15,7 +15,7 @@ class SkyLegacyCatalogCacheStoreTests final : public QObject {
 
 private slots:
     void initTestCase();
-    void savesAndLoadsBothCacheSlots();
+    void loadsSeededCacheSlots();
     void reportsNoCacheWhenEverySlotIsEmpty();
     void clearsStarSlotAndKeepsDeepSkySlot();
     void clearsBothCacheSlots();
@@ -42,7 +42,7 @@ void SkyLegacyCatalogCacheStoreTests::resetStorage() const
     m_settings.resetForCurrentTest();
 }
 
-void SkyLegacyCatalogCacheStoreTests::savesAndLoadsBothCacheSlots()
+void SkyLegacyCatalogCacheStoreTests::loadsSeededCacheSlots()
 {
     resetStorage();
 
@@ -51,7 +51,7 @@ void SkyLegacyCatalogCacheStoreTests::savesAndLoadsBothCacheSlots()
     savedSnapshot.catalogBinarySchemaVersion = 7;
     savedSnapshot.deepSkyBinaryPayload = QByteArray("deep-sky-binary-payload");
 
-    QVERIFY(SkyLegacyCatalogCacheStore::save(savedSnapshot));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(savedSnapshot));
     const std::optional<SkyCatalogLegacyCacheSnapshot> loadedSnapshot = SkyLegacyCatalogCacheStore::load();
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->sourceLabel, savedSnapshot.sourceLabel);
@@ -79,7 +79,7 @@ void SkyLegacyCatalogCacheStoreTests::clearsStarSlotAndKeepsDeepSkySlot()
     resetStorage();
 
     const SkyCatalogLegacyCacheSnapshot savedSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot();
-    QVERIFY(SkyLegacyCatalogCacheStore::save(savedSnapshot));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(savedSnapshot));
 
     QVERIFY(SkyLegacyCatalogCacheStore::clearStarCache());
     const std::optional<SkyCatalogLegacyCacheSnapshot> starClearedSnapshot = SkyLegacyCatalogCacheStore::load();
@@ -98,7 +98,7 @@ void SkyLegacyCatalogCacheStoreTests::clearsBothCacheSlots()
 {
     resetStorage();
 
-    QVERIFY(SkyLegacyCatalogCacheStore::save(skygate::ui::tests::sampleCatalogCacheSnapshot()));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(skygate::ui::tests::sampleCatalogCacheSnapshot()));
 
     QVERIFY(SkyLegacyCatalogCacheStore::clearStarCache());
     QVERIFY(SkyLegacyCatalogCacheStore::clearDeepSkyCache());

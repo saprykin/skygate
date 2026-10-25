@@ -102,11 +102,6 @@ QString SkyCatalogManager::participationSummary() const
     return m_runtime->participationSummary();
 }
 
-std::size_t SkyCatalogManager::bodyCount() const noexcept
-{
-    return m_runtime->bodyCount();
-}
-
 std::size_t SkyCatalogManager::constellationCount() const noexcept
 {
     return m_runtime->constellationCount();
@@ -132,19 +127,9 @@ QStringList SkyCatalogManager::sourceInstanceIds() const
     return m_runtime->sourceInstanceIds();
 }
 
-bool SkyCatalogManager::isSourceEnabled(const QString& instanceId) const
-{
-    return m_runtime->isSourceEnabled(instanceId);
-}
-
 QHash<QString, QString> SkyCatalogManager::sourceTitles() const
 {
     return m_runtime->sourceTitles();
-}
-
-QString SkyCatalogManager::sourceTitle(const QString& instanceId) const
-{
-    return m_runtime->sourceTitle(instanceId);
 }
 
 QVector<SkyCatalogManager::SourceViewEntry> SkyCatalogManager::sourceViewEntries() const

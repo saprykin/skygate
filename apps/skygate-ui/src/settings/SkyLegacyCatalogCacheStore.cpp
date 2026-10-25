@@ -1,6 +1,5 @@
 #include "SkyLegacyCatalogCacheStore.hpp"
 #include "SkyCacheFiles.hpp"
-#include "SkyPersistedStateSnapshot.hpp"
 #include "SkySettingsKeyBuilder.hpp"
 #include "SkySettingsValueCodecs.hpp"
 #include "diagnostics/SkyLoggingCategories.hpp"
@@ -64,83 +63,6 @@ void loadCachePayload(const QString& path, const QString& logNoun, QByteArray& p
 }
 
 }  // namespace
-
-bool SkyLegacyCatalogCacheStore::save(const SkyCatalogLegacyCacheSnapshot& snapshot)
-{
-    if (snapshot.catalogPayload.isEmpty() && snapshot.deepSkyCatalogPayload.isEmpty()) {
-        return false;
-    }
-
-    QSettings settings;
-    const QString configuredPath =
-        settings.value(SkySettingsKeyBuilder::key("catalogCachePath"), defaultCatalogCachePath()).toString();
-    const QString configuredDeepSkyPath =
-        settings.value(SkySettingsKeyBuilder::key("deepSkyCatalogCachePath"), defaultDeepSkyCatalogCachePath())
-            .toString();
-    const auto writePayload = [](const QString& path, const QByteArray& payload) {
-        if (path.isEmpty() || payload.isEmpty()) {
-            return true;
-        }
-        return SkyCacheFiles::writeFileAtomically(path, payload, QStringLiteral("catalog cache"));
-    };
-
-    if (!writePayload(configuredPath, snapshot.catalogPayload)) {
-        return false;
-    }
-    if (!writePayload(configuredDeepSkyPath, snapshot.deepSkyCatalogPayload)) {
-        return false;
-    }
-    const QString configuredBinaryPath = defaultCatalogBinaryCachePath();
-    const QString configuredDeepSkyBinaryPath = defaultDeepSkyBinaryCatalogCachePath();
-    if (!writePayload(configuredBinaryPath, snapshot.catalogBinaryPayload)) {
-        return false;
-    }
-    if (!writePayload(configuredDeepSkyBinaryPath, snapshot.deepSkyBinaryPayload)) {
-        return false;
-    }
-    settings.setValue(SkySettingsKeyBuilder::key("version"), SkyPersistedStateSnapshot::kSettingsVersion);
-    if (!snapshot.catalogPayload.isEmpty()) {
-        settings.setValue(SkySettingsKeyBuilder::key("catalogCachePath"), configuredPath);
-    }
-    if (!snapshot.deepSkyCatalogPayload.isEmpty()) {
-        settings.setValue(SkySettingsKeyBuilder::key("deepSkyCatalogCachePath"), configuredDeepSkyPath);
-    }
-    if (!snapshot.catalogBinaryPayload.isEmpty()) {
-        settings.setValue(SkySettingsKeyBuilder::key("catalogBinaryCachePath"), configuredBinaryPath);
-        settings.setValue(
-            SkySettingsKeyBuilder::key("catalogBinarySchemaVersion"), snapshot.catalogBinarySchemaVersion
-        );
-    }
-    if (!snapshot.deepSkyBinaryPayload.isEmpty()) {
-        settings.setValue(SkySettingsKeyBuilder::key("deepSkyBinaryCatalogCachePath"), configuredDeepSkyBinaryPath);
-    }
-    if (!snapshot.catalogPayload.isEmpty()) {
-        settings.setValue(SkySettingsKeyBuilder::key("catalogSourceLabel"), snapshot.sourceLabel);
-        settings.setValue(SkySettingsKeyBuilder::key("catalogConstellationLineRefs"), snapshot.constellationLineRows);
-        settings.setValue(
-            SkySettingsKeyBuilder::key("catalogConstellationAnchorGroups"), snapshot.constellationAnchorGroupRows
-        );
-        settings.setValue(
-            SkySettingsKeyBuilder::key("catalogConstellationLineSchemaVersion"), snapshot.constellationLineSchemaVersion
-        );
-        settings.setValue(
-            SkySettingsKeyBuilder::key("catalogConstellationCount"),
-            static_cast<qulonglong>(snapshot.constellationCount)
-        );
-    }
-    if (!snapshot.deepSkyCatalogPayload.isEmpty()) {
-        settings.setValue(SkySettingsKeyBuilder::key("deepSkyCatalogSourceLabel"), snapshot.deepSkySourceLabel);
-    }
-    settings.sync();
-    if (settings.status() != QSettings::NoError) {
-        qCWarning(skygateCatalogCacheLog) << "Failed to save catalog cache settings";
-        return false;
-    }
-    qCInfo(skygateCatalogCacheLog).noquote() << "Catalog cache saved: starBytes" << snapshot.catalogPayload.size()
-                                             << "deepSkyBytes" << snapshot.deepSkyCatalogPayload.size()
-                                             << "constellationSegments" << snapshot.constellationLineRows.count('\n');
-    return true;
-}
 
 std::optional<SkyCatalogLegacyCacheSnapshot> SkyLegacyCatalogCacheStore::load()
 {

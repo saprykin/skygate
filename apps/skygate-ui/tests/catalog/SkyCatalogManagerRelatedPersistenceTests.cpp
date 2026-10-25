@@ -11,6 +11,7 @@
 #include "support/RelatedDatasetFixture.hpp"
 #include "support/SettingsTestFixture.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
+#include "support/CatalogSourceStateQuery.hpp"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -19,6 +20,8 @@
 
 #include <algorithm>
 #include <utility>
+
+using skygate::ui::tests::isCatalogSourceEnabled;
 
 using skygate::ui::tests::CatalogSourceFactsQuery;
 using skygate::ui::tests::ConstellationAnchorGroupLookup;
@@ -321,8 +324,8 @@ void SkyCatalogManagerRelatedPersistenceTests::disabledOwnerDataStaysOwnedButIna
 
     SkyCatalogManager restoredManager(&store);
     QVERIFY(restoredManager.restoreCatalogCache());
-    QVERIFY(!restoredManager.isSourceEnabled(sourceAId));
-    QVERIFY(restoredManager.isSourceEnabled(sourceBId));
+    QVERIFY(!isCatalogSourceEnabled(restoredManager, sourceAId));
+    QVERIFY(isCatalogSourceEnabled(restoredManager, sourceBId));
 
     // The disabled owner's references stay inactive after the restart.
     QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{2});
@@ -405,7 +408,7 @@ void SkyCatalogManagerRelatedPersistenceTests::removedOwnerRelatedDataDoesNotRet
     legacy.constellationLineSchemaVersion =
         skygate::ui::internal::SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
     legacy.constellationCount = 1U;
-    QVERIFY(store.saveCatalogCache(legacy));
+    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacy));
 
     // The removed owner's dataset does not return through another record or
     // through the legacy fallback.
@@ -471,8 +474,8 @@ void SkyCatalogManagerRelatedPersistenceTests::corruptOwnerPayloadLeavesSiblingD
 
     // The corrupted owner restores without related data and keeps its
     // configuration; the sibling's dataset is untouched.
-    QVERIFY(restoredManager.isSourceEnabled(sourceAId));
-    QVERIFY(restoredManager.isSourceEnabled(sourceBId));
+    QVERIFY(isCatalogSourceEnabled(restoredManager, sourceAId));
+    QVERIFY(isCatalogSourceEnabled(restoredManager, sourceBId));
     QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{2});
     QVERIFY(ConstellationAnchorGroupLookup::find(restoredManager, "Orion") == nullptr);
     QVERIFY(ConstellationAnchorGroupLookup::find(restoredManager, "Lyra") != nullptr);

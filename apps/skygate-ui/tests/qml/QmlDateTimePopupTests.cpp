@@ -1,4 +1,5 @@
 #include "support/QmlTestSupport.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 #include "time/SkyTimeController.hpp"
 
 using namespace skygate::ui::tests;
@@ -93,7 +94,7 @@ void QmlDateTimePopupTests::dateTimePopupNowOutsideClickAndEnterKeyWork()
     auto controller = makeController();
     QVERIFY(controller != nullptr);
     QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("UTC")));
-    QVERIFY(controller->setUtcDateTimeText("2024-01-02", "03:04:05"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2024-01-02", "03:04:05"));
     controller->setLive(false);
 
     QQmlEngine engine;

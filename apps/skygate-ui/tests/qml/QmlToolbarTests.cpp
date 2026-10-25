@@ -1,4 +1,5 @@
 #include "support/QmlTestSupport.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 
 using namespace skygate::ui::tests;
 
@@ -216,7 +217,7 @@ void QmlToolbarTests::timelineToolbarControlsUpdateController()
     QVERIFY(controller != nullptr);
     controller->setTimelineToolbarCollapsed(false);
     controller->setStepSeconds(60);
-    QVERIFY(controller->setUtcDateTimeText("2024-01-02", "03:04:05"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2024-01-02", "03:04:05"));
     controller->setLive(true);
     const QString originalTimeText = controller->utcTimeText();
 

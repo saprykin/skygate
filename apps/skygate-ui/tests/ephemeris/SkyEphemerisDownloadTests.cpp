@@ -101,7 +101,12 @@ void SkyEphemerisDownloadTests::stagesAssetFromSourceUrl()
         progressTotal = totalBytes;
     };
 
-    const SkyEphemerisDataManager::StagedUpdateDownloadResult result = manager.stageEphemerisUpdateAsset(request);
+    SkyEphemerisDataManager::StagedUpdateDownloadResult result;
+    manager.stageEphemerisUpdateAssetAsync(
+        request, [&result](SkyEphemerisDataManager::StagedUpdateDownloadResult stagedResult) {
+            result = std::move(stagedResult);
+        }
+    );
 
     const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
     QVERIFY2(result.isSuccess(), failureMessage.constData());
@@ -373,7 +378,12 @@ void SkyEphemerisDownloadTests::cancelDuringDownloadKeepsStagingAndActiveData()
         return cancellationChecks >= 3;
     };
 
-    const SkyEphemerisDataManager::StagedUpdateDownloadResult result = manager.stageEphemerisUpdateAsset(request);
+    SkyEphemerisDataManager::StagedUpdateDownloadResult result;
+    manager.stageEphemerisUpdateAssetAsync(
+        request, [&result](SkyEphemerisDataManager::StagedUpdateDownloadResult stagedResult) {
+            result = std::move(stagedResult);
+        }
+    );
 
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),

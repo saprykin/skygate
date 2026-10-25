@@ -62,7 +62,7 @@ void recordNotifications(SkyCatalogManager& manager, std::vector<NotificationEve
             NotificationEvent{
                 .kind = kind,
                 .revision = manager.catalogRevision(),
-                .bodyCount = manager.bodyCount(),
+                .bodyCount = manager.starCatalog()->bodies().size(),
                 .lineRefCount = manager.constellationLineRefs().size(),
                 .constellationCount = manager.constellationCount(),
                 .downloading = manager.downloadingCatalog(),
@@ -685,7 +685,7 @@ void SkyCatalogManagerTransitionTests::completedLoadPublishesStatusThenRelatedDa
     QTRY_VERIFY(!manager.downloadingCatalog());
     QVERIFY(FakeReplyQuery::findPendingReplyForUrl(networkAccessManager, relatedUrl) != nullptr);
 
-    const std::size_t acceptedBodyCount = manager.bodyCount();
+    const std::size_t acceptedBodyCount = manager.starCatalog()->bodies().size();
     const std::size_t catalogIndex = indexOfKind(events, NotificationEvent::Kind::Catalog);
     QVERIFY(catalogIndex < events.size());
     QVERIFY(catalogIndex >= 3);

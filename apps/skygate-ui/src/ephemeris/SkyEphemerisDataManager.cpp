@@ -115,19 +115,9 @@ QString SkyEphemerisDataManager::statusText() const
     return m_assetStatusView.statusText();
 }
 
-QString SkyEphemerisDataManager::datasetInfoText() const
-{
-    return m_assetStatusView.datasetInfoText();
-}
-
 QString SkyEphemerisDataManager::shortRangeKernelStatusText() const
 {
     return m_assetStatusView.shortRangeKernelStatusText();
-}
-
-QString SkyEphemerisDataManager::longRangeKernelStatusText() const
-{
-    return m_assetStatusView.longRangeKernelStatusText();
 }
 
 QString SkyEphemerisDataManager::kernelDisplayText() const
@@ -163,16 +153,6 @@ std::uint64_t SkyEphemerisDataManager::supportDataCacheSizeBytes() const
 QString SkyEphemerisDataManager::lastUpdateResultText() const
 {
     return m_assetStatusView.lastUpdateResultText();
-}
-
-QString SkyEphemerisDataManager::dataRevisionToken() const
-{
-    return m_assetStatusView.dataRevisionToken();
-}
-
-bool SkyEphemerisDataManager::usingInstalledData() const noexcept
-{
-    return m_activeSource == ActiveSource::Installed;
 }
 
 std::uint64_t SkyEphemerisDataManager::dataRevision() const noexcept
@@ -314,12 +294,6 @@ void SkyEphemerisDataManager::clearUpdateCancellation() noexcept
 bool SkyEphemerisDataManager::updateCancellationRequested() const noexcept
 {
     return m_updateCancellationRequested.load();
-}
-
-SkyEphemerisDataManager::StagedUpdateDownloadResult
-SkyEphemerisDataManager::stageEphemerisUpdateAsset(const StagedUpdateDownloadRequest& request)
-{
-    return m_downloadService->stage(combineCancellation(request, this));
 }
 
 void SkyEphemerisDataManager::stageEphemerisUpdateAssetAsync(

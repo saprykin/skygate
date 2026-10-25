@@ -23,6 +23,7 @@
 #include "support/RelatedDatasetFixture.hpp"
 #include "support/SettingsTestFixture.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
+#include "support/CatalogSourceStateQuery.hpp"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -40,6 +41,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+using skygate::ui::tests::isCatalogSourceEnabled;
 
 using skygate::ui::tests::CatalogBodyQuery;
 using skygate::ui::tests::CatalogNotificationRecorder;
@@ -315,7 +318,7 @@ CollectionSnapshotFingerprint collectionFingerprint(const SkyCatalogManager& man
     for (const QString& instanceId : fingerprint.instanceIds) {
         fingerprint.enabledFlags.push_back(
             instanceId + QStringLiteral("=")
-            + (manager.isSourceEnabled(instanceId) ? QStringLiteral("enabled") : QStringLiteral("disabled"))
+            + (isCatalogSourceEnabled(manager, instanceId) ? QStringLiteral("enabled") : QStringLiteral("disabled"))
         );
     }
     const QHash<QString, QString> titles = manager.sourceTitles();
@@ -323,7 +326,7 @@ CollectionSnapshotFingerprint collectionFingerprint(const SkyCatalogManager& man
         fingerprint.titles.push_back(CatalogSourceFactsQuery::durableTitle(titles.value(instanceId)));
     }
 
-    fingerprint.bodyCount = manager.bodyCount();
+    fingerprint.bodyCount = manager.starCatalog()->bodies().size();
     if (const skygate::ephemeris::IStarCatalog* catalog = manager.starCatalog(); catalog != nullptr) {
         const auto bodies = catalog->bodies();
         const std::span<const QString> sourceIds = manager.sourceIds();
@@ -424,7 +427,7 @@ void SkyCatalogManagerCompositionTests::interchangeabilityKeepsProvenanceAndRela
 
     const skygate::ephemeris::IStarCatalog* catalog = manager.starCatalog();
     QVERIFY(catalog != nullptr);
-    QCOMPARE(manager.bodyCount(), catalog->bodies().size());
+    QVERIFY(!catalog->bodies().empty());
     QCOMPARE(manager.sourceIds().size(), catalog->bodies().size());
     QCOMPARE(manager.contributorSourceIds().size(), catalog->bodies().size());
 
@@ -488,7 +491,7 @@ void SkyCatalogManagerCompositionTests::interchangeabilityKeepsProvenanceAndRela
     // Disabling one owner drops only its contributions, and its retained
     // dataset returns with the source.
     manager.disableSource(secondInstanceId);
-    QVERIFY(!manager.isSourceEnabled(secondInstanceId));
+    QVERIFY(!isCatalogSourceEnabled(manager, secondInstanceId));
     QCOMPARE(activeAnchorNames(manager), QStringList({QStringLiteral("Orion"), QStringLiteral("Cygnus")}));
     QVERIFY(findBodyById(manager.starCatalog(), QStringLiteral("hip_70001")) == nullptr);
     QVERIFY(findBodyById(manager.starCatalog(), QStringLiteral("hip_70002")) != nullptr);
@@ -665,7 +668,7 @@ void SkyCatalogManagerCompositionTests::bundledFallbackFillsGapsKeepingConfigure
     const std::optional<std::size_t> m1Index = bodyIndexById(catalog, QStringLiteral("messier_001"));
     QVERIFY(m1Index.has_value());
     QCOMPARE(manager.sourceIds()[*m1Index], QStringLiteral("bundled-deep-sky"));
-    QCOMPARE(manager.sourceTitle(QStringLiteral("bundled-deep-sky")), QStringLiteral("Bundled Messier"));
+    QCOMPARE(manager.sourceTitles().value(QStringLiteral("bundled-deep-sky")), QStringLiteral("Bundled Messier"));
 
     // The fallback participation and the configured value survive a restart.
     SkyCatalogManager restoredManager(&store);
@@ -839,7 +842,7 @@ void SkyCatalogManagerCompositionTests::collectionKeepsSnapshotAndIdentitiesOnRe
         // owned related dataset, and the overlapping survivor falls back to the
         // earlier instance that supplies the same identifier.
         manager.disableSource(archiveInstanceId);
-        QVERIFY(!manager.isSourceEnabled(archiveInstanceId));
+        QVERIFY(!isCatalogSourceEnabled(manager, archiveInstanceId));
         QVERIFY(findBodyById(manager.starCatalog(), QStringLiteral("hip_70003")) == nullptr);
         const std::optional<std::size_t> fallenBackIndex =
             bodyIndexById(manager.starCatalog(), QStringLiteral("hip_70002"));

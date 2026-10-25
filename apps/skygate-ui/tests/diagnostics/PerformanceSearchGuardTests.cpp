@@ -23,6 +23,7 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
 #include "skygate/testsupport/PerformanceBudget.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 
 #include <QColor>
 #include <QElapsedTimer>
@@ -36,6 +37,8 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+using skygate::ui::tests::setControllerUtcDateTime;
 
 using skygate::ui::tests::GuardApparentPlaceCalculator;
 using skygate::ui::tests::GuardBatchStarAstrometryCalculator;
@@ -247,7 +250,7 @@ void PerformanceSearchGuardTests::profilesHighPrecisionMoonSearchSelection()
     SkyContextController controller(std::move(catalog), std::move(engine), initializationOptions, nullptr);
     controller.setLatitudeText(QStringLiteral("47.4"));
     controller.setLongitudeText(QStringLiteral("8.5"));
-    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("2026-05-03"), QStringLiteral("21:00:00")));
+    QVERIFY(setControllerUtcDateTime(controller, QStringLiteral("2026-05-03"), QStringLiteral("21:00:00")));
     controller.setMagnitudeCutoff(12.0);
     controller.setViewCenter(45.0, 180.0);
 

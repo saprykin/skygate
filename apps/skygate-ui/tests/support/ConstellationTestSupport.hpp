@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CatalogCacheTestSupport.hpp"
 #include "SettingsTestFixture.hpp"
 #include "app/SkyContextController.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
@@ -91,7 +92,7 @@ stellariumConstellationIndexJsonPayload(const QList<QPair<QString, QList<int>>>&
     stateSnapshot.catalogPresetIndex = 2;
 
     const SkySettingsStore settingsStore;
-    return settingsStore.saveCatalogCache(snapshot) && settingsStore.saveState(stateSnapshot);
+    return seedLegacyCatalogCache(snapshot) && settingsStore.saveState(stateSnapshot);
 }
 
 inline void restoreSeededCatalogCache(SkyContextController& controller)
