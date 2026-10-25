@@ -3,6 +3,7 @@
 #include "catalog/CatalogSchemaRegistry.hpp"
 #include "catalog/io/CatalogColumnValueReader.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
+#include "catalog/io/DelimitedSchemaOptions.hpp"
 
 #include <QString>
 
@@ -37,21 +38,17 @@ OpenNgcCatalogParser::parse(const std::string_view data, const CatalogParseProgr
 
     return DelimitedCatalogParser::run(
         data,
-        DelimitedCatalogReaderOptions{
-            .separator = schema->delimiter,
-            .requiredColumns = schema->requiredColumns,
-            .invalidErrorCode = CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv,
-            .rowCountLimitFloor = kOpenNgcRowCountLimitFloor,
-            .minExpectedBytesPerDataRow = kOpenNgcMinExpectedBytesPerDataRow,
-            .emptyInputDetail = schema->emptyInputDetail(),
-            .missingColumnsDetail = schema->missingRequiredColumnsDetail(),
-            .rowLimitDetail = schema->rowLimitDetail(),
-        },
-        DelimitedCatalogParserOptions{
-            .zeroResultCode = CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv,
-            .zeroResultDetail = "OpenNGC CSV payload does not contain any valid deep-sky object rows.",
-            .formatName = schema->diagnosticName,
-        },
+        DelimitedSchemaOptions::readerOptions(
+            *schema,
+            CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv,
+            kOpenNgcRowCountLimitFloor,
+            kOpenNgcMinExpectedBytesPerDataRow
+        ),
+        DelimitedSchemaOptions::parserOptions(
+            *schema,
+            CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv,
+            "OpenNGC CSV payload does not contain any valid deep-sky object rows."
+        ),
         kOpenNgcInvalidCategoryLabels,
         [](const DelimitedCatalogRow& row, std::size_t rowNumber) -> RowParseOutcome {
             const QString typeText = row.decodeColumn(QStringLiteral("Type"));

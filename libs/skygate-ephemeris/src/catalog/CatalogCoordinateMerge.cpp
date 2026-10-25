@@ -177,12 +177,7 @@ void CatalogCoordinateMerge::takeHigherPrecedence(
         }
 
         winner.starAstrometry = loserAstrometry;
-        winnerOrigins.starAstrometry = loserOrigins.starAstrometry;
-        winnerOrigins.properMotionRightAscension = loserOrigins.properMotionRightAscension;
-        winnerOrigins.properMotionDeclination = loserOrigins.properMotionDeclination;
-        winnerOrigins.stellarParallax = loserOrigins.stellarParallax;
-        winnerOrigins.radialVelocity = loserOrigins.radialVelocity;
-        winnerOrigins.astrometryValidityRange = loserOrigins.astrometryValidityRange;
+        CatalogFieldOrigins::adoptAstrometryOrigins(winnerOrigins, loserOrigins);
         CatalogFieldOrigins::refreshCoordinateModelOrigin(winnerOrigins);
         return AstrometryMergeOutcome::Adopted;
     }
@@ -265,21 +260,11 @@ void CatalogCoordinateMerge::replaceCoordinateModelInPlace(
     winner.fixedEquatorial = loserFixed;
     winner.starAstrometry = loser.starAstrometryValue();
     winnerOrigins.fixedEquatorial = loserOrigins.fixedEquatorial;
-    winnerOrigins.starAstrometry = loserOrigins.starAstrometry;
-    winnerOrigins.properMotionRightAscension = loserOrigins.properMotionRightAscension;
-    winnerOrigins.properMotionDeclination = loserOrigins.properMotionDeclination;
-    winnerOrigins.stellarParallax = loserOrigins.stellarParallax;
-    winnerOrigins.radialVelocity = loserOrigins.radialVelocity;
-    winnerOrigins.astrometryValidityRange = loserOrigins.astrometryValidityRange;
+    CatalogFieldOrigins::adoptAstrometryOrigins(winnerOrigins, loserOrigins);
 
     if (loserAstrometryContradictsFixed) {
         winner.starAstrometry = std::nullopt;
-        winnerOrigins.starAstrometry = std::nullopt;
-        winnerOrigins.properMotionRightAscension = std::nullopt;
-        winnerOrigins.properMotionDeclination = std::nullopt;
-        winnerOrigins.stellarParallax = std::nullopt;
-        winnerOrigins.radialVelocity = std::nullopt;
-        winnerOrigins.astrometryValidityRange = std::nullopt;
+        CatalogFieldOrigins::clearAstrometryOrigins(winnerOrigins);
     }
 
     if (replacedFixedConflicts) {

@@ -2,7 +2,6 @@
 #include "StellariumHipParser.hpp"
 #include "StringUtilities.hpp"
 #include "catalog/CatalogIdentifier.hpp"
-#include "catalog/io/CatalogParsingUtilities.hpp"
 
 #include <QJsonObject>
 #include <QJsonValue>
@@ -21,7 +20,7 @@ namespace {
 
 QString prettifyConstellationId(QString id)
 {
-    id = CatalogParsingUtilities::normalizedLabelText(id);
+    id = StringUtilities::normalizedLabelText(id);
     if (id.isEmpty()) {
         return {};
     }
@@ -126,8 +125,7 @@ std::vector<ConstellationAnchorGroup> StellariumAnchorGroupExtractor::extract(co
         }
         std::sort(uniqueHips.begin(), uniqueHips.end());
 
-        const std::string labelKey =
-            StringUtilities::normalizedLookupKey(CatalogParsingUtilities::toUtf8String(labelText));
+        const std::string labelKey = StringUtilities::normalizedLookupKey(StringUtilities::toUtf8(labelText));
         auto indexIt = indexByLabelKey.find(labelKey);
         if (indexIt == indexByLabelKey.end()) {
             std::vector<std::string> hipIds;
@@ -136,7 +134,7 @@ std::vector<ConstellationAnchorGroup> StellariumAnchorGroupExtractor::extract(co
                 hipIds.push_back(CatalogIdentifier::hipBodyId(static_cast<std::uint64_t>(hip)));
             }
             const std::size_t newIndex = anchorGroups.size();
-            anchorGroups.emplace_back(CatalogParsingUtilities::toUtf8String(labelText), std::move(hipIds));
+            anchorGroups.emplace_back(StringUtilities::toUtf8(labelText), std::move(hipIds));
             indexByLabelKey.insert({labelKey, newIndex});
             return;
         }

@@ -69,6 +69,34 @@ namespace skygate::ephemeris {
     return origins;
 }
 
+void CatalogFieldOrigins::adoptAstrometryOrigins(CatalogFieldOrigins& target, const CatalogFieldOrigins& source)
+{
+    target.starAstrometry = source.starAstrometry;
+    target.properMotionRightAscension = source.properMotionRightAscension;
+    target.properMotionDeclination = source.properMotionDeclination;
+    target.stellarParallax = source.stellarParallax;
+    target.radialVelocity = source.radialVelocity;
+    target.astrometryValidityRange = source.astrometryValidityRange;
+}
+
+void CatalogFieldOrigins::clearAstrometryOrigins(CatalogFieldOrigins& target)
+{
+    target.starAstrometry = std::nullopt;
+    target.properMotionRightAscension = std::nullopt;
+    target.properMotionDeclination = std::nullopt;
+    target.stellarParallax = std::nullopt;
+    target.radialVelocity = std::nullopt;
+    target.astrometryValidityRange = std::nullopt;
+}
+
+void CatalogFieldOrigins::adoptDeepSkyOrigins(CatalogFieldOrigins& target, const CatalogFieldOrigins& source)
+{
+    target.deepSkyKind = source.deepSkyKind;
+    target.majorAxis = source.majorAxis;
+    target.minorAxis = source.minorAxis;
+    target.positionAngle = source.positionAngle;
+}
+
 void CatalogFieldOrigins::refreshCoordinateModelOrigin(CatalogFieldOrigins& origins)
 {
     std::optional<ValueOrigin> model;

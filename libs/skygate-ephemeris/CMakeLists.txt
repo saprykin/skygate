@@ -335,6 +335,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/RowParseOutcome.hpp
     src/catalog/io/DelimitedCatalogReaderOptions.hpp
     src/catalog/io/DelimitedCatalogRow.hpp
+    src/catalog/io/DelimitedSchemaOptions.hpp
     src/catalog/opengc/OpenNgcObjectMapper.hpp
     src/catalog/opengc/OpenNgcObjectMapping.hpp
     src/catalog/stellarium/StellariumHipParser.hpp
@@ -387,6 +388,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/composition/CoreBodyCatalogAugmenter.cpp
     src/catalog/io/DelimitedCatalogReader.cpp
     src/catalog/io/DelimitedCatalogRow.cpp
+    src/catalog/io/DelimitedSchemaOptions.cpp
     src/catalog/io/CsvRowTokenizer.hpp
     src/catalog/io/CatalogColumnValueReader.hpp
     src/catalog/hyg/HygCatalogParser.hpp

@@ -1,6 +1,6 @@
 #include "StellariumHipParser.hpp"
 #include "NumericParsingUtilities.hpp"
-#include "catalog/io/CatalogParsingUtilities.hpp"
+#include "StringUtilities.hpp"
 
 #include <QJsonObject>
 
@@ -37,8 +37,7 @@ std::optional<int> StellariumHipParser::parseStrictHipText(QString text)
         }
     }
 
-    const std::optional<int> parsedValue =
-        NumericParsingUtilities::parseInt(CatalogParsingUtilities::toUtf8String(text));
+    const std::optional<int> parsedValue = NumericParsingUtilities::parseInt(StringUtilities::toUtf8(text));
     if (!parsedValue.has_value() || *parsedValue <= 0) {
         return std::nullopt;
     }

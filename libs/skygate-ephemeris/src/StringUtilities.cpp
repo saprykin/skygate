@@ -1,8 +1,11 @@
 #include "StringUtilities.hpp"
 #include "AsciiText.hpp"
 
+#include <QByteArray>
+
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <utility>
 
 namespace skygate::ephemeris {
@@ -32,6 +35,16 @@ bool appendUniqueValue(std::vector<std::string>& values, std::string value, Same
 bool StringUtilities::isAsciiWhitespace(const char character) noexcept
 {
     return skygate::core::AsciiText::isWhitespace(character);
+}
+
+bool StringUtilities::isAsciiDigit(const char character) noexcept
+{
+    return skygate::core::AsciiText::isDigit(character);
+}
+
+bool StringUtilities::isAsciiLetter(const char character) noexcept
+{
+    return skygate::core::AsciiText::isLetter(character);
 }
 
 char StringUtilities::toLowerAscii(const char character) noexcept
@@ -74,6 +87,17 @@ bool StringUtilities::containsIgnoreAsciiCase(const std::string_view value, cons
     return toLowerAscii(value).find(toLowerAscii(token)) != std::string::npos;
 }
 
+std::string StringUtilities::toUtf8(const QString& text)
+{
+    const QByteArray utf8 = text.toUtf8();
+    return std::string(utf8.constData(), static_cast<std::size_t>(utf8.size()));
+}
+
+QString StringUtilities::fromUtf8(const std::string_view text)
+{
+    return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
+}
+
 std::string StringUtilities::normalizedLookupKey(const std::string_view value)
 {
     return toLowerAscii(trimAsciiWhitespace(value));
@@ -89,6 +113,18 @@ std::string StringUtilities::normalizedAlnumKey(const std::string_view value)
         }
     }
     return key;
+}
+
+QString StringUtilities::normalizedLabelText(QString text)
+{
+    text = text.trimmed();
+    if (text.isEmpty()) {
+        return {};
+    }
+
+    text.replace('_', ' ');
+    text.replace('-', ' ');
+    return text.simplified();
 }
 
 std::vector<std::string_view> StringUtilities::splitView(const std::string_view text, const char delimiter)

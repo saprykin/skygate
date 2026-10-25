@@ -6,6 +6,7 @@
 #include "DistantCelestialBody.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
+#include "StringUtilities.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogStarAstrometry.hpp"
 #include "catalog/InMemoryStarCatalog.hpp"
@@ -41,7 +42,7 @@ constexpr std::uint64_t kMaxOrderEntryCount = 10'000'000ULL;
 
 void writeString(QDataStream& stream, const std::string& value)
 {
-    stream << QString::fromStdString(value);
+    stream << StringUtilities::fromUtf8(value);
 }
 
 [[nodiscard]] bool readString(QDataStream& stream, std::string& value)
@@ -51,7 +52,7 @@ void writeString(QDataStream& stream, const std::string& value)
     if (stream.status() != QDataStream::Ok) {
         return false;
     }
-    value = text.toStdString();
+    value = StringUtilities::toUtf8(text);
     return true;
 }
 

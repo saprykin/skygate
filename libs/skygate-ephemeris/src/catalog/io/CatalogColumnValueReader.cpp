@@ -1,8 +1,11 @@
 #include "CatalogColumnValueReader.hpp"
 #include "CatalogParsingUtilities.hpp"
+#include "NumericParsingUtilities.hpp"
+#include "StringUtilities.hpp"
 
 #include <QString>
 
+#include <cstdint>
 #include <optional>
 
 namespace skygate::ephemeris {
@@ -56,6 +59,13 @@ std::optional<double> CatalogColumnValueReader::declinationDeg(const DelimitedCa
 {
     return parseColumn(row, column, [](const QString& text) {
         return CatalogParsingUtilities::parseDeclinationDeg(text);
+    });
+}
+
+std::optional<std::uint64_t> CatalogColumnValueReader::uint64(const DelimitedCatalogRow& row, const QString& column)
+{
+    return parseColumn(row, column, [](const QString& text) {
+        return NumericParsingUtilities::parseUint64(StringUtilities::toUtf8(text));
     });
 }
 

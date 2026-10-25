@@ -1,10 +1,10 @@
 #include "CatalogParsingUtilities.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "NumericParsingUtilities.hpp"
+#include "StringUtilities.hpp"
 #include "math/MathConstants.hpp"
 #include "catalog/normalize/CatalogSnapshotValidator.hpp"
 
-#include <QByteArray>
 #include <QStringList>
 
 #include <cstddef>
@@ -48,20 +48,7 @@ std::optional<double> parseSexagesimal(const QString& text, const bool allowsNeg
 
 std::string CatalogParsingUtilities::toUtf8String(const QString& text)
 {
-    const QByteArray utf8 = text.toUtf8();
-    return std::string(utf8.constData(), static_cast<std::size_t>(utf8.size()));
-}
-
-QString CatalogParsingUtilities::normalizedLabelText(QString text)
-{
-    text = text.trimmed();
-    if (text.isEmpty()) {
-        return {};
-    }
-
-    text.replace('_', ' ');
-    text.replace('-', ' ');
-    return text.simplified();
+    return StringUtilities::toUtf8(text);
 }
 
 std::optional<double> CatalogParsingUtilities::parseFiniteDouble(const QStringView text)
@@ -71,7 +58,7 @@ std::optional<double> CatalogParsingUtilities::parseFiniteDouble(const QStringVi
         trimmed.removeFirst();
     }
 
-    return NumericParsingUtilities::parseFiniteDouble(toUtf8String(trimmed));
+    return NumericParsingUtilities::parseFiniteDouble(StringUtilities::toUtf8(trimmed));
 }
 
 std::optional<double> CatalogParsingUtilities::parseFiniteDouble(const QString& text)

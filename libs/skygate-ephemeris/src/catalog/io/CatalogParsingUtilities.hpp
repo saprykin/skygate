@@ -8,12 +8,14 @@
 
 namespace skygate::ephemeris {
 
+// Catalog field parsing: coordinate text, screened numeric domains, and the
+// absences of the value model. Text normalization and the UTF-8 payload bridge
+// live in StringUtilities.
 class CatalogParsingUtilities final {
 public:
+    // Forwards to StringUtilities::toUtf8, which owns the one UTF-8 bridge of a
+    // decoded payload text.
     [[nodiscard]] static std::string toUtf8String(const QString& text);
-    // Normalizes a display label: trims, turns `_` and `-` separators into
-    // single spaces, and collapses whitespace runs.
-    [[nodiscard]] static QString normalizedLabelText(QString text);
     [[nodiscard]] static std::optional<double> parseFiniteDouble(QStringView text);
     [[nodiscard]] static std::optional<double> parseFiniteDouble(const QString& text);
     [[nodiscard]] static std::optional<double> parsePositiveDouble(QStringView text);

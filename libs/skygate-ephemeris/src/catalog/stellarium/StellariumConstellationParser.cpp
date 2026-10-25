@@ -2,6 +2,7 @@
 #include "StellariumAnchorGroupExtractor.hpp"
 #include "StellariumHipParser.hpp"
 #include "StellariumLineRefExtractor.hpp"
+#include "StringUtilities.hpp"
 
 #include <QByteArray>
 #include <QJsonDocument>
@@ -12,11 +13,13 @@ namespace skygate::ephemeris {
 namespace {
 
 // True when the payload's first non-whitespace byte starts a JSON object or
-// array. A whitespace-only payload does not look like JSON.
+// array. A whitespace-only payload does not look like JSON. Whitespace is the
+// shared ASCII predicate, so JSON framing accepts the same leading bytes every
+// other payload probe does.
 [[nodiscard]] bool looksLikeJsonPayload(const std::string_view payload) noexcept
 {
     for (const char byte : payload) {
-        if (byte == ' ' || byte == '\t' || byte == '\n' || byte == '\r') {
+        if (StringUtilities::isAsciiWhitespace(byte)) {
             continue;
         }
         return byte == '{' || byte == '[';

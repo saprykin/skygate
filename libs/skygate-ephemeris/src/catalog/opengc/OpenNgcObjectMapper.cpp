@@ -1,7 +1,6 @@
 #include "OpenNgcObjectMapper.hpp"
 #include "StringUtilities.hpp"
 #include "catalog/CatalogIdentifier.hpp"
-#include "catalog/io/CatalogParsingUtilities.hpp"
 
 #include <QRegularExpression>
 #include <QString>
@@ -23,7 +22,7 @@ constexpr std::string_view kOpenNgcFallbackNamespace = "open_ngc";
 // so labels such as "Maia Nebula" and "MWSC 3156" stay descriptive names.
 std::optional<CatalogIdentifier> recognizedDesignation(const QString& text)
 {
-    return CatalogIdentifier::designationFromText(CatalogParsingUtilities::toUtf8String(text.trimmed()));
+    return CatalogIdentifier::designationFromText(StringUtilities::toUtf8(text.trimmed()));
 }
 
 // One designation as an alias reads: the prefix CatalogIdentifier knows for the
@@ -38,21 +37,19 @@ QString designationAliasText(const std::string_view namespaceName, const QString
 // CatalogIdentifier.
 QString normalizedCatalogAlias(QString text)
 {
-    text = CatalogParsingUtilities::normalizedLabelText(text);
+    text = StringUtilities::normalizedLabelText(text);
     if (text.isEmpty()) {
         return {};
     }
 
-    return QString::fromStdString(
-        CatalogIdentifier::normalizedDesignationText(CatalogParsingUtilities::toUtf8String(text))
-    );
+    return QString::fromStdString(CatalogIdentifier::normalizedDesignationText(StringUtilities::toUtf8(text)));
 }
 
 QString objectIdFromAlias(const QString& alias)
 {
     const QString normalized = normalizedCatalogAlias(alias);
     if (const std::optional<CatalogIdentifier> designation =
-            CatalogIdentifier::designationFromText(CatalogParsingUtilities::toUtf8String(normalized));
+            CatalogIdentifier::designationFromText(StringUtilities::toUtf8(normalized));
         designation.has_value()) {
         return QString::fromStdString(CatalogIdentifier::bodyId(designation->namespaceName, designation->value));
     }
@@ -68,9 +65,7 @@ QString objectIdFromAlias(const QString& alias)
     if (id.isEmpty()) {
         return {};
     }
-    return QString::fromStdString(
-        CatalogIdentifier::bodyId(kOpenNgcFallbackNamespace, CatalogParsingUtilities::toUtf8String(id))
-    );
+    return QString::fromStdString(CatalogIdentifier::bodyId(kOpenNgcFallbackNamespace, StringUtilities::toUtf8(id)));
 }
 
 void appendAlias(std::vector<std::string>& aliases, const QString& alias)
@@ -80,7 +75,7 @@ void appendAlias(std::vector<std::string>& aliases, const QString& alias)
         return;
     }
 
-    StringUtilities::appendUniqueIgnoreAsciiCase(aliases, CatalogParsingUtilities::toUtf8String(normalized));
+    StringUtilities::appendUniqueIgnoreAsciiCase(aliases, StringUtilities::toUtf8(normalized));
 }
 
 void appendDelimitedAliases(std::vector<std::string>& aliases, const QString& text)
@@ -123,7 +118,7 @@ bool OpenNgcObjectMapper::shouldSkipType(const QString& typeText)
 QString OpenNgcObjectMapper::withoutLeadingZeros(const QString& value)
 {
     const QString trimmed = value.trimmed();
-    return QString::fromStdString(CatalogIdentifier::stripLeadingZeros(CatalogParsingUtilities::toUtf8String(trimmed)));
+    return QString::fromStdString(CatalogIdentifier::stripLeadingZeros(StringUtilities::toUtf8(trimmed)));
 }
 
 OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
@@ -157,9 +152,7 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
 
         const QString aliasText = designationAliasText(namespaceName, value);
         appendAlias(mapping.aliases, aliasText);
-        mapping.externalIdentifiers.push_back(
-            CatalogIdentifier::make(namespaceName, CatalogParsingUtilities::toUtf8String(value))
-        );
+        mapping.externalIdentifiers.push_back(CatalogIdentifier::make(namespaceName, StringUtilities::toUtf8(value)));
         if (primaryValue.isEmpty()) {
             primaryNamespace = namespaceName;
             primaryValue = value;
@@ -173,7 +166,7 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
     if (const std::optional<CatalogIdentifier> designation = recognizedDesignation(name); designation.has_value()) {
         CatalogIdentifier::appendUnique(mapping.externalIdentifiers, *designation);
     }
-    mapping.sourceRecordId = CatalogParsingUtilities::toUtf8String(name);
+    mapping.sourceRecordId = StringUtilities::toUtf8(name);
     appendAlias(mapping.aliases, name);
     appendDelimitedAliases(mapping.aliases, identifiers);
     appendDelimitedAliases(mapping.aliases, commonNames);
@@ -186,8 +179,8 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
                                                         : normalizedCatalogAlias(name);
     const QString id = objectIdFromAlias(primaryValue.isEmpty() ? name : primaryAlias);
 
-    mapping.id = CatalogParsingUtilities::toUtf8String(id);
-    mapping.displayName = CatalogParsingUtilities::toUtf8String(displayName);
+    mapping.id = StringUtilities::toUtf8(id);
+    mapping.displayName = StringUtilities::toUtf8(displayName);
     mapping.kind = kindFromOpenNgcType(typeText);
     return mapping;
 }

@@ -58,6 +58,19 @@ struct CatalogFieldOrigins final {
     [[nodiscard]] static CatalogFieldOrigins
     originsOf(const BaseCelestialBody& body, std::size_t sourceRank, std::size_t rowOrdinal);
 
+    // Adopts the origins of one astrometry record: its anchor and every optional
+    // astrometry field. A merge that adopts or replaces a coordinate model takes
+    // the whole block, so no component origin outlives the value it describes.
+    static void adoptAstrometryOrigins(CatalogFieldOrigins& target, const CatalogFieldOrigins& source);
+
+    // Clears the astrometry anchor and every optional astrometry origin, for a
+    // model whose astrometry was rejected as contradictory.
+    static void clearAstrometryOrigins(CatalogFieldOrigins& target);
+
+    // Adopts the origins of one deep-sky metadata block: its kind and every
+    // optional size or orientation field.
+    static void adoptDeepSkyOrigins(CatalogFieldOrigins& target, const CatalogFieldOrigins& source);
+
     // Origin of the survivor's coherent coordinate model anchor: the
     // higher-precedence origin among the model components the survivor carries, so
     // replacing or clearing a component never leaves a stale anchor behind.

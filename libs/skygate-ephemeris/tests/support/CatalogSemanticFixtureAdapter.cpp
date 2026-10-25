@@ -5,12 +5,11 @@
 #include "catalog/CatalogSchemaRegistry.hpp"
 #include "time/EpochCodec.hpp"
 #include "time/TimeScale.hpp"
-#include "catalog/io/CatalogParsingUtilities.hpp"
+#include "catalog/io/CatalogColumnValueReader.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
 
 #include <QString>
 #include <QStringList>
-#include <QStringView>
 
 #include <cstddef>
 #include <memory>
@@ -32,11 +31,7 @@ constexpr std::size_t kMinExpectedBytesPerDataRow = 8;
 
 [[nodiscard]] std::optional<double> optionalFiniteDoubleColumn(const DelimitedCatalogRow& row, const QString& name)
 {
-    const QString text = row.decodeColumn(name);
-    if (text.trimmed().isEmpty()) {
-        return std::nullopt;
-    }
-    return CatalogParsingUtilities::parseFiniteDouble(QStringView{text});
+    return CatalogColumnValueReader::finiteDouble(row, name);
 }
 
 void appendNonEmptyAlias(std::vector<std::string>& aliases, const QString& text)
@@ -45,7 +40,7 @@ void appendNonEmptyAlias(std::vector<std::string>& aliases, const QString& text)
     if (trimmed.isEmpty()) {
         return;
     }
-    StringUtilities::appendUniqueIgnoreAsciiCase(aliases, CatalogParsingUtilities::toUtf8String(trimmed));
+    StringUtilities::appendUniqueIgnoreAsciiCase(aliases, StringUtilities::toUtf8(trimmed));
 }
 
 void appendDelimitedAliases(std::vector<std::string>& aliases, const QString& text)
@@ -63,9 +58,7 @@ void appendIdentifierIfPresent(
         return;
     }
     identifiers.push_back(
-        CatalogIdentifier::make(
-            CatalogParsingUtilities::toUtf8String(namespaceName), CatalogParsingUtilities::toUtf8String(value.trimmed())
-        )
+        CatalogIdentifier::make(StringUtilities::toUtf8(namespaceName), StringUtilities::toUtf8(value.trimmed()))
     );
 }
 
@@ -156,7 +149,7 @@ public:
                     .rightAscensionHours = *rightAscensionHours, .declinationDeg = *declinationDeg
                 };
                 const QString displayLabel = row.decodeColumn(QStringLiteral("display_label")).trimmed();
-                const std::string sourceKey = CatalogParsingUtilities::toUtf8String(objKey);
+                const std::string sourceKey = StringUtilities::toUtf8(objKey);
 
                 if (category == "star") {
                     OwnGalaxyCelestialBody body;
@@ -191,7 +184,7 @@ public:
                     }
 
                     if (!displayLabel.isEmpty()) {
-                        body.displayName = CatalogParsingUtilities::toUtf8String(displayLabel);
+                        body.displayName = StringUtilities::toUtf8(displayLabel);
                         appendNonEmptyAlias(body.identity.aliases, displayLabel);
                     } else {
                         body.displayName = body.id;
@@ -218,8 +211,7 @@ public:
                     body.identity.externalIdentifiers, QStringLiteral("ic"), row.decodeColumn("ic_id")
                 );
 
-                body.displayName =
-                    displayLabel.isEmpty() ? body.id : CatalogParsingUtilities::toUtf8String(displayLabel);
+                body.displayName = displayLabel.isEmpty() ? body.id : StringUtilities::toUtf8(displayLabel);
 
                 std::vector<std::string> aliases;
                 appendDelimitedAliases(aliases, row.decodeColumn(QStringLiteral("aliases")));

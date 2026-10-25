@@ -16,6 +16,22 @@
 #include <vector>
 
 namespace skygate::ephemeris {
+namespace {
+
+// Values one record claims in a namespace, in the order the record lists them.
+[[nodiscard]] std::vector<std::string_view>
+valuesForNamespace(const std::vector<CatalogIdentifier>& designations, const std::string_view namespaceName)
+{
+    std::vector<std::string_view> values;
+    for (const CatalogIdentifier& identifier : designations) {
+        if (!identifier.empty() && identifier.namespaceName == namespaceName) {
+            values.push_back(identifier.value);
+        }
+    }
+    return values;
+}
+
+}  // namespace
 
 // Retains the union of identifiers from both records, including several
 // values in the same namespace (a single object can carry multiple NGC or IC
@@ -96,18 +112,10 @@ bool CatalogIdentityAbsorption::hasContradictoryIdentifiers(const BaseCelestialB
         }
         checkedNamespaces.push_back(lhsIdentifier.namespaceName);
 
-        std::vector<std::string_view> lhsValues;
-        std::vector<std::string_view> rhsValues;
-        for (const CatalogIdentifier& identifier : lhsDesignations) {
-            if (!identifier.empty() && identifier.namespaceName == lhsIdentifier.namespaceName) {
-                lhsValues.push_back(identifier.value);
-            }
-        }
-        for (const CatalogIdentifier& identifier : rhsDesignations) {
-            if (!identifier.empty() && identifier.namespaceName == lhsIdentifier.namespaceName) {
-                rhsValues.push_back(identifier.value);
-            }
-        }
+        const std::vector<std::string_view> lhsValues =
+            valuesForNamespace(lhsDesignations, lhsIdentifier.namespaceName);
+        const std::vector<std::string_view> rhsValues =
+            valuesForNamespace(rhsDesignations, lhsIdentifier.namespaceName);
         if (rhsValues.empty()) {
             continue;
         }
@@ -174,10 +182,7 @@ void CatalogIdentityAbsorption::mergeDistantInPlace(
     }
     if (!winner.deepSkyObject.has_value()) {
         winner.deepSkyObject = *loserDeepSky;
-        winnerOrigins.deepSkyKind = loserOrigins.deepSkyKind;
-        winnerOrigins.majorAxis = loserOrigins.majorAxis;
-        winnerOrigins.minorAxis = loserOrigins.minorAxis;
-        winnerOrigins.positionAngle = loserOrigins.positionAngle;
+        CatalogFieldOrigins::adoptDeepSkyOrigins(winnerOrigins, loserOrigins);
         return;
     }
 

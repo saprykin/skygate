@@ -28,16 +28,6 @@ constexpr DesignationPrefix kDesignationPrefixes[] = {
            || CatalogIdentifier::isDeepSkyDesignationNamespace(namespaceName);
 }
 
-[[nodiscard]] bool isAsciiDigit(const char character) noexcept
-{
-    return character >= '0' && character <= '9';
-}
-
-[[nodiscard]] bool isAsciiLetter(const char character) noexcept
-{
-    return (character >= 'A' && character <= 'Z') || (character >= 'a' && character <= 'z');
-}
-
 }  // namespace
 
 CatalogIdentifier CatalogIdentifier::make(const std::string_view namespaceName, const std::string_view value)
@@ -102,15 +92,15 @@ std::optional<CatalogIdentifier> CatalogIdentifier::designationFromText(const st
         if (!remainder.empty() && remainder.front() == ' ') {
             remainder.remove_prefix(1U);
         }
-        if (remainder.empty() || !isAsciiDigit(remainder.front())) {
+        if (remainder.empty() || !StringUtilities::isAsciiDigit(remainder.front())) {
             continue;
         }
 
         std::size_t index = 0U;
-        while (index < remainder.size() && isAsciiDigit(remainder[index])) {
+        while (index < remainder.size() && StringUtilities::isAsciiDigit(remainder[index])) {
             ++index;
         }
-        while (index < remainder.size() && isAsciiLetter(remainder[index])) {
+        while (index < remainder.size() && StringUtilities::isAsciiLetter(remainder[index])) {
             ++index;
         }
         if (index != remainder.size()) {

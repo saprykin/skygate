@@ -1,17 +1,15 @@
 #include "HygCatalogParser.hpp"
-#include "NumericParsingUtilities.hpp"
 #include "StringUtilities.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogObjectIdentity.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
 #include "catalog/io/CatalogColumnValueReader.hpp"
-#include "catalog/io/CatalogParsingUtilities.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
+#include "catalog/io/DelimitedSchemaOptions.hpp"
 #include "time/EpochCodec.hpp"
 #include "time/TimeScale.hpp"
 
 #include <QString>
-#include <QStringView>
 
 #include <cstddef>
 #include <cstdint>
@@ -57,7 +55,7 @@ void appendNonEmptyAlias(std::vector<std::string>& aliases, const QString& text)
         return;
     }
 
-    StringUtilities::appendUnique(aliases, CatalogParsingUtilities::toUtf8String(text));
+    StringUtilities::appendUnique(aliases, StringUtilities::toUtf8(text));
 }
 
 }  // namespace
@@ -77,35 +75,31 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
 
     return DelimitedCatalogParser::run(
         data,
-        DelimitedCatalogReaderOptions{
-            .separator = schema->delimiter,
-            .requiredColumns = schema->requiredColumns,
-            .invalidErrorCode = CatalogLoadResult::ErrorCode::InvalidHygCsv,
-            .rowCountLimitFloor = kHygRowCountLimitFloor,
-            .minExpectedBytesPerDataRow = kHygMinExpectedBytesPerDataRow,
-            .emptyInputDetail = schema->emptyInputDetail(),
-            .missingColumnsDetail = schema->missingRequiredColumnsDetail(),
-            .rowLimitDetail = schema->rowLimitDetail(),
-        },
-        DelimitedCatalogParserOptions{
-            .zeroResultCode = CatalogLoadResult::ErrorCode::InvalidHygCsv,
-            .zeroResultDetail = "HYG CSV payload does not contain any valid star rows.",
-            .formatName = schema->diagnosticName,
-        },
+        DelimitedSchemaOptions::readerOptions(
+            *schema, CatalogLoadResult::ErrorCode::InvalidHygCsv, kHygRowCountLimitFloor, kHygMinExpectedBytesPerDataRow
+        ),
+        DelimitedSchemaOptions::parserOptions(
+            *schema,
+            CatalogLoadResult::ErrorCode::InvalidHygCsv,
+            "HYG CSV payload does not contain any valid star rows."
+        ),
         kHygInvalidCategoryLabels,
         [&](const DelimitedCatalogRow& row, std::size_t rowNumber) -> RowParseOutcome {
-            const QString raText = row.decodeColumn(QStringLiteral("ra"));
-            const QString decText = row.decodeColumn(QStringLiteral("dec"));
-            const QString magText = row.decodeColumn(QStringLiteral("mag"));
-            const auto raHours = CatalogParsingUtilities::parseFiniteDouble(QStringView{raText});
-            const auto decDeg = CatalogParsingUtilities::parseFiniteDouble(QStringView{decText});
-            const auto magnitude = CatalogParsingUtilities::parseFiniteDouble(QStringView{magText});
+            const auto raHours = CatalogColumnValueReader::finiteDouble(row, QStringLiteral("ra"));
+            const auto decDeg = CatalogColumnValueReader::finiteDouble(row, QStringLiteral("dec"));
+            const auto magnitude = CatalogColumnValueReader::finiteDouble(row, QStringLiteral("mag"));
             if (!raHours.has_value() || !decDeg.has_value() || !magnitude.has_value()) {
+                // The sample quotes the raw columns, so it is decoded here rather
+                // than read through the value reader that just rejected them.
                 return RowParseOutcome{
                     .invalidCategoryIndex = 0,
-                    .invalidSample =
-                        QStringLiteral("row %1 ra='%2' dec='%3' mag='%4'")
-                            .arg(QString::number(static_cast<qulonglong>(rowNumber + 1U)), raText, decText, magText),
+                    .invalidSample = QStringLiteral("row %1 ra='%2' dec='%3' mag='%4'")
+                                         .arg(
+                                             QString::number(static_cast<qulonglong>(rowNumber + 1U)),
+                                             row.decodeColumn(QStringLiteral("ra")),
+                                             row.decodeColumn(QStringLiteral("dec")),
+                                             row.decodeColumn(QStringLiteral("mag"))
+                                         ),
                 };
             }
 
@@ -113,9 +107,7 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
             const QString properName = row.decodeColumn(QStringLiteral("proper"));
             const QString bayerFlamsteed = row.decodeColumn(QStringLiteral("bf"));
             const QString hip = row.decodeColumn(QStringLiteral("hip"));
-            const std::optional<std::uint64_t> hipNumber =
-                hip.isEmpty() ? std::nullopt
-                              : NumericParsingUtilities::parseUint64(CatalogParsingUtilities::toUtf8String(hip));
+            const std::optional<std::uint64_t> hipNumber = CatalogColumnValueReader::uint64(row, QStringLiteral("hip"));
             if (!hip.isEmpty() && !hipNumber.has_value()) {
                 return RowParseOutcome{
                     .invalidCategoryIndex = 0,
@@ -148,9 +140,7 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
             if (hipNumber.has_value()) {
                 body.id = CatalogIdentifier::hipBodyId(*hipNumber);
             } else if (!idField.isEmpty()) {
-                body.id = CatalogIdentifier::bodyId(
-                    CatalogIdentifier::kHygNamespace, CatalogParsingUtilities::toUtf8String(idField)
-                );
+                body.id = CatalogIdentifier::bodyId(CatalogIdentifier::kHygNamespace, StringUtilities::toUtf8(idField));
             } else {
                 // The counter restarts for every payload, so this id is a
                 // record key of this parse only; composition qualifies it
@@ -159,7 +149,7 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
                 body.identity.idScope = CatalogObjectIdentity::IdScope::SourceLocal;
             }
 
-            body.identity.sourceRecordId = CatalogParsingUtilities::toUtf8String(idField);
+            body.identity.sourceRecordId = StringUtilities::toUtf8(idField);
             if (hipNumber.has_value()) {
                 body.identity.externalIdentifiers.push_back(
                     CatalogIdentifier::make(CatalogIdentifier::kHipNamespace, std::to_string(*hipNumber))
@@ -167,20 +157,18 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
             }
             if (!idField.isEmpty()) {
                 body.identity.externalIdentifiers.push_back(
-                    CatalogIdentifier::make(
-                        CatalogIdentifier::kHygNamespace, CatalogParsingUtilities::toUtf8String(idField)
-                    )
+                    CatalogIdentifier::make(CatalogIdentifier::kHygNamespace, StringUtilities::toUtf8(idField))
                 );
             }
             appendNonEmptyAlias(body.identity.aliases, properName);
             appendNonEmptyAlias(body.identity.aliases, bayerFlamsteed);
 
             if (!properName.isEmpty()) {
-                body.displayName = CatalogParsingUtilities::toUtf8String(properName);
+                body.displayName = StringUtilities::toUtf8(properName);
             } else if (!bayerFlamsteed.isEmpty()) {
-                body.displayName = CatalogParsingUtilities::toUtf8String(bayerFlamsteed);
+                body.displayName = StringUtilities::toUtf8(bayerFlamsteed);
             } else if (!hip.isEmpty()) {
-                body.displayName = "HIP " + CatalogParsingUtilities::toUtf8String(hip);
+                body.displayName = "HIP " + StringUtilities::toUtf8(hip);
             } else {
                 body.displayName = body.id;
             }

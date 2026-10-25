@@ -17,7 +17,7 @@ std::filesystem::path EphemerisDataFileUtilities::pathFromQString(const QString&
 
 QString EphemerisDataFileUtilities::stringToQString(const std::string& value)
 {
-    return QString::fromUtf8(value.data(), static_cast<qsizetype>(value.size()));
+    return StringUtilities::fromUtf8(value);
 }
 
 bool EphemerisDataFileUtilities::hasUnsafePathComponent(const std::filesystem::path& path)

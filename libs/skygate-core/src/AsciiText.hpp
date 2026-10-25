@@ -18,6 +18,16 @@ public:
                || character == '\v';
     }
 
+    [[nodiscard]] static constexpr bool isDigit(const char character) noexcept
+    {
+        return character >= '0' && character <= '9';
+    }
+
+    [[nodiscard]] static constexpr bool isLetter(const char character) noexcept
+    {
+        return (character >= 'A' && character <= 'Z') || (character >= 'a' && character <= 'z');
+    }
+
     [[nodiscard]] static constexpr char toLower(const char character) noexcept
     {
         return character >= 'A' && character <= 'Z' ? static_cast<char>(character - 'A' + 'a') : character;

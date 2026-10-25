@@ -1,5 +1,6 @@
 #include "ConstellationReferenceResolver.hpp"
 
+#include "StringUtilities.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/stellarium/StellariumHipParser.hpp"
 
@@ -27,9 +28,7 @@ constexpr std::size_t kMaxDiagnosticExamples = 5U;
 // index, so consumers never parse or normalize the HIP reference themselves.
 std::optional<CatalogIdentifier> parseHipReference(const std::string_view reference)
 {
-    const std::optional<int> hipNumber = StellariumHipParser::parseStrictHipText(
-        QString::fromUtf8(reference.data(), static_cast<qsizetype>(reference.size()))
-    );
+    const std::optional<int> hipNumber = StellariumHipParser::parseStrictHipText(StringUtilities::fromUtf8(reference));
     if (!hipNumber.has_value()) {
         return std::nullopt;
     }

@@ -79,7 +79,7 @@ QString CsvRowTokenizer::decodeTrimmedField(const QStringView field)
 
 QString CsvRowTokenizer::decodeTrimmedLine(const std::string_view line)
 {
-    return QString::fromUtf8(line.data(), static_cast<qsizetype>(line.size())).trimmed();
+    return StringUtilities::fromUtf8(line).trimmed();
 }
 
 }  // namespace skygate::ephemeris

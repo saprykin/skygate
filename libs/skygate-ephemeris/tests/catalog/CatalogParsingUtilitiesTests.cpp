@@ -9,7 +9,6 @@ class CatalogParsingUtilitiesTests final : public QObject {
 
 private slots:
     void convertsQtTextToUtf8();
-    void normalizesLabelSeparatorsAndWhitespace();
     void parsesFiniteAndPositiveDoubles();
     void parsesSexagesimalCoordinates();
     void validatesDecimalCoordinateRanges();
@@ -19,15 +18,6 @@ private slots:
 void CatalogParsingUtilitiesTests::convertsQtTextToUtf8()
 {
     QCOMPARE(skygate::ephemeris::CatalogParsingUtilities::toUtf8String(QString::fromUtf8("M31")), std::string("M31"));
-}
-
-void CatalogParsingUtilitiesTests::normalizesLabelSeparatorsAndWhitespace()
-{
-    using skygate::ephemeris::CatalogParsingUtilities;
-
-    QCOMPARE(CatalogParsingUtilities::normalizedLabelText(QStringLiteral("  NGC_224 ")), QStringLiteral("NGC 224"));
-    QCOMPARE(CatalogParsingUtilities::normalizedLabelText(QStringLiteral("alpha-beta")), QStringLiteral("alpha beta"));
-    QCOMPARE(CatalogParsingUtilities::normalizedLabelText(QStringLiteral("  ")), QString{});
 }
 
 void CatalogParsingUtilitiesTests::parsesFiniteAndPositiveDoubles()

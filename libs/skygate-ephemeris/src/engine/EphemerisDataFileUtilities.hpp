@@ -2,6 +2,7 @@
 
 #include "EphemerisDataManifest.hpp"
 #include "EphemerisDataPayloadReader.hpp"
+#include "StringUtilities.hpp"
 
 #include <QString>
 
@@ -53,10 +54,12 @@ public:
 
     [[nodiscard]] static QString pathToQString(const std::filesystem::path& path);
     [[nodiscard]] static std::filesystem::path pathFromQString(const QString& path);
+    // The manifest text bridges forward to StringUtilities, which owns the one
+    // UTF-8 bridge of a decoded payload text.
     [[nodiscard]] static QString stringToQString(const std::string& value);
     [[nodiscard]] static std::string stringFromQString(const QString& value)
     {
-        return value.toStdString();
+        return StringUtilities::toUtf8(value);
     }
     [[nodiscard]] static bool hasUnsafePathComponent(const std::filesystem::path& path);
     [[nodiscard]] static bool

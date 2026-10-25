@@ -2,10 +2,13 @@
 #include "StringUtilities.hpp"
 
 #include <algorithm>
+#include <optional>
 #include <utility>
 
 namespace skygate::ephemeris {
 namespace {
+
+constexpr char kFieldDelimiter = '|';
 
 void sanitizeLabel(std::string& label)
 {
@@ -16,6 +19,39 @@ void sanitizeLabel(std::string& label)
     label = std::string(StringUtilities::trimAsciiWhitespace(label));
 }
 
+// Every row of the codec is one non-empty left field, the delimiter, one
+// non-empty right field, and a line terminator. Serializers skip a row that
+// carries an empty side instead of writing a frame the parsers would reject.
+void appendRow(std::string& rows, const std::string_view left, const std::string_view right)
+{
+    if (left.empty() || right.empty()) {
+        return;
+    }
+
+    rows.append(left);
+    rows += kFieldDelimiter;
+    rows.append(right);
+    rows += '\n';
+}
+
+// The two fields of one framed row, or nothing when the row has no delimiter or
+// an empty side. Both row families are parsed through the same framing rule.
+[[nodiscard]] std::optional<std::pair<std::string_view, std::string_view>> splitRow(const std::string_view line)
+{
+    const std::size_t delimiter = line.find(kFieldDelimiter);
+    if (delimiter == std::string_view::npos) {
+        return std::nullopt;
+    }
+
+    const std::string_view left = line.substr(0U, delimiter);
+    const std::string_view right = line.substr(delimiter + 1U);
+    if (left.empty() || right.empty()) {
+        return std::nullopt;
+    }
+
+    return std::pair{left, right};
+}
+
 }  // namespace
 
 std::string ConstellationDataCodec::serializeLineRows(const std::span<const ConstellationLineRef> lineRefs)
@@ -23,14 +59,7 @@ std::string ConstellationDataCodec::serializeLineRows(const std::span<const Cons
     std::string rows;
     rows.reserve(lineRefs.size() * 24U);
     for (const auto& lineRef : lineRefs) {
-        if (lineRef.first.empty() || lineRef.second.empty()) {
-            continue;
-        }
-
-        rows += lineRef.first;
-        rows += '|';
-        rows += lineRef.second;
-        rows += '\n';
+        appendRow(rows, lineRef.first, lineRef.second);
     }
 
     return rows;
@@ -40,18 +69,12 @@ std::vector<ConstellationLineRef> ConstellationDataCodec::parseLineRows(const st
 {
     std::vector<ConstellationLineRef> lineRefs;
     for (const std::string_view line : StringUtilities::splitView(rows, '\n')) {
-        const std::size_t delimiter = line.find('|');
-        if (delimiter == std::string_view::npos) {
+        const std::optional<std::pair<std::string_view, std::string_view>> fields = splitRow(line);
+        if (!fields.has_value()) {
             continue;
         }
 
-        const std::string_view startId = line.substr(0, delimiter);
-        const std::string_view endId = line.substr(delimiter + 1);
-        if (startId.empty() || endId.empty()) {
-            continue;
-        }
-
-        lineRefs.emplace_back(std::string(startId), std::string(endId));
+        lineRefs.emplace_back(std::string(fields->first), std::string(fields->second));
     }
 
     return lineRefs;
@@ -63,36 +86,21 @@ ConstellationDataCodec::serializeAnchorGroupRows(const std::span<const Constella
     std::string rows;
     rows.reserve(anchorGroups.size() * 48U);
     for (const auto& anchorGroup : anchorGroups) {
-        if (anchorGroup.first.empty() || anchorGroup.second.empty()) {
-            continue;
-        }
-
         std::string sanitizedLabel = anchorGroup.first;
         sanitizeLabel(sanitizedLabel);
-        if (sanitizedLabel.empty()) {
-            continue;
-        }
 
-        std::string row = sanitizedLabel;
-        row += '|';
-        bool hasAnyHip = false;
+        std::string hipList;
         for (const std::string& hipId : anchorGroup.second) {
             if (hipId.empty()) {
                 continue;
             }
-            if (hasAnyHip) {
-                row += ',';
+            if (!hipList.empty()) {
+                hipList += ',';
             }
-            row += hipId;
-            hasAnyHip = true;
+            hipList += hipId;
         }
 
-        if (!hasAnyHip) {
-            continue;
-        }
-
-        rows += row;
-        rows += '\n';
+        appendRow(rows, sanitizedLabel, hipList);
     }
 
     return rows;
@@ -102,24 +110,20 @@ std::vector<ConstellationAnchorGroup> ConstellationDataCodec::parseAnchorGroupRo
 {
     std::vector<ConstellationAnchorGroup> anchorGroups;
     for (const std::string_view line : StringUtilities::splitView(rows, '\n')) {
-        const std::size_t delimiter = line.find('|');
-        if (delimiter == std::string_view::npos) {
-            continue;
-        }
-
-        const std::string_view label = line.substr(0, delimiter);
-        const std::string_view hipList = line.substr(delimiter + 1);
-        if (label.empty() || hipList.empty()) {
+        const std::optional<std::pair<std::string_view, std::string_view>> fields = splitRow(line);
+        if (!fields.has_value()) {
             continue;
         }
 
         std::vector<std::string> hipIds;
-        for (const std::string_view hipId : StringUtilities::splitView(hipList, ',')) {
+        for (const std::string_view hipId : StringUtilities::splitView(fields->second, ',')) {
             hipIds.emplace_back(hipId);
         }
-        if (!hipIds.empty()) {
-            anchorGroups.emplace_back(std::string(label), std::move(hipIds));
+        if (hipIds.empty()) {
+            continue;
         }
+
+        anchorGroups.emplace_back(std::string(fields->first), std::move(hipIds));
     }
 
     return anchorGroups;
