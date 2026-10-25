@@ -17,6 +17,7 @@ PreferencesCompactActionButton 1.0 ../../../controls/PreferencesCompactActionBut
 PreferencesComboBox 1.0 ../../../controls/PreferencesComboBox.qml
 PreferencesFieldLabel 1.0 ../../../controls/PreferencesFieldLabel.qml
 PreferencesGroupTitle 1.0 ../../../controls/PreferencesGroupTitle.qml
+PreferencesPickerRow 1.0 ../../../controls/PreferencesPickerRow.qml
 PreferencesSearchablePickerShell 1.0 ../../../controls/PreferencesSearchablePickerShell.qml
 PreferencesSectionButton 1.0 ../../../controls/PreferencesSectionButton.qml
 PreferencesTextField 1.0 ../../../controls/PreferencesTextField.qml
@@ -35,3 +36,4 @@ StatusDateTimePopup 1.0 ../../../status/StatusDateTimePopup.qml
 StatusDegradationPopup 1.0 ../../../status/StatusDegradationPopup.qml
 StatusFooter 1.0 ../../../status/StatusFooter.qml
 StatusNightConditionsPopup 1.0 ../../../status/StatusNightConditionsPopup.qml
+StatusPopupScaffold 1.0 ../../../status/StatusPopupScaffold.qml

@@ -8,6 +8,58 @@ Item {
     required property var preferencesDraft
     required property var theme
     readonly property var themeOptions: preferencesDraft.skyContextController.themeOptions
+    readonly property var overlayRows: [
+        {
+            objectName: "overlayHorizonCheckBox",
+            label: "Horizon",
+            draftProperty: "overlayHorizon"
+        },
+        {
+            objectName: "overlayAltAzGridCheckBox",
+            label: "Alt/Az grid",
+            draftProperty: "overlayAltAzGrid"
+        },
+        {
+            objectName: "overlayConstellationLinesCheckBox",
+            label: "Constellation lines",
+            draftProperty: "overlayConstellationLines"
+        },
+        {
+            objectName: "overlayConstellationLabelsCheckBox",
+            label: "Constellation labels",
+            draftProperty: "overlayConstellationLabels"
+        },
+        {
+            objectName: "overlaySolarSystemLabelsCheckBox",
+            label: "Solar system labels",
+            draftProperty: "overlaySolarSystemLabels"
+        },
+        {
+            objectName: "overlayDeepSkyObjectsCheckBox",
+            label: "Deep sky objects",
+            draftProperty: "overlayDeepSkyObjects"
+        },
+        {
+            objectName: "overlayDeepSkyLabelsCheckBox",
+            label: "Deep sky labels",
+            draftProperty: "overlayDeepSkyLabels"
+        },
+        {
+            objectName: "overlayEclipticCheckBox",
+            label: "Ecliptic",
+            draftProperty: "overlayEcliptic"
+        },
+        {
+            objectName: "overlayCelestialEquatorCheckBox",
+            label: "Celestial equator",
+            draftProperty: "overlayCelestialEquator"
+        },
+        {
+            objectName: "overlayCircumpolarBoundaryCheckBox",
+            label: "Circumpolar boundary",
+            draftProperty: "overlayCircumpolarBoundary"
+        }
+    ]
 
     function themeIndexForId(themeId) {
         for (let index = 0; index < themeOptions.length; ++index) {
@@ -78,113 +130,40 @@ Item {
 
             PreferencesGroupTitle {
                 theme: root.theme
+                Layout.row: 0
+                Layout.column: 0
                 columnSpan: 4
                 text: "Overlay Layers"
             }
 
-            PreferencesCheckBox {
-                theme: root.theme
-                objectName: "overlayHorizonCheckBox"
-                checked: root.preferencesDraft.overlayHorizon
-                onToggled: root.preferencesDraft.overlayHorizon = checked
-            }
-            PreferencesFieldLabel {
-                theme: root.theme
-                text: "Horizon"
-            }
-            PreferencesCheckBox {
-                theme: root.theme
-                objectName: "overlayAltAzGridCheckBox"
-                checked: root.preferencesDraft.overlayAltAzGrid
-                onToggled: root.preferencesDraft.overlayAltAzGrid = checked
-            }
-            PreferencesFieldLabel {
-                theme: root.theme
-                text: "Alt/Az grid"
+            Repeater {
+                model: root.overlayRows
+
+                PreferencesCheckBox {
+                    required property var modelData
+                    required property int index
+
+                    theme: root.theme
+                    Layout.row: Math.floor(index / 2) + 1
+                    Layout.column: (index % 2) * 2
+                    objectName: modelData.objectName
+                    checked: root.preferencesDraft[modelData.draftProperty]
+                    onToggled: root.preferencesDraft[modelData.draftProperty] = checked
+                }
             }
 
-            PreferencesCheckBox {
-                theme: root.theme
-                objectName: "overlayConstellationLinesCheckBox"
-                checked: root.preferencesDraft.overlayConstellationLines
-                onToggled: root.preferencesDraft.overlayConstellationLines = checked
-            }
-            PreferencesFieldLabel {
-                theme: root.theme
-                text: "Constellation lines"
-            }
-            PreferencesCheckBox {
-                theme: root.theme
-                objectName: "overlayConstellationLabelsCheckBox"
-                checked: root.preferencesDraft.overlayConstellationLabels
-                onToggled: root.preferencesDraft.overlayConstellationLabels = checked
-            }
-            PreferencesFieldLabel {
-                theme: root.theme
-                text: "Constellation labels"
-            }
+            Repeater {
+                model: root.overlayRows
 
-            PreferencesCheckBox {
-                theme: root.theme
-                objectName: "overlaySolarSystemLabelsCheckBox"
-                checked: root.preferencesDraft.overlaySolarSystemLabels
-                onToggled: root.preferencesDraft.overlaySolarSystemLabels = checked
-            }
-            PreferencesFieldLabel {
-                theme: root.theme
-                text: "Solar system labels"
-            }
-            PreferencesCheckBox {
-                theme: root.theme
-                objectName: "overlayDeepSkyObjectsCheckBox"
-                checked: root.preferencesDraft.overlayDeepSkyObjects
-                onToggled: root.preferencesDraft.overlayDeepSkyObjects = checked
-            }
-            PreferencesFieldLabel {
-                theme: root.theme
-                text: "Deep sky objects"
-            }
+                PreferencesFieldLabel {
+                    required property var modelData
+                    required property int index
 
-            PreferencesCheckBox {
-                theme: root.theme
-                objectName: "overlayDeepSkyLabelsCheckBox"
-                checked: root.preferencesDraft.overlayDeepSkyLabels
-                onToggled: root.preferencesDraft.overlayDeepSkyLabels = checked
-            }
-            PreferencesFieldLabel {
-                theme: root.theme
-                text: "Deep sky labels"
-            }
-            PreferencesCheckBox {
-                theme: root.theme
-                objectName: "overlayEclipticCheckBox"
-                checked: root.preferencesDraft.overlayEcliptic
-                onToggled: root.preferencesDraft.overlayEcliptic = checked
-            }
-            PreferencesFieldLabel {
-                theme: root.theme
-                text: "Ecliptic"
-            }
-
-            PreferencesCheckBox {
-                theme: root.theme
-                objectName: "overlayCelestialEquatorCheckBox"
-                checked: root.preferencesDraft.overlayCelestialEquator
-                onToggled: root.preferencesDraft.overlayCelestialEquator = checked
-            }
-            PreferencesFieldLabel {
-                theme: root.theme
-                text: "Celestial equator"
-            }
-            PreferencesCheckBox {
-                theme: root.theme
-                objectName: "overlayCircumpolarBoundaryCheckBox"
-                checked: root.preferencesDraft.overlayCircumpolarBoundary
-                onToggled: root.preferencesDraft.overlayCircumpolarBoundary = checked
-            }
-            PreferencesFieldLabel {
-                theme: root.theme
-                text: "Circumpolar boundary"
+                    theme: root.theme
+                    Layout.row: Math.floor(index / 2) + 1
+                    Layout.column: (index % 2) * 2 + 1
+                    text: modelData.label
+                }
             }
         }
     }

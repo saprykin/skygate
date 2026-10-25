@@ -371,6 +371,7 @@ qt_add_qml_module(skygate-ui
         qml/controls/PreferencesCompactActionButton.qml
         qml/controls/PreferencesFieldLabel.qml
         qml/controls/PreferencesGroupTitle.qml
+        qml/controls/PreferencesPickerRow.qml
         qml/controls/PreferencesSearchablePickerShell.qml
         qml/controls/PreferencesSectionButton.qml
         qml/controls/PreferencesTextField.qml
@@ -389,6 +390,7 @@ qt_add_qml_module(skygate-ui
         qml/status/StatusDegradationPopup.qml
         qml/status/StatusFooter.qml
         qml/status/StatusNightConditionsPopup.qml
+        qml/status/StatusPopupScaffold.qml
     RESOURCES
         resources/icons/skygate-icon-512.png
         resources/icons/skygate-about-icon-512.png
