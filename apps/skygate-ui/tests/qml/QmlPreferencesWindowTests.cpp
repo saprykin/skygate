@@ -136,6 +136,15 @@ void QmlPreferencesWindowTests::engineFooterStatusVisibleWhenNotBusy()
     QTRY_VERIFY(statusLabel->isVisible());
     QTRY_VERIFY(!progressBar->isVisible());
     QTRY_VERIFY(!cancelButton->isVisible());
+
+    // The footer presents the controller status without the owner prefix.
+    QString expectedFooterText = controller->ephemerisDataStatusText();
+    const QString statusPrefix = controller->ephemerisDataStatusTextPrefix();
+    QVERIFY(!statusPrefix.isEmpty());
+    QVERIFY2(expectedFooterText.startsWith(statusPrefix), qPrintable(expectedFooterText));
+    expectedFooterText.remove(0, statusPrefix.size());
+    QVERIFY(!expectedFooterText.isEmpty());
+    QTRY_COMPARE(statusLabel->property("text").toString(), expectedFooterText);
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 

@@ -8,6 +8,7 @@
 #include "catalog/SkyCatalogPresets.hpp"
 #include "catalog/SkyCatalogSourceCollectionModel.hpp"
 #include "catalog/SkyCatalogSourcePresetModel.hpp"
+#include "catalog/SkyCatalogText.hpp"
 #include "diagnostics/SkyLogging.hpp"
 #include "diagnostics/SkyLoggingConfiguration.hpp"
 #include "ephemeris/SkyEphemerisDataManager.hpp"
@@ -33,6 +34,7 @@
 
 #include <cmath>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 using namespace skygate::ui::internal;
@@ -555,6 +557,12 @@ void SkyContextController::setTrackedTarget(
 QString SkyContextController::catalogStatusText() const
 {
     return m_catalogManager != nullptr ? m_catalogManager->statusText() : QString();
+}
+
+QString SkyContextController::catalogStatusTextPrefix() const
+{
+    constexpr std::string_view prefix = SkyCatalogText::kStatusPrefix;
+    return QString::fromLatin1(prefix.data(), static_cast<qsizetype>(prefix.size()));
 }
 
 QString SkyContextController::catalogDatasetInfoText() const

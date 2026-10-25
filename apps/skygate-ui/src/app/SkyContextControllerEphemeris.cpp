@@ -7,6 +7,7 @@
 #include "engine/IEphemerisDataSnapshot.hpp"
 #include "ephemeris/SkyEphemerisDataManager.hpp"
 #include "ephemeris/SkyEphemerisSettingsPolicy.hpp"
+#include "ephemeris/SkyEphemerisStatusText.hpp"
 #include "ephemeris/SkyEphemerisUpdateWorkflow.hpp"
 #include "factory/EphemerisFactoryCreationDiagnostic.hpp"
 
@@ -16,6 +17,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -146,6 +148,12 @@ QString SkyContextController::ephemerisWavelengthText() const
 QString SkyContextController::ephemerisDataStatusText() const
 {
     return m_ephemerisUpdateWorkflow->statusText();
+}
+
+QString SkyContextController::ephemerisDataStatusTextPrefix() const
+{
+    constexpr std::string_view prefix = SkyEphemerisStatusText::kStatusPrefix;
+    return QString::fromLatin1(prefix.data(), static_cast<qsizetype>(prefix.size()));
 }
 
 QString SkyContextController::ephemerisEngineStatusText() const

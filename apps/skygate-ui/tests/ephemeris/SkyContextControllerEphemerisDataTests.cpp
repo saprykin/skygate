@@ -3,6 +3,7 @@
 #include "catalog/SkyCatalogManager.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "ephemeris/SkyEphemerisDataManager.hpp"
+#include "ephemeris/SkyEphemerisStatusText.hpp"
 #include "settings/SkySettingsStore.hpp"
 #include "support/EphemerisDataCacheSnapshotFixture.hpp"
 #include "support/SettingsTestFixture.hpp"
@@ -261,6 +262,13 @@ void SkyContextControllerEphemerisDataTests::controllerOwnsManagerAndExposesSnap
     SkyContextController controller(nullptr, nullptr, options, nullptr);
 
     QCOMPARE(controller.ephemerisDataStatusText(), QString("Ephemeris data: Bundled fallback"));
+    // Presentations below the controller strip the prefix the status owner owns.
+    constexpr std::string_view statusPrefix = skygate::ui::internal::SkyEphemerisStatusText::kStatusPrefix;
+    QCOMPARE(
+        controller.ephemerisDataStatusTextPrefix(),
+        QString::fromLatin1(statusPrefix.data(), static_cast<qsizetype>(statusPrefix.size()))
+    );
+    QVERIFY(controller.ephemerisDataStatusText().startsWith(controller.ephemerisDataStatusTextPrefix()));
     QCOMPARE(controller.ephemerisKernelDisplayText(), QString("Bundled"));
     QVERIFY(controller.ephemerisDataRevision() > 0U);
     QVERIFY(controller.activeEphemerisDataSnapshot() != nullptr);

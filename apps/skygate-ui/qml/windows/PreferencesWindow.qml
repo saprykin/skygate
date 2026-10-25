@@ -384,13 +384,16 @@ Window {
                             objectName: "preferencesFooterStatusLabel"
                             visible: preferencesWindow.footerBusy || preferencesWindow.footerEngineStatusVisible
                             text: {
+                                const controller = preferencesWindow.skyContextController
                                 const statusText = preferencesWindow.selectedPage === preferencesWindow.engineSection
-                                    ? (preferencesWindow.skyContextController.ephemerisDataStatusText || "")
-                                    : (preferencesWindow.skyContextController.catalogStatusText || "")
-                                return statusText.startsWith("Catalog: ")
-                                    ? statusText.substring(9)
-                                    : (statusText.startsWith("Ephemeris data: ")
-                                       ? statusText.substring(16)
+                                    ? (controller.ephemerisDataStatusText || "")
+                                    : (controller.catalogStatusText || "")
+                                const catalogPrefix = controller.catalogStatusTextPrefix
+                                const ephemerisPrefix = controller.ephemerisDataStatusTextPrefix
+                                return statusText.startsWith(catalogPrefix)
+                                    ? statusText.substring(catalogPrefix.length)
+                                    : (statusText.startsWith(ephemerisPrefix)
+                                       ? statusText.substring(ephemerisPrefix.length)
                                        : statusText)
                             }
                             color: preferencesWindow.textSecondary

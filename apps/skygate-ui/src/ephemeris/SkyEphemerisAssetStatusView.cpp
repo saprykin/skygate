@@ -55,15 +55,13 @@ QString SkyEphemerisAssetStatusView::statusText() const
 
 QString SkyEphemerisAssetStatusView::datasetInfoText() const
 {
-    switch (m_source) {
-    case SkyEphemerisActiveSource::Installed:
+    if (m_source == SkyEphemerisActiveSource::Installed) {
         return installedDatasetInfoText(m_snapshot);
-    case SkyEphemerisActiveSource::MissingInstalledFallback:
-        return QStringLiteral("Bundled fallback (installed data missing)");
-    case SkyEphemerisActiveSource::BundledFallback:
-        break;
     }
-    return QStringLiteral("Bundled fallback");
+
+    // The fallback labels come from the status type, so the dataset info and the
+    // status text of the same state cannot drift apart.
+    return assetStatus(QString()).statusText();
 }
 
 QString SkyEphemerisAssetStatusView::shortRangeKernelStatusText() const
@@ -73,13 +71,9 @@ QString SkyEphemerisAssetStatusView::shortRangeKernelStatusText() const
 
 QString SkyEphemerisAssetStatusView::kernelDisplayText() const
 {
-    if (!usingInstalledData()) {
-        return QStringLiteral("Bundled");
-    }
-
     const std::optional<bool> installedKernelLongRange = m_snapshot.installedKernelLongRange;
-    if (!installedKernelLongRange.has_value()) {
-        return QStringLiteral("Bundled");
+    if (!usingInstalledData() || !installedKernelLongRange.has_value()) {
+        return SkyEphemerisAssetStatus::bundledFallback().displayText();
     }
     return *installedKernelLongRange ? QStringLiteral("DE441") : QStringLiteral("DE440s");
 }

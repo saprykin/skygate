@@ -12,6 +12,14 @@ namespace {
 
 constexpr std::size_t kBytesPerMebibyte = 1024U * 1024U;
 
+// Wraps a status body in the class prefix, so the texts produced here and the
+// presentations that strip the prefix read the same constant.
+[[nodiscard]] QString withStatusPrefix(const QString& body)
+{
+    constexpr std::string_view prefix = SkyCatalogText::kStatusPrefix;
+    return QString::fromLatin1(prefix.data(), static_cast<qsizetype>(prefix.size())) + body;
+}
+
 }  // namespace
 
 QString SkyCatalogText::withoutStatusPrefix(QString statusText)
@@ -47,105 +55,110 @@ QString SkyCatalogText::collectionSummary(
 )
 {
     const QLocale locale = QLocale::system();
-    return QString("Catalog: %1 (%2 objects, %3 deep sky, %4 constellations)")
-        .arg(
-            participationSummary,
-            locale.toString(static_cast<qulonglong>(bodyCount)),
-            locale.toString(static_cast<qulonglong>(deepSkyObjectCount)),
-            locale.toString(static_cast<qulonglong>(constellationCount))
-        );
+    return withStatusPrefix(QStringLiteral("%1 (%2 objects, %3 deep sky, %4 constellations)")
+                                .arg(
+                                    participationSummary,
+                                    locale.toString(static_cast<qulonglong>(bodyCount)),
+                                    locale.toString(static_cast<qulonglong>(deepSkyObjectCount)),
+                                    locale.toString(static_cast<qulonglong>(constellationCount))
+                                ));
 }
 
 QString SkyCatalogText::collectionRejected(const QString& detail)
 {
-    return QString("Catalog: Collection rejected: %1").arg(detail);
+    return withStatusPrefix(QStringLiteral("Collection rejected: %1").arg(detail));
 }
 
 QString SkyCatalogText::savedCollectionUnreadable(const QString& diagnostic)
 {
-    return QString(
-               "Catalog: Saved catalog configuration unreadable; the active collection stays in use. "
-               "Add, update, or reorder a catalog source to rewrite the saved configuration: %1"
-    )
-        .arg(diagnostic);
+    const QString bodyTemplate = QString(
+        "Saved catalog configuration unreadable; the active collection stays in use. "
+        "Add, update, or reorder a catalog source to rewrite the saved configuration: %1"
+    );
+    return withStatusPrefix(bodyTemplate.arg(diagnostic));
 }
 
 QString SkyCatalogText::loadFailed()
 {
-    return "Catalog: Failed to load";
+    return withStatusPrefix(QStringLiteral("Failed to load"));
 }
 
 QString SkyCatalogText::networkUnavailable()
 {
-    return "Catalog: Network unavailable";
+    return withStatusPrefix(QStringLiteral("Network unavailable"));
 }
 
 QString SkyCatalogText::downloadCanceled()
 {
-    return "Catalog: Download canceled.";
+    return withStatusPrefix(QStringLiteral("Download canceled."));
 }
 
 QString SkyCatalogText::downloadFailed()
 {
-    return "Catalog: Download failed";
+    return withStatusPrefix(QStringLiteral("Download failed"));
 }
 
 QString SkyCatalogText::invalidUrl()
 {
-    return "Catalog: Invalid URL";
+    return withStatusPrefix(QStringLiteral("Invalid URL"));
 }
 
 QString SkyCatalogText::invalidSourceUrl(const QString& urlText)
 {
-    return QString("Catalog: Invalid source URL %1").arg(urlText);
+    return withStatusPrefix(QStringLiteral("Invalid source URL %1").arg(urlText));
 }
 
 QString SkyCatalogText::sourceDownloadStarted(const QString& urlText)
 {
-    return QString("Catalog: Downloading %1...").arg(urlText);
+    return withStatusPrefix(QStringLiteral("Downloading %1...").arg(urlText));
 }
 
 QString SkyCatalogText::sourceDownloadFailed(const QString& urlText, const QString& errorText, const int httpStatusCode)
 {
-    return QString("Catalog: Source %1 failed (%2, HTTP %3)").arg(urlText, errorText, QString::number(httpStatusCode));
+    return withStatusPrefix(
+        QStringLiteral("Source %1 failed (%2, HTTP %3)").arg(urlText, errorText, QString::number(httpStatusCode))
+    );
 }
 
 QString SkyCatalogText::sourceTooLarge(const QString& urlText, const std::size_t maxBytes)
 {
     const qulonglong maxMebibytes = static_cast<qulonglong>(maxBytes / kBytesPerMebibyte);
-    return QString("Catalog: Source %1 file too large (max %2 MiB)").arg(urlText, QString::number(maxMebibytes));
+    return withStatusPrefix(
+        QStringLiteral("Source %1 file too large (max %2 MiB)").arg(urlText, QString::number(maxMebibytes))
+    );
 }
 
 QString SkyCatalogText::sourceEmptyPayload(const QString& urlText)
 {
-    return QString("Catalog: Source %1 returned empty data").arg(urlText);
+    return withStatusPrefix(QStringLiteral("Source %1 returned empty data").arg(urlText));
 }
 
 QString SkyCatalogText::sourceParseFailed(const QString& sourceUrl, const QString& description)
 {
-    return QString("Catalog: Source %1 parse failed: %2").arg(sourceUrl, description);
+    return withStatusPrefix(QStringLiteral("Source %1 parse failed: %2").arg(sourceUrl, description));
 }
 
 QString SkyCatalogText::processingDownloadedCatalog()
 {
-    return "Catalog: Processing downloaded catalog...";
+    return withStatusPrefix(QStringLiteral("Processing downloaded catalog..."));
 }
 
 QString SkyCatalogText::processingParsedObjects(const std::size_t parsedObjectCount)
 {
     const QLocale locale = QLocale::system();
-    return QString("Catalog: Processing... %1 objects parsed")
-        .arg(locale.toString(static_cast<qulonglong>(parsedObjectCount)));
+    return withStatusPrefix(
+        QString("Processing... %1 objects parsed").arg(locale.toString(static_cast<qulonglong>(parsedObjectCount)))
+    );
 }
 
 QString SkyCatalogText::callbackContextUnavailable()
 {
-    return "Catalog: Callback context unavailable";
+    return withStatusPrefix(QStringLiteral("Callback context unavailable"));
 }
 
 QString SkyCatalogText::emptyDeepSkyCatalog()
 {
-    return "Catalog: Downloaded deep-sky catalog contains no DSOs";
+    return withStatusPrefix(QStringLiteral("Downloaded deep-sky catalog contains no DSOs"));
 }
 
 QString SkyCatalogText::missingConstellationData(const QString& reason)
@@ -155,27 +168,34 @@ QString SkyCatalogText::missingConstellationData(const QString& reason)
 
 QString SkyCatalogText::unknownSourcePreset(const QString& presetId)
 {
-    return QString("Catalog: Unknown source preset '%1'").arg(presetId);
+    return withStatusPrefix(QStringLiteral("Unknown source preset '%1'").arg(presetId));
 }
 
 QString SkyCatalogText::cacheClearBlocked()
 {
-    return "Catalog: Cannot clear cache while download is in progress";
+    return withStatusPrefix(QStringLiteral("Cannot clear cache while download is in progress"));
 }
 
 QString SkyCatalogText::starCacheClearResult(const bool cacheCleared)
 {
-    return cacheCleared ? "Catalog: Star catalog cache cleared" : "Catalog: Star catalog cache clear failed";
+    return withStatusPrefix(
+        cacheCleared ? QStringLiteral("Star catalog cache cleared") : QStringLiteral("Star catalog cache clear failed")
+    );
 }
 
 QString SkyCatalogText::deepSkyCacheClearResult(const bool cacheCleared)
 {
-    return cacheCleared ? "Catalog: Deep-sky catalog cache cleared" : "Catalog: Deep-sky catalog cache clear failed";
+    return withStatusPrefix(
+        cacheCleared ? QStringLiteral("Deep-sky catalog cache cleared")
+                     : QStringLiteral("Deep-sky catalog cache clear failed")
+    );
 }
 
 QString SkyCatalogText::sourceCacheClearResult(const bool cacheCleared)
 {
-    return cacheCleared ? "Catalog: Source cache cleared" : "Catalog: Source cache clear failed";
+    return withStatusPrefix(
+        cacheCleared ? QStringLiteral("Source cache cleared") : QStringLiteral("Source cache clear failed")
+    );
 }
 
 QString SkyCatalogText::sourcePayloadUnavailable()

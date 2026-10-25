@@ -1,6 +1,7 @@
 #include "UtcTimeCodec.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
 #include "catalog/SkyCatalogPresets.hpp"
+#include "catalog/SkyCatalogText.hpp"
 #include "settings/SkySettingsStore.hpp"
 #include "support/CatalogCacheTestSupport.hpp"
 #include "support/SkyContextControllerTestSupport.hpp"
@@ -319,6 +320,13 @@ void SkyContextControllerNightCatalogTests::failedDeepSkyCatalogDownloadKeepsCou
     QCOMPARE(infoSpy.count(), 0);
     QCOMPARE(controller->deepSkyCatalogInfoText(), QString("Objects: 110"));
     QCOMPARE(controller->catalogStatusText(), QString("Catalog: Invalid URL"));
+    // Presentations below the controller strip the prefix the status owner owns.
+    constexpr std::string_view statusPrefix = skygate::ui::internal::SkyCatalogText::kStatusPrefix;
+    QCOMPARE(
+        controller->catalogStatusTextPrefix(),
+        QString::fromLatin1(statusPrefix.data(), static_cast<qsizetype>(statusPrefix.size()))
+    );
+    QVERIFY(controller->catalogStatusText().startsWith(controller->catalogStatusTextPrefix()));
 }
 
 void SkyContextControllerNightCatalogTests::restoresCachedCatalogConstellationCount()

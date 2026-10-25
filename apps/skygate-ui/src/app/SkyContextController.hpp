@@ -122,11 +122,13 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(QString ephemerisWavelengthText READ ephemerisWavelengthText WRITE setEphemerisWavelengthText NOTIFY ephemerisSettingsChanged)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
     Q_PROPERTY(QString catalogStatusText READ catalogStatusText NOTIFY catalogStatusTextChanged)
+    Q_PROPERTY(QString catalogStatusTextPrefix READ catalogStatusTextPrefix CONSTANT)
     Q_PROPERTY(
         QString ephemerisDataStatusText
         READ ephemerisDataStatusText
         NOTIFY ephemerisDataStatusTextChanged
     )
+    Q_PROPERTY(QString ephemerisDataStatusTextPrefix READ ephemerisDataStatusTextPrefix CONSTANT)
     Q_PROPERTY(
         QString ephemerisEngineStatusText
         READ ephemerisEngineStatusText
@@ -323,7 +325,9 @@ public:
     [[nodiscard]] QString ephemerisWavelengthText() const;
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
+    [[nodiscard]] QString catalogStatusTextPrefix() const;
     [[nodiscard]] QString ephemerisDataStatusText() const;
+    [[nodiscard]] QString ephemerisDataStatusTextPrefix() const;
     [[nodiscard]] QString ephemerisEngineStatusText() const;
     [[nodiscard]] QString ephemerisShortRangeKernelStatusText() const;
     [[nodiscard]] QString ephemerisKernelDisplayText() const;
