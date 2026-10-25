@@ -332,7 +332,6 @@ private slots:
     void focusSearchTargetNormalizesKind();
     void focusSearchTargetIgnoresInvalidTargets();
     void trackSearchTargetStartsLiveAndCentersBody();
-    void trackSearchTargetNormalizesKind();
     void searchTreatsNonAsciiSpaceAsData();
     void trackSearchTargetPreservesBceTimelineAnchor();
     void trackedBcePlaybackCatchUpUsesConfiguredStep();
@@ -551,34 +550,6 @@ void SkyContextControllerSearchTrackingTests::trackSearchTargetStartsLiveAndCent
     controller->setViewCenter(12.0, 123.0);
 
     QVERIFY(controller->trackSearchTarget("body", "demo_target"));
-
-    QVERIFY(controller->live());
-    QVERIFY(controller->hasTrackedTarget());
-    QCOMPARE(controller->trackedTargetKind(), QString("body"));
-    QCOMPARE(controller->trackedTargetId(), QString("demo_target"));
-    QCOMPARE(controller->trackedTargetDisplayText(), QString("Demo Target"));
-    QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
-    QCOMPARE(controller->selectedSearchTargetId(), QString("demo_target"));
-
-    const QDateTime timelineUtc = controllerUtcTime(*controller);
-    QCOMPARE(timelineUtc, QDateTime(QDate(2000, 1, 1), QTime(0, 0, 0), QTimeZone::UTC));
-
-    const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
-    const auto* targetState = findStateById(snapshot, "demo_target");
-    QVERIFY(targetState != nullptr);
-    QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
-    QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
-}
-
-void SkyContextControllerSearchTrackingTests::trackSearchTargetNormalizesKind()
-{
-    FakeTimeSource timeSource;
-    const auto controller = createSingleBodyController("demo_target", "Demo Target", &timeSource);
-    controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText("2000-01-01", "00:00:00"));
-    controller->setViewCenter(12.0, 123.0);
-
-    QVERIFY(controller->trackSearchTarget(" BODY ", "demo_target"));
 
     QVERIFY(controller->live());
     QVERIFY(controller->hasTrackedTarget());

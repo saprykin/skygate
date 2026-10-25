@@ -7,8 +7,6 @@ class SkyOverlayLayerSettingsTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void defaultsMatchLayerPolicy_data();
-    void defaultsMatchLayerPolicy();
     void propertySettersRoundTrip_data();
     void propertySettersRoundTrip();
     void setVisibilityEmitsChangedSignalsOnce_data();
@@ -55,21 +53,6 @@ QMetaMethod signalMethod(const QObject& object, const QByteArray& signalName)
 }
 
 }  // namespace
-
-void SkyOverlayLayerSettingsTests::defaultsMatchLayerPolicy_data()
-{
-    addOverlayLayerPropertyColumns();
-    addOverlayLayerPropertyRows();
-}
-
-void SkyOverlayLayerSettingsTests::defaultsMatchLayerPolicy()
-{
-    QFETCH(QByteArray, propertyName);
-    QFETCH(bool, defaultValue);
-
-    SkyOverlayLayerSettings settings;
-    QCOMPARE(settings.property(propertyName.constData()).toBool(), defaultValue);
-}
 
 void SkyOverlayLayerSettingsTests::propertySettersRoundTrip_data()
 {

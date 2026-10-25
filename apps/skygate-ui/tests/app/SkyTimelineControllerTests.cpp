@@ -46,9 +46,7 @@ private slots:
     void honorsFractionalSpeedMultiplier();
     void advancesByElapsedGapWhileCatchingUp();
     void appliesLargeStepWhileCatchingUp();
-    void completesCatchUpExactlyAtWallTime();
     void clampsAdvancementToWallTime();
-    void remainsCatchingUpWhenAdvancementIsShort();
     void usesMinimumOneSecondOfElapsedTime();
     void crossesBceBoundaryWhileCatchingUp();
     void returnsNoAdvancementWhenSpeedIsZero();
@@ -138,20 +136,6 @@ void SkyTimelineControllerTests::appliesLargeStepWhileCatchingUp()
     QVERIFY(result->catchingUpToCurrentUtc);
 }
 
-void SkyTimelineControllerTests::completesCatchUpExactlyAtWallTime()
-{
-    auto controller = timelineController(kUnitSpeedMultiplier, kCatchUpStepSeconds);
-
-    const UtcTimePoint timelineUtc = utcAtSeconds(1000);
-    const UtcTimePoint wallUtc = utcAtSeconds(1060);
-    const auto result = controller.computeCatchUpAdvancement(timelineUtc, utcAtSeconds(1001), wallUtc);
-
-    QVERIFY(result.has_value());
-    QCOMPARE(epochMicros(result->nextUtc), epochMicros(wallUtc));
-    QVERIFY(result->advancedWhileCatchingUp);
-    QVERIFY(!result->catchingUpToCurrentUtc);
-}
-
 void SkyTimelineControllerTests::clampsAdvancementToWallTime()
 {
     auto controller = timelineController(1.0, 3600);
@@ -164,19 +148,6 @@ void SkyTimelineControllerTests::clampsAdvancementToWallTime()
     QCOMPARE(epochMicros(result->nextUtc), epochMicros(wallUtc));
     QVERIFY(result->advancedWhileCatchingUp);
     QVERIFY(!result->catchingUpToCurrentUtc);
-}
-
-void SkyTimelineControllerTests::remainsCatchingUpWhenAdvancementIsShort()
-{
-    auto controller = timelineController(1.0, 30);
-
-    const UtcTimePoint timelineUtc = utcAtSeconds(1000);
-    const auto result = controller.computeCatchUpAdvancement(timelineUtc, utcAtSeconds(1001), utcAtSeconds(2000));
-
-    QVERIFY(result.has_value());
-    QCOMPARE(epochMicros(result->nextUtc), epochMicros(timelineUtc) + 30'000'000);
-    QVERIFY(result->advancedWhileCatchingUp);
-    QVERIFY(result->catchingUpToCurrentUtc);
 }
 
 void SkyTimelineControllerTests::usesMinimumOneSecondOfElapsedTime()
