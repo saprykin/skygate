@@ -10,12 +10,7 @@
             "name": "base",
             "hidden": true,
             "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build-ninja/${presetName}",
-            "cacheVariables": {
-                "CMAKE_CXX_STANDARD": "20",
-                "CMAKE_CXX_STANDARD_REQUIRED": "ON",
-                "CMAKE_CXX_EXTENSIONS": "OFF"
-            }
+            "binaryDir": "${sourceDir}/build-ninja/${presetName}"
         },
         {
             "name": "windows-vcpkg-base",
@@ -64,8 +59,7 @@
             "displayName": "Core Debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "OFF",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
+                "SKYGATE_BUILD_UI": "OFF"
             }
         },
         {
@@ -87,8 +81,7 @@
             "displayName": "Core Debug (Linux vcpkg)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "OFF",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
+                "SKYGATE_BUILD_UI": "OFF"
             }
         },
         {
@@ -98,8 +91,7 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON",
-                "VCPKG_MANIFEST_FEATURES": "high-precision-ephemeris"
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON"
             }
         },
         {
@@ -108,9 +100,7 @@
             "displayName": "CI Core Debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "OFF",
-                "SKYGATE_BUILD_TESTS": "ON",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
+                "SKYGATE_BUILD_UI": "OFF"
             }
         },
         {
@@ -118,9 +108,7 @@
             "inherits": "base",
             "displayName": "UI Debug",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "ON",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
+                "CMAKE_BUILD_TYPE": "Debug"
             }
         },
         {
@@ -130,9 +118,7 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
-                "SKYGATE_BUILD_TESTS": "ON",
-                "SKYGATE_ENABLE_COVERAGE": "ON",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
+                "SKYGATE_ENABLE_COVERAGE": "ON"
             }
         },
         {
@@ -141,8 +127,7 @@
             "displayName": "Core Debug (Windows vcpkg)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "OFF",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
+                "SKYGATE_BUILD_UI": "OFF"
             }
         },
         {
@@ -152,8 +137,7 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON",
-                "VCPKG_MANIFEST_FEATURES": "high-precision-ephemeris"
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON"
             }
         },
         {
@@ -161,9 +145,7 @@
             "inherits": "windows-vcpkg-base",
             "displayName": "UI Debug (Windows vcpkg)",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "ON",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
+                "CMAKE_BUILD_TYPE": "Debug"
             }
         },
         {
@@ -173,10 +155,8 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
-                "SKYGATE_BUILD_UI": "ON",
                 "SKYGATE_BUILD_TESTS": "OFF",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON",
-                "VCPKG_MANIFEST_FEATURES": "high-precision-ephemeris"
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON"
             }
         },
         {
@@ -185,8 +165,7 @@
             "displayName": "Core Debug (macOS vcpkg zlib)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "OFF",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
+                "SKYGATE_BUILD_UI": "OFF"
             }
         },
         {
@@ -196,8 +175,7 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON",
-                "VCPKG_MANIFEST_FEATURES": "high-precision-ephemeris"
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON"
             }
         },
         {
@@ -205,9 +183,7 @@
             "inherits": "macos-vcpkg-base",
             "displayName": "UI Debug (macOS vcpkg zlib)",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "ON",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
+                "CMAKE_BUILD_TYPE": "Debug"
             }
         },
         {
@@ -217,10 +193,8 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
-                "SKYGATE_BUILD_UI": "ON",
                 "SKYGATE_BUILD_TESTS": "OFF",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON",
-                "VCPKG_MANIFEST_FEATURES": "high-precision-ephemeris"
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON"
             }
         },
         {
@@ -230,10 +204,8 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
-                "SKYGATE_BUILD_UI": "ON",
                 "SKYGATE_BUILD_TESTS": "OFF",
-                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON",
-                "VCPKG_MANIFEST_FEATURES": "high-precision-ephemeris"
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON"
             }
         }
     ],

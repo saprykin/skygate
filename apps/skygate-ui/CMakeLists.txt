@@ -392,7 +392,6 @@ qt_add_qml_module(skygate-ui
         qml/status/StatusNightConditionsPopup.qml
         qml/status/StatusPopupScaffold.qml
     RESOURCES
-        resources/icons/skygate-icon-512.png
         resources/icons/skygate-about-icon-512.png
 )
 

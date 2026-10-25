@@ -67,7 +67,6 @@ jobs:
           --parallel 2
           --output-on-failure
           --no-tests=error
-          -E '^skygate-ui-qml-main-window-tests$'
 
       - name: Print compiler cache stats
         if: always()
