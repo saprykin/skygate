@@ -1,6 +1,7 @@
 #include "SkyObjectInspectorFormatters.hpp"
 #include "ObservationEventCalculator.hpp"
 #include "app/SkyContextTextFormatter.hpp"
+#include "math/AngleMath.hpp"
 #include "time/SkyQtTimeCodec.hpp"
 #include "time/SkyTimeController.hpp"
 
@@ -49,11 +50,11 @@ QString formatRightAscension(const double rightAscensionHours)
         return "--";
     }
 
-    int totalSeconds = static_cast<int>(std::llround(rightAscensionHours * 3600.0));
+    // Wrapping the hours keeps negative input on the clock and folds a full
+    // turn to zero before the seconds round up to a whole day.
+    int totalSeconds =
+        static_cast<int>(std::llround(skygate::core::AngleMath::normalizeHours(rightAscensionHours) * 3600.0));
     totalSeconds %= 24 * 3600;
-    if (totalSeconds < 0) {
-        totalSeconds += 24 * 3600;
-    }
 
     const int hours = totalSeconds / 3600;
     const int minutes = (totalSeconds % 3600) / 60;

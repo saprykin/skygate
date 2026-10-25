@@ -1,5 +1,5 @@
 #include "SkyObjectSearchModel.hpp"
-#include "StringUtilities.hpp"
+#include "AsciiText.hpp"
 #include "math/NumericTolerance.hpp"
 #include "selection/SkySelectionTargetKind.hpp"
 
@@ -11,7 +11,7 @@ namespace {
 
 QString normalizedKey(const QString& value)
 {
-    return QString::fromStdString(skygate::ephemeris::StringUtilities::normalizedLookupKey(value.toStdString()));
+    return QString::fromStdString(skygate::core::AsciiText::normalizedLookupKey(value.toStdString()));
 }
 
 QString compactedKey(const QString& value)

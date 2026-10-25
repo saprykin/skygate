@@ -1,21 +1,16 @@
 #include "ConstellationReferenceCalculator.hpp"
+#include "HorizontalCoordinate.hpp"
 #include "SkyContextController.hpp"
 #include "StringUtilities.hpp"
 #include "diagnostics/SkyPerformanceLogging.hpp"
 #include "diagnostics/SkyPerformanceStageTimer.hpp"
 #include "selection/SkySelectionTargetKind.hpp"
 
-#include <cmath>
 #include <string>
 
 using skygate::ephemeris::StringUtilities;
 
 namespace {
-
-bool hasFiniteHorizontal(const skygate::core::HorizontalCoordinate& horizontal)
-{
-    return std::isfinite(horizontal.altitudeDeg) && std::isfinite(horizontal.azimuthDeg);
-}
 
 const skygate::ephemeris::CelestialBodyState*
 findBodyStateById(const skygate::ephemeris::EphemerisSnapshot& snapshot, const QString& targetId)
@@ -65,7 +60,7 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
         const std::string trimmedTargetId = targetId.trimmed().toStdString();
         const auto bodyState = engine->computeBodyState(requestContext.request, trimmedTargetId);
         const double lookupMs = timer.stageMilliseconds();
-        if (!bodyState.has_value() || !hasFiniteHorizontal(bodyState->horizontal)) {
+        if (!bodyState.has_value() || !bodyState->horizontal.isFinite()) {
             return false;
         }
 
@@ -145,7 +140,7 @@ bool SkyContextController::trackSearchTarget(const QString& targetKind, const QS
     const auto requestContext = ephemerisRequestContextFor(trackingContext);
     const auto snapshot = engine->compute(requestContext.request);
     const auto* bodyState = findBodyStateById(snapshot, targetId);
-    if (bodyState == nullptr || !hasFiniteHorizontal(bodyState->horizontal)) {
+    if (bodyState == nullptr || !bodyState->horizontal.isFinite()) {
         return false;
     }
 
@@ -193,7 +188,7 @@ bool SkyContextController::recenterTrackedTarget(const bool emitSkyContextChange
     const auto requestContext = ephemerisRequestContext();
     const auto snapshot = engine->compute(requestContext.request);
     const auto* bodyState = findBodyStateById(snapshot, m_search.trackedTargetId());
-    if (bodyState == nullptr || !hasFiniteHorizontal(bodyState->horizontal)) {
+    if (bodyState == nullptr || !bodyState->horizontal.isFinite()) {
         clearTrackedTarget();
         return false;
     }

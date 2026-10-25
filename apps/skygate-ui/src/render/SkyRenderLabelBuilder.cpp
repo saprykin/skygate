@@ -1,4 +1,5 @@
 #include "SkyRenderLabelBuilder.hpp"
+#include "AsciiText.hpp"
 #include "SkyRenderGlyph.hpp"
 #include "SkyRenderLabel.hpp"
 #include "math/NumericTolerance.hpp"
@@ -67,16 +68,7 @@ struct DeepSkyLabelCandidate final {
 [[nodiscard]] bool startsWithCatalogPrefix(const std::string_view text, const std::string_view prefix)
 {
     return text.size() > prefix.size()
-           && std::equal(
-               prefix.begin(),
-               prefix.end(),
-               text.begin(),
-               text.begin() + static_cast<std::ptrdiff_t>(prefix.size()),
-               [](const char lhs, const char rhs) {
-                   return std::tolower(static_cast<unsigned char>(lhs))
-                          == std::tolower(static_cast<unsigned char>(rhs));
-               }
-           )
+           && skygate::core::AsciiText::equalsIgnoreCase(text.substr(0U, prefix.size()), prefix)
            && text.at(prefix.size()) == ' ';
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
 #include <string_view>
 
 namespace skygate::core {
@@ -33,6 +34,16 @@ public:
         return character >= 'A' && character <= 'Z' ? static_cast<char>(character - 'A' + 'a') : character;
     }
 
+    [[nodiscard]] static std::string toLower(const std::string_view text)
+    {
+        std::string lowered;
+        lowered.reserve(text.size());
+        for (const char character : text) {
+            lowered.push_back(toLower(character));
+        }
+        return lowered;
+    }
+
     [[nodiscard]] static constexpr std::string_view trimWhitespace(const std::string_view text) noexcept
     {
         std::size_t begin = 0;
@@ -46,6 +57,13 @@ public:
         }
 
         return text.substr(begin, end - begin);
+    }
+
+    // Lookup keys match however the caller typed an identifier: surrounding
+    // whitespace and ASCII case fold away, every other character stays.
+    [[nodiscard]] static std::string normalizedLookupKey(const std::string_view text)
+    {
+        return toLower(trimWhitespace(text));
     }
 
     [[nodiscard]] static constexpr bool

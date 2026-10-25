@@ -1,8 +1,8 @@
 #include "TimeZoneCatalogModel.hpp"
 #include "TimeZoneCatalogEntry.hpp"
 
+#include "AsciiText.hpp"
 #include "SkyQtTimeCodec.hpp"
-#include "StringUtilities.hpp"
 #include "TimeZoneAliasCatalog.hpp"
 
 #include <QStringList>
@@ -21,7 +21,7 @@ QString normalizedFilterKey(const QString& value)
     QString text = value;
     text.replace(QLatin1Char('_'), QLatin1Char(' '));
     text.replace(QLatin1Char('-'), QLatin1Char(' '));
-    const std::string normalized = skygate::ephemeris::StringUtilities::normalizedLookupKey(text.toStdString());
+    const std::string normalized = skygate::core::AsciiText::normalizedLookupKey(text.toStdString());
     return QString::fromStdString(normalized).simplified();
 }
 

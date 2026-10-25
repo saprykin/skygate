@@ -54,11 +54,7 @@ char StringUtilities::toLowerAscii(const char character) noexcept
 
 std::string StringUtilities::toLowerAscii(const std::string_view value)
 {
-    std::string lowered(value);
-    std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](const char character) {
-        return toLowerAscii(character);
-    });
-    return lowered;
+    return skygate::core::AsciiText::toLower(value);
 }
 
 std::string_view StringUtilities::trimAsciiWhitespace(const std::string_view value) noexcept
@@ -100,7 +96,7 @@ QString StringUtilities::fromUtf8(const std::string_view text)
 
 std::string StringUtilities::normalizedLookupKey(const std::string_view value)
 {
-    return toLowerAscii(trimAsciiWhitespace(value));
+    return skygate::core::AsciiText::normalizedLookupKey(value);
 }
 
 std::string StringUtilities::normalizedAlnumKey(const std::string_view value)

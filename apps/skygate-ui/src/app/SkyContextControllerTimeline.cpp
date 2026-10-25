@@ -1,4 +1,5 @@
 #include "SkyContextController.hpp"
+#include "HorizontalCoordinate.hpp"
 #include "SkyContextProjectionTypeCodec.hpp"
 #include "engine/EphemerisComputationPolicy.hpp"
 #include "math/NumericTolerance.hpp"
@@ -143,7 +144,8 @@ void SkyContextController::setViewCenter(const double altitudeDeg, const double 
 
 bool SkyContextController::setViewCenterInternal(const double altitudeDeg, const double azimuthDeg)
 {
-    if (!std::isfinite(altitudeDeg) || !std::isfinite(azimuthDeg)) {
+    const skygate::core::HorizontalCoordinate center{.altitudeDeg = altitudeDeg, .azimuthDeg = azimuthDeg};
+    if (!center.isFinite()) {
         emit viewDirectionChanged();
         return false;
     }

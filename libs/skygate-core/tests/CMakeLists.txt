@@ -78,3 +78,4 @@ add_skygate_core_qtest(skygate-core-prepared-projection-tests projection/Prepare
 add_skygate_core_qtest(skygate-core-projection-pipeline-boundary-tests projection/ProjectionPipelineBoundaryTests.cpp)
 add_skygate_core_qtest(skygate-core-projection-property-tests projection/ProjectionPropertyTests.cpp)
 add_skygate_core_qtest(skygate-core-viewport-math-tests geometry/ViewportMathTests.cpp)
+add_skygate_core_qtest(skygate-core-ascii-text-tests text/AsciiTextTests.cpp)

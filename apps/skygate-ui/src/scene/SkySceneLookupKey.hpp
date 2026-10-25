@@ -1,6 +1,6 @@
 #pragma once
 
-#include "StringUtilities.hpp"
+#include "AsciiText.hpp"
 
 #include <QString>
 
@@ -12,12 +12,12 @@ class SkySceneLookupKey final {
 public:
     [[nodiscard]] static QString normalized(const QString& value)
     {
-        return QString::fromStdString(skygate::ephemeris::StringUtilities::normalizedLookupKey(value.toStdString()));
+        return QString::fromStdString(skygate::core::AsciiText::normalizedLookupKey(value.toStdString()));
     }
 
     [[nodiscard]] static QString normalized(const std::string& value)
     {
-        return QString::fromStdString(skygate::ephemeris::StringUtilities::normalizedLookupKey(value));
+        return QString::fromStdString(skygate::core::AsciiText::normalizedLookupKey(value));
     }
 };
 
