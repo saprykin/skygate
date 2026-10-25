@@ -90,7 +90,7 @@ void PerformanceSceneProfileTests::buildsLargeSceneWithinGuardrail()
     );
     QVERIFY(catalog != nullptr);
     auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
-    QVERIFY(engineResult.isSuccess());
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(engineResult.status));
     auto engine = std::move(engineResult.engine);
     QVERIFY(engine != nullptr);
 

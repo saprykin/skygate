@@ -126,7 +126,7 @@ void CatalogSnapshotBoundaryTests::factoryConsumesProviderThroughCommonBodyView(
     const skygate::ephemeris::EphemerisEngineFactoryResult result =
         skygate::ephemeris::EphemerisEngineFactory::create(provider);
 
-    QVERIFY(result.isSuccess());
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(result.status));
     QVERIFY(result.engine != nullptr);
 
     const auto starState = result.engine->computeBodyState(context, "alt_star");
@@ -152,7 +152,7 @@ void CatalogSnapshotBoundaryTests::engineSnapshotRemainsValidAfterProviderChange
             std::vector<DistantCelestialBody>{makeSnapshotBoundaryDeepSkyObject()}
         );
         auto result = skygate::ephemeris::EphemerisEngineFactory::create(provider);
-        QVERIFY(result.isSuccess());
+        QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(result.status));
         engine = std::move(result.engine);
     }
 

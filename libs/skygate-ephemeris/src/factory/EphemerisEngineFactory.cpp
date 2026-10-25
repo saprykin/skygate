@@ -8,18 +8,13 @@
 #include "engine/EphemerisEngineOptions.hpp"
 #include "engine/simple/SimpleEphemerisEngine.hpp"
 
-#include <initializer_list>
 #include <memory>
-#include <span>
-#include <utility>
-#include <vector>
 
 namespace skygate::ephemeris {
 
 namespace {
 
-[[nodiscard]] EphemerisEngineFactoryResult
-makeInvalidFactoryRequestResult(const EphemerisEngineKind::Type requestedKind)
+[[nodiscard]] EphemerisEngineFactoryResult makeInvalidFactoryRequestResult()
 {
     return EphemerisEngineFactoryResult::failure(
         EphemerisFactoryCreationStatus::Type::FailedInvalidRequest,
@@ -27,8 +22,7 @@ makeInvalidFactoryRequestResult(const EphemerisEngineKind::Type requestedKind)
             EphemerisFactoryCreationDiagnostic::Code::InvalidRequest,
             EphemerisFactoryCreationDiagnosticSeverity::Error,
             "The requested ephemeris engine kind is not supported.",
-        }},
-        requestedKind
+        }}
     );
 }
 
@@ -61,8 +55,7 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngin
                 normalizedRequest.options
             ),
             EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine,
-            {},
-            normalizedRequest.engineKind
+            {}
         );
         break;
     }
@@ -70,7 +63,7 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngin
         result = HighPrecisionEngineAssembly::assemble(normalizeRequestOptions(request));
         break;
     default:
-        result = makeInvalidFactoryRequestResult(request.engineKind);
+        result = makeInvalidFactoryRequestResult();
         break;
     }
 
@@ -79,29 +72,12 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngin
     return result;
 }
 
-EphemerisEngineFactoryResult EphemerisEngineFactory::create()
-{
-    EphemerisEngineFactoryRequest request;
-    request.options = SimpleEphemerisEngine::defaultOptions();
-    return create(request);
-}
-
 EphemerisEngineFactoryResult EphemerisEngineFactory::create(const IStarCatalog& catalog)
 {
     EphemerisEngineFactoryRequest request;
     request.catalog = std::make_shared<CelestialBodyCatalog>(catalog.bodies());
     request.options = SimpleEphemerisEngine::defaultOptions();
     return create(request);
-}
-
-EphemerisEngineFactoryResult EphemerisEngineFactory::create(std::initializer_list<OwnGalaxyCelestialBody> bodies)
-{
-    return create(std::span<const OwnGalaxyCelestialBody>{bodies.begin(), bodies.size()});
-}
-
-EphemerisEngineFactoryResult EphemerisEngineFactory::create(std::span<const OwnGalaxyCelestialBody> bodies)
-{
-    return create(CelestialBodyCatalog(std::vector<OwnGalaxyCelestialBody>{bodies.begin(), bodies.end()}));
 }
 
 EphemerisEngineFactoryResult EphemerisEngineFactory::create(const CelestialBodyCatalog& catalog)

@@ -406,7 +406,8 @@ std::unique_ptr<SkyContextController> makeControllerWithManifest(
         return {};
     }
     auto ephemerisEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(*starCatalog);
-    if (!ephemerisEngineResult.isSuccess() || ephemerisEngineResult.engine == nullptr) {
+    if (!skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(ephemerisEngineResult.status)
+        || ephemerisEngineResult.engine == nullptr) {
         return {};
     }
     auto ephemerisEngine = std::move(ephemerisEngineResult.engine);

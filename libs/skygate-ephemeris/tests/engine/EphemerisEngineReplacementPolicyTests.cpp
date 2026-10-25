@@ -1,6 +1,7 @@
 #include "factory/EphemerisEngineReplacementPolicy.hpp"
 #include "engine/EphemerisEngineKind.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactoryRequest.hpp"
 #include "factory/EphemerisEngineFactoryResult.hpp"
 
 #include <QtTest/QtTest>
@@ -11,6 +12,7 @@
 namespace {
 
 using skygate::ephemeris::EphemerisEngineFactory;
+using skygate::ephemeris::EphemerisEngineFactoryRequest;
 using skygate::ephemeris::EphemerisEngineFactoryResult;
 using skygate::ephemeris::EphemerisEngineKind;
 using skygate::ephemeris::EphemerisEngineReplacementPolicy;
@@ -18,21 +20,21 @@ using skygate::ephemeris::EphemerisFactoryCreationStatus;
 
 constexpr EphemerisEngineKind::Type kNonEnumeratedEngineKind = static_cast<EphemerisEngineKind::Type>(42);
 
-[[nodiscard]] EphemerisEngineFactoryResult makeSimpleFallbackResult(const EphemerisEngineKind::Type requestedKind)
+[[nodiscard]] EphemerisEngineFactoryResult makeSimpleFallbackResult()
 {
-    auto created = EphemerisEngineFactory::create();
-    Q_ASSERT(created.isSuccess());
+    auto created = EphemerisEngineFactory::create(EphemerisEngineFactoryRequest{});
+    Q_ASSERT(EphemerisFactoryCreationStatus::isSuccess(created.status));
     return EphemerisEngineFactoryResult::success(
-        std::move(created.engine), EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback, {}, requestedKind
+        std::move(created.engine), EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback
     );
 }
 
-[[nodiscard]] EphemerisEngineFactoryResult makeRequestedEngineResult(const EphemerisEngineKind::Type requestedKind)
+[[nodiscard]] EphemerisEngineFactoryResult makeRequestedEngineResult()
 {
-    auto created = EphemerisEngineFactory::create();
-    Q_ASSERT(created.isSuccess());
+    auto created = EphemerisEngineFactory::create(EphemerisEngineFactoryRequest{});
+    Q_ASSERT(EphemerisFactoryCreationStatus::isSuccess(created.status));
     return EphemerisEngineFactoryResult::success(
-        std::move(created.engine), EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine, {}, requestedKind
+        std::move(created.engine), EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine
     );
 }
 
@@ -53,15 +55,10 @@ private slots:
 
 void EphemerisEngineReplacementPolicyTests::keepsCurrentHighPrecisionWhenRebuildFallsBack()
 {
-    const EphemerisEngineFactoryResult fallbackResult =
-        makeSimpleFallbackResult(EphemerisEngineKind::Type::HighPrecision);
+    const EphemerisEngineFactoryResult fallbackResult = makeSimpleFallbackResult();
     QVERIFY(fallbackResult.usedSimpleEngineFallback());
     QCOMPARE(
-        static_cast<std::uint8_t>(fallbackResult.requestedKind()),
-        static_cast<std::uint8_t>(EphemerisEngineKind::Type::HighPrecision)
-    );
-    QCOMPARE(
-        static_cast<std::uint8_t>(fallbackResult.effectiveKind()),
+        static_cast<std::uint8_t>(fallbackResult.engine->kind()),
         static_cast<std::uint8_t>(EphemerisEngineKind::Type::Simple)
     );
 
@@ -74,8 +71,7 @@ void EphemerisEngineReplacementPolicyTests::keepsCurrentHighPrecisionWhenRebuild
 
 void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineForNonFallbackResults()
 {
-    const EphemerisEngineFactoryResult requestedResult =
-        makeRequestedEngineResult(EphemerisEngineKind::Type::HighPrecision);
+    const EphemerisEngineFactoryResult requestedResult = makeRequestedEngineResult();
 
     QVERIFY(!EphemerisEngineReplacementPolicy::shouldKeepCurrentEngine(
         EphemerisEngineKind::Type::HighPrecision, requestedResult, EphemerisEngineKind::Type::HighPrecision
@@ -84,7 +80,7 @@ void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineForNonFallbackR
 
 void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineForSimpleRequestedKind()
 {
-    const EphemerisEngineFactoryResult fallbackResult = makeSimpleFallbackResult(EphemerisEngineKind::Type::Simple);
+    const EphemerisEngineFactoryResult fallbackResult = makeSimpleFallbackResult();
 
     QVERIFY(!EphemerisEngineReplacementPolicy::shouldKeepCurrentEngine(
         EphemerisEngineKind::Type::Simple, fallbackResult, EphemerisEngineKind::Type::HighPrecision
@@ -93,8 +89,7 @@ void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineForSimpleReques
 
 void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineForSimpleCurrentKind()
 {
-    const EphemerisEngineFactoryResult fallbackResult =
-        makeSimpleFallbackResult(EphemerisEngineKind::Type::HighPrecision);
+    const EphemerisEngineFactoryResult fallbackResult = makeSimpleFallbackResult();
 
     QVERIFY(!EphemerisEngineReplacementPolicy::shouldKeepCurrentEngine(
         EphemerisEngineKind::Type::HighPrecision, fallbackResult, EphemerisEngineKind::Type::Simple
@@ -103,7 +98,7 @@ void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineForSimpleCurren
 
 void EphemerisEngineReplacementPolicyTests::keepsCurrentNonEnumeratedWhenRebuildFallsBack()
 {
-    const EphemerisEngineFactoryResult fallbackResult = makeSimpleFallbackResult(kNonEnumeratedEngineKind);
+    const EphemerisEngineFactoryResult fallbackResult = makeSimpleFallbackResult();
     QVERIFY(fallbackResult.usedSimpleEngineFallback());
 
     QVERIFY(
@@ -115,7 +110,7 @@ void EphemerisEngineReplacementPolicyTests::keepsCurrentNonEnumeratedWhenRebuild
 
 void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineForDifferentFallbackKind()
 {
-    const EphemerisEngineFactoryResult fallbackResult = makeSimpleFallbackResult(kNonEnumeratedEngineKind);
+    const EphemerisEngineFactoryResult fallbackResult = makeSimpleFallbackResult();
 
     QVERIFY(!EphemerisEngineReplacementPolicy::shouldKeepCurrentEngine(
         kNonEnumeratedEngineKind, fallbackResult, EphemerisEngineKind::Type::Simple
@@ -124,7 +119,7 @@ void EphemerisEngineReplacementPolicyTests::replacesCurrentEngineForDifferentFal
 
 void EphemerisEngineReplacementPolicyTests::replacesNonEnumeratedEngineForNonFallbackResult()
 {
-    const EphemerisEngineFactoryResult requestedResult = makeRequestedEngineResult(kNonEnumeratedEngineKind);
+    const EphemerisEngineFactoryResult requestedResult = makeRequestedEngineResult();
 
     QVERIFY(!EphemerisEngineReplacementPolicy::shouldKeepCurrentEngine(
         kNonEnumeratedEngineKind, requestedResult, kNonEnumeratedEngineKind

@@ -34,7 +34,7 @@ void QmlSmokeTests::mainQmlLoadsWithRealContextObjects()
     auto starCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(starCatalog != nullptr);
     auto ephemerisEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(*starCatalog);
-    QVERIFY(ephemerisEngineResult.isSuccess());
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(ephemerisEngineResult.status));
     auto ephemerisEngine = std::move(ephemerisEngineResult.engine);
     QVERIFY(ephemerisEngine != nullptr);
 

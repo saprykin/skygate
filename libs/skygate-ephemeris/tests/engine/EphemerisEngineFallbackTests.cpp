@@ -154,7 +154,7 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     QVERIFY(catalog != nullptr);
 
     auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
-    QVERIFY(engineResult.isSuccess());
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(engineResult.status));
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
@@ -282,7 +282,7 @@ void EphemerisEngineFallbackTests::skipsHorizontalCoordinatesForInvalidObserver(
     QVERIFY(catalog != nullptr);
 
     auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
-    QVERIFY(engineResult.isSuccess());
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(engineResult.status));
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
@@ -323,8 +323,9 @@ void EphemerisEngineFallbackTests::fixedCoordinatesOverrideExplicitSourceDispatc
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1710000000));
 
     const std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies{body};
-    auto directEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(bodies);
-    QVERIFY(directEngineResult.isSuccess());
+    const skygate::ephemeris::CelestialBodyCatalog bodyCatalog(bodies);
+    auto directEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(bodyCatalog);
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(directEngineResult.status));
     const auto& directEngine = directEngineResult.engine;
     QVERIFY(directEngine != nullptr);
 
@@ -338,7 +339,7 @@ void EphemerisEngineFallbackTests::fixedCoordinatesOverrideExplicitSourceDispatc
     QCOMPARE(catalog->bodies()[0]->kind, skygate::ephemeris::BaseCelestialBody::Kind::Planet);
 
     auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
-    QVERIFY(engineResult.isSuccess());
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(engineResult.status));
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 

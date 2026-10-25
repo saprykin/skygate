@@ -684,8 +684,9 @@ void EphemerisApiModelTests::keepsLegacyBodyStateFieldsReadableWithMetadata()
 
 void EphemerisApiModelTests::simpleEngineExposesMetadataDefaults()
 {
-    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create();
-    QVERIFY(engineResult.isSuccess());
+    auto engineResult =
+        skygate::ephemeris::EphemerisEngineFactory::create(skygate::ephemeris::EphemerisEngineFactoryRequest{});
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(engineResult.status));
     QVERIFY(engineResult.engine != nullptr);
     const auto& engine = engineResult.engine;
 

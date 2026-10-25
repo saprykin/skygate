@@ -531,7 +531,10 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineShortRangeDataAndClearRevert()
 
     skygate::ephemeris::EphemerisEngineFactoryResult cleanInstallEngineResult =
         createAcceptanceHighPrecisionEngine(cleanInstallSnapshot, manifest);
-    QVERIFY2(cleanInstallEngineResult.isSuccess(), factoryDiagnostics(cleanInstallEngineResult).constData());
+    QVERIFY2(
+        skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(cleanInstallEngineResult.status),
+        factoryDiagnostics(cleanInstallEngineResult).constData()
+    );
     QVERIFY(cleanInstallEngineResult.engine != nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(cleanInstallEngineResult.engine->kind()),
@@ -566,7 +569,10 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineShortRangeDataAndClearRevert()
 
     skygate::ephemeris::EphemerisEngineFactoryResult installedEngineResult =
         createAcceptanceHighPrecisionEngine(installedSnapshot, manifest);
-    QVERIFY2(installedEngineResult.isSuccess(), factoryDiagnostics(installedEngineResult).constData());
+    QVERIFY2(
+        skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(installedEngineResult.status),
+        factoryDiagnostics(installedEngineResult).constData()
+    );
     QVERIFY(installedEngineResult.engine != nullptr);
     verifyDE440sShortRangeBodyState(*installedEngineResult.engine);
 
@@ -580,7 +586,10 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineShortRangeDataAndClearRevert()
 
     skygate::ephemeris::EphemerisEngineFactoryResult bundledFallbackEngineResult =
         createAcceptanceHighPrecisionEngine(bundledFallbackSnapshot, manifest);
-    QVERIFY2(bundledFallbackEngineResult.isSuccess(), factoryDiagnostics(bundledFallbackEngineResult).constData());
+    QVERIFY2(
+        skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(bundledFallbackEngineResult.status),
+        factoryDiagnostics(bundledFallbackEngineResult).constData()
+    );
     QVERIFY(bundledFallbackEngineResult.engine != nullptr);
     verifyDE440sShortRangeBodyState(*bundledFallbackEngineResult.engine);
 }
@@ -615,7 +624,10 @@ void SkyAcceptanceMatrixTests::optionalLongRangeProfileSelectsDe441Kernel()
 
     skygate::ephemeris::EphemerisEngineFactoryResult longRangeEngineResult =
         createAcceptanceHighPrecisionEngine(snapshot, manifest);
-    QVERIFY2(longRangeEngineResult.isSuccess(), factoryDiagnostics(longRangeEngineResult).constData());
+    QVERIFY2(
+        skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(longRangeEngineResult.status),
+        factoryDiagnostics(longRangeEngineResult).constData()
+    );
     QVERIFY(longRangeEngineResult.engine != nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(longRangeEngineResult.engine->kind()),

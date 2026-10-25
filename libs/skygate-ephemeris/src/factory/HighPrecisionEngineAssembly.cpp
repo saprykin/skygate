@@ -216,8 +216,7 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
                     std::move(dependencies)
                 ),
                 EphemerisFactoryCreationStatus::Type::CreatedRequestedEngine,
-                {},
-                request.engineKind
+                {}
             );
         }
     }
@@ -230,13 +229,12 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
             EphemerisFactoryCreationStatus::Type::CreatedSimpleFallback,
             EphemerisFactoryDiagnostics::withSeverity(
                 std::move(diagnostics), EphemerisFactoryCreationDiagnosticSeverity::Warning
-            ),
-            request.engineKind
+            )
         );
     }
 
     return EphemerisEngineFactoryResult::failure(
-        EphemerisFactoryDiagnostics::failureStatus(diagnostics), std::move(diagnostics), request.engineKind
+        EphemerisFactoryDiagnostics::failureStatus(diagnostics), std::move(diagnostics)
     );
 }
 

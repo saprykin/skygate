@@ -69,7 +69,7 @@ void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximation()
     QVERIFY(catalog != nullptr);
 
     auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
-    QVERIFY(engineResult.isSuccess());
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(engineResult.status));
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
@@ -108,7 +108,7 @@ void EphemerisRegressionTests::solarSystemBodiesMatchGoldenAcrossContexts()
     QVERIFY(catalog != nullptr);
 
     auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
-    QVERIFY(engineResult.isSuccess());
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(engineResult.status));
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
@@ -199,7 +199,7 @@ void EphemerisRegressionTests::solarSystemBodiesStayNearExternalReferenceValues(
     QVERIFY(catalog != nullptr);
 
     auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
-    QVERIFY(engineResult.isSuccess());
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(engineResult.status));
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 

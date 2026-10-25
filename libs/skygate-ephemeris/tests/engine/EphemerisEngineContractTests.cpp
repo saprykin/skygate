@@ -277,7 +277,7 @@ void EphemerisEngineContractTests::simpleEngineHonorsHardenedContract()
     QVERIFY(catalog != nullptr);
 
     auto result = EphemerisEngineFactory::create(*catalog);
-    QVERIFY(result.isSuccess());
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(result.status));
     QVERIFY(result.engine != nullptr);
     const IEphemerisEngine& engine = *result.engine;
 
@@ -308,7 +308,7 @@ void EphemerisEngineContractTests::testDoublesHonorHardenedContract()
     auto catalog = makeSingleBodyCatalog("target");
     QVERIFY(catalog != nullptr);
     auto innerResult = EphemerisEngineFactory::create(*catalog);
-    QVERIFY(innerResult.isSuccess());
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(innerResult.status));
     const EphemerisEngineOptions innerOptions = innerResult.engine->options();
     tests::RequestCountingEphemerisEngine countingEngine(
         std::move(innerResult.engine), innerOptions, std::shared_ptr<const CelestialBodyCatalog>()
@@ -326,7 +326,7 @@ void EphemerisEngineContractTests::contextQueriesRouteThroughSingleBodyOverloads
     auto catalog = makeSingleBodyCatalog("target");
     QVERIFY(catalog != nullptr);
     auto innerResult = EphemerisEngineFactory::create(*catalog);
-    QVERIFY(innerResult.isSuccess());
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(innerResult.status));
     const EphemerisEngineOptions innerOptions = innerResult.engine->options();
     tests::RequestCountingEphemerisEngine engine(
         std::move(innerResult.engine), innerOptions, std::shared_ptr<const CelestialBodyCatalog>()
