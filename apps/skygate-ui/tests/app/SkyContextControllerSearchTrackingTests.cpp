@@ -420,11 +420,12 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetUsesSingleBodyLoo
     );
     configureFocusTestContext(*controller);
 
+    const int lookupsBeforeFocus = engine->requestBodyStateCount();
     QVERIFY(controller->focusSearchTarget("body", "moon"));
 
     QCOMPARE(engine->requestComputeCount(), 0);
     QCOMPARE(engine->contextComputeCount(), 0);
-    QCOMPARE(engine->requestBodyStateCount(), 1);
+    QCOMPARE(engine->requestBodyStateCount() - lookupsBeforeFocus, 1);
     QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
     QCOMPARE(controller->selectedSearchTargetId(), QString("moon"));
     QCOMPARE(controller->viewCenterAltitudeDeg(), 23.0);
