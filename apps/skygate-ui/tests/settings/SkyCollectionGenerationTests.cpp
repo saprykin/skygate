@@ -4,7 +4,7 @@
 #include "settings/SkySettingsStore.hpp"
 #include "support/CatalogCacheTestSupport.hpp"
 #include "support/CatalogCollectionCacheFixture.hpp"
-#include "support/LogCapture.hpp"
+#include <skygate/testsupport/LogCapture.hpp>
 #include "support/SettingsTestFixture.hpp"
 
 #include <QDir>
@@ -250,7 +250,7 @@ void SkyCollectionGenerationTests::legacyFlatCollectionRecordsStillLoad()
     settings.endGroup();
     settings.sync();
 
-    skygate::ui::tests::LogCapture capture;
+    skygate::testsupport::LogCapture capture;
     SkySettingsStore store;
     const auto loaded = store.loadCatalogCollectionCache();
     QVERIFY(loaded.isLoaded());
@@ -397,7 +397,7 @@ void SkyCollectionGenerationTests::emptyLegacyCollectionStillLoadsWithoutArtifac
         settings.sync();
     }
 
-    skygate::ui::tests::LogCapture capture;
+    skygate::testsupport::LogCapture capture;
     const SkySettingsStore store;
     const auto loaded = store.loadCatalogCollectionCache();
     QVERIFY(loaded.isLoaded());
@@ -460,7 +460,7 @@ void SkyCollectionGenerationTests::missingManifestWithRecordsSkipsEmptyCollectio
         settings.remove(QStringLiteral("skyContext/catalogCollectionCommittedGeneration"));
         settings.sync();
     }
-    skygate::ui::tests::LogCapture capture;
+    skygate::testsupport::LogCapture capture;
     const auto unreadable = store.loadCatalogCollectionCache();
     QCOMPARE(unreadable.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
     QCOMPARE(unreadable.failure, SkyCatalogCollectionCacheLoadResult::Failure::LegacyRecordsReplaced);
@@ -513,7 +513,7 @@ void SkyCollectionGenerationTests::missingManifestWithSidecarsLogsManifestLoss()
     }
     QVERIFY(QFile::remove(skygate::ui::tests::catalogCollectionManifestFilePath(directory)));
 
-    skygate::ui::tests::LogCapture capture;
+    skygate::testsupport::LogCapture capture;
     const auto stagedLeftovers = store.loadCatalogCollectionCache();
     QCOMPARE(stagedLeftovers.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
     QVERIFY(!stagedLeftovers.diagnostic.isEmpty());
@@ -624,7 +624,7 @@ void SkyCollectionGenerationTests::truncatedManifestIsUnusableButRecoverable()
     QCOMPARE(truncatedManifest.write(truncatedContent), qint64(truncatedContent.size()));
     truncatedManifest.close();
 
-    skygate::ui::tests::LogCapture capture;
+    skygate::testsupport::LogCapture capture;
     const auto truncated = store.loadCatalogCollectionCache();
     QCOMPARE(truncated.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
     QCOMPARE(truncated.failure, SkyCatalogCollectionCacheLoadResult::Failure::ManifestUnreadable);
@@ -660,7 +660,7 @@ void SkyCollectionGenerationTests::missingCommittedGenerationRecordsAreUnusable(
         settings.sync();
     }
 
-    skygate::ui::tests::LogCapture capture;
+    skygate::testsupport::LogCapture capture;
     const auto missingRecords = store.loadCatalogCollectionCache();
     QCOMPARE(missingRecords.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
     QCOMPARE(missingRecords.failure, SkyCatalogCollectionCacheLoadResult::Failure::CommittedGenerationMissing);
@@ -694,7 +694,7 @@ void SkyCollectionGenerationTests::invalidPersistedPolicyFallsBackToMerge()
         settings.sync();
     }
 
-    skygate::ui::tests::LogCapture capture;
+    skygate::testsupport::LogCapture capture;
     const auto loaded = store.loadCatalogCollectionCache();
     QVERIFY(loaded.isLoaded());
     QCOMPARE(loaded.snapshot.sources.size(), 2);
@@ -723,7 +723,7 @@ void SkyCollectionGenerationTests::invalidRecordsStoredMarkerIsUnusable()
     // An unreadable marker is not proof that the generation's records were
     // stored, so the generation stays unusable and the warning names the
     // setting that failed to decode.
-    skygate::ui::tests::LogCapture capture;
+    skygate::testsupport::LogCapture capture;
     const auto loaded = store.loadCatalogCollectionCache();
     QCOMPARE(loaded.state, SkyCatalogCollectionCacheLoadResult::State::Unusable);
     QCOMPARE(loaded.failure, SkyCatalogCollectionCacheLoadResult::Failure::CommittedGenerationMissing);
@@ -953,7 +953,7 @@ void SkyCollectionGenerationTests::failedCollectionSaveLogsExplicitError()
     );
     QVERIFY(QDir().mkpath(blockedPath));
 
-    skygate::ui::tests::LogCapture capture(QtInfoMsg);
+    skygate::testsupport::LogCapture capture(QtInfoMsg);
     QVERIFY(!store.saveCatalogCollectionCache(newCollectionSnapshot()));
 
     const QString messages = capture.joinedMessages();

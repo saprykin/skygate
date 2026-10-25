@@ -3,7 +3,7 @@
 #include "catalog/SkyCatalogSourceCachePaths.hpp"
 #include "catalog/SkyCatalogSourceCacheRecord.hpp"
 #include "catalog/SkyCatalogSourceRecordCodec.hpp"
-#include "support/LogCapture.hpp"
+#include <skygate/testsupport/LogCapture.hpp>
 #include "support/SettingsTestFixture.hpp"
 
 #include <QByteArray>
@@ -195,7 +195,7 @@ void SkyCatalogSourceRecordCodecTests::unknownPolicyFallsBackToMerge()
     settings.setValue(QStringLiteral("policy"), 200);
     settings.endGroup();
 
-    skygate::ui::tests::LogCapture capture;
+    skygate::testsupport::LogCapture capture;
     QStringList unreadableInstanceIds;
     const SkyCatalogSourceCacheRecord loaded =
         SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup(), unreadableInstanceIds);
@@ -214,7 +214,7 @@ void SkyCatalogSourceRecordCodecTests::unknownSchemaHintFallsBackToNoHint()
     settings.setValue(QStringLiteral("schemaHint"), 200);
     settings.endGroup();
 
-    skygate::ui::tests::LogCapture capture;
+    skygate::testsupport::LogCapture capture;
     QStringList unreadableInstanceIds;
     const SkyCatalogSourceCacheRecord loaded =
         SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup(), unreadableInstanceIds);
@@ -235,7 +235,7 @@ void SkyCatalogSourceRecordCodecTests::missingPayloadSidecarReportsInstance()
     );
     settings.endGroup();
 
-    skygate::ui::tests::LogCapture capture;
+    skygate::testsupport::LogCapture capture;
     QStringList unreadableInstanceIds;
     const SkyCatalogSourceCacheRecord loaded =
         SkyCatalogSourceRecordCodec::loadRecord(settings, recordGroup(), unreadableInstanceIds);

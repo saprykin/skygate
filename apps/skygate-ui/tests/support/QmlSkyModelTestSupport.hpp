@@ -1,6 +1,8 @@
 #pragma once
 
+#include "CatalogBodyQuery.hpp"
 #include "ITimeSource.hpp"
+#include "SkyEphemerisTestSupport.hpp"
 #include "app/SkyContextController.hpp"
 #include "time/SkyQtTimeCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
@@ -27,7 +29,7 @@ class FixedTimeSource final : public skygate::core::ITimeSource {
 public:
     [[nodiscard]] static QDateTime defaultUtc()
     {
-        return QDateTime(QDate(2026, 5, 6), QTime(9, 30, 0), QTimeZone::UTC);
+        return fixedNowUtc();
     }
 
     [[nodiscard]] static const skygate::core::ITimeSource& shared()
@@ -69,15 +71,6 @@ inline std::unique_ptr<SkySceneModel> makeSceneModel(SkyContextController& contr
     auto sceneModel = std::make_unique<SkySceneModel>();
     sceneModel->setSkyContextController(&controller);
     return sceneModel;
-}
-
-inline bool catalogContainsDisplayName(
-    const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies, const QString& displayName
-)
-{
-    return std::any_of(bodies.begin(), bodies.end(), [&displayName](const skygate::ephemeris::BaseCelestialBody* body) {
-        return body != nullptr && QString::fromStdString(body->displayName) == displayName;
-    });
 }
 
 }  // namespace skygate::ui::tests

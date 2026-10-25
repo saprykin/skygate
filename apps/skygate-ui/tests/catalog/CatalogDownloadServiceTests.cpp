@@ -4,7 +4,7 @@
 #include "support/CatalogDownloadWorkflowTestSupport.hpp"
 #include "support/CatalogTestPayloads.hpp"
 #include "support/FakeNetworkAccessManager.hpp"
-#include "support/LogCapture.hpp"
+#include <skygate/testsupport/LogCapture.hpp>
 
 #include <QCoreApplication>
 #include <QNetworkReply>
@@ -100,7 +100,7 @@ void CatalogDownloadServiceTests::logsStartAndSuccessAtInfoLevel()
     CatalogDownloadService service(&networkAccessManager);
 
     CatalogDownloadService::DownloadResult finalResult;
-    LogCapture capture(QtInfoMsg);
+    skygate::testsupport::LogCapture capture(QtInfoMsg);
     runAsync([&](QEventLoop& loop) {
         service.downloadFirstSuccessfulFromUrls(
             newCancellation(),

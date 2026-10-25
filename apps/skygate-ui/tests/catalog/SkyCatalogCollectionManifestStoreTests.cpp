@@ -1,6 +1,6 @@
 #include "catalog/SkyCatalogCollectionManifestStore.hpp"
 #include "catalog/SkyCatalogSourceCachePaths.hpp"
-#include "support/LogCapture.hpp"
+#include <skygate/testsupport/LogCapture.hpp>
 #include "support/SettingsTestFixture.hpp"
 
 #include <QByteArray>
@@ -101,7 +101,7 @@ void SkyCatalogCollectionManifestStoreTests::reportsAbsentAndUnreadableManifests
     // committed manifest.
     const QString manifestPath = SkyCatalogCollectionManifestStore::path(m_directory);
     QVERIFY(QDir().mkpath(manifestPath));
-    skygate::ui::tests::LogCapture capture;
+    skygate::testsupport::LogCapture capture;
     QCOMPARE(
         SkyCatalogCollectionManifestStore::read(m_directory).state, SkyCatalogCollectionManifestStore::State::Absent
     );

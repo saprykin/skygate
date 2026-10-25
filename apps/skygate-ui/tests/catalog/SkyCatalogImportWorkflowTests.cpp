@@ -11,7 +11,7 @@
 #include "support/CatalogDownloadWorkflowTestSupport.hpp"
 #include "support/CatalogTestPayloads.hpp"
 #include "support/FakeNetworkAccessManager.hpp"
-#include "support/LogCapture.hpp"
+#include <skygate/testsupport/LogCapture.hpp>
 
 #include <QCoreApplication>
 #include <QtTest/QtTest>
@@ -127,7 +127,7 @@ void SkyCatalogImportWorkflowTests::parsesConstellationPayloads()
 
     skygate::ui::internal::SkyConstellationLineImportResult finalResult;
     QStringList statuses;
-    LogCapture capture(QtInfoMsg);
+    skygate::testsupport::LogCapture capture(QtInfoMsg);
     runAsync([&](QEventLoop& loop) {
         workflow.downloadConstellationLines(
             newCancellation(),

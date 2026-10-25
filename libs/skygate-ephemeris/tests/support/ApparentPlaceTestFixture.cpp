@@ -1,13 +1,12 @@
 #include "ApparentPlaceTestFixture.hpp"
 
-#include "UtcTimePoint.hpp"
+#include "HighPrecisionEngineFixture.hpp"
 #include "engine/EphemerisEngineQueryStatus.hpp"
 #include "time/TimeScale.hpp"
 #include "engine/highprecision/CelestialFrameTransformRequest.hpp"
 #include "engine/highprecision/EphemerisMetadataMerger.hpp"
 
 #include <array>
-#include <chrono>
 #include <string>
 #include <vector>
 
@@ -17,18 +16,6 @@ using namespace skygate::ephemeris::highprecision;
 using namespace skygate::core;
 
 namespace {
-
-[[nodiscard]] ObservationContext makeContext()
-{
-    ObservationContext context;
-    context.utcTime = UtcTimePoint(std::chrono::seconds(1'704'067'200));
-    context.observer = {
-        .latitudeDeg = 37.7749,
-        .longitudeDeg = -122.4194,
-        .elevationMeters = 10.0,
-    };
-    return context;
-}
 
 [[nodiscard]] EphemerisEngineQueryResult
 frameTransformMetadata(const CelestialReferenceFrame::Type sourceFrame, const CelestialReferenceFrame::Type targetFrame)
@@ -50,7 +37,7 @@ frameTransformMetadata(const CelestialReferenceFrame::Type sourceFrame, const Ce
 EphemerisRequest ApparentPlaceTestFixture::request(const EphemerisCorrectionFlags correctionFlags)
 {
     EphemerisRequest request;
-    request.context = makeContext();
+    request.context = HighPrecisionEngineFixture::context();
     request.epoch = {
         .julianDatePart1 = 2'460'310.0,
         .julianDatePart2 = 0.5,

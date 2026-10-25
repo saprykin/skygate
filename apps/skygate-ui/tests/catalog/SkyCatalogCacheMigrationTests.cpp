@@ -7,7 +7,7 @@
 #include "support/CatalogCacheFixture.hpp"
 #include "support/CatalogCacheTestSupport.hpp"
 #include "support/CatalogTestPayloads.hpp"
-#include "support/LogCapture.hpp"
+#include <skygate/testsupport/LogCapture.hpp>
 #include "support/SettingsTestFixture.hpp"
 
 #include <QByteArray>
@@ -677,7 +677,7 @@ void SkyCatalogCacheMigrationTests::logsCollectionLifecycleSummariesAtInfoLevel(
 {
     SkySettingsStore store;
     const SkyCatalogCacheController controller(&store);
-    skygate::ui::tests::LogCapture capture(QtInfoMsg);
+    skygate::testsupport::LogCapture capture(QtInfoMsg);
 
     QVERIFY(store.saveCatalogCollectionCache(CatalogCacheFixture::makeCollectionSnapshot()));
     const auto result = controller.restoreCollection(0, 0, QString(), QString());

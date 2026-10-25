@@ -1,4 +1,4 @@
-#include "support/LogCapture.hpp"
+#include <skygate/testsupport/LogCapture.hpp>
 #include "support/QmlWarningScope.hpp"
 
 #include <QDebug>
@@ -72,8 +72,8 @@ private slots:
 
 void LogCaptureTests::logCaptureFiltersByMinimumSeverity()
 {
-    skygate::ui::tests::LogCapture warningCapture;
-    skygate::ui::tests::LogCapture infoCapture(QtInfoMsg);
+    skygate::testsupport::LogCapture warningCapture;
+    skygate::testsupport::LogCapture infoCapture(QtInfoMsg);
 
     qInfo().noquote() << "threshold-info";
     qWarning().noquote() << "threshold-warning";
@@ -92,11 +92,11 @@ void LogCaptureTests::nestedCaptureFanOutsAndRestoresPreviousHandler()
     MessageHandlerGuard handlerGuard(&recordWarnings);
 
     {
-        skygate::ui::tests::LogCapture outer;
+        skygate::testsupport::LogCapture outer;
         qWarning().noquote() << "outer-before";
 
         {
-            skygate::ui::tests::LogCapture inner;
+            skygate::testsupport::LogCapture inner;
             qWarning().noquote() << "nested-warning";
             QVERIFY(inner.joinedMessages().contains(QStringLiteral("nested-warning")));
         }
@@ -120,7 +120,7 @@ void LogCaptureTests::interleavedHelpersRestorePreviousHandler()
     MessageHandlerGuard handlerGuard(&recordWarnings);
 
     std::optional<skygate::ui::tests::QmlWarningScope> warnings;
-    std::optional<skygate::ui::tests::LogCapture> capture;
+    std::optional<skygate::testsupport::LogCapture> capture;
 
     warnings.emplace();
     capture.emplace();

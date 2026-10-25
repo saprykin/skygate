@@ -1,5 +1,6 @@
 #include "CatalogRuntimeFixture.hpp"
 #include "BaseCelestialBody.hpp"
+#include "CatalogMergeTestSupport.hpp"
 #include "CelestialBodyCatalog.hpp"
 #include "DeepSkyObjectInfo.hpp"
 #include "EquatorialCoordinate.hpp"
@@ -37,7 +38,6 @@ CatalogRuntimeFixture::makeFixedBody(std::string id, std::string displayName, co
     skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
     body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
     body.visualMagnitude = magnitude;
     body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
@@ -95,26 +95,8 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> CatalogRuntimeFixture::makeMix
     std::vector<skygate::ephemeris::DistantCelestialBody> distantBodies
 )
 {
-    std::vector<skygate::ephemeris::CelestialBodyCatalog::OrderEntry> order;
-    order.reserve(ownGalaxyBodies.size() + distantBodies.size());
-    for (std::size_t index = 0; index < ownGalaxyBodies.size(); ++index) {
-        order.push_back(
-            skygate::ephemeris::CelestialBodyCatalog::OrderEntry{
-                .domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy,
-                .bodyIndex = index,
-            }
-        );
-    }
-    for (std::size_t index = 0; index < distantBodies.size(); ++index) {
-        order.push_back(
-            skygate::ephemeris::CelestialBodyCatalog::OrderEntry{
-                .domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant,
-                .bodyIndex = index,
-            }
-        );
-    }
-    return skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(
-        std::move(ownGalaxyBodies), std::move(distantBodies), std::move(order)
+    return skygate::ephemeris::tests::CatalogMergeTestSupport::createCatalog(
+        std::move(ownGalaxyBodies), std::move(distantBodies)
     );
 }
 

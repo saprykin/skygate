@@ -3,11 +3,11 @@
 #include "DeviceLocationTestSupport.hpp"
 #include "ITimeSource.hpp"
 #include "SettingsTestFixture.hpp"
+#include "SkyEphemerisTestSupport.hpp"
 #include "app/SkyContextController.hpp"
 #include "time/SkyQtTimeCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "diagnostics/SkyLogging.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
 #include "theme/SkyOverlayLayerSettings.hpp"
 #include "time/SkyTimeController.hpp"
 
@@ -26,10 +26,14 @@
 
 namespace {
 
-QDateTime fixedNowUtc()
-{
-    return QDateTime(QDate(2026, 5, 6), QTime(9, 30, 0), QTimeZone::UTC);
-}
+// Reuse the fixtures the shared support headers already provide instead of
+// keeping local copies; these declarations keep the suites' unqualified calls
+// working.
+using skygate::ephemeris::tests::findStateById;
+using skygate::ui::tests::createTestEphemerisEngine;
+using skygate::ui::tests::fixedNowUtc;
+using skygate::ui::tests::makeBody;
+using skygate::ui::tests::testControllerOptions;
 
 class FakeTimeSource final : public skygate::core::ITimeSource {
 public:
@@ -40,54 +44,19 @@ public:
         return SkyQtTimeCodec::toUtcTimePoint(m_nowUtc);
     }
 
-    void setNowUtc(const QDateTime& nowUtc)
-    {
-        m_nowUtc = nowUtc.toUTC();
-    }
-
-    void advanceSeconds(const int seconds)
-    {
-        m_nowUtc = m_nowUtc.addSecs(seconds);
-    }
-
 private:
     QDateTime m_nowUtc;
 };
-
-skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
-    std::string id,
-    std::string displayName,
-    const skygate::ephemeris::BaseCelestialBody::Kind type,
-    const double visualMagnitude,
-    const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
-)
-{
-    skygate::ephemeris::OwnGalaxyCelestialBody body;
-    body.id = std::move(id);
-    body.displayName = std::move(displayName);
-    body.kind = type;
-    body.visualMagnitude = visualMagnitude;
-    body.fixedEquatorial = fixedEquatorial;
-    return body;
-}
 
 std::unique_ptr<skygate::ephemeris::IStarCatalog> createTestCatalog()
 {
     return skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
 }
 
-std::unique_ptr<skygate::ephemeris::IEphemerisEngine>
-createTestEphemerisEngine(const skygate::ephemeris::IStarCatalog& starCatalog)
-{
-    return std::move(skygate::ephemeris::EphemerisEngineFactory::create(starCatalog).engine);
-}
-
 SkyContextController::InitializationOptions
 controllerInitializationOptions(bool loadSettings, const skygate::core::ITimeSource* timeSource = nullptr)
 {
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = loadSettings;
-    initializationOptions.initializeLocation = false;
+    SkyContextController::InitializationOptions initializationOptions = testControllerOptions(loadSettings);
     initializationOptions.timeSource = timeSource;
     return initializationOptions;
 }
@@ -160,18 +129,6 @@ createControllerWithOptions(SkyContextController::InitializationOptions initiali
 QDateTime controllerUtcTime(const SkyContextController& controller)
 {
     return SkyQtTimeCodec::toQDateTimeUtc(controller.skyContext().utcTime);
-}
-
-const skygate::ephemeris::CelestialBodyState*
-findStateById(const skygate::ephemeris::EphemerisSnapshot& snapshot, const std::string& bodyId)
-{
-    for (const auto& state : snapshot.states) {
-        if (snapshot.bodyAt(state.bodyIndex).id == bodyId) {
-            return &state;
-        }
-    }
-
-    return nullptr;
 }
 
 void configureFocusTestContext(SkyContextController& controller)

@@ -1,5 +1,5 @@
 #include "settings/SkyCacheFiles.hpp"
-#include "support/LogCapture.hpp"
+#include <skygate/testsupport/LogCapture.hpp>
 #include "support/SettingsTestFixture.hpp"
 
 #include <QDir>
@@ -102,7 +102,7 @@ void SkyCacheFilesTests::removesExistingFilesAndReportsFailures()
 
     const QString directoryPath = m_settings.currentTestFilePath(QStringLiteral("remove-directory"));
     QVERIFY(QDir().mkpath(directoryPath));
-    skygate::ui::tests::LogCapture capture(QtWarningMsg);
+    skygate::testsupport::LogCapture capture(QtWarningMsg);
     QVERIFY(!SkyCacheFiles::removeFiles({directoryPath}, QStringLiteral("test cache")));
     QVERIFY(capture.joinedMessages().contains(QStringLiteral("Failed to remove test cache file")));
 }

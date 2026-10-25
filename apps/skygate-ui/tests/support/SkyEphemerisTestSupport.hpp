@@ -2,6 +2,7 @@
 
 #include "EquatorialCoordinate.hpp"
 #include "ObservationContext.hpp"
+#include "TestHelpers.hpp"
 #include "app/SkyContextController.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/IStarCatalog.hpp"
@@ -9,7 +10,9 @@
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/SkyTimeController.hpp"
 
+#include <QDateTime>
 #include <QString>
+#include <QTimeZone>
 
 #include <memory>
 #include <optional>
@@ -30,6 +33,13 @@ struct TestSkyContextConfig {
     bool applyTimeZone = true;
     bool applyUtcDateTime = true;
 };
+
+// Fixed "now" shared by the UI fixtures so a pinned time source, a controller
+// timeline, and the rendered scene all observe one deterministic instant.
+[[nodiscard]] inline QDateTime fixedNowUtc()
+{
+    return QDateTime(QDate(2026, 5, 6), QTime(9, 30, 0), QTimeZone::UTC);
+}
 
 [[nodiscard]] inline skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
     std::string id,
@@ -181,13 +191,8 @@ inline bool configureTestSkyContext(SkyContextController& controller, const Test
 [[nodiscard]] inline std::optional<skygate::ephemeris::CelestialBodyState>
 findBodyStateById(const skygate::ephemeris::EphemerisSnapshot& snapshot, const std::string& bodyId)
 {
-    for (const skygate::ephemeris::CelestialBodyState& state : snapshot.states) {
-        if (snapshot.bodyAt(state.bodyIndex).id == bodyId) {
-            return state;
-        }
-    }
-
-    return std::nullopt;
+    const skygate::ephemeris::CelestialBodyState* state = skygate::ephemeris::tests::findStateById(snapshot, bodyId);
+    return state != nullptr ? std::optional<skygate::ephemeris::CelestialBodyState>(*state) : std::nullopt;
 }
 
 }  // namespace skygate::ui::tests

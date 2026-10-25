@@ -2,7 +2,7 @@
 #include "support/CatalogCacheTestSupport.hpp"
 #include "support/CatalogCollectionCacheFixture.hpp"
 #include "support/CatalogTestPayloads.hpp"
-#include "support/LogCapture.hpp"
+#include <skygate/testsupport/LogCapture.hpp>
 #include "support/SettingsTestFixture.hpp"
 
 #include <QDir>
@@ -282,7 +282,7 @@ void SkyCatalogCacheSettingsTests::legacyLoaderReportsOnlyUnreadableCaches()
     );
 
     const SkySettingsStore store;
-    skygate::ui::tests::LogCapture capture(QtWarningMsg);
+    skygate::testsupport::LogCapture capture(QtWarningMsg);
     QVERIFY(!store.loadCatalogCache().has_value());
 
     // A path that exists but cannot be opened is reported, while the absent
