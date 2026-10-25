@@ -4,7 +4,13 @@ set -euo pipefail
 scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repoRoot="$(cd "${scriptDir}/../.." && pwd)"
 
-buildDir="${SKYGATE_APPIMAGE_BUILD_DIR:-${repoRoot}/build-ninja/ui-release-linux-appimage}"
+# Reuse the ui-release-linux-vcpkg configure preset so the release build flags
+# stay defined in CMakePresets.json; the only intentional difference is the
+# install prefix (/usr), which the AppDir layout expects. The AppImage build
+# keeps its own binary directory so it does not flip the install prefix of a
+# plain preset build tree.
+configurePreset="ui-release-linux-vcpkg"
+buildDir="${SKYGATE_APPIMAGE_BUILD_DIR:-${repoRoot}/build-ninja/appimage}"
 appDir="${SKYGATE_APPIMAGE_APPDIR:-${buildDir}/SkyGate.AppDir}"
 distDir="${SKYGATE_APPIMAGE_DIST_DIR:-${repoRoot}/dist}"
 toolsDir="${SKYGATE_APPIMAGE_TOOLS_DIR:-${buildDir}/appimage-tools}"
@@ -68,27 +74,25 @@ if [[ -n "${qtRootDir}" ]]; then
 fi
 
 cmakeArgs=(
+    --preset "${configurePreset}"
     -S "${repoRoot}"
     -B "${buildDir}"
-    -G Ninja
-    -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_INSTALL_PREFIX=/usr
-    -DSKYGATE_BUILD_UI=ON
-    -DSKYGATE_BUILD_TESTS=OFF
     -DSKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS="${SKYGATE_APPIMAGE_ENABLE_HIGH_PRECISION:-ON}"
 )
 
 if [[ -n "${prefixPath}" ]]; then
     cmakeArgs+=("-DCMAKE_PREFIX_PATH=${prefixPath}")
 fi
-if [[ -n "${VCPKG_ROOT:-}" ]]; then
-    cmakeArgs+=(
-        "-DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-        "-DVCPKG_MANIFEST_FEATURES=high-precision-ephemeris"
-    )
+if [[ -z "${VCPKG_ROOT:-}" ]]; then
+    # The preset wires its toolchain file from VCPKG_ROOT; clear it so a
+    # system-dependency build without vcpkg keeps working.
+    cmakeArgs+=("-DCMAKE_TOOLCHAIN_FILE=")
 fi
 
-cmake "${cmakeArgs[@]}"
+# Configure presets are looked up from the working directory, so configure from
+# the repository root.
+(cd "${repoRoot}" && cmake "${cmakeArgs[@]}")
 cmake --build "${buildDir}" --target skygate-ui --parallel
 
 rm -rf "${appDir}"
