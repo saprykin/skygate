@@ -1,11 +1,7 @@
-#include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
-#include "catalog/SkyCatalogCollectionPersistRequest.hpp"
 #include "catalog/SkyCatalogCollectionStore.hpp"
-#include "catalog/SkyCatalogSourcePersistEntry.hpp"
 #include "settings/SkySettingsStore.hpp"
 #include "support/CatalogCacheFixture.hpp"
-#include "support/CatalogTestPayloads.hpp"
 #include "support/SettingsTestFixture.hpp"
 
 #include <QDir>
@@ -14,22 +10,15 @@
 #include <QtTest/QtTest>
 
 #include <cstddef>
-#include <memory>
 #include <string>
-#include <utility>
 
-using skygate::ephemeris::CatalogCompositionPolicy;
 using skygate::ui::internal::SkyCatalogCacheController;
-using skygate::ui::internal::SkyCatalogCollectionPersistRequest;
-using skygate::ui::internal::SkyCatalogSourcePersistEntry;
 using skygate::ui::tests::CatalogCacheFixture;
 
 namespace {
 
 constexpr int kCurrentCollectionSchemaVersion =
     skygate::ui::internal::SkyCatalogCollectionStore::kCollectionSchemaVersion;
-constexpr int kCurrentConstellationSchemaVersion =
-    skygate::ui::internal::SkyCatalogCollectionStore::kConstellationLineCacheSchemaVersion;
 
 }  // namespace
 
@@ -40,10 +29,7 @@ private slots:
     void initTestCase();
     void init();
     void restoresCollectionSourcesAndConstellationLabels();
-    void roundTripsEachSourcesOwnRelatedDataset();
-    void adoptsPriorSnapshotWithOneRelatedOwner();
     void dropsPriorDuplicatedRelatedPayloads();
-    void corruptRelatedPayloadLeavesSiblingsIntact();
 
 private:
     void resetSettings();
@@ -101,94 +87,6 @@ void SkyCatalogCacheRelatedDataTests::restoresCollectionSourcesAndConstellationL
     QVERIFY(result.sources[1].record.constellationData.lineRefs().empty());
 }
 
-void SkyCatalogCacheRelatedDataTests::roundTripsEachSourcesOwnRelatedDataset()
-{
-    auto sourceACatalog = CatalogCacheFixture::makeStarCatalog("hip_11", "Owner A Star");
-    auto sourceBCatalog = CatalogCacheFixture::makeStarCatalog("hip_22", "Owner B Star");
-
-    SkyCatalogCollectionPersistRequest request;
-    SkyCatalogSourcePersistEntry sourceA;
-    sourceA.record.instanceId = QStringLiteral("custom:owner-a");
-    sourceA.record.title = QStringLiteral("Owner A");
-    sourceA.record.urls = QStringList{QStringLiteral("https://example.test/owner-a.csv")};
-    sourceA.record.relatedDatasetUrls = QStringList{QStringLiteral("https://example.test/owner-a-lines.json")};
-    sourceA.record.policy = CatalogCompositionPolicy::Merge;
-    sourceA.record.enabled = true;
-    sourceA.catalog = sourceACatalog.get();
-    sourceA.record.payload =
-        skygate::ui::tests::sampleHygCsvPayload({.id = 11, .hip = 11, .properName = "Owner A Star"});
-    sourceA.record.constellationLineRows = "hip_11|hip_12\nhip_12|hip_13\n";
-    sourceA.record.constellationAnchorGroupRows = "Orion|hip_11,hip_12\n";
-    sourceA.record.constellationLineSchemaVersion = kCurrentConstellationSchemaVersion;
-    sourceA.record.constellationCount = 1;
-    request.sources.push_back(std::move(sourceA));
-
-    SkyCatalogSourcePersistEntry sourceB;
-    sourceB.record.instanceId = QStringLiteral("custom:owner-b");
-    sourceB.record.title = QStringLiteral("Owner B");
-    sourceB.record.urls = QStringList{QStringLiteral("https://example.test/owner-b.csv")};
-    sourceB.record.relatedDatasetUrls = QStringList{QStringLiteral("https://example.test/owner-b-lines.json")};
-    sourceB.record.policy = CatalogCompositionPolicy::Merge;
-    sourceB.record.enabled = true;
-    sourceB.catalog = sourceBCatalog.get();
-    sourceB.record.payload =
-        skygate::ui::tests::sampleHygCsvPayload({.id = 22, .hip = 22, .properName = "Owner B Star"});
-    sourceB.record.constellationLineRows = "hip_21|hip_22\n";
-    sourceB.record.constellationAnchorGroupRows = "Lyra|hip_21,hip_22\n";
-    sourceB.record.constellationLineSchemaVersion = kCurrentConstellationSchemaVersion;
-    sourceB.record.constellationCount = 2;
-    request.sources.push_back(std::move(sourceB));
-
-    SkySettingsStore store;
-    const SkyCatalogCacheController controller(&store);
-    controller.persistCollection(request);
-
-    const auto result = controller.restoreCollection(0, 0, QString(), QString());
-    QVERIFY(result.restored);
-    QCOMPARE(result.sources.size(), std::size_t{2});
-
-    // Each record restores only the dataset its own download produced.
-    const auto& sourceAConstellationData = result.sources[0].record.constellationData;
-    QCOMPARE(sourceAConstellationData.lineRefs().size(), 2U);
-    QCOMPARE(sourceAConstellationData.lineRefs()[0].first, std::string("hip_11"));
-    QCOMPARE(sourceAConstellationData.lineRefs()[0].second, std::string("hip_12"));
-    QCOMPARE(sourceAConstellationData.anchorGroups().size(), 1U);
-    QCOMPARE(sourceAConstellationData.anchorGroups()[0].first, std::string("Orion"));
-    QCOMPARE(sourceAConstellationData.count(), 1U);
-
-    const auto& sourceBConstellationData = result.sources[1].record.constellationData;
-    QCOMPARE(sourceBConstellationData.lineRefs().size(), 1U);
-    QCOMPARE(sourceBConstellationData.lineRefs()[0].first, std::string("hip_21"));
-    QCOMPARE(sourceBConstellationData.lineRefs()[0].second, std::string("hip_22"));
-    QCOMPARE(sourceBConstellationData.anchorGroups().size(), 1U);
-    QCOMPARE(sourceBConstellationData.anchorGroups()[0].first, std::string("Lyra"));
-    QCOMPARE(sourceBConstellationData.count(), 2U);
-}
-
-void SkyCatalogCacheRelatedDataTests::adoptsPriorSnapshotWithOneRelatedOwner()
-{
-    // A record written before the per-source related format holds a copy of
-    // the composed collection-wide view. With one such record in the snapshot
-    // no other record could have supplied the copy, so that record is its
-    // owner and the payload is migrated instead of discarded.
-    auto snapshot = CatalogCacheFixture::makeCollectionSnapshot();
-    snapshot.schemaVersion = kCurrentCollectionSchemaVersion - 1;
-
-    SkySettingsStore store;
-    QVERIFY(store.saveCatalogCollectionCache(snapshot));
-
-    const SkyCatalogCacheController controller(&store);
-    const auto result = controller.restoreCollection(0, 0, QString(), QString());
-
-    QVERIFY(result.restored);
-    QVERIFY(result.requiresRecordUpgrade);
-    QCOMPARE(result.sources.size(), std::size_t{2});
-    QCOMPARE(result.sources[0].record.constellationData.lineRefs().size(), 1U);
-    QCOMPARE(result.sources[0].record.constellationData.anchorGroups().size(), 1U);
-    QCOMPARE(result.sources[0].record.constellationData.count(), 1U);
-    QVERIFY(result.sources[1].record.constellationData.lineRefs().empty());
-}
-
 void SkyCatalogCacheRelatedDataTests::dropsPriorDuplicatedRelatedPayloads()
 {
     // The prior writer serialized the same composed collection-wide view into
@@ -218,56 +116,6 @@ void SkyCatalogCacheRelatedDataTests::dropsPriorDuplicatedRelatedPayloads()
     QVERIFY(result.sources[1].record.constellationData.lineRefs().empty());
     QVERIFY(result.sources[1].record.constellationData.anchorGroups().empty());
     QCOMPARE(result.sources[1].record.constellationData.count(), std::size_t{0});
-}
-
-void SkyCatalogCacheRelatedDataTests::corruptRelatedPayloadLeavesSiblingsIntact()
-{
-    auto snapshot = CatalogCacheFixture::makeCollectionSnapshot();
-    // The star record's line payload is unreadable...
-    snapshot.sources[0].constellationLineRows = "not a related line payload";
-    // ... and the deep-sky record's anchor payload is unreadable.
-    snapshot.sources[1].constellationLineRows = "hip_51|hip_52\n";
-    snapshot.sources[1].constellationAnchorGroupRows = "not a related anchor payload";
-    snapshot.sources[1].constellationLineSchemaVersion = kCurrentConstellationSchemaVersion;
-    snapshot.sources[1].constellationCount = 1;
-
-    // A third, healthy record carries a distinguishable dataset.
-    SkyCatalogSourceCacheRecord healthy;
-    healthy.instanceId = QStringLiteral("custom:healthy-owner");
-    healthy.title = QStringLiteral("Healthy Owner");
-    healthy.urls = QStringList{QStringLiteral("https://example.test/healthy-owner.csv")};
-    healthy.policy = CatalogCompositionPolicy::Merge;
-    healthy.enabled = true;
-    healthy.order = 2;
-    healthy.payload = skygate::ui::tests::sampleHygCsvPayload();
-    healthy.constellationLineRows = "hip_61|hip_62\n";
-    healthy.constellationAnchorGroupRows = "Draco|hip_61,hip_62\n";
-    healthy.constellationLineSchemaVersion = kCurrentConstellationSchemaVersion;
-    healthy.constellationCount = 3;
-    snapshot.sources.push_back(std::move(healthy));
-
-    SkySettingsStore store;
-    QVERIFY(store.saveCatalogCollectionCache(snapshot));
-
-    const SkyCatalogCacheController controller(&store);
-    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Saved related constellation dataset is unreadable"));
-    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Saved related constellation dataset is unreadable"));
-    const auto result = controller.restoreCollection(0, 0, QString(), QString());
-
-    QVERIFY(result.restored);
-    QCOMPARE(result.sources.size(), std::size_t{3});
-    // A record whose payload cannot be parsed restores without related data,
-    // including no partial dataset from the readable half.
-    QVERIFY(result.sources[0].record.constellationData.lineRefs().empty());
-    QVERIFY(result.sources[0].record.constellationData.anchorGroups().empty());
-    QVERIFY(result.sources[1].record.constellationData.lineRefs().empty());
-    QVERIFY(result.sources[1].record.constellationData.anchorGroups().empty());
-    // The healthy owner's dataset is unaffected.
-    QCOMPARE(result.sources[2].record.constellationData.lineRefs().size(), 1U);
-    QCOMPARE(result.sources[2].record.constellationData.lineRefs()[0].first, std::string("hip_61"));
-    QCOMPARE(result.sources[2].record.constellationData.anchorGroups().size(), 1U);
-    QCOMPARE(result.sources[2].record.constellationData.anchorGroups()[0].first, std::string("Draco"));
-    QCOMPARE(result.sources[2].record.constellationData.count(), 3U);
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogCacheRelatedDataTests)

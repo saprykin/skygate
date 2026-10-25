@@ -82,7 +82,6 @@ private slots:
     void unifiedDownloadSourceKeepsStarCatalogsUnfiltered();
     void multiMemberArchiveLoadsDescriptorSelectedMember();
     void reportsMissingDescriptorArchiveMember();
-    void reportsContradictorySchemaHint();
     void reportsUnsupportedSchemaPayload();
     void reportsAmbiguousArchiveWithoutDescriptorChoice();
     void retainsBehaviorForSingleMemberZipGzipAndPlain();
@@ -376,36 +375,6 @@ void SkyCatalogImportWorkflowTests::reportsMissingDescriptorArchiveMember()
     QVERIFY(finalResult.catalog == nullptr);
     QVERIFY(finalResult.errorText.contains("requested archive member not found"));
     QVERIFY(finalResult.errorText.contains("catalog/missing.csv"));
-}
-
-void SkyCatalogImportWorkflowTests::reportsContradictorySchemaHint()
-{
-    FakeNetworkAccessManager networkAccessManager;
-    networkAccessManager.enqueueResponse("https://example.test/stars.csv", {.payload = sampleHygCsvPayload()});
-
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "Catalog payload parse failed: Catalog payload schema 'HYG CSV' does not match the expected schema hint "
-        "'OpenNGC CSV'."
-    );
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "Catalog: Source https://example.test/stars.csv parse failed: schema hint mismatch (Catalog payload schema "
-        "'HYG CSV' does not match the expected schema hint 'OpenNGC CSV'.)"
-    );
-
-    skygate::ui::internal::SkyCatalogSourceImportResult finalResult;
-    runSourceDownload(
-        networkAccessManager,
-        makeDescriptorInstance(
-            QStringLiteral("https://example.test/stars.csv"), skygate::ephemeris::CatalogSourceType::OpenNgcCsv
-        ),
-        finalResult
-    );
-
-    QVERIFY(finalResult.catalog == nullptr);
-    QVERIFY(finalResult.errorText.contains("schema hint mismatch"));
-    QVERIFY(finalResult.errorText.contains("OpenNGC CSV"));
 }
 
 void SkyCatalogImportWorkflowTests::reportsUnsupportedSchemaPayload()

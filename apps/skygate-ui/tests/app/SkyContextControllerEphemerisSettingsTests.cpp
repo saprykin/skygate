@@ -288,8 +288,6 @@ private slots:
     void ephemerisEngineKindIndexRejectsOutOfRangeValues();
     void engineSwitchResetsCorrectionPresetToDefaults();
     void oldHandleStaysUsableAfterReplacement();
-    void unchangedSettingsKeepOptionsRevision();
-    void optionFieldChangeBumpsOptionsRevision();
     void engineModelExposesRegistryLabelsAndCapabilities();
     void correctionPresetMappingsMatchEngineFlags();
     void invalidCorrectionPresetKeepsOptionsAndNotifies();
@@ -594,33 +592,6 @@ void SkyContextControllerEphemerisSettingsTests::oldHandleStaysUsableAfterReplac
     QVERIFY(!snapshot.states.empty());
 }
 
-void SkyContextControllerEphemerisSettingsTests::unchangedSettingsKeepOptionsRevision()
-{
-    const auto controller = createController(false);
-
-    controller->setEphemerisAtmosphericPressureText(QStringLiteral("900"));
-    const std::uint64_t changedRevision = controller->ephemerisRequestContext().engineOptionsRevision;
-    QSignalSpy ephemerisSettingsSpy(controller.get(), &SkyContextController::ephemerisSettingsChanged);
-
-    controller->setEphemerisAtmosphericPressureText(QStringLiteral("900"));
-
-    QCOMPARE(controller->ephemerisRequestContext().engineOptionsRevision, changedRevision);
-    QCOMPARE(ephemerisSettingsSpy.count(), 0);
-}
-
-void SkyContextControllerEphemerisSettingsTests::optionFieldChangeBumpsOptionsRevision()
-{
-    const auto controller = createController(false);
-    const std::uint64_t initialRevision = controller->ephemerisRequestContext().engineOptionsRevision;
-    QSignalSpy ephemerisSettingsSpy(controller.get(), &SkyContextController::ephemerisSettingsChanged);
-
-    controller->setEphemerisAtmosphericPressureText(QStringLiteral("900"));
-
-    QVERIFY(controller->ephemerisRequestContext().engineOptionsRevision != initialRevision);
-    QCOMPARE(ephemerisSettingsSpy.count(), 1);
-    QCOMPARE(controller->ephemerisRequestContext().request.options.atmosphericPressureHpa(), 900.0);
-}
-
 void SkyContextControllerEphemerisSettingsTests::engineModelExposesRegistryLabelsAndCapabilities()
 {
     const auto controller = createController(false);
@@ -855,6 +826,7 @@ void SkyContextControllerEphemerisSettingsTests::acceptedSettingsNotifyAndBumpRe
     QCOMPARE(ephemerisSettingsSpy.count(), 1);
     QCOMPARE(skyContextSpy.count(), 1);
     QCOMPARE(notifications, QStringList({QStringLiteral("settings"), QStringLiteral("skyContext")}));
+    QCOMPARE(controller->ephemerisRequestContext().request.options.atmosphericPressureHpa(), 900.0);
 
     notifications.clear();
     controller->setEphemerisAtmosphericPressureText(QStringLiteral("2000.01"));

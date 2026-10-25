@@ -110,7 +110,6 @@ private slots:
     void emptyCatalogCollectionCacheIsExplicitlyPersisted();
     void failedCollectionSaveKeepsLegacyCacheUnmigrated();
     void legacyFlatCollectionRecordsStillLoad();
-    void interruptedStagingKeepsFlatCollectionLoaded();
     void emptyLegacyCollectionStillLoadsWithoutArtifacts();
     void missingManifestWithRecordsSkipsEmptyCollection();
     void missingManifestWithSidecarsLogsManifestLoss();
@@ -124,7 +123,6 @@ private slots:
     void failedSourceBinaryWriteKeepsCommittedSnapshot();
     void failedMetadataPublicationKeepsCommittedSnapshot();
     void failedManifestPublicationKeepsGenerationIntact();
-    void failedFirstPublicationKeepsLegacyCacheReadable();
     void successfulUpdateReplacesCommittedGeneration();
     void failedCollectionSaveLogsExplicitError();
 
@@ -263,121 +261,6 @@ void SkyCollectionGenerationTests::legacyFlatCollectionRecordsStillLoad()
     const QString messages = capture.joinedMessages();
     QVERIFY(!messages.contains(QStringLiteral("Catalog collection manifest is missing")));
     QVERIFY(!messages.contains(QStringLiteral("stale catalog collection version marker")));
-}
-
-void SkyCollectionGenerationTests::interruptedStagingKeepsFlatCollectionLoaded()
-{
-    const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
-    QVERIFY(QDir().mkpath(directory));
-
-    const QString firstPayloadPath = QDir(directory).filePath(QStringLiteral("flat-first.txt"));
-    const QString secondPayloadPath = QDir(directory).filePath(QStringLiteral("flat-second.txt"));
-    const auto writePayload = [](const QString& path, const QByteArray& payload) {
-        QFile file(path);
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            return false;
-        }
-        return file.write(payload) == payload.size();
-    };
-    QVERIFY(writePayload(firstPayloadPath, QByteArray("flat raw first")));
-    QVERIFY(writePayload(secondPayloadPath, QByteArray("flat raw second")));
-
-    // A collection written by an earlier release keeps its version marker and
-    // sidecar-named record groups directly in the settings file.
-    {
-        QSettings settings;
-        settings.setValue(QStringLiteral("skyContext/catalogCollectionVersion"), 2);
-        settings.setValue(QStringLiteral("skyContext/catalogBinarySchemaVersion"), 7);
-        // The group names sort opposite to the order values on purpose: only
-        // sorting by the order field yields the configured sequence.
-        settings.beginGroup(QStringLiteral("catalogSources/catalog-source-flat-second"));
-        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("flat:first"));
-        settings.setValue(QStringLiteral("descriptorId"), QStringLiteral("flat_first"));
-        settings.setValue(QStringLiteral("title"), QStringLiteral("Flat First"));
-        settings.setValue(QStringLiteral("urls"), QStringList{QStringLiteral("https://example.test/first.csv")});
-        settings.setValue(
-            QStringLiteral("policy"), static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::Merge)
-        );
-        settings.setValue(QStringLiteral("enabled"), true);
-        settings.setValue(QStringLiteral("order"), 0);
-        settings.setValue(QStringLiteral("payloadPath"), firstPayloadPath);
-        settings.endGroup();
-        settings.beginGroup(QStringLiteral("catalogSources/catalog-source-flat-first"));
-        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("flat:second"));
-        settings.setValue(QStringLiteral("descriptorId"), QStringLiteral("flat_second"));
-        settings.setValue(QStringLiteral("title"), QStringLiteral("Flat Second"));
-        settings.setValue(QStringLiteral("urls"), QStringList{QStringLiteral("https://example.test/second.csv")});
-        settings.setValue(
-            QStringLiteral("policy"), static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly)
-        );
-        settings.setValue(QStringLiteral("enabled"), false);
-        settings.setValue(QStringLiteral("order"), 1);
-        settings.setValue(QStringLiteral("payloadPath"), secondPayloadPath);
-        settings.endGroup();
-        settings.sync();
-    }
-
-    SkySettingsStore store;
-    const auto flat = store.loadCatalogCollectionCache();
-    QVERIFY(flat.isLoaded());
-    QCOMPARE(flat.snapshot.schemaVersion, 2);
-    QCOMPARE(flat.snapshot.binarySchemaVersion, 7);
-    QCOMPARE(flat.snapshot.sources.size(), 2);
-    QCOMPARE(flat.snapshot.sources[0].instanceId, QString("flat:first"));
-    QCOMPARE(flat.snapshot.sources[0].order, 0);
-    QCOMPARE(flat.snapshot.sources[0].payload, QByteArray("flat raw first"));
-    QCOMPARE(flat.snapshot.sources[1].instanceId, QString("flat:second"));
-    QCOMPARE(flat.snapshot.sources[1].order, 1);
-    QCOMPARE(flat.snapshot.sources[1].payload, QByteArray("flat raw second"));
-
-    // An interrupted first upgrade staged generation records and a sidecar
-    // without publishing a manifest. The older flat collection is already
-    // committed configuration, so it stays the loaded collection while the
-    // staged generation is neither promoted nor allowed to outrank it.
-    const QString stagedSidecarPath = skygate::ui::tests::stagedCatalogSourceSidecarPath(
-        directory, 4, QStringLiteral("staged:source"), QStringLiteral(".txt")
-    );
-    QVERIFY(writePayload(stagedSidecarPath, QByteArray("staged raw payload")));
-    {
-        QSettings settings;
-        settings.setValue(QStringLiteral("catalogSources/4/recordsStored"), true);
-        settings.beginGroup(QStringLiteral("catalogSources/4/catalog-source-staged"));
-        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("staged:source"));
-        settings.setValue(QStringLiteral("title"), QStringLiteral("Staged Source"));
-        settings.setValue(QStringLiteral("order"), 0);
-        settings.setValue(QStringLiteral("payloadPath"), stagedSidecarPath);
-        settings.endGroup();
-        settings.sync();
-    }
-
-    const auto mixed = store.loadCatalogCollectionCache();
-    QVERIFY(mixed.isLoaded());
-    QCOMPARE(mixed.snapshot.schemaVersion, 2);
-    QCOMPARE(mixed.snapshot.binarySchemaVersion, 7);
-    QCOMPARE(mixed.snapshot.sources.size(), 2);
-    QCOMPARE(mixed.snapshot.sources[0].instanceId, QString("flat:first"));
-    QCOMPARE(mixed.snapshot.sources[0].descriptorId, QString("flat_first"));
-    QCOMPARE(mixed.snapshot.sources[0].title, QString("Flat First"));
-    QCOMPARE(mixed.snapshot.sources[0].urls, QStringList{QStringLiteral("https://example.test/first.csv")});
-    QCOMPARE(mixed.snapshot.sources[0].policy, skygate::ephemeris::CatalogCompositionPolicy::Merge);
-    QVERIFY(mixed.snapshot.sources[0].enabled);
-    QCOMPARE(mixed.snapshot.sources[0].order, 0);
-    QCOMPARE(mixed.snapshot.sources[0].payload, QByteArray("flat raw first"));
-    QCOMPARE(mixed.snapshot.sources[1].instanceId, QString("flat:second"));
-    QCOMPARE(mixed.snapshot.sources[1].descriptorId, QString("flat_second"));
-    QCOMPARE(mixed.snapshot.sources[1].title, QString("Flat Second"));
-    QCOMPARE(mixed.snapshot.sources[1].urls, QStringList{QStringLiteral("https://example.test/second.csv")});
-    QCOMPARE(mixed.snapshot.sources[1].policy, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
-    QVERIFY(!mixed.snapshot.sources[1].enabled);
-    QCOMPARE(mixed.snapshot.sources[1].order, 1);
-    QCOMPARE(mixed.snapshot.sources[1].payload, QByteArray("flat raw second"));
-    QVERIFY(!mixed.diagnostic.isEmpty());
-
-    // Reading the older collection neither consumes nor rewrites the staged
-    // generation artifacts.
-    QFile stagedSidecar(stagedSidecarPath);
-    QVERIFY(stagedSidecar.open(QIODevice::ReadOnly));
-    QCOMPARE(stagedSidecar.readAll(), QByteArray("staged raw payload"));
 }
 
 void SkyCollectionGenerationTests::emptyLegacyCollectionStillLoadsWithoutArtifacts()
@@ -851,51 +734,6 @@ void SkyCollectionGenerationTests::failedManifestPublicationKeepsGenerationIntac
         directory, committedGeneration + 1U, QStringLiteral("custom:alpha"), QStringLiteral(".txt")
     );
     QVERIFY(!QFile::exists(stagedPath));
-}
-
-void SkyCollectionGenerationTests::failedFirstPublicationKeepsLegacyCacheReadable()
-{
-    const QString directory = CatalogCollectionCacheFixture::prepareCollectionCacheDirectory(m_settings);
-
-    SkySettingsStore store;
-    const auto legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
-        {.sourceLabel = QStringLiteral("Legacy custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
-    );
-    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(legacy));
-
-    // Block the generation manifest so the first collection save fails after
-    // its payload files and records were staged. No generation was durably
-    // published, so the readable legacy cache must remain the fallback.
-    const QString manifestPath = skygate::ui::tests::catalogCollectionManifestFilePath(directory);
-    QVERIFY(QDir().mkpath(manifestPath));
-
-    const auto firstCollection = makeCollectionSnapshot({makeCollectionRecord(
-        QStringLiteral("custom:alpha"), QStringLiteral("Alpha"), QByteArray("raw alpha"), QByteArray("binary alpha")
-    )});
-    QVERIFY(!store.saveCatalogCollectionCache(firstCollection));
-    const auto failedFirstSave = store.loadCatalogCollectionCache();
-    QCOMPARE(failedFirstSave.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
-    // A failed first publication leaves no commit record behind either.
-    {
-        QSettings settings;
-        QVERIFY(!settings.contains(QStringLiteral("skyContext/catalogCollectionCommittedGeneration")));
-    }
-
-    const auto legacyAfterFailure = store.loadCatalogCache();
-    QVERIFY(legacyAfterFailure.has_value());
-    QCOMPARE(legacyAfterFailure->sourceLabel, legacy.sourceLabel);
-    QCOMPARE(legacyAfterFailure->catalogPayload, legacy.catalogPayload);
-    QCOMPARE(legacyAfterFailure->deepSkyCatalogPayload, legacy.deepSkyCatalogPayload);
-
-    // Once the manifest can be published, the same snapshot commits while the
-    // legacy cache stays readable without being the fallback.
-    QVERIFY(QDir(manifestPath).removeRecursively());
-    QVERIFY(store.saveCatalogCollectionCache(firstCollection));
-    const auto committed = store.loadCatalogCollectionCache();
-    QVERIFY(committed.isLoaded());
-    QCOMPARE(committed.snapshot.sources.size(), 1);
-    QCOMPARE(committed.snapshot.sources[0].title, QString("Alpha"));
-    QVERIFY(store.loadCatalogCache().has_value());
 }
 
 void SkyCollectionGenerationTests::successfulUpdateReplacesCommittedGeneration()

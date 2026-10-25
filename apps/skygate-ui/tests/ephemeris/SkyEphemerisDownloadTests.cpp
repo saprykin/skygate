@@ -396,6 +396,22 @@ void SkyEphemerisDownloadTests::cancelDuringDownloadKeepsStagingAndActiveData()
     const qint64 stagedSize = QFileInfo(result.stagedPath).size();
     QVERIFY(stagedSize > 0);
     QVERIFY(stagedSize < payload.size());
+
+    // The next attempt resumes into the same staging path instead of starting a
+    // second download, and the completed asset still leaves the active data
+    // untouched until it is activated.
+    request.cancellationRequested = {};
+    const SkyEphemerisDataManager::StagedUpdateDownloadResult restarted = manager.stageEphemerisUpdateAsset(request);
+
+    const QByteArray failureMessage =
+        restarted.diagnostics.empty() ? QByteArray{} : restarted.diagnostics.front().toUtf8();
+    QVERIFY2(restarted.isSuccess(), failureMessage.constData());
+    QCOMPARE(restarted.stagedPath, result.stagedPath);
+    QCOMPARE(restarted.stagedBytes, static_cast<std::uint64_t>(payload.size()));
+    QCOMPARE(QFileInfo(restarted.stagedPath).size(), static_cast<qint64>(payload.size()));
+    QCOMPARE(manager.dataRevision(), originalRevision);
+    QCOMPARE(manager.activeCacheSnapshot().installedKernelPath, oldKernelPath);
+    QCOMPARE(store.loadEphemerisDataCache().installedKernelPath, oldKernelPath);
 }
 
 QTEST_GUILESS_MAIN(SkyEphemerisDownloadTests)

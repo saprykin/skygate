@@ -408,22 +408,10 @@ target_compile_definitions(skygate-ui-sky-ephemeris-data-status-tests
         SKYGATE_UI_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/.."
 )
 add_skygate_ui_qtest(skygate-ui-sky-ephemeris-download-tests ephemeris/SkyEphemerisDownloadTests.cpp)
-target_compile_definitions(skygate-ui-sky-ephemeris-download-tests
-    PRIVATE
-        SKYGATE_UI_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/.."
-)
 add_skygate_ui_qtest(skygate-ui-sky-ephemeris-activation-tests ephemeris/SkyEphemerisActivationTests.cpp)
-target_compile_definitions(skygate-ui-sky-ephemeris-activation-tests
-    PRIVATE
-        SKYGATE_UI_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/.."
-)
 add_skygate_ui_qtest(
     skygate-ui-context-controller-ephemeris-data-tests
     ephemeris/SkyContextControllerEphemerisDataTests.cpp
-)
-target_compile_definitions(skygate-ui-context-controller-ephemeris-data-tests
-    PRIVATE
-        SKYGATE_UI_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/.."
 )
 add_skygate_ui_qtest(
     skygate-ui-sky-ephemeris-settings-policy-tests

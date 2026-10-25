@@ -249,6 +249,12 @@ void SkyCatalogManagerRelatedPersistenceTests::relatedDatasetsRoundTripToTheirOw
     QVERIFY(!CatalogSourceFactsQuery::relatedLineRefsContainHip(recordALines, "hip_26311"));
     QVERIFY(CatalogSourceFactsQuery::relatedLineRefsContainHip(recordBLines, "hip_26311"));
     QVERIFY(!CatalogSourceFactsQuery::relatedLineRefsContainHip(recordBLines, "hip_27989"));
+    QVERIFY(recordA->constellationAnchorGroupRows.contains(QByteArrayLiteral("Orion")));
+    QVERIFY(!recordA->constellationAnchorGroupRows.contains(QByteArrayLiteral("Lyra")));
+    QVERIFY(recordB->constellationAnchorGroupRows.contains(QByteArrayLiteral("Lyra")));
+    QVERIFY(!recordB->constellationAnchorGroupRows.contains(QByteArrayLiteral("Orion")));
+    QCOMPARE(recordA->constellationCount, std::size_t{1});
+    QCOMPARE(recordB->constellationCount, std::size_t{1});
 
     // The restart restores each dataset to its own owner.
     SkyCatalogManager restoredManager(&store);
@@ -428,6 +434,8 @@ void SkyCatalogManagerRelatedPersistenceTests::corruptOwnerPayloadLeavesSiblingD
     const QString sourceARelatedUrl = QStringLiteral("https://example.test/corrupt-owner-a-lines.json");
     const QString sourceBUrl = QStringLiteral("https://example.test/corrupt-owner-b-stars.csv");
     const QString sourceBRelatedUrl = QStringLiteral("https://example.test/corrupt-owner-b-lines.json");
+    const QString sourceCUrl = QStringLiteral("https://example.test/corrupt-owner-c-stars.csv");
+    const QString sourceCRelatedUrl = QStringLiteral("https://example.test/corrupt-owner-c-lines.json");
 
     skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(sourceAUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
@@ -437,6 +445,11 @@ void SkyCatalogManagerRelatedPersistenceTests::corruptOwnerPayloadLeavesSiblingD
     networkAccessManager.enqueueResponse(sourceBUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
     networkAccessManager.enqueueResponse(
         sourceBRelatedUrl, {.payload = RelatedDatasetFixture::lyraRelatedDatasetPayload()}
+    );
+    networkAccessManager.enqueueResponse(sourceCUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(
+        sourceCRelatedUrl,
+        {.payload = RelatedDatasetFixture::relatedDatasetPayload(QStringLiteral("draco"), {61, 62, 63})}
     );
 
     SkySettingsStore store;
@@ -456,34 +469,53 @@ void SkyCatalogManagerRelatedPersistenceTests::corruptOwnerPayloadLeavesSiblingD
     QTRY_VERIFY(!manager.downloadingCatalog());
     QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{4});
 
-    // Corrupt one owner's stored related payload in place.
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceC =
+        RelatedDatasetFixture::relatedDatasetInstance(sourceCUrl, sourceCRelatedUrl);
+    const QString sourceCId = sourceC.instanceId;
+    manager.loadSource(sourceC, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{6});
+
+    // Corrupt one owner's stored line payload and another owner's anchor
+    // payload in place, leaving each record's other half readable.
     auto corruptedSnapshot = store.loadCatalogCollectionCache();
     QVERIFY(corruptedSnapshot.isLoaded());
-    const auto corruptedRecord = std::find_if(
-        corruptedSnapshot.snapshot.sources.begin(),
-        corruptedSnapshot.snapshot.sources.end(),
-        [&sourceAId](const SkyCatalogSourceCacheRecord& record) { return record.instanceId == sourceAId; }
-    );
-    QVERIFY(corruptedRecord != corruptedSnapshot.snapshot.sources.end());
-    corruptedRecord->constellationLineRows = "not a related line payload";
+    const auto recordFor = [&corruptedSnapshot](const QString& instanceId) {
+        return std::find_if(
+            corruptedSnapshot.snapshot.sources.begin(),
+            corruptedSnapshot.snapshot.sources.end(),
+            [&instanceId](const SkyCatalogSourceCacheRecord& record) { return record.instanceId == instanceId; }
+        );
+    };
+    const auto corruptedLinesRecord = recordFor(sourceAId);
+    QVERIFY(corruptedLinesRecord != corruptedSnapshot.snapshot.sources.end());
+    corruptedLinesRecord->constellationLineRows = "not a related line payload";
+    const auto corruptedAnchorsRecord = recordFor(sourceBId);
+    QVERIFY(corruptedAnchorsRecord != corruptedSnapshot.snapshot.sources.end());
+    corruptedAnchorsRecord->constellationAnchorGroupRows = "not a related anchor payload";
     QVERIFY(store.saveCatalogCollectionCache(corruptedSnapshot.snapshot));
 
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Saved related constellation dataset is unreadable"));
     QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Saved related constellation dataset is unreadable"));
     SkyCatalogManager restoredManager(&store);
     QVERIFY(restoredManager.restoreCatalogCache());
 
-    // The corrupted owner restores without related data and keeps its
-    // configuration; the sibling's dataset is untouched.
+    // A record whose dataset cannot be parsed restores without related data,
+    // including no partial dataset from its readable half; every owner keeps
+    // its configuration.
     QVERIFY(isCatalogSourceEnabled(restoredManager, sourceAId));
     QVERIFY(isCatalogSourceEnabled(restoredManager, sourceBId));
+    QVERIFY(isCatalogSourceEnabled(restoredManager, sourceCId));
     QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{2});
     QVERIFY(ConstellationAnchorGroupLookup::find(restoredManager, "Orion") == nullptr);
-    QVERIFY(ConstellationAnchorGroupLookup::find(restoredManager, "Lyra") != nullptr);
+    QVERIFY(ConstellationAnchorGroupLookup::find(restoredManager, "Lyra") == nullptr);
+    QVERIFY(ConstellationAnchorGroupLookup::find(restoredManager, "Draco") != nullptr);
     QCOMPARE(restoredManager.constellationCount(), std::size_t{1});
 
-    restoredManager.disableSource(sourceBId);
+    // The healthy owner's dataset is unaffected and still toggles with it.
+    restoredManager.disableSource(sourceCId);
     QVERIFY(restoredManager.constellationLineRefs().empty());
-    restoredManager.enableSource(sourceBId);
+    restoredManager.enableSource(sourceCId);
     QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{2});
 }
 
@@ -541,6 +573,16 @@ void SkyCatalogManagerRelatedPersistenceTests::migratesPriorSingleOwnerRelatedPa
         CatalogSourceFactsQuery::findRecord(migrated.snapshot, QStringLiteral("custom:prior-owner"));
     QVERIFY(migratedRecord != nullptr);
     QCOMPARE(CatalogSourceFactsQuery::relatedLineRefs(*migratedRecord).size(), std::size_t{2});
+    QCOMPARE(migratedRecord->constellationCount, std::size_t{1});
+    QVERIFY(migratedRecord->constellationAnchorGroupRows.contains(QByteArrayLiteral("Orion")));
+
+    // The adopted dataset is attributed to its single owner only: the bundled
+    // record that never held it stays without related data.
+    const SkyCatalogSourceCacheRecord* migratedBundled =
+        CatalogSourceFactsQuery::findRecord(migrated.snapshot, QStringLiteral("primary"));
+    QVERIFY(migratedBundled != nullptr);
+    QVERIFY(CatalogSourceFactsQuery::relatedLineRefs(*migratedBundled).empty());
+    QVERIFY(migratedBundled->constellationAnchorGroupRows.isEmpty());
 
     // The next start reads the migrated records without another migration and
     // with the owner's dataset intact.

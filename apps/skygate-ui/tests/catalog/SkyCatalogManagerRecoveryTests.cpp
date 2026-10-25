@@ -467,17 +467,35 @@ void SkyCatalogManagerRecoveryTests::interruptedGenerationUpgradeRestoresFlatSou
         settings.sync();
     }
 
-    // An interrupted first upgrade staged a generation record without
-    // publishing a manifest.
+    // An interrupted first upgrade staged a generation record and sidecar
+    // without publishing a manifest.
+    const quint64 stagedGeneration = 4U;
     {
         QSettings settings;
-        settings.setValue(QStringLiteral("catalogSources/4/recordsStored"), true);
-        settings.beginGroup(QStringLiteral("catalogSources/4/catalog-source-staged"));
+        settings.setValue(QStringLiteral("catalogSources/%1/recordsStored").arg(stagedGeneration), true);
+        settings.beginGroup(QStringLiteral("catalogSources/%1/catalog-source-staged").arg(stagedGeneration));
         settings.setValue(QStringLiteral("instanceId"), QStringLiteral("staged:source"));
         settings.setValue(QStringLiteral("title"), QStringLiteral("Staged Source"));
         settings.setValue(QStringLiteral("order"), 0);
         settings.endGroup();
         settings.sync();
+    }
+    const QString stagedSidecarPath = skygate::ui::tests::stagedCatalogSourceSidecarPath(
+        directory, stagedGeneration, QStringLiteral("staged:source"), QStringLiteral(".txt")
+    );
+    QVERIFY(CatalogTestPayloadFile::write(stagedSidecarPath, QByteArray("staged raw payload")));
+
+    // The mixed state is answered from the flat records, and the loader reports
+    // the discarded staged candidate instead of silently ignoring it. Reading
+    // it neither consumes nor rewrites the staged generation artifacts.
+    {
+        const auto mixed = store.loadCatalogCollectionCache();
+        QVERIFY(mixed.isLoaded());
+        QVERIFY(!mixed.diagnostic.isEmpty());
+        QCOMPARE(mixed.snapshot.sources.size(), 2);
+        QFile stagedSidecar(stagedSidecarPath);
+        QVERIFY(stagedSidecar.open(QIODevice::ReadOnly));
+        QCOMPARE(stagedSidecar.readAll(), QByteArray("staged raw payload"));
     }
 
     // The flat records are the committed configuration, so the manager
@@ -489,6 +507,7 @@ void SkyCatalogManagerRecoveryTests::interruptedGenerationUpgradeRestoresFlatSou
         QCOMPARE(manager.sourceInstanceIds(), QStringList({QStringLiteral("flat:stars"), QStringLiteral("flat:dso")}));
         QVERIFY(CatalogBodyQuery::containsDisplayName(manager.starCatalog(), QStringLiteral("Flat Star")));
         QVERIFY(!manager.sourceTitles().values().contains(QStringLiteral("Custom")));
+        QVERIFY(CatalogBodyQuery::containsId(manager.starCatalog(), QStringLiteral("hip_909101")));
     }
 
     // The upgrade committed a generation with the same identities, options,
@@ -500,15 +519,20 @@ void SkyCatalogManagerRecoveryTests::interruptedGenerationUpgradeRestoresFlatSou
     );
     QCOMPARE(upgraded.snapshot.sources.size(), 2);
     QCOMPARE(upgraded.snapshot.sources[0].instanceId, QStringLiteral("flat:stars"));
+    QCOMPARE(upgraded.snapshot.sources[0].title, QStringLiteral("Flat Stars"));
     QCOMPARE(upgraded.snapshot.sources[0].descriptorId, QStringLiteral("flat_stars"));
     QCOMPARE(upgraded.snapshot.sources[0].urls, QStringList{QStringLiteral("https://example.test/flat-stars.csv")});
     QCOMPARE(upgraded.snapshot.sources[0].policy, skygate::ephemeris::CatalogCompositionPolicy::Merge);
     QVERIFY(upgraded.snapshot.sources[0].enabled);
     QCOMPARE(upgraded.snapshot.sources[0].order, 0);
     QCOMPARE(upgraded.snapshot.sources[1].instanceId, QStringLiteral("flat:dso"));
+    QCOMPARE(upgraded.snapshot.sources[1].title, QStringLiteral("Flat DSO"));
     QCOMPARE(upgraded.snapshot.sources[1].urls, QStringList{QStringLiteral("https://example.test/flat-dso.csv")});
     QCOMPARE(upgraded.snapshot.sources[1].policy, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
     QCOMPARE(upgraded.snapshot.sources[1].order, 1);
+    // The upgrade parsed both flat payloads into binary payloads.
+    QVERIFY(!upgraded.snapshot.sources[0].binaryPayload.isEmpty());
+    QVERIFY(!upgraded.snapshot.sources[1].binaryPayload.isEmpty());
 
     // Two restarts restore the upgraded generation with the same identities
     // and order; the retired two-slot source never returns.
@@ -521,6 +545,8 @@ void SkyCatalogManagerRecoveryTests::interruptedGenerationUpgradeRestoresFlatSou
         QVERIFY(CatalogBodyQuery::containsDisplayName(restarted.starCatalog(), QStringLiteral("Flat Star")));
         QVERIFY(!restarted.sourceTitles().values().contains(QStringLiteral("Custom")));
     }
+
+    // The retired two-slot cache is still readable and was never migrated.
     QVERIFY(store.loadCatalogCache().has_value());
 }
 

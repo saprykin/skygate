@@ -31,7 +31,6 @@ class SkyCatalogCacheSettingsTests final : public QObject {
 
 private slots:
     void initTestCase();
-    void savesLoadsAndClearsCatalogCachesIndependently();
     void savesLoadsAndClearsCatalogCollectionCache();
     void clearSourceCacheEvictsPayloadKeepsConfiguration();
     void missingReferencedPayloadLoadsWithoutData();
@@ -46,46 +45,6 @@ private:
 void SkyCatalogCacheSettingsTests::initTestCase()
 {
     QVERIFY(m_settings.initialize(QStringLiteral("SkyCatalogCacheSettingsTests")));
-}
-
-void SkyCatalogCacheSettingsTests::savesLoadsAndClearsCatalogCachesIndependently()
-{
-    m_settings.resetSettingsWithCatalogCachePaths(
-        QStringLiteral("catalog-cache-test.txt"), QStringLiteral("deep-sky-catalog-cache-test.txt")
-    );
-
-    SkySettingsStore store;
-    const SkyCatalogLegacyCacheSnapshot savedSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot(
-        {.constellationLineRows = "a|b\n",
-         .constellationAnchorGroupRows = "Orion|hip1,hip2\n",
-         .constellationCount = 42}
-    );
-
-    QVERIFY(skygate::ui::tests::seedLegacyCatalogCache(savedSnapshot));
-    const auto loadedSnapshot = store.loadCatalogCache();
-    QVERIFY(loadedSnapshot.has_value());
-    QCOMPARE(loadedSnapshot->sourceLabel, savedSnapshot.sourceLabel);
-    QCOMPARE(loadedSnapshot->deepSkySourceLabel, savedSnapshot.deepSkySourceLabel);
-    QCOMPARE(loadedSnapshot->catalogPayload, savedSnapshot.catalogPayload);
-    QCOMPARE(loadedSnapshot->deepSkyCatalogPayload, savedSnapshot.deepSkyCatalogPayload);
-    QCOMPARE(loadedSnapshot->constellationLineRows, savedSnapshot.constellationLineRows);
-    QCOMPARE(loadedSnapshot->constellationLineSchemaVersion, savedSnapshot.constellationLineSchemaVersion);
-    QCOMPARE(loadedSnapshot->constellationCount, savedSnapshot.constellationCount);
-
-    QVERIFY(store.clearCatalogCache());
-    const auto starClearedSnapshot = store.loadCatalogCache();
-    QVERIFY(starClearedSnapshot.has_value());
-    QVERIFY(starClearedSnapshot->sourceLabel.isEmpty());
-    QVERIFY(starClearedSnapshot->catalogPayload.isEmpty());
-    QVERIFY(starClearedSnapshot->constellationLineRows.isEmpty());
-    QVERIFY(starClearedSnapshot->constellationAnchorGroupRows.isEmpty());
-    QCOMPARE(starClearedSnapshot->constellationLineSchemaVersion, 0);
-    QCOMPARE(starClearedSnapshot->constellationCount, 0U);
-    QCOMPARE(starClearedSnapshot->deepSkySourceLabel, savedSnapshot.deepSkySourceLabel);
-    QCOMPARE(starClearedSnapshot->deepSkyCatalogPayload, savedSnapshot.deepSkyCatalogPayload);
-
-    QVERIFY(store.clearDeepSkyCatalogCache());
-    QVERIFY(!store.loadCatalogCache().has_value());
 }
 
 void SkyCatalogCacheSettingsTests::savesLoadsAndClearsCatalogCollectionCache()

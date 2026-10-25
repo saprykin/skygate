@@ -45,7 +45,6 @@ private slots:
     void truncatedCommittedManifestRejectsLegacyMigration();
     void restoreUsesCommittedOverStagedGeneration();
     void missingManifestStagedGenerationRejectsRestore();
-    void interruptedGenerationStagingKeepsFlatCollection();
     void logsCollectionLifecycleSummariesAtInfoLevel();
 
 private:
@@ -299,9 +298,11 @@ void SkyCatalogCacheMigrationTests::failedMigrationCommitKeepsLegacyCacheReadabl
     blocker.write("x");
     blocker.close();
     QSettings settings;
+    const QVariant committedCollectionPath = settings.value(QStringLiteral("skyContext/catalogCollectionCachePath"));
     settings.setValue(
         QStringLiteral("skyContext/catalogCollectionCachePath"), blockerPath + QStringLiteral("/nested/cache")
     );
+    settings.sync();
 
     const SkyCatalogCacheController controller(&store);
     const QString customUrl = QStringLiteral("https://example.test/custom-stars.csv");
@@ -309,15 +310,21 @@ void SkyCatalogCacheMigrationTests::failedMigrationCommitKeepsLegacyCacheReadabl
     QVERIFY(migrated.migratedLegacy);
     QCOMPARE(migrated.sources.size(), std::size_t{2});
 
-    // The failed commit is not recorded as a completed migration and leaves the
-    // legacy cache readable.
+    // The failed commit is neither recorded as a completed migration nor as a
+    // committed generation, and it leaves the legacy cache readable.
     controller.persistCollection(CatalogCacheFixture::persistRequestFromRestoreResult(migrated));
-    QVERIFY(!store.loadCatalogCollectionCache().isLoaded());
+    const auto failedCommit = store.loadCatalogCollectionCache();
+    QCOMPARE(failedCommit.state, SkyCatalogCollectionCacheLoadResult::State::Absent);
+    QCOMPARE(failedCommit.failure, SkyCatalogCollectionCacheLoadResult::Failure::None);
+    QVERIFY(!settings.contains(QStringLiteral("skyContext/catalogCollectionCommittedGeneration")));
     const auto legacyAfterFailure = store.loadCatalogCache();
     QVERIFY(legacyAfterFailure.has_value());
     QCOMPARE(legacyAfterFailure->sourceLabel, legacy.sourceLabel);
     QCOMPARE(legacyAfterFailure->catalogPayload, legacy.catalogPayload);
     QCOMPARE(legacyAfterFailure->deepSkyCatalogPayload, legacy.deepSkyCatalogPayload);
+    QCOMPARE(legacyAfterFailure->constellationLineRows, legacy.constellationLineRows);
+    QCOMPARE(legacyAfterFailure->constellationAnchorGroupRows, legacy.constellationAnchorGroupRows);
+    QCOMPARE(legacyAfterFailure->constellationCount, legacy.constellationCount);
 
     // The next start migrates the same readable legacy configuration again.
     const auto retried = controller.restoreCollection(2, 1, customUrl, QString());
@@ -325,6 +332,17 @@ void SkyCatalogCacheMigrationTests::failedMigrationCommitKeepsLegacyCacheReadabl
     QCOMPARE(retried.sources.size(), std::size_t{2});
     QCOMPARE(retried.sources[0].record.instanceId, migrated.sources[0].record.instanceId);
     QCOMPARE(retried.sources[1].record.instanceId, migrated.sources[1].record.instanceId);
+
+    // Once the collection writes can be published, the same records commit and
+    // the legacy cache stays readable without being the fallback.
+    settings.setValue(QStringLiteral("skyContext/catalogCollectionCachePath"), committedCollectionPath);
+    settings.sync();
+    controller.persistCollection(CatalogCacheFixture::persistRequestFromRestoreResult(retried));
+    const auto committed = store.loadCatalogCollectionCache();
+    QVERIFY(committed.isLoaded());
+    QCOMPARE(committed.snapshot.sources.size(), 2);
+    QCOMPARE(committed.snapshot.sources[0].instanceId, migrated.sources[0].record.instanceId);
+    QVERIFY(store.loadCatalogCache().has_value());
 }
 
 void SkyCatalogCacheMigrationTests::failedCollectionWritePreservesPriorData()
@@ -573,112 +591,6 @@ void SkyCatalogCacheMigrationTests::missingManifestStagedGenerationRejectsRestor
     QVERIFY(recovered.restored);
     QVERIFY(!recovered.migratedLegacy);
     QVERIFY(recovered.sources.empty());
-}
-
-void SkyCatalogCacheMigrationTests::interruptedGenerationStagingKeepsFlatCollection()
-{
-    SkySettingsStore store;
-    // The retired pre-generation two-slot cache stays readable on disk, so a
-    // restore that fell back to it would return its legacy source.
-    QVERIFY(
-        skygate::ui::tests::seedLegacyCatalogCache(
-            skygate::ui::tests::sampleCatalogCacheSnapshot(
-                {.sourceLabel = QStringLiteral("Legacy Custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
-            )
-        )
-    );
-
-    const QString directory = m_settings.filePath(QStringLiteral("collection-cache"));
-    QVERIFY(QDir().mkpath(directory));
-
-    const QString firstPayloadPath = QDir(directory).filePath(QStringLiteral("flat-first.txt"));
-    const QString secondPayloadPath = QDir(directory).filePath(QStringLiteral("flat-second.txt"));
-    const auto writeFile = [](const QString& path, const QByteArray& contents) {
-        QFile file(path);
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            return false;
-        }
-        return file.write(contents) == contents.size();
-    };
-    QVERIFY(writeFile(
-        firstPayloadPath,
-        skygate::ui::tests::sampleHygCsvPayload({.id = 909001, .hip = 909001, .properName = "Flat Star", .mag = "1.0"})
-    ));
-    QVERIFY(writeFile(secondPayloadPath, skygate::ui::tests::sampleCompactOpenNgcCsvPayload()));
-
-    // A flat collection written before generations were published: two
-    // configured sources whose order, identities, and options must survive.
-    {
-        QSettings settings;
-        settings.setValue(QStringLiteral("skyContext/catalogCollectionVersion"), 2);
-        settings.setValue(QStringLiteral("skyContext/catalogBinarySchemaVersion"), 7);
-        settings.beginGroup(QStringLiteral("catalogSources/catalog-source-flat-stars"));
-        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("flat:stars"));
-        settings.setValue(QStringLiteral("title"), QStringLiteral("Flat Stars"));
-        settings.setValue(QStringLiteral("urls"), QStringList{QStringLiteral("https://example.test/flat-stars.csv")});
-        settings.setValue(QStringLiteral("policy"), static_cast<int>(CatalogCompositionPolicy::Merge));
-        settings.setValue(QStringLiteral("enabled"), true);
-        settings.setValue(QStringLiteral("order"), 0);
-        settings.setValue(QStringLiteral("payloadPath"), firstPayloadPath);
-        settings.endGroup();
-        settings.beginGroup(QStringLiteral("catalogSources/catalog-source-flat-dso"));
-        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("flat:dso"));
-        settings.setValue(QStringLiteral("title"), QStringLiteral("Flat DSO"));
-        settings.setValue(QStringLiteral("urls"), QStringList{QStringLiteral("https://example.test/flat-dso.csv")});
-        settings.setValue(QStringLiteral("policy"), static_cast<int>(CatalogCompositionPolicy::DeepSkyOnly));
-        settings.setValue(QStringLiteral("enabled"), true);
-        settings.setValue(QStringLiteral("order"), 1);
-        settings.setValue(QStringLiteral("payloadPath"), secondPayloadPath);
-        settings.endGroup();
-        settings.sync();
-    }
-
-    // An interrupted first upgrade staged a generation record and sidecar
-    // without publishing a manifest.
-    const quint64 stagedGeneration = 4U;
-    {
-        QSettings settings;
-        settings.setValue(QStringLiteral("catalogSources/%1/recordsStored").arg(stagedGeneration), true);
-        settings.beginGroup(QStringLiteral("catalogSources/%1/catalog-source-staged").arg(stagedGeneration));
-        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("staged:source"));
-        settings.setValue(QStringLiteral("title"), QStringLiteral("Staged Title"));
-        settings.setValue(QStringLiteral("order"), 0);
-        settings.endGroup();
-        settings.sync();
-    }
-    const QString stagedSidecarPath = stagedCatalogSourceSidecarPath(
-        directory, stagedGeneration, QStringLiteral("staged:source"), QStringLiteral(".txt")
-    );
-    QVERIFY(writeFile(stagedSidecarPath, QByteArray("staged raw payload")));
-
-    const SkyCatalogCacheController controller(&store);
-    const auto result =
-        controller.restoreCollection(2, 1, QStringLiteral("https://example.test/legacy-stars.csv"), QString());
-
-    // The flat collection is already committed configuration, so it is
-    // restored instead of the readable legacy two-slot cache and with no
-    // legacy migration, while the staged generation stays ignored.
-    QVERIFY(result.restored);
-    QVERIFY(!result.migratedLegacy);
-    QVERIFY(result.requiresRecordUpgrade);
-    QCOMPARE(result.sources.size(), std::size_t{2});
-    QCOMPARE(result.sources[0].instance.instanceId, QStringLiteral("flat:stars"));
-    QCOMPARE(result.sources[0].instance.title, QStringLiteral("Flat Stars"));
-    QCOMPARE(result.sources[0].record.policy, CatalogCompositionPolicy::Merge);
-    QCOMPARE(result.sources[1].instance.instanceId, QStringLiteral("flat:dso"));
-    QCOMPARE(result.sources[1].instance.title, QStringLiteral("Flat DSO"));
-    QCOMPARE(result.sources[1].record.policy, CatalogCompositionPolicy::DeepSkyOnly);
-    QVERIFY(result.sources[0].record.catalog != nullptr);
-    QCOMPARE(CatalogCacheFixture::firstBodyId(*result.sources[0].record.catalog), QStringLiteral("hip_909001"));
-    QVERIFY(result.sources[1].record.catalog != nullptr);
-    QCOMPARE(result.sources[1].record.catalog->bodies().size(), std::size_t{1});
-
-    // The readable legacy cache and the staged sidecar are left untouched by
-    // the restore that used the flat records.
-    QVERIFY(store.loadCatalogCache().has_value());
-    QFile stagedSidecar(stagedSidecarPath);
-    QVERIFY(stagedSidecar.open(QIODevice::ReadOnly));
-    QCOMPARE(stagedSidecar.readAll(), QByteArray("staged raw payload"));
 }
 
 void SkyCatalogCacheMigrationTests::logsCollectionLifecycleSummariesAtInfoLevel()

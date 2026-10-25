@@ -1,4 +1,5 @@
 #include "diagnostics/SkyLogging.hpp"
+#include "settings/SkySettingsSnapshotCodecs.hpp"
 #include "settings/SkySettingsStore.hpp"
 #include "support/SettingsTestFixture.hpp"
 
@@ -102,6 +103,23 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.ephemerisSettingsPresent = true;
 
     QVERIFY(store.saveState(savedSnapshot));
+
+    // Every field is persisted in its own settings domain, which pins the key
+    // layout the settings file exposes.
+    const auto domains = skygate::ui::internal::SkySettingsSnapshotCodecs::splitStateSnapshot(savedSnapshot);
+    QCOMPARE(domains.timeline.live, false);
+    QCOMPARE(domains.search.toolbarCollapsed, true);
+    QCOMPARE(domains.view.themeId, QString("night-vision"));
+    QCOMPARE(domains.location.displayTimeZoneId, QString("Europe/Zurich"));
+    QCOMPARE(domains.catalogSources.deepSkyPresetIndex, 1);
+    QCOMPARE(domains.logging.logToFile, true);
+    QCOMPARE(
+        static_cast<std::uint8_t>(domains.ephemeris.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+    QCOMPARE(domains.ephemeris.preferredDataProfileId, QString("de441-long-range"));
+    QCOMPARE(domains.ephemerisSettingsPresent, true);
+
     const auto loadedSnapshot = store.loadState();
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->live, savedSnapshot.live);
@@ -260,12 +278,17 @@ void SkySettingsStoreTests::partialStateAndUnknownOverlayKeysAreTolerated()
 {
     QSettings settings;
     settings.clear();
+
+    // Without a schema version marker the settings file describes nothing the
+    // store can load, so the caller keeps its in-memory state.
+    const SkySettingsStore store;
+    QVERIFY(!store.loadState().has_value());
+
     settings.setValue("skyContext/version", 3);
     settings.setValue("skyContext/searchToolbarCollapsed", true);
     settings.setValue("skyContext/overlayLayers/altAzGrid", false);
     settings.setValue("skyContext/overlayLayers/unusedPrototypeLayer", true);
 
-    const SkySettingsStore store;
     const auto loadedSnapshot = store.loadState();
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->live, true);
@@ -278,6 +301,15 @@ void SkySettingsStoreTests::partialStateAndUnknownOverlayKeysAreTolerated()
     QCOMPARE(loadedSnapshot->logToTerminal, true);
     QCOMPARE(loadedSnapshot->logToFile, false);
     QCOMPARE(loadedSnapshot->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
+
+    // The absent ephemeris settings section keeps the engine and data-profile
+    // defaults instead of inventing a stored selection.
+    QCOMPARE(
+        static_cast<std::uint8_t>(loadedSnapshot->ephemeris.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
+    QCOMPARE(loadedSnapshot->ephemeris.preferredDataProfileId, QString("de440s-short-range"));
+    QCOMPARE(loadedSnapshot->ephemerisSettingsPresent, false);
 }
 
 void SkySettingsStoreTests::malformedEphemerisUserSettingsFallBackToDefaults()

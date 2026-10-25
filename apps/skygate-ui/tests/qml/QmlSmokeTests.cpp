@@ -58,14 +58,13 @@ void QmlSmokeTests::mainQmlLoadsWithRealContextObjects()
     engine.load(mainQmlUrl);
     QCoreApplication::processEvents();
 
+    // The smoke test proves that Main.qml instantiates against the real context
+    // objects and that the sky interaction layer is wired into it. The other
+    // object-name spot checks live in the focused QML suites (status footer,
+    // date/time popup, night conditions).
     QVERIFY(!objectCreationFailed);
     QVERIFY(!engine.rootObjects().isEmpty());
     QObject* rootObject = engine.rootObjects().front();
-    QVERIFY(skygate::ui::tests::firstObjectWithObjectName(rootObject, QStringLiteral("statusFooter")) != nullptr);
-    QVERIFY(skygate::ui::tests::firstObjectWithObjectName(rootObject, QStringLiteral("dateTimePopup")) != nullptr);
-    QVERIFY(
-        skygate::ui::tests::firstObjectWithObjectName(rootObject, QStringLiteral("nightConditionsPopup")) != nullptr
-    );
     QVERIFY(
         skygate::ui::tests::firstObjectWithObjectName(rootObject, QStringLiteral("skyInteractionLayer")) != nullptr
     );
