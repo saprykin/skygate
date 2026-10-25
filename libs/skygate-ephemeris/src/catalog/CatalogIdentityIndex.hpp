@@ -55,7 +55,6 @@ public:
         std::vector<std::size_t> candidates;
 
         [[nodiscard]] bool hasSingleMatch() const noexcept;
-        [[nodiscard]] bool isAuthoritative() const noexcept;
         [[nodiscard]] bool isAmbiguous() const noexcept;
     };
 

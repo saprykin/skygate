@@ -93,7 +93,6 @@ void CatalogIdentityIndexTests::resolvesCanonicalIdCaseInsensitively()
     const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
 
     QVERIFY(resolution.hasSingleMatch());
-    QVERIFY(resolution.isAuthoritative());
     QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::CanonicalId);
     QCOMPARE(resolution.index, std::size_t{0});
 }
@@ -108,7 +107,6 @@ void CatalogIdentityIndexTests::resolvesExternalIdentifierAcrossCanonicalIds()
     const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
 
     QVERIFY(resolution.hasSingleMatch());
-    QVERIFY(resolution.isAuthoritative());
     QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::ExternalIdentifier);
     QCOMPARE(resolution.index, std::size_t{0});
 }
@@ -137,7 +135,6 @@ void CatalogIdentityIndexTests::resolvesDeepSkyAlias()
     const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
 
     QVERIFY(resolution.hasSingleMatch());
-    QVERIFY(!resolution.isAuthoritative());
     QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::Alias);
     QCOMPARE(resolution.index, std::size_t{0});
 }
@@ -169,7 +166,6 @@ void CatalogIdentityIndexTests::reportsAmbiguousAuthoritativeMatch()
     const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
 
     QVERIFY(resolution.isAmbiguous());
-    QVERIFY(resolution.isAuthoritative());
     QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::AmbiguousAuthoritative);
     QCOMPARE(resolution.candidates.size(), std::size_t{2});
     QCOMPARE(resolution.candidates[0], std::size_t{0});
@@ -188,7 +184,6 @@ void CatalogIdentityIndexTests::reportsAmbiguousAliasMatch()
     const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
 
     QVERIFY(resolution.isAmbiguous());
-    QVERIFY(!resolution.isAuthoritative());
     QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::AmbiguousAlias);
     QCOMPARE(resolution.candidates.size(), std::size_t{2});
 }
@@ -209,7 +204,7 @@ void CatalogIdentityIndexTests::resolvesIdentifierChainsIncrementally()
     const OwnGalaxyCelestialBody third = makeStar("cat_a_3", {CatalogIdentifier::make("hyg", "5")});
     const CatalogIdentityIndex::Resolution thirdResolution = index.resolve(third);
     QVERIFY(thirdResolution.hasSingleMatch());
-    QVERIFY(thirdResolution.isAuthoritative());
+    QCOMPARE(thirdResolution.kind, CatalogIdentityIndex::Resolution::MatchKind::ExternalIdentifier);
     QCOMPARE(thirdResolution.index, std::size_t{0});
 }
 
@@ -223,7 +218,6 @@ void CatalogIdentityIndexTests::resolvesRetainedCanonicalIds()
     const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
 
     QVERIFY(resolution.hasSingleMatch());
-    QVERIFY(resolution.isAuthoritative());
     QVERIFY(!resolution.isAmbiguous());
     QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::CanonicalId);
     QCOMPARE(resolution.index, std::size_t{0});
@@ -241,7 +235,6 @@ void CatalogIdentityIndexTests::resolvesRetainedCanonicalIdsOfIncomingBody()
     const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
 
     QVERIFY(resolution.hasSingleMatch());
-    QVERIFY(resolution.isAuthoritative());
     QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::CanonicalId);
     QCOMPARE(resolution.index, std::size_t{0});
 }
@@ -261,7 +254,6 @@ void CatalogIdentityIndexTests::prefersRetainedCanonicalIdOverAlias()
     const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
 
     QVERIFY(resolution.hasSingleMatch());
-    QVERIFY(resolution.isAuthoritative());
     QVERIFY(!resolution.isAmbiguous());
     QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::CanonicalId);
     QCOMPARE(resolution.index, std::size_t{0});

@@ -390,7 +390,7 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
     // The active related view is recomposed from the owned datasets of the
     // enabled sources before composition, so the reported constellation count
     // reflects the same collection state as the composed snapshot.
-    request.currentConstellationCount = buildActiveConstellationView(activeLineRefs, activeAnchorGroups);
+    const std::size_t currentConstellationCount = buildActiveConstellationView(activeLineRefs, activeAnchorGroups);
 
     std::size_t knownDeepSkyObjectCount = 0;
     for (const SkyCatalogSourceRecord* source : candidateSources) {
@@ -459,7 +459,7 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
     m_bodyCount = composed.bodyCount;
     m_catalogConstellationCount = countConstellationBodies(m_starCatalog->bodies());
     static_cast<void>(m_constellationRefs.setDataset(
-        std::move(activeLineRefs), std::move(activeAnchorGroups), request.currentConstellationCount
+        std::move(activeLineRefs), std::move(activeAnchorGroups), currentConstellationCount
     ));
     m_deepSkyObjectCount = composed.deepSkyObjectCount;
     m_deepSkyCatalogFoundObjectCount = composed.foundDeepSkyObjectCount;

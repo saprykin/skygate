@@ -18,7 +18,6 @@ class CatalogPayloadParserTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void detectsPayloadFormats();
     void parsesLeadingCommentPayloads();
     void rejectsSubstringLookalikeHeader();
     void rejectsPipeRowsPayload();
@@ -34,25 +33,6 @@ private slots:
     void logsUnsupportedAndArchiveFailures();
 };
 
-void CatalogPayloadParserTests::detectsPayloadFormats()
-{
-    const skygate::ephemeris::CatalogPayloadParser parser;
-
-    QVERIFY(parser.detectFormat("alpha|Alpha|Star|1.0\n") == skygate::ephemeris::CatalogSourceType::Unknown);
-    QVERIFY(parser.detectFormat("id,hip,proper,ra,dec,mag\n") == skygate::ephemeris::CatalogSourceType::HygCsv);
-    QVERIFY(parser.detectFormat("Name;Type;RA;Dec;M;NGC;IC\n") == skygate::ephemeris::CatalogSourceType::OpenNgcCsv);
-
-    constexpr std::array<unsigned char, 2> kGzipPrefix{{0x1f, 0x8b}};
-    const std::string_view gzipPrefix(reinterpret_cast<const char*>(kGzipPrefix.data()), kGzipPrefix.size());
-    QVERIFY(parser.detectFormat(gzipPrefix) == skygate::ephemeris::CatalogSourceType::Unknown);
-
-    constexpr std::array<unsigned char, 4> kZipPrefix{{0x50, 0x4b, 0x03, 0x04}};
-    const std::string_view zipPrefix(reinterpret_cast<const char*>(kZipPrefix.data()), kZipPrefix.size());
-    QVERIFY(parser.detectFormat(zipPrefix) == skygate::ephemeris::CatalogSourceType::Unknown);
-
-    QVERIFY(parser.detectFormat("just some plain text") == skygate::ephemeris::CatalogSourceType::Unknown);
-}
-
 void CatalogPayloadParserTests::parsesLeadingCommentPayloads()
 {
     using namespace skygate::ephemeris;
@@ -60,14 +40,12 @@ void CatalogPayloadParserTests::parsesLeadingCommentPayloads()
 
     const CatalogPayloadParser parser;
 
-    QCOMPARE(parser.detectFormat(CatalogHeaderCorpus::kHygLeadingComment), CatalogSourceType::HygCsv);
     const auto hygResult = parser.parseResult(CatalogHeaderCorpus::kHygLeadingComment);
     QVERIFY2(hygResult.isSuccess(), hygResult.errorDetail.c_str());
     QVERIFY(hygResult.catalog != nullptr);
     QCOMPARE(hygResult.catalog->bodies().size(), 1U);
     QVERIFY(hygResult.catalog->bodies()[0]->id == "hyg_1");
 
-    QCOMPARE(parser.detectFormat(CatalogHeaderCorpus::kOpenNgcLeadingComment), CatalogSourceType::OpenNgcCsv);
     const auto openNgcResult = parser.parseResult(CatalogHeaderCorpus::kOpenNgcLeadingComment);
     QVERIFY2(openNgcResult.isSuccess(), openNgcResult.errorDetail.c_str());
     QVERIFY(openNgcResult.catalog != nullptr);
@@ -81,7 +59,6 @@ void CatalogPayloadParserTests::rejectsSubstringLookalikeHeader()
     using namespace skygate::ephemeris::tests;
 
     const CatalogPayloadParser parser;
-    QCOMPARE(parser.detectFormat(CatalogHeaderCorpus::kHygLookalikeHeader), CatalogSourceType::Unknown);
 
     QTest::ignoreMessage(QtWarningMsg, "Catalog payload parse failed: Catalog payload format is not recognized.");
     const auto result = parser.parseResult(CatalogHeaderCorpus::kHygLookalikeHeader);

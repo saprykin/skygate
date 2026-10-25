@@ -35,11 +35,6 @@ CatalogLoadResult logSuccessfulParse(CatalogLoadResult result)
 
 }  // namespace
 
-CatalogSourceType CatalogPayloadParser::detectFormat(const std::string_view payload) const noexcept
-{
-    return CatalogPayloadFormatDetector::detect(payload);
-}
-
 CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& request) const
 {
     CatalogLoadResult result;

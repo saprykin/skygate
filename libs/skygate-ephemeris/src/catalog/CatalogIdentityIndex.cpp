@@ -90,12 +90,6 @@ bool CatalogIdentityIndex::Resolution::hasSingleMatch() const noexcept
     return kind == MatchKind::CanonicalId || kind == MatchKind::ExternalIdentifier || kind == MatchKind::Alias;
 }
 
-bool CatalogIdentityIndex::Resolution::isAuthoritative() const noexcept
-{
-    return kind == MatchKind::CanonicalId || kind == MatchKind::ExternalIdentifier
-           || kind == MatchKind::AmbiguousAuthoritative;
-}
-
 bool CatalogIdentityIndex::Resolution::isAmbiguous() const noexcept
 {
     return kind == MatchKind::AmbiguousAuthoritative || kind == MatchKind::AmbiguousAlias;

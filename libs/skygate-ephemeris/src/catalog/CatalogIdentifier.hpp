@@ -67,7 +67,6 @@ struct CatalogIdentifier {
 
     bool operator==(const CatalogIdentifier& other) const = default;
     bool operator!=(const CatalogIdentifier& other) const = default;
-    [[nodiscard]] bool operator<(const CatalogIdentifier& other) const;
 };
 
 }  // namespace skygate::ephemeris

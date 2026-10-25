@@ -220,12 +220,4 @@ bool CatalogIdentifier::empty() const noexcept
     return namespaceName.empty() || value.empty();
 }
 
-bool CatalogIdentifier::operator<(const CatalogIdentifier& other) const
-{
-    if (namespaceName != other.namespaceName) {
-        return namespaceName < other.namespaceName;
-    }
-    return value < other.value;
-}
-
 }  // namespace skygate::ephemeris
