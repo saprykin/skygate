@@ -816,8 +816,14 @@ static_assert(std::is_enum_v<skygate::ephemeris::EphemerisEngineKind::Type>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisCorrectionFlags::Type>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisEngineQueryStatus::Type>);
 // Guards the ABI/stack-usage ceiling for the QML-facing result type so it stays
-// cheap to pass by value across the UI boundary.
+// cheap to pass by value across the UI boundary. MSVC debug builds inflate
+// std::string and std::vector with iterator-debugging proxies, so the release
+// layouts stay at 224 bytes while the debug layout fits 256.
+#if defined(_ITERATOR_DEBUG_LEVEL) && _ITERATOR_DEBUG_LEVEL != 0
+static_assert(sizeof(skygate::ephemeris::EphemerisEngineQueryResult) <= 256);
+#else
 static_assert(sizeof(skygate::ephemeris::EphemerisEngineQueryResult) <= 224);
+#endif
 
 QTEST_MAIN(EphemerisApiModelTests)
 
