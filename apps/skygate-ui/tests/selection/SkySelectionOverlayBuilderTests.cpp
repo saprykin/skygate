@@ -432,6 +432,7 @@ private slots:
     void constellationMarkerSkipsNonFiniteStates();
     void constellationMarkerKeepsCancelResidue();
     void inspectorFormatsSourceAliasesAndFallbacks();
+    void inspectorRoundsNegativeRightAscensionBeforeWrapping();
     void inspectorSurfacesEphemerisMetadataAndWarnings();
     void inspectorFormatsEveryCanonicalEphemerisWarning();
     void inspectorUsesHighPrecisionStateForSelectedObject();
@@ -642,6 +643,21 @@ void SkySelectionOverlayBuilderTests::inspectorFormatsSourceAliasesAndFallbacks(
     input = makeInput(fixture);
     input.selectedObjectTargetId = "messier_031";
     QCOMPARE(overlayInspectorFieldValue(builder.buildSelectedObjectInspectorData(input), "Source"), QString("Catalog"));
+}
+
+void SkySelectionOverlayBuilderTests::inspectorRoundsNegativeRightAscensionBeforeWrapping()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    // Half a second below zero: rounding the whole span first keeps the clock
+    // on 23h 59m 59s instead of folding a whole turn to 0h 00m 00s.
+    fixture.snapshot.states[3].equatorial = {.rightAscensionHours = -0.5 / 3600.0, .declinationDeg = -12.5};
+    auto input = makeInput(fixture);
+    input.selectedObjectTargetId = "messier_031";
+
+    const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
+
+    QCOMPARE(overlayInspectorFieldValue(inspector, "RA / Dec"), QString("23h 59m 59s / -12d 30m 00s"));
 }
 
 void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarnings()

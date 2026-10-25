@@ -50,11 +50,13 @@ QString formatRightAscension(const double rightAscensionHours)
         return "--";
     }
 
-    // Wrapping the hours keeps negative input on the clock and folds a full
-    // turn to zero before the seconds round up to a whole day.
-    int totalSeconds =
-        static_cast<int>(std::llround(skygate::core::AngleMath::normalizeHours(rightAscensionHours) * 3600.0));
-    totalSeconds %= 24 * 3600;
+    // Rounding the whole span first keeps a negative half-second tie on
+    // 23h 59m 59s: folding the hours onto the clock before the round would
+    // land that tie on 0h 00m 00s instead. The rounded value then goes back
+    // through the shared hour wrap to reach the clock.
+    const double roundedHours = static_cast<double>(std::llround(rightAscensionHours * 3600.0)) / 3600.0;
+    const int totalSeconds =
+        static_cast<int>(std::llround(skygate::core::AngleMath::normalizeHours(roundedHours) * 3600.0));
 
     const int hours = totalSeconds / 3600;
     const int minutes = (totalSeconds % 3600) / 60;
