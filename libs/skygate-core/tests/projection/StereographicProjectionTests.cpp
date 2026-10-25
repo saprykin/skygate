@@ -12,7 +12,12 @@ constexpr skygate::core::ProjectionType kProjectionType = skygate::core::Project
 [[nodiscard]] skygate::core::ScreenPoint
 projectPoint(const skygate::core::HorizontalCoordinate& coordinate, const skygate::core::ProjectionParams& params)
 {
-    return skygate::core::ProjectionAlgorithms::project(kProjectionType, coordinate, params);
+    skygate::core::ProjectionFrame frame;
+    if (!skygate::core::ProjectionAlgorithms::prepareFrame(kProjectionType, params, frame)) {
+        return skygate::core::ScreenPoint::invalidParameters();
+    }
+
+    return skygate::core::ProjectionAlgorithms::project(frame, coordinate);
 }
 
 [[nodiscard]] bool isNear(const double value, const double expected, const double tolerance)

@@ -25,7 +25,12 @@ constexpr std::array<skygate::core::ProjectionType, 2> kCircularProjectionTypes{
     const skygate::core::ProjectionParams& params
 )
 {
-    return skygate::core::ProjectionAlgorithms::project(projectionType, coordinate, params);
+    skygate::core::ProjectionFrame frame;
+    if (!skygate::core::ProjectionAlgorithms::prepareFrame(projectionType, params, frame)) {
+        return skygate::core::ScreenPoint::invalidParameters();
+    }
+
+    return skygate::core::ProjectionAlgorithms::project(frame, coordinate);
 }
 
 }  // namespace

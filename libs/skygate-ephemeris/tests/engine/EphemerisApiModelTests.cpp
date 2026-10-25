@@ -257,11 +257,11 @@ void EphemerisApiModelTests::constructsAndNormalizesAstronomicalTimes()
         static_cast<std::uint8_t>(plusSeconds.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Utc)
     );
 
-    const auto plusMinutesInTai = utcEpoch.addSeconds(43'200.0, skygate::core::TimeScale::Tai);
-    QCOMPARE(plusMinutesInTai.julianDatePart1, 2'451'545.0);
-    QCOMPARE(plusMinutesInTai.julianDatePart2, 0.75);
+    const auto plusSecondsInTai = utcEpoch.addSeconds(43'200.0, skygate::core::TimeScale::Tai);
+    QCOMPARE(plusSecondsInTai.julianDatePart1, 2'451'545.0);
+    QCOMPARE(plusSecondsInTai.julianDatePart2, 0.75);
     QCOMPARE(
-        static_cast<std::uint8_t>(plusMinutesInTai.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tai)
+        static_cast<std::uint8_t>(plusSecondsInTai.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tai)
     );
 
     const skygate::core::CivilDateTime j2000Noon{

@@ -14,12 +14,6 @@ public:
     prepareFrame(ProjectionType projectionType, const ProjectionParams& params, ProjectionFrame& frame) noexcept;
     [[nodiscard]] static ScreenPoint
     project(const ProjectionFrame& frame, const HorizontalCoordinate& coordinate, double marginPx = 0.0) noexcept;
-    [[nodiscard]] static ScreenPoint project(
-        ProjectionType projectionType,
-        const HorizontalCoordinate& coordinate,
-        const ProjectionParams& params,
-        double marginPx = 0.0
-    ) noexcept;
 };
 
 }  // namespace skygate::core

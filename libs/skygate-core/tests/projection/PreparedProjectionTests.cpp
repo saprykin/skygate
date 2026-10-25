@@ -90,9 +90,13 @@ void PreparedProjectionTests::matchesDirectInvalidCoordinateStatus()
     QVERIFY(preparedProjection.has_value());
 
     const skygate::core::HorizontalCoordinate invalidCoordinate{.altitudeDeg = -95.0, .azimuthDeg = 180.0};
-    const auto directPoint = skygate::core::ProjectionAlgorithms::project(
-        skygate::core::ProjectionType::AzimuthalEquidistant, invalidCoordinate, params
+    skygate::core::ProjectionFrame frame;
+    QVERIFY(
+        skygate::core::ProjectionAlgorithms::prepareFrame(
+            skygate::core::ProjectionType::AzimuthalEquidistant, params, frame
+        )
     );
+    const auto directPoint = skygate::core::ProjectionAlgorithms::project(frame, invalidCoordinate);
     const auto preparedPoint = preparedProjection->project(invalidCoordinate);
 
     QCOMPARE(preparedPoint.status, directPoint.status);

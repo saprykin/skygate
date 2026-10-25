@@ -146,19 +146,4 @@ ScreenPoint ProjectionAlgorithms::project(
     return ScreenPoint::invalidParameters();
 }
 
-ScreenPoint ProjectionAlgorithms::project(
-    const ProjectionType projectionType,
-    const HorizontalCoordinate& coordinate,
-    const ProjectionParams& params,
-    const double marginPx
-) noexcept
-{
-    ProjectionFrame frame;
-    if (!prepareFrame(projectionType, params, frame)) {
-        return ScreenPoint::invalidParameters();
-    }
-
-    return project(frame, coordinate, marginPx);
-}
-
 }  // namespace skygate::core
