@@ -201,9 +201,9 @@ void writeIdentityWithScope(QDataStream& stream, const std::uint8_t idScope)
 {
     writePayloadString(stream, "");
     stream << idScope;
-    stream << static_cast<std::uint64_t>(0U);
-    stream << static_cast<std::uint64_t>(0U);
-    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<quint64>(0U);
+    stream << static_cast<quint64>(0U);
+    stream << static_cast<quint64>(0U);
 }
 
 void writeEmptyIdentity(QDataStream& stream)
@@ -251,7 +251,7 @@ void writeDistantBodyWithDeepSkyInfoKind(QDataStream& stream, const std::uint8_t
     stream << false;
     stream << true;
     stream << infoKind;
-    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<quint64>(0U);
     stream << false << false << false;
 }
 
@@ -269,22 +269,21 @@ void writeStarBodyWithTimeScale(QDataStream& stream, const std::uint8_t timeScal
     stream << false << false << false << false << false;
 }
 
-QByteArray makeOrderEntryPayload(const std::uint8_t domain, const std::uint64_t bodyIndex)
+QByteArray makeOrderEntryPayload(const std::uint8_t domain, const quint64 bodyIndex)
 {
     QByteArray buffer;
     QDataStream stream(&buffer, QIODevice::WriteOnly);
     stream.setVersion(QDataStream::Qt_6_5);
     stream.setByteOrder(QDataStream::LittleEndian);
     writeBinaryHeader(stream);
-    stream << static_cast<std::uint64_t>(0U);
-    stream << static_cast<std::uint64_t>(0U);
-    stream << static_cast<std::uint64_t>(1U);
+    stream << static_cast<quint64>(0U);
+    stream << static_cast<quint64>(0U);
+    stream << static_cast<quint64>(1U);
     stream << domain << bodyIndex;
     return buffer;
 }
 
-QByteArray
-makeSingleBodyOrderPayload(const std::uint8_t domain, const std::uint64_t bodyIndex, const bool ownGalaxyBody)
+QByteArray makeSingleBodyOrderPayload(const std::uint8_t domain, const quint64 bodyIndex, const bool ownGalaxyBody)
 {
     QByteArray buffer;
     QDataStream stream(&buffer, QIODevice::WriteOnly);
@@ -292,19 +291,19 @@ makeSingleBodyOrderPayload(const std::uint8_t domain, const std::uint64_t bodyIn
     stream.setByteOrder(QDataStream::LittleEndian);
     writeBinaryHeader(stream);
     if (ownGalaxyBody) {
-        stream << static_cast<std::uint64_t>(1U);
+        stream << static_cast<quint64>(1U);
         writeOwnGalaxyBodyWithKind(
             stream, static_cast<std::uint8_t>(skygate::ephemeris::BaseCelestialBody::Kind::Star)
         );
-        stream << static_cast<std::uint64_t>(0U);
+        stream << static_cast<quint64>(0U);
     } else {
-        stream << static_cast<std::uint64_t>(0U);
-        stream << static_cast<std::uint64_t>(1U);
+        stream << static_cast<quint64>(0U);
+        stream << static_cast<quint64>(1U);
         writeDistantBodyWithKind(
             stream, static_cast<std::uint8_t>(skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject)
         );
     }
-    stream << static_cast<std::uint64_t>(1U);
+    stream << static_cast<quint64>(1U);
     stream << domain << bodyIndex;
     return buffer;
 }
@@ -316,10 +315,10 @@ QByteArray makeInvalidOwnGalaxyKindPayload(const std::uint8_t kind)
     stream.setVersion(QDataStream::Qt_6_5);
     stream.setByteOrder(QDataStream::LittleEndian);
     writeBinaryHeader(stream);
-    stream << static_cast<std::uint64_t>(1U);
+    stream << static_cast<quint64>(1U);
     writeOwnGalaxyBodyWithKind(stream, kind);
-    stream << static_cast<std::uint64_t>(0U);
-    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<quint64>(0U);
+    stream << static_cast<quint64>(0U);
     return buffer;
 }
 
@@ -330,10 +329,10 @@ QByteArray makeInvalidIdScopePayload(const std::uint8_t idScope)
     stream.setVersion(QDataStream::Qt_6_5);
     stream.setByteOrder(QDataStream::LittleEndian);
     writeBinaryHeader(stream);
-    stream << static_cast<std::uint64_t>(1U);
+    stream << static_cast<quint64>(1U);
     writeOwnGalaxyBodyWithIdScope(stream, idScope);
-    stream << static_cast<std::uint64_t>(0U);
-    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<quint64>(0U);
+    stream << static_cast<quint64>(0U);
     return buffer;
 }
 
@@ -344,10 +343,10 @@ QByteArray makeInvalidDeepSkyKindPayload(const std::uint8_t kind)
     stream.setVersion(QDataStream::Qt_6_5);
     stream.setByteOrder(QDataStream::LittleEndian);
     writeBinaryHeader(stream);
-    stream << static_cast<std::uint64_t>(0U);
-    stream << static_cast<std::uint64_t>(1U);
+    stream << static_cast<quint64>(0U);
+    stream << static_cast<quint64>(1U);
     writeDistantBodyWithDeepSkyInfoKind(stream, kind);
-    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<quint64>(0U);
     return buffer;
 }
 
@@ -358,10 +357,10 @@ QByteArray makeInvalidTimeScalePayload(const std::uint8_t timeScale)
     stream.setVersion(QDataStream::Qt_6_5);
     stream.setByteOrder(QDataStream::LittleEndian);
     writeBinaryHeader(stream);
-    stream << static_cast<std::uint64_t>(1U);
+    stream << static_cast<quint64>(1U);
     writeStarBodyWithTimeScale(stream, timeScale);
-    stream << static_cast<std::uint64_t>(0U);
-    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<quint64>(0U);
+    stream << static_cast<quint64>(0U);
     return buffer;
 }
 
@@ -372,7 +371,7 @@ QByteArray makePayloadTruncatedAtFixedEquatorialFlag()
     stream.setVersion(QDataStream::Qt_6_5);
     stream.setByteOrder(QDataStream::LittleEndian);
     writeBinaryHeader(stream);
-    stream << static_cast<std::uint64_t>(1U);
+    stream << static_cast<quint64>(1U);
     writePayloadString(stream, "hip_test");
     writePayloadString(stream, "Test");
     stream << static_cast<std::uint8_t>(skygate::ephemeris::BaseCelestialBody::Kind::Star);
@@ -467,7 +466,7 @@ void CatalogBinaryCodecTests::rejectsUnknownOrderDomainWithEmptyVectors()
 
 void CatalogBinaryCodecTests::rejectsUnknownOrderDomainWithExtremeIndex()
 {
-    const QByteArray payload = makeOrderEntryPayload(0xFFU, std::numeric_limits<std::uint64_t>::max());
+    const QByteArray payload = makeOrderEntryPayload(0xFFU, std::numeric_limits<quint64>::max());
     QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(payload) == nullptr);
 }
 
