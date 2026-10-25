@@ -15,8 +15,7 @@ private slots:
     void loadsBundledCatalogBySourceType();
     void loadsHygCatalogBySourceRequest();
     void loadsHygCatalogBySourceTypeWithProgress();
-    void reportsDiagnosticsForSelectionAndErrors();
-    void leavesCatalogUntruncatedForDisabledOrLargerInput();
+    void reportsDiagnosticsForErrors();
     void rejectsEmptyBodyCatalogsAndUnsupportedSources();
 };
 
@@ -77,23 +76,8 @@ void CatalogFactoryTests::loadsHygCatalogBySourceTypeWithProgress()
     QVERIFY(callbackLastCount == 2U);
 }
 
-void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
+void CatalogFactoryTests::reportsDiagnosticsForErrors()
 {
-    const auto selectedCatalog = skygate::ephemeris::CatalogLoader::load(
-        skygate::ephemeris::CatalogSourceType::HygCsv,
-        "id,hip,proper,ra,dec,mag\n"
-        "1,11,Alpha,1.0,2.0,3.0\n"
-        "2,22,Beta,4.0,5.0,6.0\n",
-        {},
-        skygate::ephemeris::CatalogSelectionOptions{
-            .mode = skygate::ephemeris::CatalogSelectionMode::BrightestByVisualMagnitude, .maxBodyCount = 1U
-        }
-    );
-    QVERIFY(selectedCatalog.isSuccess());
-    QVERIFY(selectedCatalog.diagnostics.parsedBodyCount == 2U);
-    QVERIFY(selectedCatalog.diagnostics.selectedBodyCount == 1U);
-    QVERIFY(selectedCatalog.diagnostics.truncatedBodyCount == 1U);
-
     QTest::ignoreMessage(
         QtWarningMsg, "HYG CSV parse failed: HYG CSV payload is missing one of the required columns: ra, dec, mag."
     );
@@ -104,40 +88,6 @@ void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
     );
     QVERIFY(!invalidCatalog.isSuccess());
     QVERIFY(invalidCatalog.errorCode == skygate::ephemeris::CatalogLoadResult::ErrorCode::MissingRequiredColumns);
-}
-
-void CatalogFactoryTests::leavesCatalogUntruncatedForDisabledOrLargerInput()
-{
-    const auto disabledSelection = skygate::ephemeris::CatalogLoader::load(
-        skygate::ephemeris::CatalogSourceType::HygCsv,
-        "id,hip,proper,ra,dec,mag\n"
-        "1,11,Alpha,1.0,2.0,3.0\n"
-        "2,22,Beta,4.0,5.0,6.0\n",
-        {},
-        skygate::ephemeris::CatalogSelectionOptions{
-            .mode = skygate::ephemeris::CatalogSelectionMode::Disabled, .maxBodyCount = 1U
-        }
-    );
-    QVERIFY(disabledSelection.isSuccess());
-    QVERIFY(disabledSelection.catalog != nullptr);
-    QCOMPARE(disabledSelection.catalog->bodies().size(), std::size_t(2));
-    QCOMPARE(disabledSelection.diagnostics.truncatedBodyCount, std::size_t(0));
-
-    const auto oversizedSelection = skygate::ephemeris::CatalogLoader::load(
-        skygate::ephemeris::CatalogSourceType::HygCsv,
-        "id,hip,proper,ra,dec,mag\n"
-        "1,11,Alpha,1.0,2.0,3.0\n"
-        "2,22,Beta,4.0,5.0,6.0\n",
-        {},
-        skygate::ephemeris::CatalogSelectionOptions{
-            .mode = skygate::ephemeris::CatalogSelectionMode::BrightestByVisualMagnitude, .maxBodyCount = 10U
-        }
-    );
-    QVERIFY(oversizedSelection.isSuccess());
-    QVERIFY(oversizedSelection.catalog != nullptr);
-    QCOMPARE(oversizedSelection.catalog->bodies().size(), std::size_t(2));
-    QCOMPARE(oversizedSelection.diagnostics.selectedBodyCount, std::size_t(2));
-    QCOMPARE(oversizedSelection.diagnostics.truncatedBodyCount, std::size_t(0));
 }
 
 void CatalogFactoryTests::rejectsEmptyBodyCatalogsAndUnsupportedSources()

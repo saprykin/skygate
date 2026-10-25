@@ -1,6 +1,5 @@
 #pragma once
 
-#include "CatalogSelectionOptions.hpp"
 #include "CatalogSourceType.hpp"
 
 #include <cstddef>
@@ -15,7 +14,6 @@ struct CatalogSourceRequest {
     CatalogSourceType type = CatalogSourceType::Bundled;
     std::string_view data;
     CatalogParseProgressCallback progressCallback;
-    CatalogSelectionOptions selectionOptions;
 };
 
 }  // namespace skygate::ephemeris

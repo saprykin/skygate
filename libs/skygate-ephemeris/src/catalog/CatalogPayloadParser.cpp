@@ -105,31 +105,22 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
         return result;
     }
 
-    result = CatalogLoader::load(schemaType, schemaPayload, request.progressCallback, request.selectionOptions);
+    result = CatalogLoader::load(schemaType, schemaPayload, request.progressCallback);
     result.detectedFormat = schemaType;
     return logSuccessfulParse(std::move(result));
 }
 
 CatalogLoadResult CatalogPayloadParser::parseResult(
-    const std::string_view payload,
-    const CatalogParseProgressCallback& progressCallback,
-    const CatalogSelectionOptions& selectionOptions
+    const std::string_view payload, const CatalogParseProgressCallback& progressCallback
 ) const
 {
-    return parseResult(
-        CatalogParseRequest{
-            .payload = payload, .progressCallback = progressCallback, .selectionOptions = selectionOptions
-        }
-    );
+    return parseResult(CatalogParseRequest{.payload = payload, .progressCallback = progressCallback});
 }
 
-std::unique_ptr<IStarCatalog> CatalogPayloadParser::parse(
-    const std::string_view payload,
-    const CatalogParseProgressCallback& progressCallback,
-    const CatalogSelectionOptions& selectionOptions
-) const
+std::unique_ptr<IStarCatalog>
+CatalogPayloadParser::parse(const std::string_view payload, const CatalogParseProgressCallback& progressCallback) const
 {
-    CatalogLoadResult result = parseResult(payload, progressCallback, selectionOptions);
+    CatalogLoadResult result = parseResult(payload, progressCallback);
     return std::move(result.catalog);
 }
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "catalog/CatalogParseRequest.hpp"
-#include "catalog/CatalogSelectionOptions.hpp"
 #include "catalog/CatalogSourceType.hpp"
 
 #include <QString>
@@ -14,7 +13,6 @@
 // promises, so a changed provider payload fails explicitly instead of being
 // parsed as whatever detection reports.
 struct CatalogParseOptions final {
-    skygate::ephemeris::CatalogSelectionOptions selectionOptions;
     // Descriptor archiveSelector. Empty means unspecified: the core selector
     // then accepts a single supported member and reports ambiguity otherwise.
     // Applies to ZIP payloads only; other containers ignore it.

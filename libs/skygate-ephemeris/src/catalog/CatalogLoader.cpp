@@ -7,7 +7,6 @@
 #include <QLoggingCategory>
 #include <QString>
 
-#include <algorithm>
 #include <utility>
 #include <vector>
 
@@ -16,8 +15,7 @@ namespace {
 
 Q_LOGGING_CATEGORY(skygateCatalogLoadLog, "skygate.catalog.load")
 
-CatalogLoadResult
-finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionOptions& selectionOptions)
+CatalogLoadResult finalizeCatalogLoad(CatalogBodyParseResult parsedBodies)
 {
     CatalogLoadResult result;
     result.errorCode = parsedBodies.errorCode;
@@ -41,35 +39,9 @@ finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionO
         return result;
     }
 
-    // Brightest-N truncation happens only when a caller enables
-    // CatalogSelectionOptions. No production caller does: the app forwards the
-    // default Disabled option through CatalogParseRequest and CatalogSourceRequest
-    // unchanged. The branch stays part of the parse contract and is covered by
-    // loaderSelectionPreservesAstrometry, so it goes away only with the option.
-    if (selectionOptions.isEnabled() && selectionOptions.mode == CatalogSelectionMode::BrightestByVisualMagnitude
-        && selectionOptions.maxBodyCount < parsedBodyCount) {
-        CelestialBodyCatalog sourceCatalog(
-            std::move(bodies), std::move(distantBodies), std::move(parsedBodies.orderedBodyIndexes)
-        );
-        std::vector<const BaseCelestialBody*> selectedBodies;
-        selectedBodies.reserve(sourceCatalog.size());
-        for (const BaseCelestialBody* body : sourceCatalog.bodies()) {
-            selectedBodies.push_back(body);
-        }
-        std::stable_sort(
-            selectedBodies.begin(),
-            selectedBodies.end(),
-            [](const BaseCelestialBody* lhs, const BaseCelestialBody* rhs) {
-                return lhs->visualMagnitude < rhs->visualMagnitude;
-            }
-        );
-        selectedBodies.resize(selectionOptions.maxBodyCount);
-        result.catalog = CatalogFactory::createStarCatalogFromCatalog(CelestialBodyCatalog(selectedBodies));
-    } else {
-        result.catalog = CatalogFactory::createStarCatalogFromBodies(
-            std::move(bodies), std::move(distantBodies), std::move(parsedBodies.orderedBodyIndexes)
-        );
-    }
+    result.catalog = CatalogFactory::createStarCatalogFromBodies(
+        std::move(bodies), std::move(distantBodies), std::move(parsedBodies.orderedBodyIndexes)
+    );
 
     result.diagnostics.parsedBodyCount = parsedBodyCount;
     result.diagnostics.selectedBodyCount = result.catalog != nullptr ? result.catalog->bodies().size() : 0U;
@@ -94,21 +66,14 @@ CatalogLoadResult CatalogLoader::load(const CatalogSourceRequest& request)
         return result;
     }
 
-    return finalizeCatalogLoad(parser->parse(request.data, request.progressCallback), request.selectionOptions);
+    return finalizeCatalogLoad(parser->parse(request.data, request.progressCallback));
 }
 
 CatalogLoadResult CatalogLoader::load(
-    const CatalogSourceType type,
-    const std::string_view data,
-    const CatalogParseProgressCallback& progressCallback,
-    const CatalogSelectionOptions& selectionOptions
+    const CatalogSourceType type, const std::string_view data, const CatalogParseProgressCallback& progressCallback
 )
 {
-    return load(
-        CatalogSourceRequest{
-            .type = type, .data = data, .progressCallback = progressCallback, .selectionOptions = selectionOptions
-        }
-    );
+    return load(CatalogSourceRequest{.type = type, .data = data, .progressCallback = progressCallback});
 }
 
 }  // namespace skygate::ephemeris

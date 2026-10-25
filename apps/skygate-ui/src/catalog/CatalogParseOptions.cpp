@@ -10,7 +10,6 @@ skygate::ephemeris::CatalogParseRequest CatalogParseOptions::makeRequest(
     skygate::ephemeris::CatalogParseRequest request;
     request.payload = payload;
     request.progressCallback = std::move(progressCallback);
-    request.selectionOptions = selectionOptions;
     request.schemaHint = schemaHint;
     if (!archiveMember.isEmpty()) {
         request.memberSelector = archiveMember.toStdString();

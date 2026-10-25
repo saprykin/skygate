@@ -5,6 +5,7 @@
 
 #include <QtTest/QtTest>
 
+#include <algorithm>
 #include <cstddef>
 #include <span>
 #include <vector>
@@ -150,7 +151,7 @@ class CelestialBodyCatalogTests final : public QObject {
 private slots:
     void snapshotConstructionPreservesMixedBodiesAndOrder();
     void appendBodyPreservesFieldsAndOrder();
-    void loaderSelectionPreservesAstrometry();
+    void loaderPreservesAstrometry();
 };
 
 void CelestialBodyCatalogTests::snapshotConstructionPreservesMixedBodiesAndOrder()
@@ -196,42 +197,42 @@ void CelestialBodyCatalogTests::appendBodyPreservesFieldsAndOrder()
     QCOMPARE(ordered[2]->kind, BaseCelestialBody::Kind::Constellation);
 }
 
-void CelestialBodyCatalogTests::loaderSelectionPreservesAstrometry()
+void CelestialBodyCatalogTests::loaderPreservesAstrometry()
 {
     const skygate::ephemeris::CatalogLoadResult result = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,hip,proper,ra,dec,mag,pmra,pmdec,parallax,rv\n"
         "1,11,Alpha,1.0,2.0,3.0,10.0,-20.0,50.0,15.0\n"
         "2,22,Beta,4.0,5.0,1.0,12.0,-18.0,45.0,10.0\n"
-        "3,33,Gamma,7.0,8.0,2.0,9.0,-11.0,60.0,5.0\n",
-        {},
-        skygate::ephemeris::CatalogSelectionOptions{
-            .mode = skygate::ephemeris::CatalogSelectionMode::BrightestByVisualMagnitude, .maxBodyCount = 2U
-        }
+        "3,33,Gamma,7.0,8.0,2.0,9.0,-11.0,60.0,5.0\n"
     );
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.catalog != nullptr);
 
     const std::span<const BaseCelestialBody* const> ordered = result.catalog->bodies();
-    QCOMPARE(ordered.size(), std::size_t(2));
-    QCOMPARE(QString::fromStdString(ordered[0]->id), QStringLiteral("hip_22"));
-    QCOMPARE(QString::fromStdString(ordered[1]->id), QStringLiteral("hip_33"));
+    QCOMPARE(ordered.size(), std::size_t(3));
 
-    QCOMPARE(ordered[0]->visualMagnitude, 1.0);
-    QVERIFY(ordered[0]->fixedEquatorialValue().has_value());
-    QCOMPARE(ordered[0]->fixedEquatorialValue()->rightAscensionHours, 4.0);
-    QCOMPARE(ordered[0]->fixedEquatorialValue()->declinationDeg, 5.0);
-    QVERIFY(ordered[0]->starAstrometryValue().has_value());
-    const CatalogStarAstrometry& astrometry = *ordered[0]->starAstrometryValue();
+    const auto alphaIt = std::find_if(ordered.begin(), ordered.end(), [](const BaseCelestialBody* body) {
+        return body != nullptr && body->id == "hip_11";
+    });
+    QVERIFY(alphaIt != ordered.end());
+    const BaseCelestialBody& alpha = **alphaIt;
+
+    QCOMPARE(alpha.visualMagnitude, 3.0);
+    QVERIFY(alpha.fixedEquatorialValue().has_value());
+    QCOMPARE(alpha.fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(alpha.fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(alpha.starAstrometryValue().has_value());
+    const CatalogStarAstrometry& astrometry = *alpha.starAstrometryValue();
     QVERIFY(astrometry.properMotionRightAscensionMasPerYear.has_value());
-    QCOMPARE(*astrometry.properMotionRightAscensionMasPerYear, 12.0);
+    QCOMPARE(*astrometry.properMotionRightAscensionMasPerYear, 10.0);
     QVERIFY(astrometry.properMotionDeclinationMasPerYear.has_value());
-    QCOMPARE(*astrometry.properMotionDeclinationMasPerYear, -18.0);
+    QCOMPARE(*astrometry.properMotionDeclinationMasPerYear, -20.0);
     QVERIFY(astrometry.stellarParallaxMas.has_value());
-    QCOMPARE(*astrometry.stellarParallaxMas, 45.0);
+    QCOMPARE(*astrometry.stellarParallaxMas, 50.0);
     QVERIFY(astrometry.radialVelocityKmPerSecond.has_value());
-    QCOMPARE(*astrometry.radialVelocityKmPerSecond, 10.0);
+    QCOMPARE(*astrometry.radialVelocityKmPerSecond, 15.0);
 }
 
 QTEST_APPLESS_MAIN(CelestialBodyCatalogTests)

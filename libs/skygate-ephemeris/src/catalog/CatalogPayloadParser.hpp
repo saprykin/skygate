@@ -2,7 +2,6 @@
 
 #include "CatalogLoadResult.hpp"
 #include "CatalogParseRequest.hpp"
-#include "CatalogSelectionOptions.hpp"
 #include "CatalogSourceType.hpp"
 #include "IStarCatalog.hpp"
 
@@ -18,17 +17,11 @@ public:
     [[nodiscard]] CatalogSourceType detectFormat(std::string_view payload) const noexcept;
 
     [[nodiscard]] CatalogLoadResult parseResult(const CatalogParseRequest& request) const;
-    [[nodiscard]] CatalogLoadResult parseResult(
-        std::string_view payload,
-        const CatalogParseProgressCallback& progressCallback = {},
-        const CatalogSelectionOptions& selectionOptions = {}
-    ) const;
+    [[nodiscard]] CatalogLoadResult
+    parseResult(std::string_view payload, const CatalogParseProgressCallback& progressCallback = {}) const;
 
-    [[nodiscard]] std::unique_ptr<IStarCatalog> parse(
-        std::string_view payload,
-        const CatalogParseProgressCallback& progressCallback = {},
-        const CatalogSelectionOptions& selectionOptions = {}
-    ) const;
+    [[nodiscard]] std::unique_ptr<IStarCatalog>
+    parse(std::string_view payload, const CatalogParseProgressCallback& progressCallback = {}) const;
 };
 
 }  // namespace skygate::ephemeris
