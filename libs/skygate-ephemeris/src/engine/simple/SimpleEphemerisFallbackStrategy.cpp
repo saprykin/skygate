@@ -1,5 +1,6 @@
 #include "SimpleEphemerisFallbackStrategy.hpp"
 #include "SimpleEphemerisEngine.hpp"
+#include "engine/EphemerisDataSourceProvenance.hpp"
 
 #include <cstddef>
 #include <limits>
@@ -30,7 +31,6 @@ std::optional<CelestialBodyState> SimpleEphemerisFallbackStrategy::computeFallba
     // The fallback reports its own metadata: the simple-engine status and
     // warnings do not describe a degraded solar-system fallback.
     state.metadata = EphemerisEngineQueryResult{};
-    state.metadata.dataSourceProvenanceKind = EphemerisDataSourceProvenance::Type::SimpleSolarSystemFallback;
     state.metadata.dataSourceProvenance = std::string{
         EphemerisDataSourceProvenance::displayName(EphemerisDataSourceProvenance::Type::SimpleSolarSystemFallback)
     };

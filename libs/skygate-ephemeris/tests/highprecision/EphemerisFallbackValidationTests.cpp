@@ -1,4 +1,3 @@
-#include "engine/EphemerisDataSourceProvenance.hpp"
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
@@ -251,10 +250,6 @@ void EphemerisFallbackValidationTests::outOfRangeSolarSystemRequestUsesSimpleFal
     QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
     QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
     QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
-    QCOMPARE(
-        static_cast<std::uint8_t>(state->metadata.dataSourceProvenanceKind),
-        static_cast<std::uint8_t>(EphemerisDataSourceProvenance::Type::SimpleSolarSystemFallback)
-    );
     QCOMPARE(state->metadata.dataSourceProvenance, std::string{"simple solar-system fallback"});
     QCOMPARE(static_cast<std::uint32_t>(state->metadata.skippedCorrections), std::uint32_t{0U});
     QVERIFY(
@@ -298,10 +293,7 @@ void EphemerisFallbackValidationTests::fallbackMarksDroppedCorrectionsUnavailabl
     QVERIFY(
         EphemerisCorrectionFlags::has(state->metadata.appliedCorrections, EphemerisCorrectionFlags::diurnalParallax())
     );
-    QCOMPARE(
-        static_cast<std::uint8_t>(state->metadata.dataSourceProvenanceKind),
-        static_cast<std::uint8_t>(EphemerisDataSourceProvenance::Type::SimpleSolarSystemFallback)
-    );
+    QCOMPARE(state->metadata.dataSourceProvenance, std::string{"simple solar-system fallback"});
 }
 
 void EphemerisFallbackValidationTests::failedRequestReturnsFailedStatus()

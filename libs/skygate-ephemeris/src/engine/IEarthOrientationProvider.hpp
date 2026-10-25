@@ -26,11 +26,7 @@ public:
 
     struct DataInfo final : EphemerisTableDataInfo {
         DataInfo() noexcept
-            : EphemerisTableDataInfo(
-                  {EphemerisTableDataStatus::Available,
-                   EphemerisTableDataStatus::Stale,
-                   EphemerisTableDataStatus::Estimated}
-              )
+            : EphemerisTableDataInfo({EphemerisTableDataStatus::Available, EphemerisTableDataStatus::Stale})
         {
         }
 

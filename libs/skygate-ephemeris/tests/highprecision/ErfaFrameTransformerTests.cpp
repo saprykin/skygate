@@ -806,7 +806,7 @@ void ErfaFrameTransformerTests::degradesItrsTransformForStaleOrientation()
 void ErfaFrameTransformerTests::degradesItrsTransformForEstimatedOrientation()
 {
     const ErfaFrameTransformer transformer(
-        frameTimeScaleService(), earthOrientationProvider(false, IEarthOrientationProvider::DataStatus::Estimated)
+        frameTimeScaleService(), earthOrientationProvider(false, IEarthOrientationProvider::DataStatus::Available, true)
     );
 
     const CelestialFrameTransformResult result = transformSingleVector(

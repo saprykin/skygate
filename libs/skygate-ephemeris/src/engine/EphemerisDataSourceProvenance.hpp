@@ -9,9 +9,8 @@ class EphemerisDataSourceProvenance {
 public:
     enum class Type : std::uint8_t {
         Unknown = 0,
-        HighPrecisionKernel = 1,
-        SimpleEngine = 2,
-        SimpleSolarSystemFallback = 3
+        SimpleEngine = 1,
+        SimpleSolarSystemFallback = 2
     };
 
     EphemerisDataSourceProvenance() = delete;
@@ -21,8 +20,6 @@ public:
         switch (type) {
         case Type::Unknown:
             return {};
-        case Type::HighPrecisionKernel:
-            return "high-precision kernel";
         case Type::SimpleEngine:
             return "simple engine";
         case Type::SimpleSolarSystemFallback:

@@ -4,9 +4,9 @@
 #include "FixedBodyAltitudeRange.hpp"
 #include "UtcTimeCodec.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "engine/TableInterpolation.hpp"
 #include "math/TimeConstants.hpp"
 
-#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -51,14 +51,15 @@ isSetBracket(const AltitudeSample& previous, const AltitudeSample& next, double 
     const AltitudeSample& previous, const AltitudeSample& next, double crossingAltitudeDeg
 ) noexcept
 {
-    const double altitudeSpanDeg = next.altitudeDeg - previous.altitudeDeg;
-    if (altitudeSpanDeg == 0.0 || !std::isfinite(altitudeSpanDeg)) {
+    const std::optional<double> fraction =
+        TableInterpolation::clampedRatio(crossingAltitudeDeg, previous.altitudeDeg, next.altitudeDeg);
+    if (!fraction.has_value()) {
         return next.utcTime;
     }
 
-    const double fraction = std::clamp((crossingAltitudeDeg - previous.altitudeDeg) / altitudeSpanDeg, 0.0, 1.0);
     const std::chrono::duration<double> spanSeconds = next.utcTime - previous.utcTime;
-    return previous.utcTime + std::chrono::duration_cast<skygate::core::UtcTimePoint::duration>(spanSeconds * fraction);
+    return previous.utcTime
+           + std::chrono::duration_cast<skygate::core::UtcTimePoint::duration>(spanSeconds * *fraction);
 }
 
 [[nodiscard]] ObservationEventStatus::Type unavailableEventStatus(

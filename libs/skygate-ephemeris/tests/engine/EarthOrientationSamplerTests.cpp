@@ -77,7 +77,7 @@ private:
 }
 
 [[nodiscard]] IEarthOrientationProvider::TableEntry
-tableEntry(const int day, const double ut1MinusUtcSeconds, const bool predicted = false)
+tableEntry(const int day, const double ut1MinusUtcSeconds, const bool predicted = false, const bool estimated = false)
 {
     return {
         .effectiveUtcEpoch = epochForDate(2026, 4, day),
@@ -85,6 +85,7 @@ tableEntry(const int day, const double ut1MinusUtcSeconds, const bool predicted 
         .polarMotionXArcseconds = 0.1,
         .polarMotionYArcseconds = 0.2,
         .predicted = predicted,
+        .estimated = estimated,
     };
 }
 
@@ -114,7 +115,7 @@ private slots:
     void derivesDiagnosticTextPerOrigin();
     void reportsStaleMetadataAsDegraded();
     void reportsPredictedMetadataAsDegraded();
-    void reportsEstimatedMetadataAsDegraded();
+    void reportsEstimatedRowsAsDegraded();
     void keepsPredictedRowsValidWhenDegradationIsOff();
     void keepsFailureTextForRejectedRanges();
     void propagatesOriginTextToUt1Resolution();
@@ -264,13 +265,12 @@ void EarthOrientationSamplerTests::reportsPredictedMetadataAsDegraded()
     QCOMPARE(interpolated.diagnosticText, std::string{"Earth-orientation sample interpolated with degraded metadata."});
 }
 
-void EarthOrientationSamplerTests::reportsEstimatedMetadataAsDegraded()
+void EarthOrientationSamplerTests::reportsEstimatedRowsAsDegraded()
 {
-    IEarthOrientationProvider::DataInfo info = availableDataInfo();
-    info.status = IEarthOrientationProvider::DataStatus::Estimated;
-
-    const EarthOrientationSampler::Sample sample =
-        EarthOrientationSampler::sample(providerWith(std::move(info)), epochForDate(2026, 4, 1));
+    const EarthOrientationSampler::Sample sample = EarthOrientationSampler::sample(
+        providerWith(availableDataInfo(), {tableEntry(1, 0.10, false, true), tableEntry(11, 0.30)}),
+        epochForDate(2026, 4, 1)
+    );
 
     QCOMPARE(sample.status, EarthOrientationSampler::Sample::Status::Degraded);
     QCOMPARE(sample.origin, EarthOrientationSampler::Sample::Origin::ExactRow);

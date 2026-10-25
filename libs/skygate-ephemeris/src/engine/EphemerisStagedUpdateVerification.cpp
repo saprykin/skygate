@@ -1,4 +1,5 @@
 #include "EphemerisStagedUpdateVerification.hpp"
+#include "EphemerisAssetMetadataPolicy.hpp"
 #include "EphemerisDataFileUtilities.hpp"
 #include "EphemerisDataPayloadReader.hpp"
 #include "EphemerisPayloadDiagnostics.hpp"
@@ -75,7 +76,7 @@ validateAssetMetadata(const EphemerisDataManifest::Asset& asset, EphemerisStaged
         );
         valid = false;
     }
-    if (!asset.live
+    if (EphemerisAssetMetadataPolicy::requiresChecksum(asset)
         && (asset.checksum.algorithm != EphemerisDataFileUtilities::kSha256Algorithm || asset.checksum.value.empty())) {
         PayloadDiagnostics::addDiagnostic(result, "Staged ephemeris asset metadata requires a sha256 checksum.");
         valid = false;
@@ -85,9 +86,7 @@ validateAssetMetadata(const EphemerisDataManifest::Asset& asset, EphemerisStaged
         PayloadDiagnostics::addDiagnostic(result, "Staged ephemeris asset metadata contains an unsafe relative path.");
         valid = false;
     }
-    if (asset.compression.kind == EphemerisDataManifest::CompressionKind::Zstd
-        && (!asset.compression.compressedSizeBytes.has_value() || !asset.compression.uncompressedSizeBytes.has_value()
-            || *asset.compression.compressedSizeBytes == 0U || *asset.compression.uncompressedSizeBytes == 0U)) {
+    if (!EphemerisAssetMetadataPolicy::hasUsableCompressionSizes(asset.compression)) {
         PayloadDiagnostics::addDiagnostic(
             result, "zstd staged ephemeris assets require positive compressed and uncompressed sizes."
         );

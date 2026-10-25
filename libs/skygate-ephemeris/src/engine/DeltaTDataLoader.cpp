@@ -10,29 +10,16 @@
 
 namespace skygate::ephemeris {
 
-namespace {
-
-using LoadedDeltaTTable = EphemerisTableLoading::LoadedTable<IDeltaTProvider, IDeltaTProvider::DataInfo>;
-
-[[nodiscard]] DeltaTDataLoader::Result toLoaderResult(LoadedDeltaTTable loaded)
-{
-    DeltaTDataLoader::Result result;
-    result.dataInfo = std::move(loaded.info);
-    result.provider = std::move(loaded.provider);
-    return result;
-}
-
-}  // namespace
-
 DeltaTDataLoader::Result
 DeltaTDataLoader::loadFromSnapshot(const IEphemerisDataSnapshot& snapshot, const Options& options)
 {
     const std::optional<EphemerisTextDataAsset> asset = snapshot.deltaTDataAsset();
     if (!asset.has_value()) {
-        return toLoaderResult(
+        return EphemerisTableLoading::toLoaderResult<Result>(
             EphemerisTableLoading::missingAsset<IDeltaTProvider, IDeltaTProvider::DataInfo>(
                 "Delta T data asset is missing from the data snapshot."
-            )
+            ),
+            &Result::dataInfo
         );
     }
 
@@ -44,7 +31,7 @@ DeltaTDataLoader::loadFromTextAsset(const EphemerisTextDataAsset& asset, const O
 {
     DeltaTDataParser::Result parsed = DeltaTDataParser::parse(asset);
     const bool parseSucceeded = parsed.isSuccess();
-    return toLoaderResult(
+    return EphemerisTableLoading::toLoaderResult<Result>(
         EphemerisTableLoading::loadParsedTable<IDeltaTProvider, IDeltaTProvider::DataInfo>(
             std::move(parsed.dataInfo),
             std::move(parsed.entries),
@@ -54,7 +41,8 @@ DeltaTDataLoader::loadFromTextAsset(const EphemerisTextDataAsset& asset, const O
             [](IDeltaTProvider::DataInfo info, std::vector<IDeltaTProvider::TableEntry> entries) {
                 return std::make_shared<TableBackedDeltaTProvider>(std::move(info), std::move(entries));
             }
-        )
+        ),
+        &Result::dataInfo
     );
 }
 

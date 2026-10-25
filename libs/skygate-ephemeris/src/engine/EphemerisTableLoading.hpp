@@ -28,6 +28,18 @@ public:
 
     EphemerisTableLoading() = delete;
 
+    /// Maps a loaded table onto the result type of one loader. Each loader
+    /// names the info field after its table, so the result names it through
+    /// `infoMember`; the provider field is the same in every loader result.
+    template <typename Result, typename Provider, typename Info>
+    [[nodiscard]] static Result toLoaderResult(LoadedTable<Provider, Info> loaded, Info Result::* const infoMember)
+    {
+        Result result;
+        result.*infoMember = std::move(loaded.info);
+        result.provider = std::move(loaded.provider);
+        return result;
+    }
+
     /// Outcome of a snapshot load that has no asset for its table.
     template <typename Provider, typename Info>
     [[nodiscard]] static LoadedTable<Provider, Info> missingAsset(std::string diagnosticText)

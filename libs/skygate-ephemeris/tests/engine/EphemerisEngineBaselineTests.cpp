@@ -62,7 +62,7 @@ private slots:
     void skyContextCompatibilityAppliesEngineDefaults();
     void requestBasedStateLookupByInsensitiveIdAndIndex();
     void requestBasedMissingIdAndIndexReturnNullopt();
-    void reportsSimpleEngineProvenanceKind();
+    void reportsSimpleEngineProvenance();
 };
 
 void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
@@ -640,7 +640,7 @@ void EphemerisEngineBaselineTests::requestBasedMissingIdAndIndexReturnNullopt()
     QVERIFY(!engine->computeBodyState(request, std::size_t{1}).has_value());
 }
 
-void EphemerisEngineBaselineTests::reportsSimpleEngineProvenanceKind()
+void EphemerisEngineBaselineTests::reportsSimpleEngineProvenance()
 {
     const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
@@ -659,10 +659,7 @@ void EphemerisEngineBaselineTests::reportsSimpleEngineProvenanceKind()
     const auto computedSnapshot = engine->compute(context);
     QCOMPARE(computedSnapshot.states.size(), catalog->bodies().size());
     for (const auto& state : computedSnapshot.states) {
-        QCOMPARE(
-            static_cast<std::uint8_t>(state.metadata.dataSourceProvenanceKind),
-            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataSourceProvenance::Type::SimpleEngine)
-        );
+        QCOMPARE(state.metadata.dataSourceProvenance, std::string{"Simple ephemeris engine"});
     }
 
     skygate::ephemeris::EphemerisRequest unsupportedRequest;
@@ -678,10 +675,6 @@ void EphemerisEngineBaselineTests::reportsSimpleEngineProvenanceKind()
         QCOMPARE(
             static_cast<std::uint8_t>(state.metadata.status),
             static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported)
-        );
-        QCOMPARE(
-            static_cast<std::uint8_t>(state.metadata.dataSourceProvenanceKind),
-            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataSourceProvenance::Type::SimpleEngine)
         );
         QCOMPARE(state.metadata.dataSourceProvenance, std::string{"Simple ephemeris engine"});
     }

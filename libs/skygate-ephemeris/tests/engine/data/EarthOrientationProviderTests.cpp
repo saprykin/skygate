@@ -649,14 +649,14 @@ void EarthOrientationProviderTests::preservesPredictionAndEstimatedWarnings()
     }
     QVERIFY(!skygate::ephemeris::EarthOrientationSampler::sample(result.provider, epochForDate(2026, 4, 4)).predicted);
     auto info = result.dataInfo;
-    info.status = skygate::ephemeris::IEarthOrientationProvider::DataStatus::Estimated;
     info.expiresAt = epochForDate(2026, 4, 1);
-    const skygate::ephemeris::TableBackedEarthOrientationProvider provider(
-        info,
-        std::vector<skygate::ephemeris::IEarthOrientationProvider::TableEntry>(
-            result.provider->entries().begin(), result.provider->entries().end()
-        )
+    std::vector<skygate::ephemeris::IEarthOrientationProvider::TableEntry> estimatedEntries(
+        result.provider->entries().begin(), result.provider->entries().end()
     );
+    for (auto& entry : estimatedEntries) {
+        entry.estimated = true;
+    }
+    const skygate::ephemeris::TableBackedEarthOrientationProvider provider(info, std::move(estimatedEntries));
     const auto combined = skygate::ephemeris::EarthOrientationSampler::sample(&provider, epochForDate(2026, 4, 2));
     QCOMPARE(combined.warningCodeMask.bits(), std::uint32_t{35});
     QVERIFY(combined.estimated);

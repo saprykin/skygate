@@ -104,6 +104,7 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/EphemerisStagedUpdateVerification.cpp
     src/engine/EphemerisStagedUpdateVerificationResult.cpp
     src/engine/EphemerisDataManifest.cpp
+    src/engine/EphemerisAssetMetadataPolicy.hpp
     src/engine/EphemerisManifestJsonReader.cpp
     src/engine/highprecision/EphemerisCacheGateway.hpp
     src/engine/highprecision/EphemerisCacheGateway.cpp
@@ -141,6 +142,7 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/TableBackedDeltaTProvider.cpp
     src/engine/TableBackedLeapSecondProvider.hpp
     src/engine/TableBackedLeapSecondProvider.cpp
+    src/engine/TableIntervalLookup.hpp
     src/engine/TableInterpolation.hpp
     src/engine/TableInterpolation.cpp
     src/engine/TimeScaleConversionStatus.hpp

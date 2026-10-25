@@ -95,7 +95,6 @@ unsupportedEpochWarningCode(const EphemerisRequest& request) noexcept
     state.equatorial.declinationDeg = notAvailable;
     state.horizontal.altitudeDeg = notAvailable;
     state.horizontal.azimuthDeg = notAvailable;
-    state.metadata.dataSourceProvenanceKind = EphemerisDataSourceProvenance::Type::SimpleEngine;
     state.metadata.dataSourceProvenance = kSimpleDataSourceProvenance;
     return state;
 }

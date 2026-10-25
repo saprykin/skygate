@@ -2,7 +2,6 @@
 
 #include "BitFlagSet.hpp"
 #include "EphemerisCorrectionFlags.hpp"
-#include "EphemerisDataSourceProvenance.hpp"
 #include "EphemerisEngineQueryStatus.hpp"
 #include "EphemerisEngineWarning.hpp"
 #include "time/EphemerisDateRange.hpp"
@@ -23,7 +22,6 @@ struct EphemerisEngineQueryResult {
     WarningMask warningCodeMask;
     std::vector<EphemerisEngineWarning::Detail> warningDetails;
     std::string dataSourceProvenance;
-    EphemerisDataSourceProvenance::Type dataSourceProvenanceKind = EphemerisDataSourceProvenance::Type::Unknown;
     std::optional<EphemerisDateRange> effectiveDataValidityRange;
     std::optional<double> estimatedAngularUncertaintyArcsec;
     EphemerisCorrectionFlags requestedCorrections = EphemerisCorrectionFlags::noCorrections();

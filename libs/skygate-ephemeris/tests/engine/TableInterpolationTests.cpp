@@ -16,6 +16,9 @@ private slots:
     void lerpAtIntervalStartReturnsLowerSample();
     void lerpAtIntervalEndReturnsUpperSample();
     void lerpAtMidpointReturnsSampleAverage();
+    void clampedRatioClampsOvershootingKeys();
+    void clampedRatioKeepsDescendingIntervalPositions();
+    void clampedRatioRejectsZeroWidthIntervals();
 };
 
 void TableInterpolationTests::ratioAtIntervalStartIsZero()
@@ -79,6 +82,32 @@ void TableInterpolationTests::lerpAtMidpointReturnsSampleAverage()
     using skygate::ephemeris::TableInterpolation;
 
     QCOMPARE(TableInterpolation::lerp(0.25, 0.75, 0.5), 0.5);
+}
+
+void TableInterpolationTests::clampedRatioClampsOvershootingKeys()
+{
+    using skygate::ephemeris::TableInterpolation;
+
+    QCOMPARE(TableInterpolation::clampedRatio(5.0, 10.0, 20.0).value_or(-1.0), 0.0);
+    QCOMPARE(TableInterpolation::clampedRatio(15.0, 10.0, 20.0).value_or(-1.0), 0.5);
+    QCOMPARE(TableInterpolation::clampedRatio(25.0, 10.0, 20.0).value_or(-1.0), 1.0);
+}
+
+void TableInterpolationTests::clampedRatioKeepsDescendingIntervalPositions()
+{
+    using skygate::ephemeris::TableInterpolation;
+
+    QCOMPARE(TableInterpolation::clampedRatio(15.0, 20.0, 10.0).value_or(-1.0), 0.5);
+    QCOMPARE(TableInterpolation::clampedRatio(5.0, 20.0, 10.0).value_or(-1.0), 1.0);
+    QCOMPARE(TableInterpolation::clampedRatio(25.0, 20.0, 10.0).value_or(-1.0), 0.0);
+}
+
+void TableInterpolationTests::clampedRatioRejectsZeroWidthIntervals()
+{
+    using skygate::ephemeris::TableInterpolation;
+
+    QVERIFY(!TableInterpolation::clampedRatio(10.0, 10.0, 10.0).has_value());
+    QVERIFY(!TableInterpolation::clampedRatio(10.0, std::numeric_limits<double>::infinity(), 20.0).has_value());
 }
 
 QTEST_MAIN(TableInterpolationTests)

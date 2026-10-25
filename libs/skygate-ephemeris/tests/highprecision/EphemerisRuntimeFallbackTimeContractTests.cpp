@@ -2,7 +2,6 @@
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
-#include "engine/EphemerisDataSourceProvenance.hpp"
 #include "engine/EphemerisEngineQueryStatus.hpp"
 #include "engine/EphemerisEngineWarning.hpp"
 #include "engine/IEphemerisFallbackStrategy.hpp"
@@ -27,6 +26,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -155,10 +156,7 @@ void assertDegradedFallbackMetadata(const CelestialBodyState& state)
     );
     QVERIFY(state.metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
     QVERIFY(state.metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
-    QCOMPARE(
-        static_cast<std::uint8_t>(state.metadata.dataSourceProvenanceKind),
-        static_cast<std::uint8_t>(EphemerisDataSourceProvenance::Type::SimpleSolarSystemFallback)
-    );
+    QCOMPARE(state.metadata.dataSourceProvenance, std::string{"simple solar-system fallback"});
     QVERIFY(std::isfinite(state.equatorial.rightAscensionHours));
     QVERIFY(std::isfinite(state.equatorial.declinationDeg));
 }

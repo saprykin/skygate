@@ -1,7 +1,8 @@
 #include "TableBackedDeltaTProvider.hpp"
+#include "TableIntervalLookup.hpp"
 #include "TableInterpolation.hpp"
 
-#include <algorithm>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -58,20 +59,24 @@ IDeltaTProvider::Estimate TableBackedDeltaTProvider::deltaTSeconds(const skygate
     const double requestedEpochKey = epoch.sortKey();
     if (requestedEpochKey >= m_entries.front().effectiveUtcEpoch.sortKey()
         && requestedEpochKey <= m_entries.back().effectiveUtcEpoch.sortKey()) {
-        const auto upper = std::ranges::lower_bound(m_entries, requestedEpochKey, {}, [](const TableEntry& entry) {
-            return entry.effectiveUtcEpoch.sortKey();
-        });
-        if (upper == m_entries.begin()) {
-            return tableEstimate(upper->deltaTSeconds, "Delta T estimate loaded from table.", m_dataInfo.provenance);
+        const TableIntervalLookup::Result interval = TableIntervalLookup::locate(
+            std::span<const TableEntry>(m_entries), requestedEpochKey, [](const TableEntry& entry) noexcept {
+                return entry.effectiveUtcEpoch.sortKey();
+            }
+        );
+        if (!interval.hasLowerRow()) {
+            return tableEstimate(
+                m_entries.front().deltaTSeconds, "Delta T estimate loaded from table.", m_dataInfo.provenance
+            );
         }
-        if (upper == m_entries.end()) {
+        if (!interval.hasUpperRow()) {
             return tableEstimate(
                 m_entries.back().deltaTSeconds, "Delta T estimate loaded from table.", m_dataInfo.provenance
             );
         }
 
-        const TableEntry& before = *(upper - 1);
-        const TableEntry& after = *upper;
+        const TableEntry& before = m_entries[interval.upperIndex - 1U];
+        const TableEntry& after = m_entries[interval.upperIndex];
         const std::optional<double> ratio = TableInterpolation::ratio(
             requestedEpochKey, before.effectiveUtcEpoch.sortKey(), after.effectiveUtcEpoch.sortKey()
         );

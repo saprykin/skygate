@@ -49,20 +49,16 @@ constexpr EphemerisTableParsing::TableParseSpec kParseSpec{
     bool& hasEndpoint
 )
 {
-    return EphemerisTableParsing::assignOptionalRangeEndpoint(
-        info.predictionRange, [endpoint, subject, &value, lineNumber, &hasEndpoint](EphemerisDateRange& range) {
-            return EphemerisTableMetadata::assignRangeEndpoint(
-                range,
-                endpoint,
-                value,
-                kPredictionRangeId,
-                kPredictionRangeDisplayName,
-                kDataLabel,
-                subject,
-                lineNumber,
-                hasEndpoint
-            );
-        }
+    return EphemerisTableMetadata::assignOptionalRangeEndpoint(
+        info.predictionRange,
+        endpoint,
+        value,
+        kPredictionRangeId,
+        kPredictionRangeDisplayName,
+        kDataLabel,
+        subject,
+        lineNumber,
+        hasEndpoint
     );
 }
 

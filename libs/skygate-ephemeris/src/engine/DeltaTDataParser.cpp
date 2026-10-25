@@ -41,21 +41,19 @@ constexpr EphemerisTableParsing::TableParseSpec kParseSpec{
     bool& hasEndpoint
 )
 {
-    return EphemerisTableParsing::assignOptionalRangeEndpoint(
+    return EphemerisTableMetadata::assignOptionalRangeEndpoint(
         info.ancientFallbackModel,
-        [endpoint, subject, &value, lineNumber, &hasEndpoint](IDeltaTProvider::DataInfo::FallbackModelInfo& fallback) {
-            return EphemerisTableMetadata::assignRangeEndpoint(
-                fallback.validityRange,
-                endpoint,
-                value,
-                kAncientFallbackRangeId,
-                kAncientFallbackRangeDisplayName,
-                kDataLabel,
-                subject,
-                lineNumber,
-                hasEndpoint
-            );
-        }
+        [](IDeltaTProvider::DataInfo::FallbackModelInfo& fallback) noexcept -> EphemerisDateRange& {
+            return fallback.validityRange;
+        },
+        endpoint,
+        value,
+        kAncientFallbackRangeId,
+        kAncientFallbackRangeDisplayName,
+        kDataLabel,
+        subject,
+        lineNumber,
+        hasEndpoint
     );
 }
 

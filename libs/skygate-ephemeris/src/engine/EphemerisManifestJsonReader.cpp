@@ -1,4 +1,5 @@
 #include "EphemerisManifestJsonReader.hpp"
+#include "EphemerisAssetMetadataPolicy.hpp"
 #include "EphemerisDataFileUtilities.hpp"
 #include "EphemerisEpochParsing.hpp"
 #include "StringUtilities.hpp"
@@ -252,9 +253,7 @@ bool EphemerisManifestJsonReader::readCompression(
     bool valid = true;
     valid &= readUInt64(object, "compressedSizeBytes", context, diagnostics, compression.compressedSizeBytes);
     valid &= readUInt64(object, "uncompressedSizeBytes", context, diagnostics, compression.uncompressedSizeBytes);
-    if (compression.kind == EphemerisDataManifest::CompressionKind::Zstd
-        && (!compression.compressedSizeBytes.has_value() || !compression.uncompressedSizeBytes.has_value()
-            || *compression.compressedSizeBytes == 0U || *compression.uncompressedSizeBytes == 0U)) {
+    if (!EphemerisAssetMetadataPolicy::hasUsableCompressionSizes(compression)) {
         diagnostics.push_back(
             std::string(context) + " zstd compression requires positive compressed and uncompressed sizes."
         );
@@ -343,7 +342,7 @@ bool EphemerisManifestJsonReader::readAsset(
 
     if (object.contains("checksum")) {
         valid &= readChecksum(object.value("checksum"), context, diagnostics, asset.checksum);
-    } else if (!asset.live) {
+    } else if (EphemerisAssetMetadataPolicy::requiresChecksum(asset)) {
         diagnostics.push_back("Asset requires checksum metadata.");
         valid = false;
     }

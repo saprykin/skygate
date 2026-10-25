@@ -10,8 +10,7 @@ enum class EphemerisTableDataStatus : std::uint8_t {
     Available,
     Missing,
     Malformed,
-    Stale,
-    Estimated
+    Stale
 };
 
 }  // namespace skygate::ephemeris

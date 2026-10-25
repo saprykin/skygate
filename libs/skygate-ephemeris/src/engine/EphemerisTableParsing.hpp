@@ -84,22 +84,6 @@ public:
         info.diagnosticText = std::move(diagnosticText);
     }
 
-    /// Assigns one endpoint of the range that an optional info field keeps.
-    /// The field is created on demand; a malformed value reports the endpoint
-    /// diagnostic and leaves the field untouched.
-    template <typename Field, typename Assign>
-    [[nodiscard]] static std::optional<std::string>
-    assignOptionalRangeEndpoint(std::optional<Field>& field, Assign assign)
-    {
-        Field updated = field.value_or(Field{});
-        if (std::optional<std::string> diagnosticText = assign(updated); diagnosticText.has_value()) {
-            return diagnosticText;
-        }
-
-        field = std::move(updated);
-        return std::nullopt;
-    }
-
     /// Mutates the optional field, creating it on demand.
     template <typename Field, typename Mutate>
     static void updateOptionalField(std::optional<Field>& field, Mutate mutate)

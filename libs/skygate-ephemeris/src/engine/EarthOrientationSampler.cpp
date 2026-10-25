@@ -1,9 +1,9 @@
 #include "EarthOrientationSampler.hpp"
 #include "EphemerisDataStaleness.hpp"
 #include "EphemerisTimePolicy.hpp"
+#include "TableIntervalLookup.hpp"
 #include "TableInterpolation.hpp"
 
-#include <algorithm>
 #include <cmath>
 #include <utility>
 
@@ -161,8 +161,7 @@ void applyDataWarnings(
         addSampleWarning(sample, EarthOrientationSampler::Sample::WarningCode::StaleData);
     }
 
-    if (info.status == IEarthOrientationProvider::DataStatus::Estimated || sample.estimated) {
-        sample.estimated = true;
+    if (sample.estimated) {
         addSampleWarning(sample, EarthOrientationSampler::Sample::WarningCode::EstimatedData);
     }
 
@@ -204,13 +203,17 @@ EarthOrientationSampler::Sample EarthOrientationSampler::sample(
     } else {
         const std::span<const IEarthOrientationProvider::TableEntry> entries = provider->entries();
         const double requestedKey = utcEpoch.sortKey();
-        const auto lowerBound = std::ranges::lower_bound(entries, requestedKey, {}, [](const auto& entry) {
-            return entry.effectiveUtcEpoch.sortKey();
-        });
+        const TableIntervalLookup::Result interval =
+            TableIntervalLookup::locate(entries, requestedKey, [](const auto& entry) {
+                return entry.effectiveUtcEpoch.sortKey();
+            });
 
-        if (lowerBound != entries.end() && sameEpochKey(lowerBound->effectiveUtcEpoch.sortKey(), requestedKey)) {
-            sample = sampleFromEntry(utcEpoch, *lowerBound, EarthOrientationSampler::Sample::Origin::ExactRow);
-        } else if (lowerBound == entries.begin()) {
+        if (interval.hasUpperRow()
+            && sameEpochKey(entries[interval.upperIndex].effectiveUtcEpoch.sortKey(), requestedKey)) {
+            sample = sampleFromEntry(
+                utcEpoch, entries[interval.upperIndex], EarthOrientationSampler::Sample::Origin::ExactRow
+            );
+        } else if (!interval.hasLowerRow()) {
             if (!options.allowOutOfRangeNearestSampleFallback) {
                 return failedSample(
                     utcEpoch,
@@ -221,7 +224,7 @@ EarthOrientationSampler::Sample EarthOrientationSampler::sample(
             sample = sampleFromEntry(utcEpoch, entries.front(), EarthOrientationSampler::Sample::Origin::NearestRow);
             nearestRowUsedFirstRow = true;
             addSampleWarning(sample, EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange);
-        } else if (lowerBound == entries.end()) {
+        } else if (!interval.hasUpperRow()) {
             if (!options.allowOutOfRangeNearestSampleFallback) {
                 return failedSample(
                     utcEpoch,
@@ -232,7 +235,7 @@ EarthOrientationSampler::Sample EarthOrientationSampler::sample(
             sample = sampleFromEntry(utcEpoch, entries.back(), EarthOrientationSampler::Sample::Origin::NearestRow);
             addSampleWarning(sample, EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange);
         } else {
-            sample = interpolateSamples(utcEpoch, *(lowerBound - 1), *lowerBound);
+            sample = interpolateSamples(utcEpoch, entries[interval.upperIndex - 1U], entries[interval.upperIndex]);
         }
 
         applyDataWarnings(sample, provider->dataInfo(), utcEpoch, options);

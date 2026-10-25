@@ -12,6 +12,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace skygate::ephemeris {
@@ -52,6 +53,71 @@ public:
         std::size_t lineNumber,
         bool& hasEndpoint
     );
+
+    /// Assigns one endpoint of a range that an info field keeps as an optional
+    /// value. The field is created on demand; a malformed date reports the
+    /// endpoint diagnostic and leaves the field untouched. `rangeOf` reaches
+    /// the range of a field that wraps it.
+    template <typename Field, typename RangeOf>
+    [[nodiscard]] static std::optional<std::string> assignOptionalRangeEndpoint(
+        std::optional<Field>& field,
+        RangeOf rangeOf,
+        skygate::core::AstronomicalEpoch EphemerisDateRange::* const endpoint,
+        const std::string_view value,
+        const std::string_view rangeId,
+        const std::string_view rangeDisplayName,
+        const std::string_view dataLabel,
+        const std::string_view subject,
+        const std::size_t lineNumber,
+        bool& hasEndpoint
+    )
+    {
+        Field updated = field.value_or(Field{});
+        if (std::optional<std::string> diagnosticText = assignRangeEndpoint(
+                rangeOf(updated),
+                endpoint,
+                value,
+                rangeId,
+                rangeDisplayName,
+                dataLabel,
+                subject,
+                lineNumber,
+                hasEndpoint
+            );
+            diagnosticText.has_value()) {
+            return diagnosticText;
+        }
+
+        field = std::move(updated);
+        return std::nullopt;
+    }
+
+    /// Endpoint assignment for an info field that keeps the range itself.
+    [[nodiscard]] static std::optional<std::string> assignOptionalRangeEndpoint(
+        std::optional<EphemerisDateRange>& field,
+        skygate::core::AstronomicalEpoch EphemerisDateRange::* const endpoint,
+        const std::string_view value,
+        const std::string_view rangeId,
+        const std::string_view rangeDisplayName,
+        const std::string_view dataLabel,
+        const std::string_view subject,
+        const std::size_t lineNumber,
+        bool& hasEndpoint
+    )
+    {
+        return assignOptionalRangeEndpoint(
+            field,
+            [](EphemerisDateRange& range) noexcept -> EphemerisDateRange& { return range; },
+            endpoint,
+            value,
+            rangeId,
+            rangeDisplayName,
+            dataLabel,
+            subject,
+            lineNumber,
+            hasEndpoint
+        );
+    }
 
     // Applies the metadata keys shared by the table formats: 'version',
     // 'source', and 'expires'. Returns true when the line carries one of the
