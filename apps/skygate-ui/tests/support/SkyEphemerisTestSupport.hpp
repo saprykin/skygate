@@ -139,38 +139,6 @@ createTestEphemerisEngine(const skygate::ephemeris::IStarCatalog& starCatalog)
     );
 }
 
-[[nodiscard]] inline std::unique_ptr<SkyContextController>
-createTestController(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies, const bool loadSettings = false)
-{
-    auto starCatalog = createTestCatalog(std::move(bodies));
-    if (starCatalog == nullptr) {
-        return nullptr;
-    }
-
-    auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
-    if (ephemerisEngine == nullptr) {
-        return nullptr;
-    }
-
-    return createTestController(std::move(starCatalog), std::move(ephemerisEngine), loadSettings);
-}
-
-[[nodiscard]] inline std::unique_ptr<SkyContextController>
-createTestController(std::vector<skygate::ephemeris::DistantCelestialBody> bodies, const bool loadSettings = false)
-{
-    auto starCatalog = createTestCatalog(std::move(bodies));
-    if (starCatalog == nullptr) {
-        return nullptr;
-    }
-
-    auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
-    if (ephemerisEngine == nullptr) {
-        return nullptr;
-    }
-
-    return createTestController(std::move(starCatalog), std::move(ephemerisEngine), loadSettings);
-}
-
 inline bool configureTestSkyContext(SkyContextController& controller, const TestSkyContextConfig& config = {})
 {
     if (config.applyTimeZone && !controller.timeController()->setTimeZoneId(config.timeZoneId)) {
