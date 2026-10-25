@@ -233,9 +233,8 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
         );
     }
 
-    return EphemerisEngineFactoryResult::failure(
-        EphemerisFactoryDiagnostics::failureStatus(diagnostics), std::move(diagnostics)
-    );
+    const EphemerisFactoryCreationStatus::Type creationStatus = EphemerisFactoryDiagnostics::failureStatus(diagnostics);
+    return EphemerisEngineFactoryResult::failure(creationStatus, std::move(diagnostics));
 }
 
 }  // namespace
