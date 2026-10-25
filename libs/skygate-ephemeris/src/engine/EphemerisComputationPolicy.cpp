@@ -31,7 +31,6 @@ EphemerisRequest EphemerisComputationPolicy::correctionFlagsFor(
     case EphemerisPrecisionPolicy::SelectionDetail:
     case EphemerisPrecisionPolicy::EventSearch:
     case EphemerisPrecisionPolicy::NightConditionsApproximate:
-    case EphemerisPrecisionPolicy::NightConditionsVerified:
         return request;
     }
 

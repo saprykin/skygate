@@ -9,8 +9,7 @@ enum class EphemerisPrecisionPolicy : std::uint8_t {
     SelectionDetail,
     Trail,
     EventSearch,
-    NightConditionsApproximate,
-    NightConditionsVerified
+    NightConditionsApproximate
 };
 
 }  // namespace skygate::ephemeris

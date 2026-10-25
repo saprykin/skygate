@@ -53,7 +53,6 @@ void EphemerisPrecisionPolicyTests::detailAndEventPoliciesPreserveCorrections()
              skygate::ephemeris::EphemerisPrecisionPolicy::SelectionDetail,
              skygate::ephemeris::EphemerisPrecisionPolicy::EventSearch,
              skygate::ephemeris::EphemerisPrecisionPolicy::NightConditionsApproximate,
-             skygate::ephemeris::EphemerisPrecisionPolicy::NightConditionsVerified,
          }) {
         const auto policyRequest = skygate::ephemeris::EphemerisRequest::fromPrecisionPolicy(request, policy, engine);
         QCOMPARE(
