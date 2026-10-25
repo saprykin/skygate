@@ -4,6 +4,8 @@
 #include "time/SkyQtTimeCodec.hpp"
 #include "time/SkyTimeController.hpp"
 
+#include <QTimeZone>
+
 #include <array>
 #include <cmath>
 #include <optional>
@@ -195,7 +197,7 @@ QString SkyObjectInspectorFormatters::formatEquatorialCoordinate(const skygate::
 
 QString SkyObjectInspectorFormatters::formatUtcTime(const skygate::core::UtcTimePoint& utcTime)
 {
-    return QString("%1 UTC").arg(SkyQtTimeCodec::formatDateTimeText(SkyQtTimeCodec::toQDateTimeUtc(utcTime)));
+    return SkyTimeController::formatUtcTimeInTimeZone(utcTime, QTimeZone::UTC);
 }
 
 QString SkyObjectInspectorFormatters::formatObservationEvent(const skygate::ephemeris::ObservationEvent& event)

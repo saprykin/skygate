@@ -9,20 +9,6 @@
 
 #include <cstdlib>
 
-namespace {
-
-qint64 floorDiv(const qint64 numerator, const qint64 denominator) noexcept
-{
-    qint64 quotient = numerator / denominator;
-    const qint64 remainder = numerator % denominator;
-    if (remainder != 0 && ((remainder < 0) != (denominator < 0))) {
-        --quotient;
-    }
-    return quotient;
-}
-
-}  // namespace
-
 QDateTime SkyQtTimeCodec::ParseResult::toQDateTime(const QTimeZone& timeZone) const
 {
     return QDateTime(QDate(year, month, day), QTime(hour, minute, second), timeZone);
@@ -30,8 +16,9 @@ QDateTime SkyQtTimeCodec::ParseResult::toQDateTime(const QTimeZone& timeZone) co
 
 QDateTime SkyQtTimeCodec::toQDateTimeUtc(const skygate::core::UtcTimePoint& utcTime)
 {
-    const qint64 epochMicros = static_cast<qint64>(skygate::core::UtcTimeCodec::toEpochMicros(utcTime));
-    return QDateTime::fromMSecsSinceEpoch(floorDiv(epochMicros, 1000), QTimeZone::UTC);
+    return QDateTime::fromMSecsSinceEpoch(
+        skygate::core::UtcTimeCodec::toEpochMillisecondsFloor(utcTime), QTimeZone::UTC
+    );
 }
 
 skygate::core::UtcTimePoint SkyQtTimeCodec::toUtcTimePoint(const QDateTime& utcDateTime)
@@ -193,4 +180,21 @@ SkyQtTimeCodec::ParseResult SkyQtTimeCodec::parseDateTime(const QString& dateTex
         .minute = time.minute(),
         .second = time.second(),
     };
+}
+
+SkyQtTimeCodec::ZonedParseResult SkyQtTimeCodec::parseZonedDateTime(
+    const QString& dateText, const QString& timeText, const QTimeZone& timeZone, const ErrorScope scope
+)
+{
+    const ParseResult parsed = parseDateTime(dateText, timeText);
+    if (parsed.error != ParseError::None) {
+        return {.utcDateTime = std::nullopt, .errorText = errorText(parsed.error, scope)};
+    }
+
+    const QDateTime zonedDateTime = parsed.toQDateTime(timeZone);
+    if (!zonedDateTime.isValid()) {
+        return {.utcDateTime = std::nullopt, .errorText = errorText(ParseError::None, scope)};
+    }
+
+    return {.utcDateTime = zonedDateTime.toUTC(), .errorText = {}};
 }

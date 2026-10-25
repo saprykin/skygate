@@ -3,7 +3,6 @@
 #include "SkyContextLocationSourceCodec.hpp"
 #include "SkyContextProjectionTypeCodec.hpp"
 #include "SkyContextTextFormatter.hpp"
-#include "SkyContextUtcDateTimeTextCodec.hpp"
 #include "SkySelectedCityChange.hpp"
 #include "catalog/SkyCatalogManager.hpp"
 #include "catalog/SkyCatalogPresets.hpp"
@@ -376,7 +375,7 @@ QString SkyContextController::utcTimeText() const
 
 QString SkyContextController::utcDateText() const
 {
-    return SkyContextUtcDateTimeTextCodec::formatDate(SkyQtTimeCodec::toQDateTimeUtc(m_location.utcTime()));
+    return SkyQtTimeCodec::formatDateText(SkyQtTimeCodec::toQDateTimeUtc(m_location.utcTime()).date());
 }
 
 QString SkyContextController::latitudeText() const

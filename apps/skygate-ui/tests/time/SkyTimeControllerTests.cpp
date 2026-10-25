@@ -1,6 +1,5 @@
 #include "ITimeSource.hpp"
 #include "UtcTimeCodec.hpp"
-#include "app/SkyContextUtcDateTimeTextCodec.hpp"
 #include "time/SkyLiveClock.hpp"
 #include "time/SkyQtTimeCodec.hpp"
 #include "time/SkyTimeController.hpp"
@@ -51,8 +50,9 @@ private slots:
     void dateTimeTextCodecsReportExactMessages();
     void acceptsTrimmedDateTimeText();
     void formatsBceDateTimesWithSuffix();
-    void dateTextCodecsAgreeOnValidDates();
-    void invalidDateTimeKeepsZeroedDateText();
+    void formatsUtcTimeInExplicitTimeZone();
+    void formatsDateTextWithPaddedYearsAndBceSuffix();
+    void formatsInvalidDateAsEmptyText();
     void emitsSignalsOnlyWhenValuesChange();
 };
 
@@ -69,7 +69,11 @@ void SkyTimeControllerTests::preservesInjectedMicrosecondTimePoint()
     FixedTimeSource timeSource;
     SkyTimeController controller(timeSource);
 
-    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(controller.utcTimePoint()), kFixedUtcEpochMicros);
+    // The exposed instant is millisecond-resolution; the fixed instant is exactly representable.
+    QCOMPARE(
+        skygate::core::UtcTimeCodec::toEpochMicros(SkyQtTimeCodec::toUtcTimePoint(controller.utcDateTime())),
+        kFixedUtcEpochMicros
+    );
 }
 
 void SkyTimeControllerTests::liveClockAdvancesFromMonotonicElapsedTime()
@@ -247,29 +251,30 @@ void SkyTimeControllerTests::dateTimeTextCodecsReportExactMessages()
     QFETCH(QString, controllerErrorText);
     QFETCH(QString, utcCodecErrorText);
 
-    using skygate::ui::internal::SkyContextUtcDateTimeTextCodec;
-
     SkyTimeController controller;
     QVERIFY(controller.setTimeZoneId(QStringLiteral("Europe/Zurich")));
 
     QCOMPARE(controller.validateDateTimeText(dateText, timeText), controllerErrorText);
-    QCOMPARE(SkyContextUtcDateTimeTextCodec::parse(dateText, timeText).errorText, utcCodecErrorText);
+    QCOMPARE(
+        SkyQtTimeCodec::parseZonedDateTime(dateText, timeText, QTimeZone::UTC, SkyQtTimeCodec::ErrorScope::Utc)
+            .errorText,
+        utcCodecErrorText
+    );
 }
 
 void SkyTimeControllerTests::acceptsTrimmedDateTimeText()
 {
-    using skygate::ui::internal::SkyContextUtcDateTimeTextCodec;
-
     SkyTimeController controller;
     QVERIFY(controller.setTimeZoneId(QStringLiteral("Europe/Zurich")));
 
     QVERIFY(controller.validateDateTimeText(QStringLiteral(" 2026-05-06 "), QStringLiteral(" 09:30:30 ")).isEmpty());
     QVERIFY(controller.validateDateTimeText(QStringLiteral("0044-03-15 BC"), QStringLiteral("12:00:00")).isEmpty());
 
-    const auto parsed =
-        SkyContextUtcDateTimeTextCodec::parse(QStringLiteral(" 0044-03-15 bc "), QStringLiteral(" 12:00:00 "));
+    const auto parsed = SkyQtTimeCodec::parseZonedDateTime(
+        QStringLiteral(" 0044-03-15 bc "), QStringLiteral(" 12:00:00 "), QTimeZone::UTC, SkyQtTimeCodec::ErrorScope::Utc
+    );
     QVERIFY(parsed.isValid());
-    QCOMPARE(parsed.utcDateTime, QDateTime(QDate(-44, 3, 15), QTime(12, 0, 0), QTimeZone::UTC));
+    QCOMPARE(*parsed.utcDateTime, QDateTime(QDate(-44, 3, 15), QTime(12, 0, 0), QTimeZone::UTC));
 }
 
 void SkyTimeControllerTests::formatsBceDateTimesWithSuffix()
@@ -280,20 +285,33 @@ void SkyTimeControllerTests::formatsBceDateTimesWithSuffix()
 
     QCOMPARE(controller.dateText(), QStringLiteral("0044-03-15 BCE"));
     QCOMPARE(controller.timeText(), QStringLiteral("12:00:00"));
-    QCOMPARE(controller.formatUtcTime(controller.utcTimePoint()), QStringLiteral("0044-03-15 BCE 12:00:00 UTC"));
+    QCOMPARE(
+        controller.formatUtcTime(SkyQtTimeCodec::toUtcTimePoint(controller.utcDateTime())),
+        QStringLiteral("0044-03-15 BCE 12:00:00 UTC")
+    );
 
     const auto oneHourLater =
         SkyQtTimeCodec::toUtcTimePoint(QDateTime(QDate(-44, 3, 15), QTime(13, 0, 0), QTimeZone::UTC));
-    QCOMPARE(
-        controller.formatUtcTimeRange(controller.utcTimePoint(), oneHourLater),
-        QStringLiteral("0044-03-15 BCE 12:00:00 / 13:00:00 UTC")
-    );
+    QCOMPARE(controller.formatUtcTime(oneHourLater), QStringLiteral("0044-03-15 BCE 13:00:00 UTC"));
 }
 
-void SkyTimeControllerTests::dateTextCodecsAgreeOnValidDates()
+void SkyTimeControllerTests::formatsUtcTimeInExplicitTimeZone()
 {
-    using skygate::ui::internal::SkyContextUtcDateTimeTextCodec;
+    const auto utcTime = SkyQtTimeCodec::toUtcTimePoint(QDateTime(QDate(2026, 5, 6), QTime(9, 30, 30), QTimeZone::UTC));
 
+    // The UTC zone label is the single source of the " UTC" suffix used for UTC-only surfaces.
+    QCOMPARE(
+        SkyTimeController::formatUtcTimeInTimeZone(utcTime, QTimeZone::UTC), QStringLiteral("2026-05-06 09:30:30 UTC")
+    );
+    QCOMPARE(
+        SkyTimeController::formatUtcTimeInTimeZone(utcTime, QTimeZone("Asia/Bishkek")),
+        QStringLiteral("2026-05-06 15:30:30 UTC+06:00")
+    );
+    QCOMPARE(SkyTimeController::formatUtcTimeInTimeZone(utcTime, QTimeZone::UTC, false), QStringLiteral("09:30 UTC"));
+}
+
+void SkyTimeControllerTests::formatsDateTextWithPaddedYearsAndBceSuffix()
+{
     const QList<QPair<QDate, QString>> cases = {
         {QDate(2026, 1, 2), QStringLiteral("2026-01-02")},
         {QDate(5, 1, 1), QStringLiteral("0005-01-01")},
@@ -306,19 +324,11 @@ void SkyTimeControllerTests::dateTextCodecsAgreeOnValidDates()
 
     for (const auto& [date, expectedText] : cases) {
         QCOMPARE(SkyQtTimeCodec::formatDateText(date), expectedText);
-        QCOMPARE(
-            SkyContextUtcDateTimeTextCodec::formatDate(QDateTime(date, QTime(12, 0, 0), QTimeZone::UTC)), expectedText
-        );
     }
 }
 
-void SkyTimeControllerTests::invalidDateTimeKeepsZeroedDateText()
+void SkyTimeControllerTests::formatsInvalidDateAsEmptyText()
 {
-    // The support codec formats an invalid instant as the zeroed placeholder;
-    // the Qt codec reports an invalid date as empty text.
-    using skygate::ui::internal::SkyContextUtcDateTimeTextCodec;
-
-    QCOMPARE(SkyContextUtcDateTimeTextCodec::formatDate(QDateTime()), QStringLiteral("0000-00-00"));
     QVERIFY(SkyQtTimeCodec::formatDateText(QDate()).isEmpty());
 }
 

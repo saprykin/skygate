@@ -19,6 +19,7 @@ private slots:
     void normalizedAzimuthPreservesNonFiniteAzimuth();
     void utcTimeCodecRoundTripsMicroseconds();
     void utcTimeCodecFloorsNegativeEpochSeconds();
+    void utcTimeCodecFloorsNegativeEpochMilliseconds();
     void systemTimeSourceUsesMicrosecondStorage();
     void projectionParamsUseCoreProjectionPolicy();
     void projectionParamsRejectNonFiniteValues();
@@ -66,6 +67,7 @@ void CoreTypesTests::utcTimeCodecRoundTripsMicroseconds()
 
     QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(utcTime), 1'717'276'800'123'456LL);
     QCOMPARE(skygate::core::UtcTimeCodec::toEpochSecondsFloor(utcTime), 1'717'276'800LL);
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMillisecondsFloor(utcTime), 1'717'276'800'123LL);
     QCOMPARE(
         skygate::core::UtcTimeCodec::toEpochMicros(skygate::core::UtcTimeCodec::fromEpochSeconds(42)), 42'000'000LL
     );
@@ -77,6 +79,16 @@ void CoreTypesTests::utcTimeCodecFloorsNegativeEpochSeconds()
     const auto utcTime = skygate::core::UtcTimeCodec::fromEpochMicros(-1'234'001LL);
 
     QCOMPARE(skygate::core::UtcTimeCodec::toEpochSecondsFloor(utcTime), -2LL);
+}
+
+void CoreTypesTests::utcTimeCodecFloorsNegativeEpochMilliseconds()
+{
+    const auto utcTime = skygate::core::UtcTimeCodec::fromEpochMicros(-1'234'001LL);
+
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMillisecondsFloor(utcTime), -1'235LL);
+    QCOMPARE(
+        skygate::core::UtcTimeCodec::toEpochMillisecondsFloor(skygate::core::UtcTimeCodec::fromEpochSeconds(0)), 0LL
+    );
 }
 
 void CoreTypesTests::systemTimeSourceUsesMicrosecondStorage()

@@ -22,8 +22,11 @@ class SkyQtTimeCodecTests final : public QObject {
 
 private slots:
     void preservesMillisecondPrecision();
+    void floorsPreEpochMicrosecondsToMilliseconds();
     void parsesCivilComponents();
     void classifiesInvalidInput();
+    void parsesZonedWallTimeToUtc();
+    void classifiesInvalidZonedInput();
     void formatsBceEpochDateText();
     void formatsDateRangeWithoutDisplayName();
     void formatsDateRangeWithDisplayName();
@@ -38,6 +41,18 @@ void SkyQtTimeCodecTests::preservesMillisecondPrecision()
 
     QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(utcTime), utcDateTime.toMSecsSinceEpoch() * 1000);
     QCOMPARE(SkyQtTimeCodec::toQDateTimeUtc(utcTime), utcDateTime);
+}
+
+void SkyQtTimeCodecTests::floorsPreEpochMicrosecondsToMilliseconds()
+{
+    // 1.999 ms before the epoch floors to -2 ms rather than truncating towards zero.
+    const auto subMillisecond = skygate::core::UtcTimeCodec::fromEpochMicros(-1'999LL);
+    QCOMPARE(SkyQtTimeCodec::toQDateTimeUtc(subMillisecond), QDateTime::fromMSecsSinceEpoch(-2, QTimeZone::UTC));
+
+    const QDateTime bceDateTime(QDate(-44, 3, 15), QTime(12, 0, 0, 123), QTimeZone::UTC);
+    const auto bceUtcTime = SkyQtTimeCodec::toUtcTimePoint(bceDateTime);
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMillisecondsFloor(bceUtcTime), bceDateTime.toMSecsSinceEpoch());
+    QCOMPARE(SkyQtTimeCodec::toQDateTimeUtc(bceUtcTime), bceDateTime);
 }
 
 void SkyQtTimeCodecTests::parsesCivilComponents()
@@ -93,6 +108,50 @@ void SkyQtTimeCodecTests::classifiesInvalidInput()
         SkyQtTimeCodec::parseDateTime(QStringLiteral("2026-05-06"), QStringLiteral("09:30:30.500")).error,
         SkyQtTimeCodec::ParseError::InvalidTimeSyntax
     );
+}
+
+void SkyQtTimeCodecTests::parsesZonedWallTimeToUtc()
+{
+    const auto zurich = SkyQtTimeCodec::parseZonedDateTime(
+        QStringLiteral("2026-05-06"),
+        QStringLiteral("09:30:30"),
+        QTimeZone("Europe/Zurich"),
+        SkyQtTimeCodec::ErrorScope::LocalDisplay
+    );
+    QVERIFY(zurich.isValid());
+    QVERIFY(zurich.errorText.isEmpty());
+    QCOMPARE(*zurich.utcDateTime, QDateTime(QDate(2026, 5, 6), QTime(7, 30, 30), QTimeZone::UTC));
+
+    const auto utc = SkyQtTimeCodec::parseZonedDateTime(
+        QStringLiteral(" 0044-03-15 bc "), QStringLiteral(" 12:00:00 "), QTimeZone::UTC, SkyQtTimeCodec::ErrorScope::Utc
+    );
+    QVERIFY(utc.isValid());
+    QCOMPARE(*utc.utcDateTime, QDateTime(QDate(-44, 3, 15), QTime(12, 0, 0), QTimeZone::UTC));
+}
+
+void SkyQtTimeCodecTests::classifiesInvalidZonedInput()
+{
+    const auto dateSyntax = SkyQtTimeCodec::parseZonedDateTime(
+        QStringLiteral("2026-5-6"), QStringLiteral("09:30:30"), QTimeZone::UTC, SkyQtTimeCodec::ErrorScope::Utc
+    );
+    QVERIFY(!dateSyntax.isValid());
+    QVERIFY(!dateSyntax.utcDateTime.has_value());
+    QCOMPARE(dateSyntax.errorText, QStringLiteral("Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates."));
+
+    const auto calendarDate = SkyQtTimeCodec::parseZonedDateTime(
+        QStringLiteral("2026-02-30"),
+        QStringLiteral("09:30:30"),
+        QTimeZone("Europe/Zurich"),
+        SkyQtTimeCodec::ErrorScope::LocalDisplay
+    );
+    QVERIFY(!calendarDate.isValid());
+    QCOMPARE(calendarDate.errorText, QStringLiteral("Enter a valid date."));
+
+    const auto timeSyntax = SkyQtTimeCodec::parseZonedDateTime(
+        QStringLiteral("2026-05-06"), QStringLiteral("09:30"), QTimeZone::UTC, SkyQtTimeCodec::ErrorScope::Utc
+    );
+    QVERIFY(!timeSyntax.isValid());
+    QCOMPARE(timeSyntax.errorText, QStringLiteral("Use HH:mm:ss for the UTC time."));
 }
 
 void SkyQtTimeCodecTests::formatsBceEpochDateText()

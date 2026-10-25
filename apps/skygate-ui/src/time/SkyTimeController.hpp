@@ -35,7 +35,6 @@ public:
     [[nodiscard]] QString timeZoneDetailText() const;
     [[nodiscard]] QAbstractItemModel* timeZoneCatalogModel() const noexcept;
     [[nodiscard]] QDateTime utcDateTime() const;
-    [[nodiscard]] skygate::core::UtcTimePoint utcTimePoint() const;
 
     void setUtcDateTime(const QDateTime& utcDateTime);
     void setUtcTimePoint(const skygate::core::UtcTimePoint& utcTime);
@@ -46,8 +45,9 @@ public:
     Q_INVOKABLE bool setTimeZoneId(const QString& timeZoneId);
     Q_INVOKABLE void goLiveNow();
     [[nodiscard]] QString formatUtcTime(const skygate::core::UtcTimePoint& utcTime, bool includeSeconds = true) const;
-    [[nodiscard]] QString
-    formatUtcTimeRange(const skygate::core::UtcTimePoint& startUtc, const skygate::core::UtcTimePoint& endUtc) const;
+    [[nodiscard]] static QString formatUtcTimeInTimeZone(
+        const skygate::core::UtcTimePoint& utcTime, const QTimeZone& timeZone, bool includeSeconds = true
+    );
 
 signals:
     void dateTextChanged();
@@ -57,16 +57,7 @@ signals:
     void goLiveNowRequested();
 
 private:
-    struct ParseResult final {
-        QDateTime utcDateTime;
-        QString errorText;
-
-        [[nodiscard]] bool isValid() const noexcept;
-    };
-
-private:
     [[nodiscard]] QDateTime displayDateTime() const;
-    [[nodiscard]] ParseResult parseDisplayDateTime(const QString& dateText, const QString& timeText) const;
     [[nodiscard]] QString formattedDateText() const;
     [[nodiscard]] QString formattedTimeText() const;
     void emitDisplayTextChanges(const QString& previousDateText, const QString& previousTimeText);

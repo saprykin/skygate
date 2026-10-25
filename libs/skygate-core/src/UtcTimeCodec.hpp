@@ -12,6 +12,7 @@ public:
     [[nodiscard]] static std::int64_t toEpochMicros(const UtcTimePoint& utcTime) noexcept;
     [[nodiscard]] static UtcTimePoint fromEpochSeconds(std::int64_t epochSeconds) noexcept;
     [[nodiscard]] static std::int64_t toEpochSecondsFloor(const UtcTimePoint& utcTime) noexcept;
+    [[nodiscard]] static std::int64_t toEpochMillisecondsFloor(const UtcTimePoint& utcTime) noexcept;
     [[nodiscard]] static double secondsSinceEpochDouble(const UtcTimePoint& utcTime) noexcept;
 };
 

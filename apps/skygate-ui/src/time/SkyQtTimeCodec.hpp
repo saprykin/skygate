@@ -10,6 +10,8 @@
 #include <QString>
 #include <QTimeZone>
 
+#include <optional>
+
 class SkyQtTimeCodec final {
 public:
     enum class ParseError {
@@ -37,6 +39,16 @@ public:
         [[nodiscard]] QDateTime toQDateTime(const QTimeZone& timeZone) const;
     };
 
+    struct ZonedParseResult final {
+        std::optional<QDateTime> utcDateTime;  // Normalized to UTC; empty when the text is not a valid instant.
+        QString errorText;
+
+        [[nodiscard]] bool isValid() const noexcept
+        {
+            return utcDateTime.has_value() && errorText.isEmpty();
+        }
+    };
+
     [[nodiscard]] static QDateTime toQDateTimeUtc(const skygate::core::UtcTimePoint& utcTime);
     [[nodiscard]] static skygate::core::UtcTimePoint toUtcTimePoint(const QDateTime& utcDateTime);
     [[nodiscard]] static QString formatDateText(const QDate& date);
@@ -52,4 +64,7 @@ public:
     [[nodiscard]] static QString errorText(ParseError error, ErrorScope scope);
     [[nodiscard]] static QRegularExpression dateInputPattern();
     [[nodiscard]] static ParseResult parseDateTime(const QString& dateText, const QString& timeText);
+    // Parses date and time text as wall time in timeZone and returns the UTC instant.
+    [[nodiscard]] static ZonedParseResult
+    parseZonedDateTime(const QString& dateText, const QString& timeText, const QTimeZone& timeZone, ErrorScope scope);
 };

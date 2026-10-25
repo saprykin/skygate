@@ -6,6 +6,8 @@
 #include "time/SkyQtTimeCodec.hpp"
 #include "time/SkyTimeController.hpp"
 
+#include <QTimeZone>
+
 #include <chrono>
 #include <cmath>
 

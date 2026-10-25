@@ -96,11 +96,6 @@ QDateTime SkyTimeController::utcDateTime() const
     return SkyQtTimeCodec::toQDateTimeUtc(m_utcTime);
 }
 
-skygate::core::UtcTimePoint SkyTimeController::utcTimePoint() const
-{
-    return m_utcTime;
-}
-
 void SkyTimeController::setUtcDateTime(const QDateTime& utcDateTime)
 {
     const QDateTime nextUtc = utcDateTime.toUTC();
@@ -150,17 +145,19 @@ bool SkyTimeController::setInitialTimeZoneId(const QString& timeZoneId)
 
 QString SkyTimeController::validateDateTimeText(const QString& dateText, const QString& timeText) const
 {
-    return parseDisplayDateTime(dateText, timeText).errorText;
+    return SkyQtTimeCodec::parseZonedDateTime(dateText, timeText, m_timeZone, SkyQtTimeCodec::ErrorScope::LocalDisplay)
+        .errorText;
 }
 
 bool SkyTimeController::setDateTimeText(const QString& dateText, const QString& timeText)
 {
-    const ParseResult parseResult = parseDisplayDateTime(dateText, timeText);
+    const SkyQtTimeCodec::ZonedParseResult parseResult =
+        SkyQtTimeCodec::parseZonedDateTime(dateText, timeText, m_timeZone, SkyQtTimeCodec::ErrorScope::LocalDisplay);
     if (!parseResult.isValid()) {
         return false;
     }
 
-    emit utcDateTimeChangeRequested(parseResult.utcDateTime);
+    emit utcDateTimeChangeRequested(*parseResult.utcDateTime);
     return true;
 }
 
@@ -190,63 +187,22 @@ void SkyTimeController::goLiveNow()
 
 QString SkyTimeController::formatUtcTime(const skygate::core::UtcTimePoint& utcTime, const bool includeSeconds) const
 {
-    const QDateTime zonedDateTime = SkyQtTimeCodec::toQDateTimeUtc(utcTime).toTimeZone(m_timeZone);
+    return formatUtcTimeInTimeZone(utcTime, m_timeZone, includeSeconds);
+}
+
+QString SkyTimeController::formatUtcTimeInTimeZone(
+    const skygate::core::UtcTimePoint& utcTime, const QTimeZone& timeZone, const bool includeSeconds
+)
+{
+    const QDateTime zonedDateTime = SkyQtTimeCodec::toQDateTimeUtc(utcTime).toTimeZone(timeZone);
     const QString timeText = includeSeconds ? SkyQtTimeCodec::formatDateTimeText(zonedDateTime)
                                             : SkyQtTimeCodec::formatTimeText(zonedDateTime, false);
     return QString("%1 %2").arg(timeText, SkyQtTimeCodec::timeZoneLabel(zonedDateTime));
 }
 
-QString SkyTimeController::formatUtcTimeRange(
-    const skygate::core::UtcTimePoint& startUtc, const skygate::core::UtcTimePoint& endUtc
-) const
-{
-    const QDateTime startDateTime = SkyQtTimeCodec::toQDateTimeUtc(startUtc).toTimeZone(m_timeZone);
-    const QDateTime endDateTime = SkyQtTimeCodec::toQDateTimeUtc(endUtc).toTimeZone(m_timeZone);
-    const QString label = SkyQtTimeCodec::timeZoneLabel(startDateTime);
-    if (startDateTime.date() == endDateTime.date() && SkyQtTimeCodec::timeZoneLabel(endDateTime) == label) {
-        return QString("%1 %2 / %3 %4")
-            .arg(
-                SkyQtTimeCodec::formatDateText(startDateTime.date()),
-                SkyQtTimeCodec::formatTimeText(startDateTime),
-                SkyQtTimeCodec::formatTimeText(endDateTime),
-                label
-            );
-    }
-
-    return QString("%1 / %2").arg(formatUtcTime(startUtc), formatUtcTime(endUtc));
-}
-
-bool SkyTimeController::ParseResult::isValid() const noexcept
-{
-    return utcDateTime.isValid() && errorText.isEmpty();
-}
-
 QDateTime SkyTimeController::displayDateTime() const
 {
     return utcDateTime().toTimeZone(m_timeZone);
-}
-
-SkyTimeController::ParseResult
-SkyTimeController::parseDisplayDateTime(const QString& dateText, const QString& timeText) const
-{
-    const SkyQtTimeCodec::ParseResult parsed = SkyQtTimeCodec::parseDateTime(dateText, timeText);
-    if (parsed.error != SkyQtTimeCodec::ParseError::None) {
-        return {
-            .utcDateTime = {},
-            .errorText = SkyQtTimeCodec::errorText(parsed.error, SkyQtTimeCodec::ErrorScope::LocalDisplay),
-        };
-    }
-
-    const QDateTime zonedDateTime = parsed.toQDateTime(m_timeZone);
-    if (!zonedDateTime.isValid()) {
-        return {
-            .utcDateTime = {},
-            .errorText =
-                SkyQtTimeCodec::errorText(SkyQtTimeCodec::ParseError::None, SkyQtTimeCodec::ErrorScope::LocalDisplay),
-        };
-    }
-
-    return {.utcDateTime = zonedDateTime.toUTC(), .errorText = {}};
 }
 
 QString SkyTimeController::formattedDateText() const
