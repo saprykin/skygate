@@ -7,8 +7,6 @@
 
 #include "UtcTimePoint.hpp"
 
-#include <optional>
-
 class QAbstractItemModel;
 class TimeZoneCatalogModel;
 

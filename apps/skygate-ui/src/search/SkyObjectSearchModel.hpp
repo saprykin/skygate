@@ -1,10 +1,6 @@
 #pragma once
 
 #include "BaseCelestialBody.hpp"
-#include "CelestialBodyState.hpp"
-#include "DistantCelestialBody.hpp"
-#include "EphemerisSnapshot.hpp"
-#include "OwnGalaxyCelestialBody.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QAbstractListModel>

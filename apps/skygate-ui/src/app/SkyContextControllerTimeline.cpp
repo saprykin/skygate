@@ -21,11 +21,6 @@ constexpr double kWheelZoomStepScale = 0.90;
 
 }  // namespace
 
-QDateTime SkyContextController::currentUtcDateTime() const
-{
-    return SkyQtTimeCodec::toQDateTimeUtc(currentUtcTime());
-}
-
 skygate::core::UtcTimePoint SkyContextController::currentUtcTime() const
 {
     return m_timeSource->nowUtc();

@@ -5,7 +5,6 @@
 
 #include <QLoggingCategory>
 #include <QSettings>
-#include <QString>
 
 #include <optional>
 

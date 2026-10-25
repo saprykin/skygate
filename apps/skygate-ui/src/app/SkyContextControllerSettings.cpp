@@ -9,9 +9,6 @@
 #include "theme/SkyOverlayLayerSettings.hpp"
 #include "time/SkyTimeController.hpp"
 
-#include <QDateTime>
-#include <QTimeZone>
-
 using namespace skygate::ui::internal;
 
 bool SkyContextController::saveSettings() const

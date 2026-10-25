@@ -5,7 +5,6 @@
 
 #include <QLoggingCategory>
 #include <QSettings>
-#include <QString>
 
 namespace skygate::ui::internal {
 namespace {

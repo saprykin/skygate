@@ -1,6 +1,5 @@
 #pragma once
 
-#include "EphemerisSnapshot.hpp"
 #include "GeoLocation.hpp"
 #include "ObservationContext.hpp"
 #include "ProjectionType.hpp"
@@ -34,7 +33,6 @@
 #include <memory>
 #include <optional>
 #include <span>
-#include <utility>
 #include <vector>
 
 namespace skygate::ephemeris {
@@ -478,7 +476,6 @@ signals:
     void skyContextChanged();
 
 private:
-    [[nodiscard]] QDateTime currentUtcDateTime() const;
     [[nodiscard]] skygate::core::UtcTimePoint currentUtcTime() const;
     [[nodiscard]] bool liveRecomputeThrottleApplies() const;
     [[nodiscard]] bool liveRecomputeThrottled(const skygate::core::UtcTimePoint& nextUtc) const;

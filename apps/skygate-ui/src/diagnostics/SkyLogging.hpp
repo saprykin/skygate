@@ -2,7 +2,6 @@
 
 #include "SkyLoggingConfiguration.hpp"
 
-#include <QMetaType>
 #include <QString>
 #include <QtGlobal>
 
