@@ -1,13 +1,13 @@
 #include "SkyContextController.hpp"
-
-#include "SkyCatalogManager.hpp"
-#include "SkyContextControllerSupport.hpp"
-#include "SkyOverlayLayerSettings.hpp"
-#include "SkySettingsStore.hpp"
-#include "SkyTimeController.hpp"
-
-#include <QDateTime>
-#include <QTimeZone>
+#include "SkyContextLocationSource.hpp"
+#include "SkyContextLocationSourceCodec.hpp"
+#include "UtcTimeCodec.hpp"
+#include "catalog/SkyCatalogManager.hpp"
+#include "ephemeris/SkyEphemerisDataManager.hpp"
+#include "ephemeris/SkyEphemerisSettingsPolicy.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "theme/SkyOverlayLayerSettings.hpp"
+#include "time/SkyTimeController.hpp"
 
 using namespace skygate::ui::internal;
 
@@ -17,7 +17,7 @@ bool SkyContextController::saveSettings() const
         return false;
     }
 
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.live = m_timeline.live();
     snapshot.timelineToolbarCollapsed = m_timeline.toolbarCollapsed();
     snapshot.searchToolbarCollapsed = m_search.toolbarCollapsed();
@@ -27,8 +27,7 @@ bool SkyContextController::saveSettings() const
     snapshot.viewCenterAltitudeDeg = m_view.centerAltitudeDeg();
     snapshot.viewCenterAzimuthDeg = m_view.centerAzimuthDeg();
     snapshot.viewFieldOfViewDeg = m_view.fieldOfViewDeg();
-    snapshot.utcEpochSeconds =
-        SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()).toSecsSinceEpoch();
+    snapshot.utcEpochMicros = static_cast<qint64>(skygate::core::UtcTimeCodec::toEpochMicros(m_location.utcTime()));
     snapshot.latitudeDeg = m_location.observer().latitudeDeg;
     snapshot.longitudeDeg = m_location.observer().longitudeDeg;
     snapshot.elevationMeters = m_location.observer().elevationMeters;
@@ -45,33 +44,30 @@ bool SkyContextController::saveSettings() const
     snapshot.logToTerminal = logToTerminal();
     snapshot.logToFile = logToFile();
     snapshot.logFilePath = logFilePath();
+    snapshot.ephemeris = SkyEphemerisSettingsPolicy::userSettingsFromEngine(
+        m_ephemerisUserSettings, m_ephemerisSession->engineKind(), m_ephemerisSession->engineOptions()
+    );
+    snapshot.ephemerisSettingsPresent = true;
     return m_settingsStore->saveState(snapshot);
 }
 
 bool SkyContextController::loadSettings()
 {
-    const auto stateSnapshot = m_settingsStore != nullptr
-        ? m_settingsStore->loadState()
-        : std::optional<SkySettingsStore::StateSnapshot> {};
+    const auto stateSnapshot =
+        m_settingsStore != nullptr ? m_settingsStore->loadState() : std::optional<SkyPersistedStateSnapshot>{};
     if (stateSnapshot.has_value()) {
         setTimelineToolbarCollapsed(stateSnapshot->timelineToolbarCollapsed);
         setSearchToolbarCollapsed(stateSnapshot->searchToolbarCollapsed);
         setSpeedMultiplier(stateSnapshot->speedMultiplier);
         setStepSeconds(stateSnapshot->stepSeconds);
         setMagnitudeCutoff(stateSnapshot->magnitudeCutoff);
-        setViewCenter(
-            stateSnapshot->viewCenterAltitudeDeg,
-            stateSnapshot->viewCenterAzimuthDeg
-        );
+        setViewCenter(stateSnapshot->viewCenterAltitudeDeg, stateSnapshot->viewCenterAzimuthDeg);
         setViewFieldOfViewDeg(stateSnapshot->viewFieldOfViewDeg);
         if (stateSnapshot->live) {
             goLiveNow();
         } else {
             setLive(false);
-            setCurrentUtc(QDateTime::fromSecsSinceEpoch(
-                stateSnapshot->utcEpochSeconds,
-                QTimeZone::UTC
-            ));
+            setCurrentUtcTime(skygate::core::UtcTimeCodec::fromEpochMicros(stateSnapshot->utcEpochMicros));
         }
 
         skygate::core::GeoLocation observer = m_location.observer();
@@ -82,20 +78,15 @@ bool SkyContextController::loadSettings()
             applyObserverLocation(observer);
         }
 
-        const auto parsedLocationSource = SkyContextLocationSourceCodec::fromString(
-            stateSnapshot->locationSourceText
-        );
+        const auto parsedLocationSource = SkyContextLocationSourceCodec::fromString(stateSnapshot->locationSourceText);
         SkyContextLocationSource locationSource = parsedLocationSource.has_value()
-            ? parsedLocationSource.value()
-            : SkyContextLocationSourceCodec::defaultSource();
+                                                      ? parsedLocationSource.value()
+                                                      : SkyContextLocationSourceCodec::defaultSource();
         if (!SkyContextLocationSourceCodec::isAvailable(locationSource)) {
             locationSource = SkyContextLocationSource::Custom;
         }
 
-        if (
-            locationSource == SkyContextLocationSource::City
-            && !applySelectedCityId(stateSnapshot->selectedCityId)
-        ) {
+        if (locationSource == SkyContextLocationSource::City && !applySelectedCityId(stateSnapshot->selectedCityId)) {
             setLocationSource(SkyContextLocationSource::Custom);
         } else {
             setLocationSource(locationSource);
@@ -114,20 +105,17 @@ bool SkyContextController::loadSettings()
         setLogToTerminal(stateSnapshot->logToTerminal);
         setLogToFile(stateSnapshot->logToFile);
         setLogFilePath(stateSnapshot->logFilePath);
+
+        if (stateSnapshot->ephemerisSettingsPresent) {
+            applyEphemerisUserSettings(stateSnapshot->ephemeris);
+        }
     }
 
     if (m_catalogManager != nullptr) {
         m_catalogManager->restoreCatalogCache();
     }
+    if (m_ephemerisDataManager != nullptr) {
+        static_cast<void>(m_ephemerisDataManager->restoreFromSettings());
+    }
     return stateSnapshot.has_value();
-}
-
-bool SkyContextController::clearCatalogCache()
-{
-    return m_catalogManager != nullptr && m_catalogManager->clearCatalogCache();
-}
-
-bool SkyContextController::clearDeepSkyCatalogCache()
-{
-    return m_catalogManager != nullptr && m_catalogManager->clearDeepSkyCatalogCache();
 }

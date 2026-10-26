@@ -1,0 +1,322 @@
+#include "SimpleEphemerisEngine.hpp"
+#include "EphemerisRequestFactory.hpp"
+#include "StringUtilities.hpp"
+#include "reference/EquatorialToHorizontalCalculator.hpp"
+#include "reference/SimpleBodyStateCalculator.hpp"
+
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string_view>
+#include <vector>
+
+namespace skygate::ephemeris {
+namespace {
+
+constexpr std::string_view kSimpleDataSourceProvenance = "Simple ephemeris engine";
+constexpr std::string_view kSimpleEngineName = "Simple ephemeris engine";
+constexpr std::string_view kSimpleDataSetId = "simple";
+constexpr std::string_view kSimpleDataSetVersion = "built-in";
+
+[[nodiscard]] EphemerisCorrectionFlags requestedCorrectionTerms(const EphemerisEngineOptions& options) noexcept
+{
+    return options.correctionFlags().without(EphemerisCorrectionFlags::geometric());
+}
+
+void markUnsupportedSimpleOptions(CelestialBodyState& state, const EphemerisEngineOptions& options) noexcept
+{
+    const EphemerisCorrectionFlags requested = options.correctionFlags();
+    const EphemerisCorrectionFlags correctionTerms = requestedCorrectionTerms(options);
+    if (!correctionTerms.hasCorrections()) {
+        state.metadata.appliedCorrections = requested == EphemerisCorrectionFlags::geometric()
+                                                ? EphemerisCorrectionFlags::geometric()
+                                                : EphemerisCorrectionFlags::noCorrections();
+        state.metadata.finalizeCorrectionTracking(requested);
+        return;
+    }
+
+    if (state.metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+        state.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
+    }
+    state.metadata.appliedCorrections = requested.has(EphemerisCorrectionFlags::geometric())
+                                            ? EphemerisCorrectionFlags::geometric()
+                                            : EphemerisCorrectionFlags::noCorrections();
+    state.metadata.addUnavailableCorrection(correctionTerms);
+    state.metadata.finalizeCorrectionTracking(requested);
+}
+
+void markUnsupportedSimpleOptions(EphemerisSnapshot& snapshot, const EphemerisEngineOptions& options) noexcept
+{
+    for (CelestialBodyState& state : snapshot.states) {
+        markUnsupportedSimpleOptions(state, options);
+    }
+}
+
+[[nodiscard]] EphemerisEngineOptions
+simpleEngineOptionsFromRequest(const EphemerisEngineOptions& requestOptions) noexcept
+{
+    EphemerisEngineOptions engineOptions = requestOptions;
+    engineOptions.setEngineKind(EphemerisEngineKind::Type::Simple);
+    return engineOptions;
+}
+
+[[nodiscard]] bool hasUnsupportedExplicitEpoch(const EphemerisRequest& request) noexcept
+{
+    return request.epoch.hasExplicit() && request.epoch.timeScale != skygate::core::TimeScale::Utc;
+}
+
+// A zero/default epoch means "no explicit epoch" and must remain a context-only
+// request. A non-finite Julian date part is an invalid explicit epoch rather
+// than an absent one, so it is rejected instead of falling back to context time.
+[[nodiscard]] std::optional<EphemerisEngineWarning::Code>
+unsupportedEpochWarningCode(const EphemerisRequest& request) noexcept
+{
+    if (!request.epoch.isFinite()) {
+        return EphemerisEngineWarning::Code::InvalidExplicitEpoch;
+    }
+    if (hasUnsupportedExplicitEpoch(request)) {
+        return EphemerisEngineWarning::Code::UnsupportedTimeScaleConversion;
+    }
+    return std::nullopt;
+}
+
+// Starting point shared by every state this engine reports: the body index,
+// unset coordinates, and the simple-engine provenance. Callers either fill in
+// the computed coordinates or keep the unset values for unsupported cases.
+[[nodiscard]] CelestialBodyState makeSimpleBodyState(const std::size_t bodyIndex) noexcept
+{
+    const double notAvailable = std::numeric_limits<double>::quiet_NaN();
+
+    CelestialBodyState state;
+    state.bodyIndex = static_cast<std::uint32_t>(bodyIndex);
+    state.equatorial.rightAscensionHours = notAvailable;
+    state.equatorial.declinationDeg = notAvailable;
+    state.horizontal.altitudeDeg = notAvailable;
+    state.horizontal.azimuthDeg = notAvailable;
+    state.metadata.dataSourceProvenance = kSimpleDataSourceProvenance;
+    return state;
+}
+
+[[nodiscard]] CelestialBodyState
+makeUnsupportedEpochState(const std::size_t bodyIndex, const EphemerisEngineWarning::Code warningCode) noexcept
+{
+    CelestialBodyState state = makeSimpleBodyState(bodyIndex);
+    state.metadata.status = EphemerisEngineQueryStatus::Type::Unsupported;
+    state.metadata.addWarning(warningCode);
+    return state;
+}
+
+[[nodiscard]] EphemerisSnapshot makeUnsupportedEpochSnapshot(
+    const EphemerisRequest& request,
+    const std::shared_ptr<const CelestialBodyCatalog>& catalog,
+    const EphemerisEngineWarning::Code warningCode
+) noexcept
+{
+    EphemerisSnapshot snapshot;
+    snapshot.context = request.context;
+    snapshot.catalogBodies = catalog;
+    snapshot.states.reserve(catalog->size());
+    for (std::size_t bodyIndex = 0; bodyIndex < catalog->size(); ++bodyIndex) {
+        snapshot.states.push_back(makeUnsupportedEpochState(bodyIndex, warningCode));
+    }
+    return snapshot;
+}
+
+}  // namespace
+
+SimpleEphemerisEngine::SimpleEphemerisEngine(const CelestialBodyCatalog& catalog, EphemerisEngineOptions engineOptions)
+    : m_catalog(std::make_shared<CelestialBodyCatalog>(catalog)),
+      m_options(simpleEngineOptionsFromRequest(engineOptions))
+{
+}
+
+EphemerisEngineKind::Type SimpleEphemerisEngine::kind() const noexcept
+{
+    return EphemerisEngineKind::Type::Simple;
+}
+
+std::string_view SimpleEphemerisEngine::name() const noexcept
+{
+    return kSimpleEngineName;
+}
+
+EphemerisCapabilities SimpleEphemerisEngine::capabilities() const noexcept
+{
+    return EphemerisCapabilities::simpleEngine();
+}
+
+EphemerisEngineTraits SimpleEphemerisEngine::traits() const noexcept
+{
+    return EphemerisEngineTraits::noTraits();
+}
+
+std::span<const EphemerisDateRange> SimpleEphemerisEngine::supportedDateRanges() const noexcept
+{
+    return {};
+}
+
+EphemerisDatasetInfo SimpleEphemerisEngine::dataSetInfo() const
+{
+    EphemerisDatasetInfo info;
+    info.id = kSimpleDataSetId;
+    info.displayName = kSimpleEngineName;
+    info.version = kSimpleDataSetVersion;
+    info.provenance = kSimpleDataSourceProvenance;
+    return info;
+}
+
+EphemerisEngineOptions SimpleEphemerisEngine::options() const noexcept
+{
+    return m_options;
+}
+
+EphemerisSnapshot SimpleEphemerisEngine::compute(const EphemerisRequest& request) const
+{
+    if (const auto warningCode = unsupportedEpochWarningCode(request)) {
+        return makeUnsupportedEpochSnapshot(request, m_catalog, *warningCode);
+    }
+
+    EphemerisSnapshot snapshot = computeSnapshot(EphemerisRequestFactory::contextFromRequest(request));
+    markUnsupportedSimpleOptions(snapshot, request.options);
+    return snapshot;
+}
+
+std::optional<CelestialBodyState>
+SimpleEphemerisEngine::computeBodyState(const EphemerisRequest& request, const std::string_view bodyId) const
+{
+    if (const auto warningCode = unsupportedEpochWarningCode(request)) {
+        for (std::size_t bodyIndex = 0; bodyIndex < m_catalog->size(); ++bodyIndex) {
+            const BaseCelestialBody& body = m_catalog->bodyAt(bodyIndex);
+            if (StringUtilities::equalsIgnoreAsciiCase(body.id, bodyId)) {
+                return makeUnsupportedEpochState(bodyIndex, *warningCode);
+            }
+        }
+        return std::nullopt;
+    }
+
+    std::optional<CelestialBodyState> state =
+        computeBodyStateById(EphemerisRequestFactory::contextFromRequest(request), bodyId);
+    if (state.has_value()) {
+        markUnsupportedSimpleOptions(*state, request.options);
+    }
+    return state;
+}
+
+std::optional<CelestialBodyState>
+SimpleEphemerisEngine::computeBodyState(const EphemerisRequest& request, const std::size_t bodyIndex) const
+{
+    if (bodyIndex >= m_catalog->size()) {
+        return std::nullopt;
+    }
+
+    if (const auto warningCode = unsupportedEpochWarningCode(request)) {
+        return makeUnsupportedEpochState(bodyIndex, *warningCode);
+    }
+
+    CelestialBodyState state = computeStateForBody(
+        m_catalog->bodyAt(bodyIndex), bodyIndex, EphemerisRequestFactory::contextFromRequest(request)
+    );
+    markUnsupportedSimpleOptions(state, request.options);
+    return state;
+}
+
+EphemerisSnapshot SimpleEphemerisEngine::compute(const skygate::core::ObservationContext& context) const
+{
+    EphemerisSnapshot snapshot = computeSnapshot(context);
+    markUnsupportedSimpleOptions(snapshot, options());
+    return snapshot;
+}
+
+std::optional<CelestialBodyState> SimpleEphemerisEngine::computeBodyState(
+    const skygate::core::ObservationContext& context, const std::string_view bodyId
+) const
+{
+    std::optional<CelestialBodyState> state = computeBodyStateById(context, bodyId);
+    if (state.has_value()) {
+        markUnsupportedSimpleOptions(*state, options());
+    }
+    return state;
+}
+
+std::optional<CelestialBodyState> SimpleEphemerisEngine::computeBodyState(
+    const skygate::core::ObservationContext& context, const std::size_t bodyIndex
+) const
+{
+    if (bodyIndex >= m_catalog->size()) {
+        return std::nullopt;
+    }
+
+    CelestialBodyState state = computeStateForBody(m_catalog->bodyAt(bodyIndex), bodyIndex, context);
+    markUnsupportedSimpleOptions(state, options());
+    return state;
+}
+
+EphemerisSnapshot SimpleEphemerisEngine::computeSnapshot(const skygate::core::ObservationContext& context) const
+{
+    EphemerisSnapshot snapshot;
+    snapshot.context = context;
+    snapshot.catalogBodies = m_catalog;
+
+    snapshot.states.reserve(m_catalog->size());
+    for (std::size_t bodyIndex = 0; bodyIndex < m_catalog->size(); ++bodyIndex) {
+        const BaseCelestialBody& body = m_catalog->bodyAt(bodyIndex);
+        snapshot.states.push_back(computeStateForBody(body, bodyIndex, context));
+    }
+
+    return snapshot;
+}
+
+std::optional<CelestialBodyState> SimpleEphemerisEngine::computeBodyStateById(
+    const skygate::core::ObservationContext& context, const std::string_view bodyId
+) const
+{
+    if (bodyId.empty()) {
+        return std::nullopt;
+    }
+
+    for (std::size_t bodyIndex = 0; bodyIndex < m_catalog->size(); ++bodyIndex) {
+        const BaseCelestialBody& body = m_catalog->bodyAt(bodyIndex);
+        if (StringUtilities::equalsIgnoreAsciiCase(body.id, bodyId)) {
+            return computeStateForBody(body, bodyIndex, context);
+        }
+    }
+
+    return std::nullopt;
+}
+
+CelestialBodyState SimpleEphemerisEngine::computeStateForBody(
+    const BaseCelestialBody& body, const std::size_t bodyIndex, const skygate::core::ObservationContext& context
+)
+{
+    CelestialBodyState state = makeSimpleBodyState(bodyIndex);
+
+    SimpleBodyStateCalculator bodyStateCalculator;
+    if (const auto equatorial = bodyStateCalculator.computeEquatorial(body, context.utcTime); equatorial.has_value()) {
+        state.equatorial = *equatorial;
+        if (context.observer.isValid()) {
+            state.horizontal =
+                EquatorialToHorizontalCalculator::compute(*equatorial, context.observer, context.utcTime);
+        } else {
+            state.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
+            state.metadata.addWarning(EphemerisEngineWarning::Code::MissingObserver);
+        }
+    } else {
+        state.metadata.status = EphemerisEngineQueryStatus::Type::Unsupported;
+        state.metadata.addWarning(EphemerisEngineWarning::Code::UnsupportedBody);
+    }
+
+    return state;
+}
+
+EphemerisEngineOptions SimpleEphemerisEngine::defaultOptions() noexcept
+{
+    EphemerisEngineOptions engineOptions;
+    engineOptions.setEngineKind(EphemerisEngineKind::Type::Simple);
+    engineOptions.setCorrectionFlags(EphemerisCorrectionFlags::noCorrections());
+    engineOptions.setEnableAtmosphericRefraction(false);
+    return engineOptions;
+}
+
+}  // namespace skygate::ephemeris

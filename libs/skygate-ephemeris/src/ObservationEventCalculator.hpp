@@ -1,0 +1,51 @@
+#pragma once
+
+#include "ObservationEventSearch.hpp"
+#include "ObservationEventSummary.hpp"
+#include "engine/IEphemerisGuidanceStrategy.hpp"
+
+#include <cstdint>
+#include <memory>
+
+namespace skygate::ephemeris {
+
+class BaseCelestialBody;
+struct EphemerisRequest;
+class IEphemerisEngine;
+
+class ObservationEventCalculator final {
+public:
+    /// Constructs a calculator with the supplied guidance strategy. Passing
+    /// nullptr is equivalent to no guidance and also falls back to direct
+    /// sampling.
+    explicit ObservationEventCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy);
+
+    /// Search-mode semantics for event computation:
+    /// - Guided: guidance samples are refined against the primary engine,
+    ///   except that a fixed body with corrections may be trusted directly when
+    ///   the engine grants `trustsGuidedSearchResult`.
+    /// - GuidedApproximate: the guidance answer may be returned directly only
+    ///   when the engine grants `trustsGuidedSearchResult`; otherwise it is
+    ///   refined like Guided.
+    enum class SearchMode : std::uint8_t {
+        Guided,
+        GuidedApproximate
+    };
+
+    [[nodiscard]] ObservationEventSummary compute(
+        const IEphemerisEngine& ephemerisEngine,
+        const EphemerisRequest& request,
+        std::uint32_t bodyIndex,
+        const BaseCelestialBody* body,
+        double crossingAltitudeDeg,
+        SearchMode searchMode
+    ) const;
+
+    // Longest search window used when a crossing event is not found earlier.
+    static constexpr int kSearchHorizonHours = ObservationEventSearch::kSearchHorizonHours;
+
+private:
+    std::shared_ptr<IEphemerisGuidanceStrategy> m_guidanceStrategy;
+};
+
+}  // namespace skygate::ephemeris

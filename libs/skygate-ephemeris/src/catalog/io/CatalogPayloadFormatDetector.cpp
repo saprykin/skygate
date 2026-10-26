@@ -1,99 +1,37 @@
-#include "catalog/io/CatalogPayloadFormatDetector.hpp"
+#include "CatalogPayloadFormatDetector.hpp"
+#include "CatalogHeaderPolicy.hpp"
+#include "catalog/CatalogSchemaRegistry.hpp"
 
-#include "StringUtilities.hpp"
+#include <QHash>
+#include <QString>
 
-#include <cstddef>
+#include <string_view>
 
 namespace skygate::ephemeris {
-namespace {
 
-std::string_view firstNonEmptyLine(std::string_view payload)
+CatalogSourceType CatalogPayloadFormatDetector::detect(const std::string_view payload) noexcept
 {
-    std::size_t cursor = 0;
-    while (cursor < payload.size()) {
-        const std::size_t newline = payload.find('\n', cursor);
-        const std::size_t lineEnd = newline == std::string_view::npos ? payload.size() : newline;
-        const std::string_view line = strings::trimAsciiWhitespace(payload.substr(cursor, lineEnd - cursor));
-        if (!line.empty() && line.front() != '#') {
-            return line;
-        }
-
-        if (newline == std::string_view::npos) {
-            break;
-        }
-        cursor = newline + 1;
-    }
-
-    return {};
-}
-
-bool hasGzipSignature(const std::string_view payload) noexcept
-{
-    if (payload.size() < 2U) {
-        return false;
-    }
-
-    const auto firstByte = static_cast<unsigned char>(payload[0]);
-    const auto secondByte = static_cast<unsigned char>(payload[1]);
-    return firstByte == 0x1fU && secondByte == 0x8bU;
-}
-
-bool hasZipSignature(const std::string_view payload) noexcept
-{
-    if (payload.size() < 4U) {
-        return false;
-    }
-
-    const auto firstByte = static_cast<unsigned char>(payload[0]);
-    const auto secondByte = static_cast<unsigned char>(payload[1]);
-    const auto thirdByte = static_cast<unsigned char>(payload[2]);
-    const auto fourthByte = static_cast<unsigned char>(payload[3]);
-    return firstByte == 0x50U
-        && secondByte == 0x4bU
-        && (
-            (thirdByte == 0x03U && fourthByte == 0x04U)
-            || (thirdByte == 0x05U && fourthByte == 0x06U)
-            || (thirdByte == 0x07U && fourthByte == 0x08U)
-        );
-}
-
-}  // namespace
-
-CatalogPayloadFormat CatalogPayloadFormatDetector::detect(const std::string_view payload) noexcept
-{
-    if (hasGzipSignature(payload)) {
-        return CatalogPayloadFormat::HygCsvGzip;
-    }
-
-    if (hasZipSignature(payload)) {
-        return CatalogPayloadFormat::HygCsvZip;
-    }
-
-    const std::string_view headerLine = firstNonEmptyLine(payload);
+    std::string_view remaining = payload;
+    const std::string_view headerLine = CatalogHeaderPolicy::findHeaderLine(remaining);
     if (headerLine.empty()) {
-        return CatalogPayloadFormat::Unknown;
+        return CatalogSourceType::Unknown;
     }
 
-    if (
-        headerLine.find(',') != std::string_view::npos
-        && strings::containsIgnoreAsciiCase(headerLine, "ra")
-        && strings::containsIgnoreAsciiCase(headerLine, "dec")
-        && strings::containsIgnoreAsciiCase(headerLine, "mag")
-    ) {
-        return CatalogPayloadFormat::HygCsv;
+    // Schemas without required header columns (for example the bundled data)
+    // cannot be identified by their header and are skipped here.
+    for (const CatalogSchemaDescriptor& descriptor : CatalogSchemaRegistry::descriptors()) {
+        if (descriptor.requiredColumns.empty()) {
+            continue;
+        }
+
+        const QHash<QString, qsizetype> header =
+            CatalogHeaderPolicy::decodeHeaderLine(headerLine, descriptor.delimiter);
+        if (CatalogHeaderPolicy::hasRequiredColumns(header, descriptor.requiredColumns)) {
+            return descriptor.type;
+        }
     }
 
-    if (
-        headerLine.find(';') != std::string_view::npos
-        && strings::containsIgnoreAsciiCase(headerLine, "Name")
-        && strings::containsIgnoreAsciiCase(headerLine, "Type")
-        && strings::containsIgnoreAsciiCase(headerLine, "RA")
-        && strings::containsIgnoreAsciiCase(headerLine, "Dec")
-    ) {
-        return CatalogPayloadFormat::OpenNgcCsv;
-    }
-
-    return CatalogPayloadFormat::Unknown;
+    return CatalogSourceType::Unknown;
 }
 
 }  // namespace skygate::ephemeris

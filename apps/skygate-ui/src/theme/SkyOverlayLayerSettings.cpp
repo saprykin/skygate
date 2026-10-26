@@ -1,9 +1,6 @@
 #include "SkyOverlayLayerSettings.hpp"
 
-SkyOverlayLayerSettings::SkyOverlayLayerSettings(QObject* parent)
-    : QObject(parent)
-{
-}
+SkyOverlayLayerSettings::SkyOverlayLayerSettings(QObject* parent) : QObject(parent) {}
 
 bool SkyOverlayLayerSettings::horizon() const noexcept
 {

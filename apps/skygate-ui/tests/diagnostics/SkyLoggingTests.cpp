@@ -1,12 +1,12 @@
-#include <QtTest>
-
-#include "SettingsTestFixture.hpp"
-#include "SkyLogging.hpp"
+#include "diagnostics/SkyLogging.hpp"
+#include "diagnostics/SkyLoggingConfiguration.hpp"
+#include "support/SettingsTestFixture.hpp"
 
 #include <QDir>
 #include <QFile>
 #include <QLoggingCategory>
 #include <QRegularExpression>
+#include <QtTest>
 
 #include <thread>
 #include <vector>
@@ -22,6 +22,7 @@ private slots:
     void cleanup();
     void defaultConfigurationUsesTerminalOnly();
     void parsesLevelText();
+    void parsesOutputText();
     void writesFileOnlyLogs();
     void infoFileThresholdIncludesWarningsAndErrors();
     void respectsDisabledOutputs();
@@ -81,8 +82,7 @@ QString SkyLoggingTests::readText(const QString& path) const
 
 skygate::ui::SkyLoggingConfiguration SkyLoggingTests::fileOnlyConfig(const QString& path) const
 {
-    skygate::ui::SkyLoggingConfiguration configuration =
-        skygate::ui::SkyLogging::defaultConfiguration();
+    skygate::ui::SkyLoggingConfiguration configuration = skygate::ui::SkyLogging::defaultConfiguration();
     configuration.logToTerminal = false;
     configuration.logToFile = true;
     configuration.logFilePath = path;
@@ -93,8 +93,7 @@ skygate::ui::SkyLoggingConfiguration SkyLoggingTests::fileOnlyConfig(const QStri
 
 void SkyLoggingTests::defaultConfigurationUsesTerminalOnly()
 {
-    const skygate::ui::SkyLoggingConfiguration configuration =
-        skygate::ui::SkyLogging::defaultConfiguration();
+    const skygate::ui::SkyLoggingConfiguration configuration = skygate::ui::SkyLogging::defaultConfiguration();
     QVERIFY(configuration.logToTerminal);
     QVERIFY(!configuration.logToFile);
     QVERIFY(!configuration.logFilePath.isEmpty());
@@ -107,17 +106,51 @@ void SkyLoggingTests::parsesLevelText()
     QCOMPARE(*skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("debug")), QtDebugMsg);
     QCOMPARE(*skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("INFO")), QtInfoMsg);
     QCOMPARE(*skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("warn")), QtWarningMsg);
-    QCOMPARE(
-        *skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("warning")),
-        QtWarningMsg
-    );
+    QCOMPARE(*skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("warning")), QtWarningMsg);
     QCOMPARE(*skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("error")), QtCriticalMsg);
-    QCOMPARE(
-        *skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("critical")),
-        QtCriticalMsg
-    );
+    QCOMPARE(*skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("critical")), QtCriticalMsg);
     QCOMPARE(*skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("fatal")), QtFatalMsg);
     QVERIFY(!skygate::ui::SkyLogging::messageTypeFromLevelText(QStringLiteral("verbose")).has_value());
+}
+
+void SkyLoggingTests::parsesOutputText()
+{
+    skygate::ui::SkyLoggingConfiguration configuration = skygate::ui::SkyLogging::defaultConfiguration();
+
+    const auto terminal = skygate::ui::SkyLogging::outputFromText(QStringLiteral(" Terminal "));
+    QVERIFY(terminal.has_value());
+    QVERIFY(*terminal == skygate::ui::SkyLogging::Output::Terminal);
+    skygate::ui::SkyLogging::applyOutput(configuration, *terminal);
+    QVERIFY(configuration.logToTerminal);
+    QVERIFY(!configuration.logToFile);
+    QCOMPARE(skygate::ui::SkyLogging::outputSummary(configuration), QStringLiteral("terminal"));
+
+    const auto file = skygate::ui::SkyLogging::outputFromText(QStringLiteral("FILE"));
+    QVERIFY(file.has_value());
+    QVERIFY(*file == skygate::ui::SkyLogging::Output::File);
+    skygate::ui::SkyLogging::applyOutput(configuration, *file);
+    QVERIFY(!configuration.logToTerminal);
+    QVERIFY(configuration.logToFile);
+    QCOMPARE(skygate::ui::SkyLogging::outputSummary(configuration), QStringLiteral("file"));
+
+    const auto both = skygate::ui::SkyLogging::outputFromText(QStringLiteral("both"));
+    QVERIFY(both.has_value());
+    QVERIFY(*both == skygate::ui::SkyLogging::Output::Both);
+    skygate::ui::SkyLogging::applyOutput(configuration, *both);
+    QVERIFY(configuration.logToTerminal);
+    QVERIFY(configuration.logToFile);
+    QCOMPARE(skygate::ui::SkyLogging::outputSummary(configuration), QStringLiteral("both"));
+
+    const auto none = skygate::ui::SkyLogging::outputFromText(QStringLiteral("none"));
+    QVERIFY(none.has_value());
+    QVERIFY(*none == skygate::ui::SkyLogging::Output::None);
+    skygate::ui::SkyLogging::applyOutput(configuration, *none);
+    QVERIFY(!configuration.logToTerminal);
+    QVERIFY(!configuration.logToFile);
+    QCOMPARE(skygate::ui::SkyLogging::outputSummary(configuration), QStringLiteral("none"));
+
+    QVERIFY(!skygate::ui::SkyLogging::outputFromText(QStringLiteral("stdout")).has_value());
+    QVERIFY(!skygate::ui::SkyLogging::outputFromText(QString()).has_value());
 }
 
 void SkyLoggingTests::writesFileOnlyLogs()
@@ -194,8 +227,7 @@ void SkyLoggingTests::blankPathFallsBackToDefault()
     skygate::ui::SkyLoggingConfiguration configuration = fileOnlyConfig(QString());
     skygate::ui::SkyLogging::configure(configuration);
 
-    const skygate::ui::SkyLoggingConfiguration normalizedConfiguration =
-        skygate::ui::SkyLogging::configuration();
+    const skygate::ui::SkyLoggingConfiguration normalizedConfiguration = skygate::ui::SkyLogging::configuration();
     QVERIFY(!normalizedConfiguration.logFilePath.isEmpty());
     QCOMPARE(normalizedConfiguration.logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
 }
@@ -265,10 +297,7 @@ void SkyLoggingTests::rotatesAndShiftsBackups()
     qCWarning(skygateLoggingTestLog) << "after-rotation";
 
     QVERIFY(readText(path).contains(QStringLiteral("after-rotation")));
-    QCOMPARE(
-        readText(logPath(QStringLiteral("skygate.1.log"))),
-        QString::fromLatin1(QByteArray(200, 'x'))
-    );
+    QCOMPARE(readText(logPath(QStringLiteral("skygate.1.log"))), QString::fromLatin1(QByteArray(200, 'x')));
     QCOMPARE(readText(logPath(QStringLiteral("skygate.2.log"))), QStringLiteral("old-one"));
     QCOMPARE(readText(logPath(QStringLiteral("skygate.3.log"))), QStringLiteral("old-two"));
 }
@@ -315,8 +344,7 @@ void SkyLoggingTests::concurrentWritesRemainLineOriented()
     for (int threadIndex = 0; threadIndex < 4; ++threadIndex) {
         threads.emplace_back([threadIndex] {
             for (int messageIndex = 0; messageIndex < 25; ++messageIndex) {
-                qCWarning(skygateLoggingTestLog)
-                    << "thread" << threadIndex << "message" << messageIndex;
+                qCWarning(skygateLoggingTestLog) << "thread" << threadIndex << "message" << messageIndex;
             }
         });
     }
@@ -342,25 +370,20 @@ void SkyLoggingTests::warningWritesAreFlushed()
 
 void SkyLoggingTests::summarizesOutputConfiguration()
 {
-    skygate::ui::SkyLoggingConfiguration configuration =
-        skygate::ui::SkyLogging::defaultConfiguration();
+    skygate::ui::SkyLoggingConfiguration configuration = skygate::ui::SkyLogging::defaultConfiguration();
     configuration.logToTerminal = true;
     configuration.logToFile = false;
     QCOMPARE(skygate::ui::SkyLogging::outputSummary(configuration), QStringLiteral("terminal"));
-    QVERIFY(skygate::ui::SkyLogging::configurationSummary(configuration).contains(
-        QStringLiteral("terminalLevel=info")
-    ));
+    QVERIFY(
+        skygate::ui::SkyLogging::configurationSummary(configuration).contains(QStringLiteral("terminalLevel=info"))
+    );
 
     configuration.logToFile = true;
     configuration.logFilePath = logPath();
     configuration.fileMinimumType = QtWarningMsg;
     QCOMPARE(skygate::ui::SkyLogging::outputSummary(configuration), QStringLiteral("both"));
-    QVERIFY(skygate::ui::SkyLogging::configurationSummary(configuration).contains(
-        QStringLiteral("outputs=both")
-    ));
-    QVERIFY(skygate::ui::SkyLogging::configurationSummary(configuration).contains(
-        QStringLiteral("fileLevel=warning")
-    ));
+    QVERIFY(skygate::ui::SkyLogging::configurationSummary(configuration).contains(QStringLiteral("outputs=both")));
+    QVERIFY(skygate::ui::SkyLogging::configurationSummary(configuration).contains(QStringLiteral("fileLevel=warning")));
     QVERIFY(skygate::ui::SkyLogging::configurationSummary(configuration).contains(logPath()));
 
     configuration.logToTerminal = false;

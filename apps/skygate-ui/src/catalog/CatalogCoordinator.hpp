@@ -1,7 +1,10 @@
 #pragma once
 
-#include "skygate/ephemeris/CatalogLoadResult.hpp"
-#include "skygate/ephemeris/IStarCatalog.hpp"
+#include "CatalogParseOptions.hpp"
+#include "SkyCatalogImportStatus.hpp"
+
+#include "catalog/CatalogLoadResult.hpp"
+#include "catalog/IStarCatalog.hpp"
 
 #include <QByteArray>
 #include <QString>
@@ -10,6 +13,7 @@
 #include <functional>
 #include <memory>
 
+class CatalogDownloadCancellation;
 class QNetworkAccessManager;
 class QObject;
 class CatalogDownloadService;
@@ -21,6 +25,7 @@ public:
         QByteArray payload;
         std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
         skygate::ephemeris::CatalogLoadDiagnostics diagnostics;
+        QString sourceUrl;
         QString errorText;
     };
 
@@ -30,7 +35,7 @@ public:
         QString errorText;
     };
 
-    using StatusHandler = std::function<void(const QString&)>;
+    using StatusHandler = std::function<void(const skygate::ui::internal::SkyCatalogImportStatus&)>;
     using CompletionHandler = std::function<void(DownloadResult)>;
     using RawCompletionHandler = std::function<void(RawDownloadResult)>;
 
@@ -38,14 +43,19 @@ public:
     explicit CatalogCoordinator(QNetworkAccessManager* networkAccessManager);
     ~CatalogCoordinator();
 
+    // Starts the download with the caller's cancellation handle so the owner
+    // can hold it before any status callback runs.
     void downloadCatalogFromUrls(
+        const std::shared_ptr<CatalogDownloadCancellation>& cancellation,
         const QStringList& urlTexts,
+        CatalogParseOptions parseOptions,
         QObject* callbackContext,
         StatusHandler statusHandler,
         CompletionHandler completionHandler
     ) const;
 
     void downloadRawDataFromUrls(
+        const std::shared_ptr<CatalogDownloadCancellation>& cancellation,
         const QStringList& urlTexts,
         QObject* callbackContext,
         StatusHandler statusHandler,

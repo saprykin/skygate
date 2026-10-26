@@ -1,4 +1,5 @@
-#include "QmlTestSupport.hpp"
+#include "support/QmlTestSupport.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
 
 using namespace skygate::ui::tests;
 
@@ -6,10 +7,7 @@ namespace {
 
 QQuickItem* searchResultDelegate(QObject* root, const QString& targetId)
 {
-    return firstQuickItemWithObjectName(
-        root,
-        QStringLiteral("searchResultDelegate_%1").arg(targetId)
-    );
+    return firstQuickItemWithObjectName(root, QStringLiteral("searchResultDelegate_%1").arg(targetId));
 }
 
 }  // namespace
@@ -22,7 +20,7 @@ private slots:
     void init();
     void searchToolbarFiltersActivatesAndClearsResults();
     void searchToolbarToggleRequestsExpandAndClearsSearch();
-    void searchToolbarDelegateClickEmptyStateAndTrackingClearWork();
+    void searchToolbarDelegateEmptyStateAndTrackingClear();
     void timelineToolbarControlsUpdateController();
     void timelineToolbarToggleResetAndContextSyncWork();
 
@@ -75,19 +73,13 @@ void QmlToolbarTests::searchToolbarFiltersActivatesAndClearsResults()
     QTRY_VERIFY(dropdown->isVisible());
 
     const QModelIndex firstResult = searchModel->index(0, 0);
-    const QString targetId = searchModel->data(
-        firstResult,
-        SkyObjectSearchModel::TargetIdRole
-    ).toString();
+    const QString targetId = searchModel->data(firstResult, SkyObjectSearchModel::TargetIdRole).toString();
     QVERIFY(!targetId.isEmpty());
 
     QTest::keyClick(exposed.window(), Qt::Key_Return);
     QTRY_COMPARE(controller->selectedSearchTargetId(), targetId);
 
-    QObject* clearButton = firstObjectWithObjectName(
-        toolbar,
-        QStringLiteral("searchClearButton")
-    );
+    QObject* clearButton = firstObjectWithObjectName(toolbar, QStringLiteral("searchClearButton"));
     QVERIFY(clearButton != nullptr);
     QVERIFY(clearButton->property("visible").toBool());
     QVERIFY(QMetaObject::invokeMethod(searchField, "forceActiveFocus"));
@@ -110,7 +102,9 @@ void QmlToolbarTests::searchToolbarToggleRequestsExpandAndClearsSearch()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -124,7 +118,9 @@ void QmlToolbarTests::searchToolbarToggleRequestsExpandAndClearsSearch()
                 onRequestExpand: function() { ++root.requestExpandCount }
             }
         }
-    )"), QStringLiteral("SearchToolbarToggleBehaviorTest.qml"));
+    )"),
+        QStringLiteral("SearchToolbarToggleBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -149,7 +145,7 @@ void QmlToolbarTests::searchToolbarToggleRequestsExpandAndClearsSearch()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlToolbarTests::searchToolbarDelegateClickEmptyStateAndTrackingClearWork()
+void QmlToolbarTests::searchToolbarDelegateEmptyStateAndTrackingClear()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -163,7 +159,9 @@ void QmlToolbarTests::searchToolbarDelegateClickEmptyStateAndTrackingClearWork()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             width: 900
@@ -174,7 +172,9 @@ void QmlToolbarTests::searchToolbarDelegateClickEmptyStateAndTrackingClearWork()
                 skyContextController: skyContext
             }
         }
-    )"), QStringLiteral("SearchToolbarDelegateBehaviorTest.qml"));
+    )"),
+        QStringLiteral("SearchToolbarDelegateBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -194,22 +194,15 @@ void QmlToolbarTests::searchToolbarDelegateClickEmptyStateAndTrackingClearWork()
     replaceText(exposed.window(), searchField, QStringLiteral("Sirius"));
     QTRY_VERIFY(searchModel->rowCount() > 0);
     const QModelIndex firstResult = searchModel->index(0, 0);
-    const QString displayText = searchModel->data(
-        firstResult,
-        SkyObjectSearchModel::DisplayTextRole
-    ).toString();
-    const QString targetId = searchModel->data(
-        firstResult,
-        SkyObjectSearchModel::TargetIdRole
-    ).toString();
+    const QString displayText = searchModel->data(firstResult, SkyObjectSearchModel::DisplayTextRole).toString();
+    const QString targetId = searchModel->data(firstResult, SkyObjectSearchModel::TargetIdRole).toString();
     QVERIFY(!displayText.isEmpty());
     QVERIFY(!targetId.isEmpty());
 
     auto* resultDelegate = searchResultDelegate(root, targetId);
     QVERIFY(resultDelegate != nullptr);
-    const QPoint clickPoint = resultDelegate->mapToScene(
-        QPointF(resultDelegate->width() * 0.5, resultDelegate->height() * 0.5)
-    ).toPoint();
+    const QPoint clickPoint =
+        resultDelegate->mapToScene(QPointF(resultDelegate->width() * 0.5, resultDelegate->height() * 0.5)).toPoint();
     QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, clickPoint);
     QTRY_COMPARE(controller->selectedSearchTargetId(), targetId);
     QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
@@ -224,7 +217,7 @@ void QmlToolbarTests::timelineToolbarControlsUpdateController()
     QVERIFY(controller != nullptr);
     controller->setTimelineToolbarCollapsed(false);
     controller->setStepSeconds(60);
-    QVERIFY(controller->setUtcDateTimeText("2024-01-02", "03:04:05"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2024-01-02", "03:04:05"));
     controller->setLive(true);
     const QString originalTimeText = controller->utcTimeText();
 
@@ -232,7 +225,9 @@ void QmlToolbarTests::timelineToolbarControlsUpdateController()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             width: 920
@@ -244,7 +239,9 @@ void QmlToolbarTests::timelineToolbarControlsUpdateController()
                 skyContextController: skyContext
             }
         }
-    )"), QStringLiteral("TimelineToolbarBehaviorTest.qml"));
+    )"),
+        QStringLiteral("TimelineToolbarBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -252,10 +249,7 @@ void QmlToolbarTests::timelineToolbarControlsUpdateController()
     ExposedQuickWindow exposed(root);
     (void)exposed;
 
-    QObject* playPauseButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("timelinePlayPauseButton")
-    );
+    QObject* playPauseButton = firstObjectWithObjectName(root, QStringLiteral("timelinePlayPauseButton"));
     QVERIFY(playPauseButton != nullptr);
     QVERIFY(QMetaObject::invokeMethod(playPauseButton, "click"));
     QTRY_VERIFY(!controller->live());
@@ -263,27 +257,18 @@ void QmlToolbarTests::timelineToolbarControlsUpdateController()
     QVERIFY(QMetaObject::invokeMethod(playPauseButton, "click"));
     QTRY_VERIFY(controller->live());
 
-    QObject* stepForwardButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("timelineStepForwardButton")
-    );
+    QObject* stepForwardButton = firstObjectWithObjectName(root, QStringLiteral("timelineStepForwardButton"));
     QVERIFY(stepForwardButton != nullptr);
     QVERIFY(QMetaObject::invokeMethod(stepForwardButton, "click"));
     QTRY_VERIFY(controller->utcTimeText() != originalTimeText);
-    QObject* stepBackwardButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("timelineStepBackwardButton")
-    );
+    QObject* stepBackwardButton = firstObjectWithObjectName(root, QStringLiteral("timelineStepBackwardButton"));
     QVERIFY(stepBackwardButton != nullptr);
     QVERIFY(QMetaObject::invokeMethod(stepBackwardButton, "click"));
     QTRY_COMPARE(controller->utcTimeText(), originalTimeText);
 
     QObject* speedCombo = firstObjectWithObjectName(root, QStringLiteral("timelineSpeedCombo"));
     QObject* stepCombo = firstObjectWithObjectName(root, QStringLiteral("timelineStepCombo"));
-    QObject* magnitudeCombo = firstObjectWithObjectName(
-        root,
-        QStringLiteral("timelineMagnitudeCombo")
-    );
+    QObject* magnitudeCombo = firstObjectWithObjectName(root, QStringLiteral("timelineMagnitudeCombo"));
     QVERIFY(speedCombo != nullptr);
     QVERIFY(stepCombo != nullptr);
     QVERIFY(magnitudeCombo != nullptr);
@@ -316,7 +301,9 @@ void QmlToolbarTests::timelineToolbarToggleResetAndContextSyncWork()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -331,7 +318,9 @@ void QmlToolbarTests::timelineToolbarToggleResetAndContextSyncWork()
                 onRequestExpand: function() { ++root.requestExpandCount }
             }
         }
-    )"), QStringLiteral("TimelineToolbarToggleBehaviorTest.qml"));
+    )"),
+        QStringLiteral("TimelineToolbarToggleBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -341,10 +330,7 @@ void QmlToolbarTests::timelineToolbarToggleResetAndContextSyncWork()
 
     QObject* speedCombo = firstObjectWithObjectName(root, QStringLiteral("timelineSpeedCombo"));
     QObject* stepCombo = firstObjectWithObjectName(root, QStringLiteral("timelineStepCombo"));
-    QObject* magnitudeCombo = firstObjectWithObjectName(
-        root,
-        QStringLiteral("timelineMagnitudeCombo")
-    );
+    QObject* magnitudeCombo = firstObjectWithObjectName(root, QStringLiteral("timelineMagnitudeCombo"));
     QVERIFY(speedCombo != nullptr);
     QVERIFY(stepCombo != nullptr);
     QVERIFY(magnitudeCombo != nullptr);
@@ -359,10 +345,7 @@ void QmlToolbarTests::timelineToolbarToggleResetAndContextSyncWork()
     QCOMPARE(stepCombo->property("currentIndex").toInt(), 1);
     QCOMPARE(magnitudeCombo->property("currentIndex").toInt(), 1);
 
-    QObject* resetButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("timelineResetViewButton")
-    );
+    QObject* resetButton = firstObjectWithObjectName(root, QStringLiteral("timelineResetViewButton"));
     QVERIFY(resetButton != nullptr);
     QVERIFY(activateControl(resetButton));
     QTRY_COMPARE(controller->viewCenterAltitudeDeg(), 45.0);

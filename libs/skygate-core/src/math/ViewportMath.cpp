@@ -1,6 +1,5 @@
-#include "skygate/core/math/ViewportMath.hpp"
-
-#include "skygate/core/math/AngleMath.hpp"
+#include "ViewportMath.hpp"
+#include "AngleMath.hpp"
 
 #include <algorithm>
 
@@ -31,8 +30,7 @@ ProjectionParams ViewportMath::buildProjectionParams(
 {
     ProjectionParams projectionParams;
     projectionParams.center = {
-        .altitudeDeg = clampAltitudeDeg(centerAltitudeDeg),
-        .azimuthDeg = normalizeAzimuthDeg(centerAzimuthDeg)
+        .altitudeDeg = clampAltitudeDeg(centerAltitudeDeg), .azimuthDeg = normalizeAzimuthDeg(centerAzimuthDeg)
     };
     projectionParams.fovDeg = clampFieldOfViewDeg(fieldOfViewDeg);
     projectionParams.rollDeg = 0.0;

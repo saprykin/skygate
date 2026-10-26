@@ -14,15 +14,10 @@ struct SkyOverlayLayerVisibility final {
 
     [[nodiscard]] bool equals(const SkyOverlayLayerVisibility& other) const noexcept
     {
-        return horizon == other.horizon
-            && altAzGrid == other.altAzGrid
-            && constellationLines == other.constellationLines
-            && constellationLabels == other.constellationLabels
-            && ecliptic == other.ecliptic
-            && celestialEquator == other.celestialEquator
-            && circumpolarBoundary == other.circumpolarBoundary
-            && solarSystemLabels == other.solarSystemLabels
-            && deepSkyObjects == other.deepSkyObjects
-            && deepSkyLabels == other.deepSkyLabels;
+        return horizon == other.horizon && altAzGrid == other.altAzGrid
+               && constellationLines == other.constellationLines && constellationLabels == other.constellationLabels
+               && ecliptic == other.ecliptic && celestialEquator == other.celestialEquator
+               && circumpolarBoundary == other.circumpolarBoundary && solarSystemLabels == other.solarSystemLabels
+               && deepSkyObjects == other.deepSkyObjects && deepSkyLabels == other.deepSkyLabels;
     }
 };

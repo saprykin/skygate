@@ -1,0 +1,367 @@
+#include "DeepSkyObjectInfo.hpp"
+#include "DistantCelestialBody.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
+#include "catalog/CatalogIdentifier.hpp"
+#include "catalog/CatalogIdentityIndex.hpp"
+
+#include <QtTest/QtTest>
+
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace {
+
+using skygate::ephemeris::BaseCelestialBody;
+using skygate::ephemeris::CatalogIdentifier;
+using skygate::ephemeris::CatalogIdentityIndex;
+using skygate::ephemeris::DeepSkyObjectInfo;
+using skygate::ephemeris::DistantCelestialBody;
+using skygate::ephemeris::OwnGalaxyCelestialBody;
+
+OwnGalaxyCelestialBody makeStar(std::string id, std::vector<CatalogIdentifier> identifiers = {})
+{
+    OwnGalaxyCelestialBody body;
+    body.id = std::move(id);
+    body.kind = BaseCelestialBody::Kind::Star;
+    body.identity.externalIdentifiers = std::move(identifiers);
+    return body;
+}
+
+DistantCelestialBody makeDeepSkyObject(
+    std::string id, std::vector<std::string> aliases = {}, std::vector<CatalogIdentifier> identifiers = {}
+)
+{
+    DistantCelestialBody body;
+    body.id = std::move(id);
+    body.kind = BaseCelestialBody::Kind::DeepSkyObject;
+    body.identity.aliases = aliases;
+    body.identity.externalIdentifiers = std::move(identifiers);
+    body.deepSkyObject = DeepSkyObjectInfo{.kind = DeepSkyObjectInfo::Kind::Galaxy, .aliases = std::move(aliases)};
+    return body;
+}
+
+OwnGalaxyCelestialBody makeStarWithRetainedCanonicalIds(std::string id, std::vector<std::string> retainedCanonicalIds)
+{
+    OwnGalaxyCelestialBody body = makeStar(std::move(id));
+    body.identity.retainedCanonicalIds = std::move(retainedCanonicalIds);
+    return body;
+}
+
+DistantCelestialBody makeDeepSkyObjectWithRetainedCanonicalIds(
+    std::string id, std::vector<std::string> aliases, std::vector<std::string> retainedCanonicalIds
+)
+{
+    DistantCelestialBody body = makeDeepSkyObject(std::move(id), std::move(aliases));
+    body.identity.retainedCanonicalIds = std::move(retainedCanonicalIds);
+    return body;
+}
+
+}  // namespace
+
+class CatalogIdentityIndexTests final : public QObject {
+    Q_OBJECT
+
+private slots:
+    void resolvesCanonicalIdCaseInsensitively();
+    void resolvesExternalIdentifierAcrossCanonicalIds();
+    void doesNotCollideAcrossNamespaces();
+    void resolvesDeepSkyAlias();
+    void doesNotMatchStarsByDisplayName();
+    void reportsAmbiguousAuthoritativeMatch();
+    void reportsAmbiguousAliasMatch();
+    void resolvesIdentifierChainsIncrementally();
+    void resolvesRetainedCanonicalIds();
+    void resolvesRetainedCanonicalIdsOfIncomingBody();
+    void prefersRetainedCanonicalIdOverAlias();
+    void reportsDuplicateRetainedCanonicalIdentities();
+    void ignoresBodiesWithoutIdentity();
+    void removesVacatedPositionKeys();
+    void keepsOtherPositionsWhenRemovingSharedKey();
+    void removesDeepSkyAliasKeys();
+    void reportsDuplicateAuthoritativeIdentities();
+    void doesNotReportDistinctAuthoritativeIdentities();
+};
+
+void CatalogIdentityIndexTests::resolvesCanonicalIdCaseInsensitively()
+{
+    const OwnGalaxyCelestialBody registered = makeStar("hip_123");
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+
+    const OwnGalaxyCelestialBody incoming = makeStar("HIP_123");
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QVERIFY(resolution.hasSingleMatch());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::CanonicalId);
+    QCOMPARE(resolution.index, std::size_t{0});
+}
+
+void CatalogIdentityIndexTests::resolvesExternalIdentifierAcrossCanonicalIds()
+{
+    const OwnGalaxyCelestialBody registered = makeStar("catalog_a_1", {CatalogIdentifier::make("hip", "32349")});
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+
+    const OwnGalaxyCelestialBody incoming = makeStar("catalog_b_9", {CatalogIdentifier::make("hip", "032349")});
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QVERIFY(resolution.hasSingleMatch());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::ExternalIdentifier);
+    QCOMPARE(resolution.index, std::size_t{0});
+}
+
+void CatalogIdentityIndexTests::doesNotCollideAcrossNamespaces()
+{
+    const OwnGalaxyCelestialBody registered = makeStar("hip_123", {CatalogIdentifier::make("hip", "123")});
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+
+    const OwnGalaxyCelestialBody incoming = makeStar("hyg_123", {CatalogIdentifier::make("hyg", "123")});
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::None);
+    QVERIFY(!resolution.hasSingleMatch());
+    QVERIFY(!resolution.isAmbiguous());
+}
+
+void CatalogIdentityIndexTests::resolvesDeepSkyAlias()
+{
+    const DistantCelestialBody registered = makeDeepSkyObject("ngc_224", {"M31"});
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+
+    const DistantCelestialBody incoming = makeDeepSkyObject("open_ngc_m31", {"M 31"});
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QVERIFY(resolution.hasSingleMatch());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::Alias);
+    QCOMPARE(resolution.index, std::size_t{0});
+}
+
+void CatalogIdentityIndexTests::doesNotMatchStarsByDisplayName()
+{
+    OwnGalaxyCelestialBody registered = makeStar("hip_1");
+    registered.displayName = "Sirius";
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+
+    OwnGalaxyCelestialBody incoming = makeStar("hip_2");
+    incoming.displayName = "Sirius";
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::None);
+}
+
+void CatalogIdentityIndexTests::reportsAmbiguousAuthoritativeMatch()
+{
+    const OwnGalaxyCelestialBody star = makeStar("hip_1", {CatalogIdentifier::make("hip", "123")});
+    const DistantCelestialBody deepSkyObject =
+        makeDeepSkyObject("ngc_123", {}, {CatalogIdentifier::make("hip", "123")});
+    CatalogIdentityIndex index;
+    index.add(star, 0U);
+    index.add(deepSkyObject, 1U);
+
+    const OwnGalaxyCelestialBody incoming = makeStar("hip_9", {CatalogIdentifier::make("hip", "123")});
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QVERIFY(resolution.isAmbiguous());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::AmbiguousAuthoritative);
+    QCOMPARE(resolution.candidates.size(), std::size_t{2});
+    QCOMPARE(resolution.candidates[0], std::size_t{0});
+    QCOMPARE(resolution.candidates[1], std::size_t{1});
+}
+
+void CatalogIdentityIndexTests::reportsAmbiguousAliasMatch()
+{
+    const DistantCelestialBody first = makeDeepSkyObject("ngc_224", {"M31"});
+    const DistantCelestialBody second = makeDeepSkyObject("ngc_598", {"M31"});
+    CatalogIdentityIndex index;
+    index.add(first, 0U);
+    index.add(second, 1U);
+
+    const DistantCelestialBody incoming = makeDeepSkyObject("open_ngc_unknown", {"M 31"});
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QVERIFY(resolution.isAmbiguous());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::AmbiguousAlias);
+    QCOMPARE(resolution.candidates.size(), std::size_t{2});
+}
+
+void CatalogIdentityIndexTests::resolvesIdentifierChainsIncrementally()
+{
+    const OwnGalaxyCelestialBody first = makeStar("cat_a_1", {CatalogIdentifier::make("hip", "1")});
+    CatalogIdentityIndex index;
+    index.add(first, 0U);
+
+    const OwnGalaxyCelestialBody second =
+        makeStar("cat_a_2", {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hyg", "5")});
+    const CatalogIdentityIndex::Resolution secondResolution = index.resolve(second);
+    QVERIFY(secondResolution.hasSingleMatch());
+    QCOMPARE(secondResolution.index, std::size_t{0});
+    index.add(second, secondResolution.index);
+
+    const OwnGalaxyCelestialBody third = makeStar("cat_a_3", {CatalogIdentifier::make("hyg", "5")});
+    const CatalogIdentityIndex::Resolution thirdResolution = index.resolve(third);
+    QVERIFY(thirdResolution.hasSingleMatch());
+    QCOMPARE(thirdResolution.kind, CatalogIdentityIndex::Resolution::MatchKind::ExternalIdentifier);
+    QCOMPARE(thirdResolution.index, std::size_t{0});
+}
+
+void CatalogIdentityIndexTests::resolvesRetainedCanonicalIds()
+{
+    const OwnGalaxyCelestialBody registered = makeStarWithRetainedCanonicalIds("replacement", {"original"});
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+
+    const OwnGalaxyCelestialBody incoming = makeStar("original");
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QVERIFY(resolution.hasSingleMatch());
+    QVERIFY(!resolution.isAmbiguous());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::CanonicalId);
+    QCOMPARE(resolution.index, std::size_t{0});
+}
+
+void CatalogIdentityIndexTests::resolvesRetainedCanonicalIdsOfIncomingBody()
+{
+    // A restored composed body still carries the canonical key of the record
+    // it absorbed. That key resolves to the earlier survivor when the restored
+    // snapshot is used as a composition input.
+    CatalogIdentityIndex index;
+    index.add(makeStar("original"), 0U);
+
+    const OwnGalaxyCelestialBody incoming = makeStarWithRetainedCanonicalIds("replacement", {"original"});
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QVERIFY(resolution.hasSingleMatch());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::CanonicalId);
+    QCOMPARE(resolution.index, std::size_t{0});
+}
+
+void CatalogIdentityIndexTests::prefersRetainedCanonicalIdOverAlias()
+{
+    // A retained canonical id stays authoritative even when an unrelated body
+    // lists the same text as a weak display alias. Demoting retained ids to
+    // aliases would turn this resolution into an ambiguous alias match.
+    const DistantCelestialBody registered = makeDeepSkyObjectWithRetainedCanonicalIds("replacement", {}, {"original"});
+    const DistantCelestialBody aliasHolder = makeDeepSkyObject("other", {"original"});
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+    index.add(aliasHolder, 1U);
+
+    const DistantCelestialBody incoming = makeDeepSkyObject("original");
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QVERIFY(resolution.hasSingleMatch());
+    QVERIFY(!resolution.isAmbiguous());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::CanonicalId);
+    QCOMPARE(resolution.index, std::size_t{0});
+}
+
+void CatalogIdentityIndexTests::reportsDuplicateRetainedCanonicalIdentities()
+{
+    CatalogIdentityIndex index;
+    index.add(makeStarWithRetainedCanonicalIds("replacement_a", {"original"}), 0U);
+    index.add(makeStarWithRetainedCanonicalIds("replacement_b", {"original"}), 1U);
+
+    const std::vector<CatalogIdentityIndex::DuplicateIdentity> duplicates = index.duplicateAuthoritativeIdentities();
+    QCOMPARE(duplicates.size(), std::size_t{1});
+    QCOMPARE(duplicates.front().key, std::string("original"));
+    QCOMPARE(duplicates.front().positions, (std::vector<std::size_t>{0U, 1U}));
+}
+
+void CatalogIdentityIndexTests::ignoresBodiesWithoutIdentity()
+{
+    const OwnGalaxyCelestialBody registered = makeStar("hip_1");
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+
+    const OwnGalaxyCelestialBody incoming = makeStar("hip_2");
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::None);
+}
+
+void CatalogIdentityIndexTests::removesVacatedPositionKeys()
+{
+    const OwnGalaxyCelestialBody registered = makeStar("hip_123", {CatalogIdentifier::make("hip", "123")});
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+
+    index.remove(0U);
+
+    QCOMPARE(index.resolve(registered).kind, CatalogIdentityIndex::Resolution::MatchKind::None);
+
+    index.add(registered, 1U);
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(registered);
+    QVERIFY(resolution.hasSingleMatch());
+    QCOMPARE(resolution.index, std::size_t{1});
+}
+
+void CatalogIdentityIndexTests::keepsOtherPositionsWhenRemovingSharedKey()
+{
+    const OwnGalaxyCelestialBody star = makeStar("hip_1", {CatalogIdentifier::make("hip", "123")});
+    const DistantCelestialBody deepSkyObject =
+        makeDeepSkyObject("ngc_123", {}, {CatalogIdentifier::make("hip", "123")});
+    CatalogIdentityIndex index;
+    index.add(star, 0U);
+    index.add(deepSkyObject, 1U);
+    QVERIFY(index.resolve(star).isAmbiguous());
+
+    index.remove(0U);
+
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(star);
+    QVERIFY(resolution.hasSingleMatch());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::ExternalIdentifier);
+    QCOMPARE(resolution.index, std::size_t{1});
+}
+
+void CatalogIdentityIndexTests::removesDeepSkyAliasKeys()
+{
+    const DistantCelestialBody registered = makeDeepSkyObject("ngc_224", {"M31"});
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+
+    index.remove(0U);
+
+    const DistantCelestialBody incoming = makeDeepSkyObject("open_ngc_m31", {"M 31"});
+    QCOMPARE(index.resolve(incoming).kind, CatalogIdentityIndex::Resolution::MatchKind::None);
+}
+
+void CatalogIdentityIndexTests::reportsDuplicateAuthoritativeIdentities()
+{
+    CatalogIdentityIndex index;
+    index.add(makeStar("hip_1", {CatalogIdentifier::make("hip", "123")}), 0U);
+    index.add(makeStar("catalog_b_1", {CatalogIdentifier::make("hip", "0123")}), 1U);
+
+    const std::vector<CatalogIdentityIndex::DuplicateIdentity> duplicates = index.duplicateAuthoritativeIdentities();
+    QCOMPARE(duplicates.size(), std::size_t{1});
+    QCOMPARE(duplicates.front().key, std::string("hip:123"));
+    QCOMPARE(duplicates.front().positions, (std::vector<std::size_t>{0U, 1U}));
+
+    // A vacated position no longer participates in the validation.
+    index.remove(1U);
+    QVERIFY(index.duplicateAuthoritativeIdentities().empty());
+
+    CatalogIdentityIndex canonicalIndex;
+    canonicalIndex.add(makeStar("hip_123"), 0U);
+    canonicalIndex.add(makeStar("HIP_123"), 1U);
+    const std::vector<CatalogIdentityIndex::DuplicateIdentity> canonicalDuplicates =
+        canonicalIndex.duplicateAuthoritativeIdentities();
+    QCOMPARE(canonicalDuplicates.size(), std::size_t{1});
+    QCOMPARE(canonicalDuplicates.front().key, std::string("hip_123"));
+    QCOMPARE(canonicalDuplicates.front().positions, (std::vector<std::size_t>{0U, 1U}));
+}
+
+void CatalogIdentityIndexTests::doesNotReportDistinctAuthoritativeIdentities()
+{
+    CatalogIdentityIndex index;
+    index.add(makeStar("hip_1", {CatalogIdentifier::make("hip", "1")}), 0U);
+    index.add(makeStar("hip_2", {CatalogIdentifier::make("hip", "2")}), 1U);
+
+    QVERIFY(index.duplicateAuthoritativeIdentities().empty());
+}
+
+QTEST_APPLESS_MAIN(CatalogIdentityIndexTests)
+
+#include "CatalogIdentityIndexTests.moc"

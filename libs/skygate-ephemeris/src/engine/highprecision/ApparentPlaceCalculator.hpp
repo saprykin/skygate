@@ -1,0 +1,57 @@
+#pragma once
+
+#include "FrameTransformBatcher.hpp"
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
+#include "IApparentPlaceCalculator.hpp"
+#include "IAtmosphericRefractionCalculator.hpp"
+#include "StarAstrometryBatchResult.hpp"
+
+#include <memory>
+#include <span>
+#include <vector>
+
+namespace skygate::ephemeris {
+class ITimeScaleService;
+class IEarthOrientationProvider;
+}  // namespace skygate::ephemeris
+
+namespace skygate::ephemeris::highprecision {
+
+struct PreparedEphemerisRequestState;
+
+class IFrameTransformer;
+
+class ApparentPlaceCalculator final : public IApparentPlaceCalculator {
+public:
+    ApparentPlaceCalculator(
+        std::shared_ptr<const IFrameTransformer> frameTransformer,
+        std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService,
+        std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider,
+        std::shared_ptr<const IAtmosphericRefractionCalculator> atmosphericRefractionCalculator = {}
+    );
+
+    [[nodiscard]] HighPrecisionCalculatorResult apply(
+        const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult
+    ) const override;
+    [[nodiscard]] std::vector<StarAstrometryBatchResult> applyBatch(
+        const EphemerisRequest& request,
+        std::span<const BaseCelestialBody* const> bodies,
+        std::span<const StarAstrometryBatchResult> calculatorResults,
+        std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
+    ) const override;
+
+private:
+    [[nodiscard]] std::vector<StarAstrometryBatchResult> processItems(
+        const EphemerisRequest& request,
+        const std::shared_ptr<const PreparedEphemerisRequestState>& preparedRequestState,
+        std::span<FrameTransformBatcher::Item> items
+    ) const;
+
+    std::shared_ptr<const IFrameTransformer> m_frameTransformer;
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_timeScaleService;
+    std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> m_earthOrientationProvider;
+    std::shared_ptr<const IAtmosphericRefractionCalculator> m_atmosphericRefractionCalculator;
+};
+
+}  // namespace skygate::ephemeris::highprecision

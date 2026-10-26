@@ -1,4 +1,6 @@
-#include "catalog/stellarium/StellariumHipParser.hpp"
+#include "StellariumHipParser.hpp"
+#include "NumericParsingUtilities.hpp"
+#include "StringUtilities.hpp"
 
 #include <QJsonObject>
 
@@ -35,9 +37,8 @@ std::optional<int> StellariumHipParser::parseStrictHipText(QString text)
         }
     }
 
-    bool isOk = false;
-    const int parsedValue = text.toInt(&isOk);
-    if (!isOk || parsedValue <= 0) {
+    const std::optional<int> parsedValue = NumericParsingUtilities::parseInt(StringUtilities::toUtf8(text));
+    if (!parsedValue.has_value() || *parsedValue <= 0) {
         return std::nullopt;
     }
 
@@ -48,12 +49,8 @@ std::optional<int> StellariumHipParser::parseHipIdentifier(const QJsonValue& val
 {
     if (value.isDouble()) {
         const double numericValue = value.toDouble();
-        if (
-            std::isfinite(numericValue)
-            && numericValue > 0.0
-            && std::floor(numericValue) == numericValue
-            && numericValue <= static_cast<double>(std::numeric_limits<int>::max())
-        ) {
+        if (std::isfinite(numericValue) && numericValue > 0.0 && std::floor(numericValue) == numericValue
+            && numericValue <= static_cast<double>(std::numeric_limits<int>::max())) {
             return static_cast<int>(numericValue);
         }
         return std::nullopt;
@@ -88,9 +85,7 @@ std::optional<int> StellariumHipParser::parseHipIdentifier(const QJsonValue& val
     return std::nullopt;
 }
 
-std::optional<std::vector<int>> StellariumHipParser::parseHipPolyline(
-    const QJsonArray& array
-)
+std::optional<std::vector<int>> StellariumHipParser::parseHipPolyline(const QJsonArray& array)
 {
     if (array.size() < 2) {
         return std::nullopt;
@@ -109,10 +104,7 @@ std::optional<std::vector<int>> StellariumHipParser::parseHipPolyline(
     return hips;
 }
 
-void StellariumHipParser::collectHipPolylines(
-    const QJsonValue& value,
-    std::vector<std::vector<int>>& polylines
-)
+void StellariumHipParser::collectHipPolylines(const QJsonValue& value, std::vector<std::vector<int>>& polylines)
 {
     if (value.isArray()) {
         const QJsonArray array = value.toArray();
@@ -152,6 +144,49 @@ void StellariumHipParser::collectHipPolylines(
             collectHipPolylines(it.value(), polylines);
         }
     }
+}
+
+void StellariumHipParser::forEachConstellationEntry(
+    const QJsonObject& rootObject, const std::function<void(const QJsonValue&, const QString&)>& visit
+)
+{
+    const QJsonValue constellationsValue = rootObject.value("constellations");
+    if (constellationsValue.isArray()) {
+        for (const QJsonValue& entry : constellationsValue.toArray()) {
+            visit(entry, {});
+        }
+        return;
+    }
+
+    if (!constellationsValue.isObject()) {
+        return;
+    }
+
+    const QJsonObject constellationsObject = constellationsValue.toObject();
+    const QJsonValue linesValue = constellationsObject.value("lines");
+    const QJsonValue lineValue = constellationsObject.value("line");
+    if (!linesValue.isUndefined() || !lineValue.isUndefined()) {
+        if (!linesValue.isUndefined()) {
+            visit(linesValue, {});
+        }
+        if (!lineValue.isUndefined()) {
+            visit(lineValue, {});
+        }
+        return;
+    }
+
+    for (auto it = constellationsObject.begin(); it != constellationsObject.end(); ++it) {
+        visit(it.value(), it.key());
+    }
+}
+
+std::size_t StellariumHipParser::constellationArrayEntryCount(const QJsonObject& rootObject)
+{
+    const QJsonValue constellationsValue = rootObject.value("constellations");
+    if (!constellationsValue.isArray()) {
+        return 0U;
+    }
+    return static_cast<std::size_t>(constellationsValue.toArray().size());
 }
 
 }  // namespace skygate::ephemeris

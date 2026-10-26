@@ -1,6 +1,8 @@
-#include <QtTest>
+#include "catalog/CatalogComposer.hpp"
+#include "render/SkyRenderGlyph.hpp"
+#include "support/SkySceneModelTestSupport.hpp"
 
-#include "SkySceneModelTestSupport.hpp"
+#include <QtTest>
 
 using skygate::ui::tests::buildDeepSkyRenderFrame;
 using skygate::ui::tests::createTestCatalog;
@@ -17,7 +19,7 @@ class SkySceneModelDeepSkyTests final : public QObject {
 
 private slots:
     void deepSkyInspectorIncludesAliasesSizeAndSource();
-    void primaryDeepSkyObjectKeepsSourceWhenMergingDeepSkyCatalog();
+    void primaryObjectsKeepSourceWhenMergingDeepSky();
     void deepSkyObjectsRenderAndCanBeHidden();
     void denseDeepSkyLabelsAreBudgeted();
     void wideDeepSkyLabelsPreferNamedObjects();
@@ -26,16 +28,9 @@ private slots:
 
 void SkySceneModelDeepSkyTests::deepSkyInspectorIncludesAliasesSizeAndSource()
 {
-    skygate::ephemeris::CelestialBody m31 = makeDeepSkyBody(
-        "messier_031",
-        "M31",
-        3.44,
-        {"M 31", "NGC 224", "Andromeda Galaxy"}
-    );
-    m31.fixedEquatorial = skygate::core::EquatorialCoordinate {
-        .rightAscensionHours = 0.7123,
-        .declinationDeg = 41.269
-    };
+    skygate::ephemeris::DistantCelestialBody m31 =
+        makeDeepSkyBody("messier_031", "M31", 3.44, {"M 31", "NGC 224", "Andromeda Galaxy"});
+    m31.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 0.7123, .declinationDeg = 41.269};
 
     TestSkyContextConfig contextConfig;
     contextConfig.utcDate = QStringLiteral("2024-09-01");
@@ -54,7 +49,9 @@ void SkySceneModelDeepSkyTests::deepSkyInspectorIncludesAliasesSizeAndSource()
     QCOMPARE(inspector.value("title").toString(), QString("M31"));
     QCOMPARE(inspectorFieldValue(inspector, "Type"), QString("Galaxy"));
     QVERIFY(inspectorFieldValue(inspector, "Angular size").contains("arcmin"));
-    QCOMPARE(inspectorFieldValue(inspector, "Source"), QString("Bundled Messier"));
+    // The configured source supplies this object, so the inspector names that
+    // source instead of a bundled deep-sky fallback.
+    QCOMPARE(inspectorFieldValue(inspector, "Source"), QString("Bundled"));
     QVERIFY(inspector.value("aliases").toString().contains("Andromeda Galaxy"));
 
     QVERIFY(controller.focusSearchTarget("body", "messier_031"));
@@ -62,61 +59,46 @@ void SkySceneModelDeepSkyTests::deepSkyInspectorIncludesAliasesSizeAndSource()
     QVERIFY(!overlayItemsContainKind(sceneModel.overlayItems(), "selectionLabel"));
 }
 
-void SkySceneModelDeepSkyTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSkyCatalog()
+void SkySceneModelDeepSkyTests::primaryObjectsKeepSourceWhenMergingDeepSky()
 {
     auto primaryCatalog = createTestCatalog({
-        makeDeepSkyBody(
-            "primary_dso",
-            "Primary DSO",
-            8.0,
-            {"Primary DSO"}
-        ),
-        makeDeepSkyBody(
-            "messier_031",
-            "M31",
-            3.44,
-            {"M 31", "NGC 224"}
-        ),
+        makeDeepSkyBody("primary_dso", "Primary DSO", 8.0, {"Primary DSO"}),
+        makeDeepSkyBody("messier_031", "M31", 3.44, {"M 31", "NGC 224"}),
     });
     QVERIFY(primaryCatalog != nullptr);
 
     auto deepSkyCatalog = createTestCatalog({
-        makeDeepSkyBody(
-            "open_ngc_m31",
-            "OpenNGC M31",
-            3.4,
-            {"M 31", "NGC 224", "Andromeda Galaxy"}
-        ),
+        makeDeepSkyBody("open_ngc_m31", "OpenNGC M31", 3.4, {"M 31", "NGC 224", "Andromeda Galaxy"}),
     });
     QVERIFY(deepSkyCatalog != nullptr);
 
-    const auto buildResult = skygate::ui::internal::SkyActiveCatalogBuilder::build(
-        skygate::ui::internal::SkyActiveCatalogBuildRequest {
-            .sourceCatalog = *primaryCatalog,
-            .deepSkyCatalog = deepSkyCatalog.get(),
-            .sourceLabel = "Primary",
-            .deepSkySourceLabel = "OpenNGC"
-        }
-    );
+    skygate::ephemeris::CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "primary",
+         .enabled = true,
+         .catalog = primaryCatalog.get(),
+         .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge},
+        {.sourceId = "deep-sky",
+         .enabled = true,
+         .catalog = deepSkyCatalog.get(),
+         .policy = skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly},
+    };
+    const auto buildResult = skygate::ephemeris::CatalogComposer::composeCollection(request);
     QVERIFY(buildResult.isSuccess());
     QCOMPARE(buildResult.sourceIds.size(), buildResult.catalog->bodies().size());
-
-    const int primarySourceIndex = buildResult.sourceLabels.indexOf("Primary");
-    const int deepSkySourceIndex = buildResult.sourceLabels.indexOf("OpenNGC");
-    QVERIFY(primarySourceIndex >= 0);
-    QVERIFY(deepSkySourceIndex >= 0);
 
     bool sawPrimaryDso = false;
     bool sawOpenNgcM31 = false;
     for (std::size_t index = 0; index < buildResult.catalog->bodies().size(); ++index) {
-        const auto& body = buildResult.catalog->bodies()[index];
-        if (body.id == "primary_dso") {
+        const auto* body = buildResult.catalog->bodies()[index];
+        QVERIFY(body != nullptr);
+        if (body->id == "primary_dso") {
             sawPrimaryDso = true;
-            QCOMPARE(buildResult.sourceIds[index], static_cast<std::uint8_t>(primarySourceIndex));
-        } else if (body.id == "open_ngc_m31") {
+            QCOMPARE(QString::fromStdString(buildResult.sourceIds[index]), QStringLiteral("primary"));
+        } else if (body->id == "open_ngc_m31") {
             sawOpenNgcM31 = true;
-            QCOMPARE(buildResult.sourceIds[index], static_cast<std::uint8_t>(deepSkySourceIndex));
-        } else if (body.id == "messier_031") {
+            QCOMPARE(QString::fromStdString(buildResult.sourceIds[index]), QStringLiteral("deep-sky"));
+        } else if (body->id == "messier_031") {
             QFAIL("Merged catalog should replace the primary M31 with the OpenNGC body");
         }
     }
@@ -127,18 +109,11 @@ void SkySceneModelDeepSkyTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSk
 
 void SkySceneModelDeepSkyTests::deepSkyObjectsRenderAndCanBeHidden()
 {
-    skygate::ephemeris::CelestialBody m31 = makeBody(
-        "messier_031",
-        "M31",
-        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
-        3.44,
-        skygate::core::EquatorialCoordinate {
-            .rightAscensionHours = 0.7123,
-            .declinationDeg = 41.269
-        }
-    );
-    m31.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
-        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
+    skygate::ephemeris::DistantCelestialBody m31 =
+        makeDeepSkyBody("messier_031", "M31", 3.44, {"M31", "Andromeda Galaxy"});
+    m31.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 0.7123, .declinationDeg = 41.269};
+    m31.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo{
+        .kind = skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy,
         .aliases = {"M31", "Andromeda Galaxy"},
         .majorAxisArcmin = 177.0,
         .minorAxisArcmin = 70.0,
@@ -154,13 +129,13 @@ void SkySceneModelDeepSkyTests::deepSkyObjectsRenderAndCanBeHidden()
     const SkySceneModel& sceneModel = harness.sceneModel();
 
     QVERIFY(!sceneModel.renderGlyphSpan().empty());
-    QVERIFY(std::any_of(
-        sceneModel.renderGlyphSpan().begin(),
-        sceneModel.renderGlyphSpan().end(),
-        [&sceneModel](const SkyRenderGlyph& glyph) {
-            return sceneModel.objectLabelAt(glyph.x, glyph.y) == "M31";
-        }
-    ));
+    QVERIFY(
+        std::any_of(
+            sceneModel.renderGlyphSpan().begin(),
+            sceneModel.renderGlyphSpan().end(),
+            [&sceneModel](const SkyRenderGlyph& glyph) { return sceneModel.objectLabelAt(glyph.x, glyph.y) == "M31"; }
+        )
+    );
 
     auto* overlayLayers = qobject_cast<SkyOverlayLayerSettings*>(controller.overlayLayers());
     QVERIFY(overlayLayers != nullptr);
@@ -171,7 +146,7 @@ void SkySceneModelDeepSkyTests::deepSkyObjectsRenderAndCanBeHidden()
 
 void SkySceneModelDeepSkyTests::denseDeepSkyLabelsAreBudgeted()
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies;
+    std::vector<skygate::ephemeris::DistantCelestialBody> bodies;
     std::vector<skygate::core::HorizontalCoordinate> coordinates;
     bodies.reserve(360U);
     coordinates.reserve(360U);
@@ -184,17 +159,15 @@ void SkySceneModelDeepSkyTests::denseDeepSkyLabelsAreBudgeted()
             "NGC " + std::to_string(index + 1),
             9.0 + (static_cast<double>(index % 5) * 0.1)
         ));
-        coordinates.push_back(skygate::core::HorizontalCoordinate {
-            .altitudeDeg = 45.0 + ((static_cast<double>(row) - 7.0) * 0.16),
-            .azimuthDeg = 180.0 + ((static_cast<double>(column) - 12.0) * 0.16)
-        });
+        coordinates.push_back(
+            skygate::core::HorizontalCoordinate{
+                .altitudeDeg = 45.0 + ((static_cast<double>(row) - 7.0) * 0.16),
+                .azimuthDeg = 180.0 + ((static_cast<double>(column) - 12.0) * 0.16)
+            }
+        );
     }
 
-    const SkyRenderFrame frame = buildDeepSkyRenderFrame(
-        std::move(bodies),
-        std::move(coordinates),
-        10.0
-    );
+    const SkyRenderFrame frame = buildDeepSkyRenderFrame(std::move(bodies), std::move(coordinates), 10.0);
 
     QCOMPARE(frame.glyphs.size(), 360U);
     QVERIFY(frame.labels.size() > 0);
@@ -203,42 +176,16 @@ void SkySceneModelDeepSkyTests::denseDeepSkyLabelsAreBudgeted()
 
 void SkySceneModelDeepSkyTests::wideDeepSkyLabelsPreferNamedObjects()
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies;
-    bodies.push_back(makeDeepSkyBody(
-        "messier_031",
-        "M31",
-        3.44,
-        {"M 31", "NGC 224", "Andromeda Galaxy"}
-    ));
-    bodies.push_back(makeDeepSkyBody(
-        "ngc_100",
-        "NGC 100",
-        4.0,
-        {"NGC 100"}
-    ));
-    bodies.push_back(makeDeepSkyBody(
-        "ngc_7000",
-        "NGC 7000",
-        4.0,
-        {"NGC 7000", "North America Nebula"}
-    ));
+    std::vector<skygate::ephemeris::DistantCelestialBody> bodies;
+    bodies.push_back(makeDeepSkyBody("messier_031", "M31", 3.44, {"M 31", "NGC 224", "Andromeda Galaxy"}));
+    bodies.push_back(makeDeepSkyBody("ngc_100", "NGC 100", 4.0, {"NGC 100"}));
+    bodies.push_back(makeDeepSkyBody("ngc_7000", "NGC 7000", 4.0, {"NGC 7000", "North America Nebula"}));
 
     const SkyRenderFrame frame = buildDeepSkyRenderFrame(
         std::move(bodies),
-        {
-            skygate::core::HorizontalCoordinate {
-                .altitudeDeg = 45.0,
-                .azimuthDeg = 180.0
-            },
-            skygate::core::HorizontalCoordinate {
-                .altitudeDeg = 45.0,
-                .azimuthDeg = 195.0
-            },
-            skygate::core::HorizontalCoordinate {
-                .altitudeDeg = 45.0,
-                .azimuthDeg = 165.0
-            }
-        },
+        {skygate::core::HorizontalCoordinate{.altitudeDeg = 45.0, .azimuthDeg = 180.0},
+         skygate::core::HorizontalCoordinate{.altitudeDeg = 45.0, .azimuthDeg = 195.0},
+         skygate::core::HorizontalCoordinate{.altitudeDeg = 45.0, .azimuthDeg = 165.0}},
         50.0
     );
 
@@ -249,7 +196,7 @@ void SkySceneModelDeepSkyTests::wideDeepSkyLabelsPreferNamedObjects()
 
 void SkySceneModelDeepSkyTests::deepestDeepSkyZoomShowsSeparatedAnonymousLabels()
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies;
+    std::vector<skygate::ephemeris::DistantCelestialBody> bodies;
     std::vector<skygate::core::HorizontalCoordinate> coordinates;
     bodies.reserve(24U);
     coordinates.reserve(24U);
@@ -257,21 +204,19 @@ void SkySceneModelDeepSkyTests::deepestDeepSkyZoomShowsSeparatedAnonymousLabels(
     for (int index = 0; index < 24; ++index) {
         const int row = index / 6;
         const int column = index % 6;
-        bodies.push_back(makeDeepSkyBody(
-            "ngc_" + std::to_string(7000 + index),
-            "NGC " + std::to_string(7000 + index),
-            10.0
-        ));
-        coordinates.push_back(skygate::core::HorizontalCoordinate {
-            .altitudeDeg = 45.0 + ((static_cast<double>(row) - 1.5) * 0.16),
-            .azimuthDeg = 180.0 + ((static_cast<double>(column) - 2.5) * 0.16)
-        });
+        bodies.push_back(
+            makeDeepSkyBody("ngc_" + std::to_string(7000 + index), "NGC " + std::to_string(7000 + index), 10.0)
+        );
+        coordinates.push_back(
+            skygate::core::HorizontalCoordinate{
+                .altitudeDeg = 45.0 + ((static_cast<double>(row) - 1.5) * 0.16),
+                .azimuthDeg = 180.0 + ((static_cast<double>(column) - 2.5) * 0.16)
+            }
+        );
     }
 
     const SkyRenderFrame frame = buildDeepSkyRenderFrame(
-        std::move(bodies),
-        std::move(coordinates),
-        skygate::core::ViewportMath::kFieldOfViewMinDeg
+        std::move(bodies), std::move(coordinates), skygate::core::ViewportMath::kFieldOfViewMinDeg
     );
 
     QCOMPARE(frame.glyphs.size(), 24U);

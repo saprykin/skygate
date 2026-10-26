@@ -26,14 +26,17 @@ public:
         DisplayTextRole,
         DetailTextRole,
         CityIdRole,
-        CountryNameRole,
-        CityNameRole,
         LatitudeDegRole,
         LongitudeDegRole,
         SelectableRole,
     };
 
     explicit LocationCatalogModel(QObject* parent = nullptr);
+
+    // Parses catalog CSV text into entries sorted by country and city.
+    // A header without a required column yields std::nullopt. Rows that do not
+    // fit the header are logged and skipped.
+    [[nodiscard]] static std::optional<QVector<LocationCatalogEntry>> parseCatalog(const QString& csvText);
 
     [[nodiscard]] int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
@@ -43,9 +46,7 @@ public:
     void setFilterText(const QString& filterText);
 
     [[nodiscard]] bool hasCityId(const QString& cityId) const;
-    [[nodiscard]] std::optional<LocationCatalogEntry> entryForCityId(
-        const QString& cityId
-    ) const;
+    [[nodiscard]] std::optional<LocationCatalogEntry> entryForCityId(const QString& cityId) const;
 
 signals:
     void filterTextChanged();

@@ -1,26 +1,20 @@
-#include <QtTest>
+#include "diagnostics/SkyLogging.hpp"
+#include "settings/SkySettingsSnapshotCodecs.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/SettingsTestFixture.hpp"
 
-#include "CatalogCacheTestSupport.hpp"
-#include "CatalogTestPayloads.hpp"
-#include "SettingsTestFixture.hpp"
-#include "SkySettingsStore.hpp"
-#include "SkyLogging.hpp"
-
-#include <QFile>
 #include <QRegularExpression>
 #include <QSettings>
+#include <QtTest/QtTest>
+
+#include <cstdint>
 
 namespace {
 
 void ignoreSkySettingsFallbackWarnings(const int count)
 {
     for (int index = 0; index < count; ++index) {
-        QTest::ignoreMessage(
-            QtWarningMsg,
-            QRegularExpression(
-                "Invalid .*setting skyContext/.* - using fallback .*"
-            )
-        );
+        QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Invalid .*setting skyContext/.* - using fallback .*"));
     }
 }
 
@@ -32,13 +26,12 @@ class SkySettingsStoreTests final : public QObject {
 private slots:
     void initTestCase();
     void savesAndLoadsStateSnapshot();
-    void savesAndLoadsNegativeUtcEpochSeconds();
-    void savesLoadsAndDefaultsMainWindowSize();
+    void savesAndLoadsNegativeUtcEpochMicros();
+    void loadsLegacyUtcEpochSecondsAsMicros();
+    void defaultsRoundTripThroughStore();
     void malformedStateValuesFallBackToDefaults();
     void partialStateAndUnknownOverlayKeysAreTolerated();
-    void savesLoadsAndClearsCatalogCachesIndependently();
-    void partialCatalogCacheSavePreservesConfiguredPeerPath();
-    void missingCacheFilesAndMalformedCacheMetadataAreTolerated();
+    void malformedEphemerisUserSettingsFallBackToDefaults();
     void savesLoadsAndDefaultsLoggingPreferences();
     void malformedLoggingPreferencesFallBackToDefaults();
 
@@ -57,7 +50,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     settings.clear();
 
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot savedSnapshot;
+    SkyPersistedStateSnapshot savedSnapshot;
     savedSnapshot.live = false;
     savedSnapshot.timelineToolbarCollapsed = true;
     savedSnapshot.searchToolbarCollapsed = true;
@@ -67,7 +60,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.viewCenterAltitudeDeg = 18.0;
     savedSnapshot.viewCenterAzimuthDeg = 220.0;
     savedSnapshot.viewFieldOfViewDeg = 74.0;
-    savedSnapshot.utcEpochSeconds = 1'717'276'800;
+    savedSnapshot.utcEpochMicros = 1'717'276'800'123'000LL;
     savedSnapshot.latitudeDeg = 47.0;
     savedSnapshot.longitudeDeg = 8.0;
     savedSnapshot.elevationMeters = 409.0;
@@ -93,8 +86,40 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.logToTerminal = false;
     savedSnapshot.logToFile = true;
     savedSnapshot.logFilePath = m_settings.filePath(QStringLiteral("skygate-test.log"));
+    savedSnapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    savedSnapshot.ephemeris.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
+                                              | skygate::ephemeris::EphemerisCorrectionFlags::stellarAberration();
+    savedSnapshot.ephemeris.correctionPresetId = QStringLiteral("astrometric");
+    savedSnapshot.ephemeris.fallbackToSimpleEngine = false;
+    savedSnapshot.ephemeris.refractionEnabled = false;
+    savedSnapshot.ephemeris.atmosphericPressureHpa = 810.0;
+    savedSnapshot.ephemeris.atmosphericTemperatureC = -2.5;
+    savedSnapshot.ephemeris.relativeHumidity = 0.62;
+    savedSnapshot.ephemeris.observingWavelengthMicrometers = 0.7;
+    savedSnapshot.ephemeris.preferredDataProfileId = QStringLiteral("de441-long-range");
+    savedSnapshot.ephemeris.onlineUpdatesEnabled = false;
+    savedSnapshot.ephemeris.updatePresetId = QStringLiteral("custom");
+    savedSnapshot.ephemeris.updateManifestUrl = QStringLiteral("https://example.com/ephemeris.json");
+    savedSnapshot.ephemerisSettingsPresent = true;
 
     QVERIFY(store.saveState(savedSnapshot));
+
+    // Every field is persisted in its own settings domain, which pins the key
+    // layout the settings file exposes.
+    const auto domains = skygate::ui::internal::SkySettingsSnapshotCodecs::splitStateSnapshot(savedSnapshot);
+    QCOMPARE(domains.timeline.live, false);
+    QCOMPARE(domains.search.toolbarCollapsed, true);
+    QCOMPARE(domains.view.themeId, QString("night-vision"));
+    QCOMPARE(domains.location.displayTimeZoneId, QString("Europe/Zurich"));
+    QCOMPARE(domains.catalogSources.deepSkyPresetIndex, 1);
+    QCOMPARE(domains.logging.logToFile, true);
+    QCOMPARE(
+        static_cast<std::uint8_t>(domains.ephemeris.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+    QCOMPARE(domains.ephemeris.preferredDataProfileId, QString("de441-long-range"));
+    QCOMPARE(domains.ephemerisSettingsPresent, true);
+
     const auto loadedSnapshot = store.loadState();
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->live, savedSnapshot.live);
@@ -102,7 +127,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QCOMPARE(loadedSnapshot->searchToolbarCollapsed, savedSnapshot.searchToolbarCollapsed);
     QCOMPARE(loadedSnapshot->speedMultiplier, savedSnapshot.speedMultiplier);
     QCOMPARE(loadedSnapshot->stepSeconds, savedSnapshot.stepSeconds);
-    QCOMPARE(loadedSnapshot->utcEpochSeconds, savedSnapshot.utcEpochSeconds);
+    QCOMPARE(loadedSnapshot->utcEpochMicros, savedSnapshot.utcEpochMicros);
     QCOMPARE(loadedSnapshot->locationSourceText, savedSnapshot.locationSourceText);
     QCOMPARE(loadedSnapshot->selectedCityId, savedSnapshot.selectedCityId);
     QCOMPARE(loadedSnapshot->displayTimeZoneId, savedSnapshot.displayTimeZoneId);
@@ -111,48 +136,86 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QVERIFY(loadedSnapshot->overlayLayers.equals(savedSnapshot.overlayLayers));
     QCOMPARE(loadedSnapshot->catalogPresetIndex, savedSnapshot.catalogPresetIndex);
     QCOMPARE(loadedSnapshot->catalogUrlText, savedSnapshot.catalogUrlText);
-    QCOMPARE(
-        loadedSnapshot->deepSkyCatalogPresetIndex,
-        savedSnapshot.deepSkyCatalogPresetIndex
-    );
+    QCOMPARE(loadedSnapshot->deepSkyCatalogPresetIndex, savedSnapshot.deepSkyCatalogPresetIndex);
     QCOMPARE(loadedSnapshot->deepSkyCatalogUrlText, savedSnapshot.deepSkyCatalogUrlText);
     QCOMPARE(loadedSnapshot->logToTerminal, savedSnapshot.logToTerminal);
     QCOMPARE(loadedSnapshot->logToFile, savedSnapshot.logToFile);
     QCOMPARE(loadedSnapshot->logFilePath, savedSnapshot.logFilePath);
+    QCOMPARE(
+        static_cast<std::uint8_t>(loadedSnapshot->ephemeris.engineKind),
+        static_cast<std::uint8_t>(savedSnapshot.ephemeris.engineKind)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(loadedSnapshot->ephemeris.correctionFlags),
+        static_cast<std::uint32_t>(savedSnapshot.ephemeris.correctionFlags)
+    );
+    QCOMPARE(loadedSnapshot->ephemeris.correctionPresetId, savedSnapshot.ephemeris.correctionPresetId);
+    QCOMPARE(loadedSnapshot->ephemeris.fallbackToSimpleEngine, savedSnapshot.ephemeris.fallbackToSimpleEngine);
+    QCOMPARE(loadedSnapshot->ephemeris.refractionEnabled, savedSnapshot.ephemeris.refractionEnabled);
+    QCOMPARE(loadedSnapshot->ephemeris.atmosphericPressureHpa, savedSnapshot.ephemeris.atmosphericPressureHpa);
+    QCOMPARE(loadedSnapshot->ephemeris.atmosphericTemperatureC, savedSnapshot.ephemeris.atmosphericTemperatureC);
+    QCOMPARE(loadedSnapshot->ephemeris.relativeHumidity, savedSnapshot.ephemeris.relativeHumidity);
+    QCOMPARE(
+        loadedSnapshot->ephemeris.observingWavelengthMicrometers, savedSnapshot.ephemeris.observingWavelengthMicrometers
+    );
+    QCOMPARE(loadedSnapshot->ephemeris.preferredDataProfileId, savedSnapshot.ephemeris.preferredDataProfileId);
+    QCOMPARE(loadedSnapshot->ephemeris.onlineUpdatesEnabled, savedSnapshot.ephemeris.onlineUpdatesEnabled);
+    QCOMPARE(loadedSnapshot->ephemeris.updatePresetId, savedSnapshot.ephemeris.updatePresetId);
+    QCOMPARE(loadedSnapshot->ephemeris.updateManifestUrl, savedSnapshot.ephemeris.updateManifestUrl);
+    QCOMPARE(loadedSnapshot->ephemerisSettingsPresent, true);
 }
 
-void SkySettingsStoreTests::savesAndLoadsNegativeUtcEpochSeconds()
+void SkySettingsStoreTests::savesAndLoadsNegativeUtcEpochMicros()
 {
     QSettings settings;
     settings.clear();
 
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot savedSnapshot;
-    savedSnapshot.utcEpochSeconds = -63'555'595'200LL;
+    SkyPersistedStateSnapshot savedSnapshot;
+    savedSnapshot.utcEpochMicros = -63'555'595'200'123'000LL;
 
     QVERIFY(store.saveState(savedSnapshot));
     const auto loadedSnapshot = store.loadState();
     QVERIFY(loadedSnapshot.has_value());
-    QCOMPARE(loadedSnapshot->utcEpochSeconds, savedSnapshot.utcEpochSeconds);
+    QCOMPARE(loadedSnapshot->utcEpochMicros, savedSnapshot.utcEpochMicros);
 }
 
-void SkySettingsStoreTests::savesLoadsAndDefaultsMainWindowSize()
+void SkySettingsStoreTests::loadsLegacyUtcEpochSecondsAsMicros()
+{
+    QSettings settings;
+    settings.clear();
+    settings.setValue("skyContext/version", 3);
+    settings.setValue("skyContext/utcEpochSeconds", -1234LL);
+
+    const SkySettingsStore store;
+    const auto loadedSnapshot = store.loadState();
+
+    QVERIFY(loadedSnapshot.has_value());
+    QCOMPARE(loadedSnapshot->utcEpochMicros, -1'234'000'000LL);
+}
+
+void SkySettingsStoreTests::defaultsRoundTripThroughStore()
 {
     QSettings settings;
     settings.clear();
 
     const SkySettingsStore store;
-    QCOMPARE(store.loadMainWindowSize(), QSize(1100, 760));
+    const SkyPersistedStateSnapshot defaults;
+    QVERIFY(store.saveState(defaults));
 
-    QVERIFY(store.saveMainWindowSize(QSize(1280, 820)));
-    QCOMPARE(store.loadMainWindowSize(), QSize(1280, 820));
-
-    settings.setValue("app/mainWindowWidth", "wide");
-    settings.setValue("app/mainWindowHeight", 12);
-    QCOMPARE(store.loadMainWindowSize(), QSize(1100, 760));
-
-    QVERIFY(store.saveMainWindowSize(QSize(300, 300)));
-    QCOMPARE(store.loadMainWindowSize(), QSize(1100, 760));
+    const auto loadedSnapshot = store.loadState();
+    QVERIFY(loadedSnapshot.has_value());
+    QCOMPARE(loadedSnapshot->stepSeconds, defaults.stepSeconds);
+    QCOMPARE(loadedSnapshot->magnitudeCutoff, defaults.magnitudeCutoff);
+    QCOMPARE(loadedSnapshot->viewFieldOfViewDeg, defaults.viewFieldOfViewDeg);
+    QCOMPARE(loadedSnapshot->viewCenterAltitudeDeg, defaults.viewCenterAltitudeDeg);
+    QCOMPARE(loadedSnapshot->viewCenterAzimuthDeg, defaults.viewCenterAzimuthDeg);
+    QCOMPARE(loadedSnapshot->ephemeris.atmosphericPressureHpa, defaults.ephemeris.atmosphericPressureHpa);
+    QCOMPARE(loadedSnapshot->ephemeris.atmosphericTemperatureC, defaults.ephemeris.atmosphericTemperatureC);
+    QCOMPARE(loadedSnapshot->ephemeris.relativeHumidity, defaults.ephemeris.relativeHumidity);
+    QCOMPARE(
+        loadedSnapshot->ephemeris.observingWavelengthMicrometers, defaults.ephemeris.observingWavelengthMicrometers
+    );
 }
 
 void SkySettingsStoreTests::malformedStateValuesFallBackToDefaults()
@@ -168,7 +231,7 @@ void SkySettingsStoreTests::malformedStateValuesFallBackToDefaults()
     settings.setValue("skyContext/viewCenterAltitudeDeg", "above");
     settings.setValue("skyContext/viewCenterAzimuthDeg", "east-ish");
     settings.setValue("skyContext/viewFieldOfViewDeg", "wide");
-    settings.setValue("skyContext/utcEpochSeconds", "yesterday");
+    settings.setValue("skyContext/utcEpochMicros", "yesterday");
     settings.setValue("skyContext/latitudeDeg", "north");
     settings.setValue("skyContext/longitudeDeg", "west");
     settings.setValue("skyContext/elevationMeters", "high");
@@ -194,7 +257,7 @@ void SkySettingsStoreTests::malformedStateValuesFallBackToDefaults()
     QCOMPARE(loadedSnapshot->viewCenterAltitudeDeg, 0.0);
     QCOMPARE(loadedSnapshot->viewCenterAzimuthDeg, 0.0);
     QCOMPARE(loadedSnapshot->viewFieldOfViewDeg, 100.0);
-    QCOMPARE(loadedSnapshot->utcEpochSeconds, 0LL);
+    QCOMPARE(loadedSnapshot->utcEpochMicros, 0LL);
     QCOMPARE(loadedSnapshot->latitudeDeg, 0.0);
     QCOMPARE(loadedSnapshot->longitudeDeg, 0.0);
     QCOMPARE(loadedSnapshot->elevationMeters, 0.0);
@@ -208,18 +271,24 @@ void SkySettingsStoreTests::malformedStateValuesFallBackToDefaults()
     QCOMPARE(loadedSnapshot->logToTerminal, true);
     QCOMPARE(loadedSnapshot->logToFile, false);
     QCOMPARE(loadedSnapshot->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
+    QCOMPARE(loadedSnapshot->ephemerisSettingsPresent, false);
 }
 
 void SkySettingsStoreTests::partialStateAndUnknownOverlayKeysAreTolerated()
 {
     QSettings settings;
     settings.clear();
+
+    // Without a schema version marker the settings file describes nothing the
+    // store can load, so the caller keeps its in-memory state.
+    const SkySettingsStore store;
+    QVERIFY(!store.loadState().has_value());
+
     settings.setValue("skyContext/version", 3);
     settings.setValue("skyContext/searchToolbarCollapsed", true);
     settings.setValue("skyContext/overlayLayers/altAzGrid", false);
     settings.setValue("skyContext/overlayLayers/unusedPrototypeLayer", true);
 
-    const SkySettingsStore store;
     const auto loadedSnapshot = store.loadState();
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->live, true);
@@ -232,117 +301,60 @@ void SkySettingsStoreTests::partialStateAndUnknownOverlayKeysAreTolerated()
     QCOMPARE(loadedSnapshot->logToTerminal, true);
     QCOMPARE(loadedSnapshot->logToFile, false);
     QCOMPARE(loadedSnapshot->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
+
+    // The absent ephemeris settings section keeps the engine and data-profile
+    // defaults instead of inventing a stored selection.
+    QCOMPARE(
+        static_cast<std::uint8_t>(loadedSnapshot->ephemeris.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
+    QCOMPARE(loadedSnapshot->ephemeris.preferredDataProfileId, QString("de440s-short-range"));
+    QCOMPARE(loadedSnapshot->ephemerisSettingsPresent, false);
 }
 
-void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
+void SkySettingsStoreTests::malformedEphemerisUserSettingsFallBackToDefaults()
 {
-    m_settings.resetSettingsWithCatalogCachePaths(
-        QStringLiteral("catalog-cache-test.txt"),
-        QStringLiteral("deep-sky-catalog-cache-test.txt")
-    );
-
-    SkySettingsStore store;
-    const SkySettingsStore::CatalogCacheSnapshot savedSnapshot =
-        skygate::ui::tests::sampleCatalogCacheSnapshot({
-            .constellationLineRows = "a|b\n",
-            .constellationLabelRows = "Orion|hip1,hip2\n",
-            .constellationCount = 42
-        });
-
-    QVERIFY(store.saveCatalogCache(savedSnapshot));
-    const auto loadedSnapshot = store.loadCatalogCache();
-    QVERIFY(loadedSnapshot.has_value());
-    QCOMPARE(loadedSnapshot->sourceLabel, savedSnapshot.sourceLabel);
-    QCOMPARE(loadedSnapshot->deepSkySourceLabel, savedSnapshot.deepSkySourceLabel);
-    QCOMPARE(loadedSnapshot->catalogPayload, savedSnapshot.catalogPayload);
-    QCOMPARE(loadedSnapshot->deepSkyCatalogPayload, savedSnapshot.deepSkyCatalogPayload);
-    QCOMPARE(loadedSnapshot->constellationLineRows, savedSnapshot.constellationLineRows);
-    QCOMPARE(
-        loadedSnapshot->constellationLineSchemaVersion,
-        savedSnapshot.constellationLineSchemaVersion
-    );
-    QCOMPARE(loadedSnapshot->constellationCount, savedSnapshot.constellationCount);
-
-    QVERIFY(store.clearCatalogCache());
-    const auto starClearedSnapshot = store.loadCatalogCache();
-    QVERIFY(starClearedSnapshot.has_value());
-    QVERIFY(starClearedSnapshot->sourceLabel.isEmpty());
-    QVERIFY(starClearedSnapshot->catalogPayload.isEmpty());
-    QVERIFY(starClearedSnapshot->constellationLineRows.isEmpty());
-    QVERIFY(starClearedSnapshot->constellationLabelRows.isEmpty());
-    QCOMPARE(starClearedSnapshot->constellationLineSchemaVersion, 0);
-    QCOMPARE(starClearedSnapshot->constellationCount, 0U);
-    QCOMPARE(
-        starClearedSnapshot->deepSkySourceLabel,
-        savedSnapshot.deepSkySourceLabel
-    );
-    QCOMPARE(
-        starClearedSnapshot->deepSkyCatalogPayload,
-        savedSnapshot.deepSkyCatalogPayload
-    );
-
-    QVERIFY(store.clearDeepSkyCatalogCache());
-    QVERIFY(!store.loadCatalogCache().has_value());
-}
-
-void SkySettingsStoreTests::partialCatalogCacheSavePreservesConfiguredPeerPath()
-{
-    const QString starCachePath = m_settings.filePath(QStringLiteral("partial-star-cache.txt"));
-    const QString deepSkyCachePath =
-        m_settings.filePath(QStringLiteral("partial-deep-sky-cache.txt"));
-    m_settings.clearSettings();
-    m_settings.setCatalogCachePaths(starCachePath, deepSkyCachePath);
     QSettings settings;
-
-    SkySettingsStore store;
-    SkySettingsStore::CatalogCacheSnapshot starSnapshot;
-    starSnapshot.sourceLabel = "Saved";
-    starSnapshot.catalogPayload = skygate::ui::tests::sampleHygCsvPayload();
-    QVERIFY(store.saveCatalogCache(starSnapshot));
-    QCOMPARE(settings.value("skyContext/catalogCachePath").toString(), starCachePath);
-    QCOMPARE(settings.value("skyContext/deepSkyCatalogCachePath").toString(), deepSkyCachePath);
-
-    SkySettingsStore::CatalogCacheSnapshot deepSkySnapshot;
-    deepSkySnapshot.deepSkySourceLabel = "Saved OpenNGC";
-    deepSkySnapshot.deepSkyCatalogPayload =
-        skygate::ui::tests::sampleCompactOpenNgcCsvPayload();
-    QVERIFY(store.saveCatalogCache(deepSkySnapshot));
-    QCOMPARE(settings.value("skyContext/catalogCachePath").toString(), starCachePath);
-    QCOMPARE(settings.value("skyContext/deepSkyCatalogCachePath").toString(), deepSkyCachePath);
-    QVERIFY(QFileInfo::exists(deepSkyCachePath));
-}
-
-void SkySettingsStoreTests::missingCacheFilesAndMalformedCacheMetadataAreTolerated()
-{
-    m_settings.clearSettings();
-    m_settings.setCatalogCachePaths(
-        m_settings.filePath(QStringLiteral("missing-star-cache.csv")),
-        m_settings.filePath(QStringLiteral("missing-deep-sky-cache.csv"))
-    );
-    QSettings settings;
-    settings.setValue("skyContext/catalogSourceLabel", "Missing HYG");
-    settings.setValue("skyContext/catalogConstellationLineSchemaVersion", "latest");
-    settings.setValue("skyContext/catalogConstellationCount", "many");
+    settings.clear();
+    settings.setValue("skyContext/version", 3);
+    settings.setValue("skyContext/ephemeris/engineKind", "experimental");
+    settings.setValue("skyContext/ephemeris/correctionFlags", "full");
+    settings.setValue("skyContext/ephemeris/correctionPresetId", "  ");
+    settings.setValue("skyContext/ephemeris/fallbackToSimpleEngine", "occasionally");
+    settings.setValue("skyContext/ephemeris/refractionEnabled", "sometimes");
+    settings.setValue("skyContext/ephemeris/atmosphericPressureHpa", "heavy");
+    settings.setValue("skyContext/ephemeris/atmosphericTemperatureC", "warm");
+    settings.setValue("skyContext/ephemeris/relativeHumidity", "humid");
+    settings.setValue("skyContext/ephemeris/observingWavelengthMicrometers", "green");
+    settings.setValue("skyContext/ephemeris/preferredDataProfileId", "");
+    settings.setValue("skyContext/ephemeris/onlineUpdatesEnabled", "maybe");
+    settings.setValue("skyContext/ephemeris/updatePresetId", " ");
+    settings.setValue("skyContext/ephemeris/updateManifestUrl", "  https://example.invalid/manifest.json  ");
 
     const SkySettingsStore store;
-    QVERIFY(!store.loadCatalogCache().has_value());
-
-    const QString cachePath = m_settings.filePath(QStringLiteral("malformed-metadata-cache.csv"));
-    QFile cacheFile(cachePath);
-    QVERIFY(cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate));
-    QVERIFY(cacheFile.write(skygate::ui::tests::sampleHygCsvPayload()) > 0);
-    cacheFile.close();
-
-    settings.setValue("skyContext/catalogCachePath", cachePath);
-    settings.setValue("skyContext/catalogConstellationLineSchemaVersion", "latest");
-    settings.setValue("skyContext/catalogConstellationCount", "many");
-    ignoreSkySettingsFallbackWarnings(2);
-    const auto loadedSnapshot = store.loadCatalogCache();
+    ignoreSkySettingsFallbackWarnings(11);
+    const auto loadedSnapshot = store.loadState();
     QVERIFY(loadedSnapshot.has_value());
-    QCOMPARE(loadedSnapshot->sourceLabel, QString("Missing HYG"));
-    QCOMPARE(loadedSnapshot->constellationLineSchemaVersion, 0);
-    QCOMPARE(loadedSnapshot->constellationCount, 0U);
-    QVERIFY(loadedSnapshot->deepSkyCatalogPayload.isEmpty());
+    const SkyEphemerisUserSettingsSnapshot defaults;
+    QCOMPARE(
+        static_cast<std::uint8_t>(loadedSnapshot->ephemeris.engineKind), static_cast<std::uint8_t>(defaults.engineKind)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(loadedSnapshot->ephemeris.correctionFlags),
+        static_cast<std::uint32_t>(defaults.correctionFlags)
+    );
+    QCOMPARE(loadedSnapshot->ephemeris.correctionPresetId, defaults.correctionPresetId);
+    QCOMPARE(loadedSnapshot->ephemeris.fallbackToSimpleEngine, defaults.fallbackToSimpleEngine);
+    QCOMPARE(loadedSnapshot->ephemeris.refractionEnabled, defaults.refractionEnabled);
+    QCOMPARE(loadedSnapshot->ephemeris.atmosphericPressureHpa, defaults.atmosphericPressureHpa);
+    QCOMPARE(loadedSnapshot->ephemeris.atmosphericTemperatureC, defaults.atmosphericTemperatureC);
+    QCOMPARE(loadedSnapshot->ephemeris.relativeHumidity, defaults.relativeHumidity);
+    QCOMPARE(loadedSnapshot->ephemeris.observingWavelengthMicrometers, defaults.observingWavelengthMicrometers);
+    QCOMPARE(loadedSnapshot->ephemeris.preferredDataProfileId, defaults.preferredDataProfileId);
+    QCOMPARE(loadedSnapshot->ephemeris.onlineUpdatesEnabled, defaults.onlineUpdatesEnabled);
+    QCOMPARE(loadedSnapshot->ephemeris.updatePresetId, defaults.updatePresetId);
+    QCOMPARE(loadedSnapshot->ephemeris.updateManifestUrl, QString("https://example.invalid/manifest.json"));
+    QCOMPARE(loadedSnapshot->ephemerisSettingsPresent, true);
 }
 
 void SkySettingsStoreTests::savesLoadsAndDefaultsLoggingPreferences()
@@ -351,7 +363,7 @@ void SkySettingsStoreTests::savesLoadsAndDefaultsLoggingPreferences()
     settings.clear();
 
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.logToTerminal = false;
     snapshot.logToFile = true;
     snapshot.logFilePath = m_settings.filePath(QStringLiteral("custom-skygate.log"));
@@ -367,10 +379,7 @@ void SkySettingsStoreTests::savesLoadsAndDefaultsLoggingPreferences()
     ignoreSkySettingsFallbackWarnings(1);
     const auto loadedWithBlankPath = store.loadState();
     QVERIFY(loadedWithBlankPath.has_value());
-    QCOMPARE(
-        loadedWithBlankPath->logFilePath,
-        skygate::ui::SkyLogging::defaultLogFilePath()
-    );
+    QCOMPARE(loadedWithBlankPath->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
 }
 
 void SkySettingsStoreTests::malformedLoggingPreferencesFallBackToDefaults()

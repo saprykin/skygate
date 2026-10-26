@@ -1,4 +1,8 @@
 #include "SkySceneOverlayAdapter.hpp"
+#include "SkyInspectorField.hpp"
+#include "SkyOverlayItem.hpp"
+#include "SkySelectedObjectInspector.hpp"
+#include "SkySelectionMarker.hpp"
 
 namespace {
 
@@ -20,14 +24,15 @@ QVariantMap inspectorFieldMap(const SkyInspectorField& field)
     QVariantMap entry;
     entry.insert("label", field.label);
     entry.insert("value", field.value);
+    if (!field.tooltip.isEmpty()) {
+        entry.insert("tooltip", field.tooltip);
+    }
     return entry;
 }
 
 }  // namespace
 
-QVariantList SkySceneOverlayAdapter::overlayItems(
-    const std::span<const SkyOverlayItem> overlayItems
-) const
+QVariantList SkySceneOverlayAdapter::overlayItems(const std::span<const SkyOverlayItem> overlayItems) const
 {
     QVariantList items;
     items.reserve(static_cast<qsizetype>(overlayItems.size()));
@@ -37,9 +42,7 @@ QVariantList SkySceneOverlayAdapter::overlayItems(
     return items;
 }
 
-QVariantMap SkySceneOverlayAdapter::selectionMarker(
-    const SkySelectionMarker& marker
-) const
+QVariantMap SkySceneOverlayAdapter::selectionMarker(const SkySelectionMarker& marker) const
 {
     if (!marker.visible) {
         return {};
@@ -52,9 +55,7 @@ QVariantMap SkySceneOverlayAdapter::selectionMarker(
     return entry;
 }
 
-QVariantMap SkySceneOverlayAdapter::selectedObjectInspector(
-    const SkySelectedObjectInspector& inspector
-) const
+QVariantMap SkySceneOverlayAdapter::selectedObjectInspector(const SkySelectedObjectInspector& inspector) const
 {
     if (!inspector.visible) {
         return {};

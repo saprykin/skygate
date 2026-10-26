@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/ephemeris/CatalogLoadResult.hpp"
+#include "catalog/CatalogSourceType.hpp"
 
 #include <string_view>
 
@@ -8,7 +8,9 @@ namespace skygate::ephemeris {
 
 class CatalogPayloadFormatDetector final {
 public:
-    [[nodiscard]] static CatalogPayloadFormat detect(std::string_view payload) noexcept;
+    // Detects the catalog schema of an already-decoded (plain-text) payload.
+    // Archive containers are decoded by the payload parser before this runs.
+    [[nodiscard]] static CatalogSourceType detect(std::string_view payload) noexcept;
 };
 
 }  // namespace skygate::ephemeris

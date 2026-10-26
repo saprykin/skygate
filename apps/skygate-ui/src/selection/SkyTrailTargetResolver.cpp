@@ -1,37 +1,38 @@
 #include "SkyTrailTargetResolver.hpp"
+#include "SkySelectionOverlayInput.hpp"
+#include "SkySelectionTargetKind.hpp"
 
-#include "SkySceneShared.hpp"
-
-QString SkyTrailTargetResolver::activeTrailTargetBodyId(
-    const SkySelectionOverlayInput& input
-) const
+std::array<SkyTrailTargetResolver::Target, SkyTrailTargetResolver::kTargetCount>
+SkyTrailTargetResolver::targetCandidates(const SkySelectionOverlayInput& input) const
 {
-    if (!input.selectedObjectTargetId.trimmed().isEmpty()) {
-        return input.selectedObjectTargetId;
-    }
+    return {
+        Target{
+            .kind = skygate::ui::internal::SkySelectionTargetKind::token(
+                skygate::ui::internal::SkySelectionTargetKind::Type::Body
+            ),
+            .id = input.selectedObjectTargetId,
+        },
+        Target{.kind = input.trackedTargetKind, .id = input.trackedTargetId},
+        Target{.kind = input.selectedSearchTargetKind, .id = input.selectedSearchTargetId},
+    };
+}
 
-    if (
-        normalizedSceneLookupKey(input.trackedTargetKind) == "body"
-        && !input.trackedTargetId.trimmed().isEmpty()
-    ) {
-        return input.trackedTargetId;
-    }
-
-    if (
-        normalizedSceneLookupKey(input.selectedSearchTargetKind) == "body"
-        && !input.selectedSearchTargetId.trimmed().isEmpty()
-    ) {
-        return input.selectedSearchTargetId;
+QString SkyTrailTargetResolver::activeTrailTargetBodyId(const SkySelectionOverlayInput& input) const
+{
+    for (const Target& candidate : targetCandidates(input)) {
+        if (skygate::ui::internal::SkySelectionTargetKind::isBody(candidate.kind)
+            && !candidate.id.trimmed().isEmpty()) {
+            return candidate.id;
+        }
     }
 
     return {};
 }
 
-std::optional<std::uint32_t> SkyTrailTargetResolver::activeTrailTargetBodyIndex(
-    const SkySelectionOverlayInput& input
-) const
+std::optional<std::uint32_t>
+SkyTrailTargetResolver::activeTrailTargetBodyIndex(const SkySelectionOverlayInput& input) const
 {
-    if (input.snapshot == nullptr || input.stateIndexByBodyId == nullptr) {
+    if (input.snapshot == nullptr) {
         return std::nullopt;
     }
 
@@ -40,12 +41,10 @@ std::optional<std::uint32_t> SkyTrailTargetResolver::activeTrailTargetBodyIndex(
         return std::nullopt;
     }
 
-    const auto stateIndexIt = input.stateIndexByBodyId->constFind(
-        normalizedSceneLookupKey(targetBodyId)
-    );
-    if (stateIndexIt == input.stateIndexByBodyId->cend()) {
+    const auto stateIndex = input.stateIndexForBodyId(targetBodyId);
+    if (!stateIndex.has_value()) {
         return std::nullopt;
     }
 
-    return input.snapshot->states.at(*stateIndexIt).bodyIndex;
+    return input.snapshot->states.at(*stateIndex).bodyIndex;
 }

@@ -7,6 +7,61 @@ to `v*` Git tags and the version declared in `CMakeLists.txt`.
 
 ## [Unreleased]
 
+### High-precision ephemeris engine
+
+This release hardens the high-precision ephemeris engine, tightens its
+architecture boundaries, and improves diagnostics and test provenance.
+
+- Added live manifest assets for upstream data that changes without a
+  manifest update. Time and Earth data (leap-second table, Earth-orientation
+  series, and Delta T data) is now marked `live` and no longer requires exact
+  size or sha256 pins, so downloading and applying updated time and Earth
+  data from the upstream providers works again while kernels keep strict
+  integrity verification.
+
+- Guarded Delta-T interpolation denominators and rejected duplicate
+  effective epochs in table data.
+- Cached time-scale, Earth-orientation, and CALCEPH kernel providers across
+  ephemeris engine rebuilds and skipped per-open kernel checksum
+  verification for installed data, which removes a multi-gigabyte kernel
+  re-hash from every startup.
+- Added a binary catalog cache payload next to the raw downloaded catalog
+  payloads so startup restores skip the gzip CSV re-parse; legacy caches are
+  upgraded on first restore and corrupt binary payloads fall back to payload
+  parsing.
+- Coalesced catalog-cache restores into a single catalog change emission so
+  startup no longer rebuilds the ephemeris engine and search model once per
+  restored catalog component.
+- Fixed UTC interval arithmetic so request epochs are no longer corrupted
+  across time scales.
+- Removed the simple-only link dependency on high-precision text parsing and
+  broke the catalog/engine date-range coupling.
+- Fixed the TDB-TT UT1-fraction argument and capped decompressed output and
+  network staging to prevent decompression bombs.
+- Added real-kernel Horizons acceptance rows at arcsecond/milliarcsecond
+  tolerances and relabeled self-derived fixtures.
+- Extracted an injected fallback strategy, unified the computation cache, and
+  made the factory a complete composition root with lossless request
+  overloads.
+- Split the time-scale service into focused offset resolvers and the data
+  manager into download, cache, and snapshot responsibilities.
+- Propagated calceph diagnostics end-to-end and added ephemeris logging.
+- Gave geometric corrections a distinct flag and added structured fallback
+  provenance.
+- Moved core-worthy calendar and Julian-date arithmetic (`CalendarTime`,
+  `EpochCodec`, `AstronomicalEpoch`, and related time types) into
+  `skygate-core` with dedicated core tests.
+- Deduplicated NAIF body IDs, WGS84 geodesy constants, and solar
+  mean-anomaly constants into `skygate-core`.
+- Consolidated the solar mean-anomaly constant so the shared value feeds
+  both the TDB-TT term and the simple Sun position; the simple-only
+  approximation changed from 357.53 to 357.528 (a sub-microsecond TDB-TT
+  effect; the HP path uses ERFA).
+- Removed the dual civil-date/epoch table-entry representation and added
+  `AstronomicalEpoch` equality.
+- Documented the high-precision interface layer and fallback strategy in the
+  architecture notes.
+
 ## [1.1.0] - 2026-05-08
 
 ### Added

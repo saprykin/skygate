@@ -1,6 +1,23 @@
-#include "QmlTestSupport.hpp"
+#include "support/QmlTestSupport.hpp"
+
+#include <QColor>
 
 using namespace skygate::ui::tests;
+
+namespace {
+
+QColor themeColor(const QObject* theme, const char* propertyName)
+{
+    return theme->property(propertyName).value<QColor>();
+}
+
+QColor checkIndicatorColor(QObject* checkBox)
+{
+    QObject* indicator = qvariant_cast<QObject*>(checkBox->property("indicator"));
+    return indicator != nullptr ? indicator->property("color").value<QColor>() : QColor();
+}
+
+}  // namespace
 
 class QmlComponentLoadTests final : public QObject {
     Q_OBJECT
@@ -10,8 +27,11 @@ private slots:
     void init();
     void keyComponentsLoadWithoutWarnings_data();
     void keyComponentsLoadWithoutWarnings();
+    void preferencesWindowUsesSuppliedControllerTheme();
+    void preferenceControlUsesSuppliedTheme();
     void aboutWindowLoadsWithBuildMetadata();
     void aboutWindowClosesFromButtonsAndShortcuts();
+    void aboutWindowUsesSuppliedTheme();
     void malformedQmlEmitsCapturedWarning();
 
 private:
@@ -33,9 +53,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
     QTest::addColumn<QString>("name");
     QTest::addColumn<QString>("source");
 
-    QTest::newRow("SearchToolbar")
-        << QStringLiteral("SearchToolbar")
-        << QStringLiteral(R"(
+    QTest::newRow("SearchToolbar") << QStringLiteral("SearchToolbar") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -47,9 +65,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("SkyAppMenuButton")
-        << QStringLiteral("SkyAppMenuButton")
-        << QStringLiteral(R"(
+    QTest::newRow("SkyAppMenuButton") << QStringLiteral("SkyAppMenuButton") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 120
@@ -62,9 +78,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("TimelineToolbar")
-        << QStringLiteral("TimelineToolbar")
-        << QStringLiteral(R"(
+    QTest::newRow("TimelineToolbar") << QStringLiteral("TimelineToolbar") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -76,9 +90,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("StatusFooter")
-        << QStringLiteral("StatusFooter")
-        << QStringLiteral(R"(
+    QTest::newRow("StatusFooter") << QStringLiteral("StatusFooter") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -92,9 +104,32 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("PreferencesCatalogSection")
-        << QStringLiteral("PreferencesCatalogSection")
-        << QStringLiteral(R"(
+    QTest::newRow("StatusDegradationPopup") << QStringLiteral("StatusDegradationPopup") << QStringLiteral(R"(
+            import QtQuick
+            Item {
+                width: 900
+                height: 520
+                StatusDegradationPopup {
+                    anchors.fill: parent
+                    skyContextController: skyContext
+                    sceneModel: skyScene
+                }
+            }
+        )");
+
+    QTest::newRow("PreferencesCatalogSection") << QStringLiteral("PreferencesCatalogSection") << QStringLiteral(R"(
+            import QtQuick
+            Item {
+                width: 900
+                height: 520
+                PreferencesCatalogSection {
+                    anchors.fill: parent
+                    skyContextController: skyContext
+                }
+            }
+        )");
+
+    QTest::newRow("PreferencesEngineSection") << QStringLiteral("PreferencesEngineSection") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -104,7 +139,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
                     skyContextController: skyContext
                     Component.onCompleted: resetFromContext()
                 }
-                PreferencesCatalogSection {
+                PreferencesEngineSection {
                     anchors.fill: parent
                     skyContextController: skyContext
                     preferencesDraft: draft
@@ -112,9 +147,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("PreferencesGeneralSection")
-        << QStringLiteral("PreferencesGeneralSection")
-        << QStringLiteral(R"(
+    QTest::newRow("PreferencesGeneralSection") << QStringLiteral("PreferencesGeneralSection") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -125,15 +158,14 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
                     Component.onCompleted: resetFromContext()
                 }
                 PreferencesGeneralSection {
+                    theme: skyContext.theme
                     anchors.fill: parent
                     preferencesDraft: draft
                 }
             }
         )");
 
-    QTest::newRow("PreferencesSkySection")
-        << QStringLiteral("PreferencesSkySection")
-        << QStringLiteral(R"(
+    QTest::newRow("PreferencesSkySection") << QStringLiteral("PreferencesSkySection") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -144,20 +176,20 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
                     Component.onCompleted: resetFromContext()
                 }
                 PreferencesSkySection {
+                    theme: skyContext.theme
                     anchors.fill: parent
                     preferencesDraft: draft
                 }
             }
         )");
 
-    QTest::newRow("PreferencesTimeZonePicker")
-        << QStringLiteral("PreferencesTimeZonePicker")
-        << QStringLiteral(R"(
+    QTest::newRow("PreferencesTimeZonePicker") << QStringLiteral("PreferencesTimeZonePicker") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
                 height: 120
                 PreferencesTimeZonePicker {
+                    theme: skyContext.theme
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.top: parent.top
@@ -168,9 +200,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("SkyOverlayLayer")
-        << QStringLiteral("SkyOverlayLayer")
-        << QStringLiteral(R"(
+    QTest::newRow("SkyOverlayLayer") << QStringLiteral("SkyOverlayLayer") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -221,6 +251,122 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
+void QmlComponentLoadTests::preferencesWindowUsesSuppliedControllerTheme()
+{
+    auto rootController = makeController();
+    QVERIFY(rootController != nullptr);
+    auto suppliedController = makeController();
+    QVERIFY(suppliedController != nullptr);
+    rootController->setThemeId(QStringLiteral("default"));
+    suppliedController->setThemeId(QStringLiteral("night-vision"));
+
+    QQmlEngine engine;
+    setupEngine(engine, *rootController);
+
+    const QmlWarningScope warnings;
+    auto object = createFileComponent(
+        engine,
+        QStringLiteral("windows/PreferencesWindow.qml"),
+        {{QStringLiteral("skyContextController"), QVariant::fromValue<QObject*>(suppliedController.get())}}
+    );
+    QVERIFY(object != nullptr);
+    auto* window = qobject_cast<QQuickWindow*>(object.get());
+    QVERIFY(window != nullptr);
+
+    QObject* suppliedTheme = suppliedController->theme();
+    QObject* rootTheme = rootController->theme();
+    QVERIFY(suppliedTheme != nullptr);
+    QVERIFY(rootTheme != nullptr);
+    QCOMPARE(qvariant_cast<QObject*>(window->property("theme")), suppliedTheme);
+
+    QCOMPARE(window->color(), themeColor(suppliedTheme, "windowBackground"));
+    QVERIFY(window->color() != themeColor(rootTheme, "windowBackground"));
+
+    QObject* terminalCheckBox = firstObjectWithObjectName(window, QStringLiteral("logToTerminalCheckBox"));
+    QVERIFY(terminalCheckBox != nullptr);
+    QCOMPARE(checkIndicatorColor(terminalCheckBox), themeColor(suppliedTheme, "checkBackground"));
+    QVERIFY(checkIndicatorColor(terminalCheckBox) != themeColor(rootTheme, "checkBackground"));
+
+    QObject* engineStatusLabel =
+        firstObjectWithObjectName(window, QStringLiteral("ephemerisEarthOrientationStatusLabel"));
+    QVERIFY(engineStatusLabel != nullptr);
+    QCOMPARE(engineStatusLabel->property("color").value<QColor>(), themeColor(suppliedTheme, "listItemPrimaryText"));
+
+    suppliedController->setThemeId(QStringLiteral("default"));
+    QTRY_COMPARE(window->color(), themeColor(suppliedTheme, "windowBackground"));
+    QTRY_COMPARE(checkIndicatorColor(terminalCheckBox), themeColor(suppliedTheme, "checkBackground"));
+    QTRY_COMPARE(
+        engineStatusLabel->property("color").value<QColor>(), themeColor(suppliedTheme, "listItemPrimaryText")
+    );
+
+    rootController->setThemeId(QStringLiteral("night-vision"));
+    QCoreApplication::processEvents();
+    QCOMPARE(window->color(), themeColor(suppliedTheme, "windowBackground"));
+    QCOMPARE(checkIndicatorColor(terminalCheckBox), themeColor(suppliedTheme, "checkBackground"));
+    QVERIFY(window->color() != themeColor(rootTheme, "windowBackground"));
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlComponentLoadTests::preferenceControlUsesSuppliedTheme()
+{
+    auto rootController = makeController();
+    QVERIFY(rootController != nullptr);
+    auto suppliedController = makeController();
+    QVERIFY(suppliedController != nullptr);
+    rootController->setThemeId(QStringLiteral("night-vision"));
+    suppliedController->setThemeId(QStringLiteral("default"));
+
+    QQmlEngine engine;
+    setupEngine(engine, *rootController);
+    engine.rootContext()->setContextProperty("suppliedTheme", suppliedController->theme());
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
+        import QtQuick
+        Item {
+            width: 320
+            height: 80
+            PreferencesTextField {
+                objectName: "suppliedThemeField"
+                anchors.fill: parent
+                theme: suppliedTheme
+                placeholderText: "Type here"
+            }
+        }
+    )"),
+        QStringLiteral("PreferencesTextFieldSuppliedThemeTest.qml")
+    );
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+    auto* field = firstQuickItemWithObjectName(root, QStringLiteral("suppliedThemeField"));
+    QVERIFY(field != nullptr);
+
+    QObject* suppliedTheme = suppliedController->theme();
+    QObject* rootTheme = rootController->theme();
+    QVERIFY(suppliedTheme != nullptr);
+    QVERIFY(rootTheme != nullptr);
+    QCOMPARE(field->property("color").value<QColor>(), themeColor(suppliedTheme, "inputText"));
+    QCOMPARE(
+        field->property("placeholderTextColor").value<QColor>(), themeColor(suppliedTheme, "inputPlaceholderText")
+    );
+    QVERIFY(field->property("color").value<QColor>() != themeColor(rootTheme, "inputText"));
+
+    suppliedController->setThemeId(QStringLiteral("night-vision"));
+    QTRY_COMPARE(field->property("color").value<QColor>(), themeColor(suppliedTheme, "inputText"));
+    QTRY_COMPARE(
+        field->property("placeholderTextColor").value<QColor>(), themeColor(suppliedTheme, "inputPlaceholderText")
+    );
+
+    rootController->setThemeId(QStringLiteral("default"));
+    QCoreApplication::processEvents();
+    QCOMPARE(field->property("color").value<QColor>(), themeColor(suppliedTheme, "inputText"));
+    QVERIFY(field->property("color").value<QColor>() != themeColor(rootTheme, "inputText"));
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
 void QmlComponentLoadTests::aboutWindowLoadsWithBuildMetadata()
 {
     auto controller = makeController();
@@ -232,7 +378,11 @@ void QmlComponentLoadTests::aboutWindowLoadsWithBuildMetadata()
     engine.rootContext()->setContextProperty("skygateGitHash", QStringLiteral("test-git"));
 
     const QmlWarningScope warnings;
-    auto object = createFileComponent(engine, QStringLiteral("windows/AboutWindow.qml"));
+    auto object = createFileComponent(
+        engine,
+        QStringLiteral("windows/AboutWindow.qml"),
+        {{QStringLiteral("theme"), QVariant::fromValue<QObject*>(controller->theme())}}
+    );
     QVERIFY(object != nullptr);
     QCOMPARE(object->property("title").toString(), QStringLiteral("About SkyGate"));
     QVERIFY(firstObjectWithProperty(object.get(), "text", QStringLiteral("SkyGate")) != nullptr);
@@ -251,7 +401,11 @@ void QmlComponentLoadTests::aboutWindowClosesFromButtonsAndShortcuts()
     engine.rootContext()->setContextProperty("skygateGitHash", QStringLiteral("test-git"));
 
     const QmlWarningScope warnings;
-    auto object = createFileComponent(engine, QStringLiteral("windows/AboutWindow.qml"));
+    auto object = createFileComponent(
+        engine,
+        QStringLiteral("windows/AboutWindow.qml"),
+        {{QStringLiteral("theme"), QVariant::fromValue<QObject*>(controller->theme())}}
+    );
     QVERIFY(object != nullptr);
     auto* window = qobject_cast<QQuickWindow*>(object.get());
     QVERIFY(window != nullptr);
@@ -267,10 +421,7 @@ void QmlComponentLoadTests::aboutWindowClosesFromButtonsAndShortcuts()
     window->show();
     QVERIFY(QTest::qWaitForWindowExposed(window));
     QTRY_VERIFY(window->isVisible());
-    QObject* closeIconButton = firstObjectWithObjectName(
-        window,
-        QStringLiteral("aboutCloseIconButton")
-    );
+    QObject* closeIconButton = firstObjectWithObjectName(window, QStringLiteral("aboutCloseIconButton"));
     QVERIFY(closeIconButton != nullptr);
     QVERIFY(activateControl(closeIconButton));
     QTRY_VERIFY(!window->isVisible());
@@ -289,6 +440,48 @@ void QmlComponentLoadTests::aboutWindowClosesFromButtonsAndShortcuts()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
+void QmlComponentLoadTests::aboutWindowUsesSuppliedTheme()
+{
+    auto rootController = makeController();
+    QVERIFY(rootController != nullptr);
+    auto suppliedController = makeController();
+    QVERIFY(suppliedController != nullptr);
+    rootController->setThemeId(QStringLiteral("default"));
+    suppliedController->setThemeId(QStringLiteral("night-vision"));
+
+    QQmlEngine engine;
+    setupEngine(engine, *rootController);
+    engine.rootContext()->setContextProperty("skygateBuildDateTime", QStringLiteral("test-build"));
+    engine.rootContext()->setContextProperty("skygateGitHash", QStringLiteral("test-git"));
+
+    const QmlWarningScope warnings;
+    auto object = createFileComponent(
+        engine,
+        QStringLiteral("windows/AboutWindow.qml"),
+        {{QStringLiteral("theme"), QVariant::fromValue<QObject*>(suppliedController->theme())}}
+    );
+    QVERIFY(object != nullptr);
+    auto* window = qobject_cast<QQuickWindow*>(object.get());
+    QVERIFY(window != nullptr);
+
+    QObject* suppliedTheme = suppliedController->theme();
+    QObject* rootTheme = rootController->theme();
+    QVERIFY(suppliedTheme != nullptr);
+    QVERIFY(rootTheme != nullptr);
+    QCOMPARE(qvariant_cast<QObject*>(window->property("theme")), suppliedTheme);
+    QCOMPARE(window->color(), themeColor(suppliedTheme, "windowBackground"));
+    QVERIFY(window->color() != themeColor(rootTheme, "windowBackground"));
+
+    suppliedController->setThemeId(QStringLiteral("default"));
+    QTRY_COMPARE(window->color(), themeColor(suppliedTheme, "windowBackground"));
+
+    rootController->setThemeId(QStringLiteral("night-vision"));
+    QCoreApplication::processEvents();
+    QCOMPARE(window->color(), themeColor(suppliedTheme, "windowBackground"));
+    QVERIFY(window->color() != themeColor(rootTheme, "windowBackground"));
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
 void QmlComponentLoadTests::malformedQmlEmitsCapturedWarning()
 {
     auto controller = makeController();
@@ -298,12 +491,16 @@ void QmlComponentLoadTests::malformedQmlEmitsCapturedWarning()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings(QmlWarningScope::Forwarding::Disabled);
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             missingProperty: true
         }
-    )"), QStringLiteral("MalformedWarningTest.qml"));
+    )"),
+        QStringLiteral("MalformedWarningTest.qml")
+    );
 
     QVERIFY(object == nullptr);
     QVERIFY(!warnings.messages().isEmpty());

@@ -1,13 +1,10 @@
 #pragma once
 
+#include "SkyNightConditionSunRow.hpp"
+
 #include <QString>
 
 #include <vector>
-
-struct SkyNightConditionSunRow final {
-    QString label;
-    QString value;
-};
 
 struct SkyNightConditionsData final {
     bool valid = false;

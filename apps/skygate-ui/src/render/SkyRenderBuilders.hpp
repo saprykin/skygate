@@ -1,21 +1,25 @@
 #pragma once
 
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
+#include "PreparedProjection.hpp"
 #include "SkyRenderFrame.hpp"
-#include "SkyOverlayLayerVisibility.hpp"
-#include "SkyTheme.hpp"
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/ephemeris/ConstellationData.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "theme/SkyOverlayLayerVisibility.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
 
 #include <span>
 
 class SkyRenderFrameBuilder final {
 public:
     [[nodiscard]] SkyRenderFrame buildFrame(
-        const skygate::ephemeris::SkySnapshot& snapshot,
+        const skygate::ephemeris::EphemerisSnapshot& snapshot,
         const skygate::core::PreparedProjection& projection,
         std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs,
-        std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
+        std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups,
         double magnitudeCutoff,
         double viewportWidth,
         double viewportHeight,

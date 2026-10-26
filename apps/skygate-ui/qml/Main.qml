@@ -41,6 +41,7 @@ ApplicationWindow {
     AboutWindow {
         id: aboutWindow
         objectName: "aboutWindow"
+        theme: skyContext.theme
         transientParentWindow: root
     }
 
@@ -57,8 +58,10 @@ ApplicationWindow {
         sceneModel: skyScene
         dateTimePopupOpen: dateTimePopup.opened
         nightConditionsPopupOpen: nightConditionsPopup.opened
+        degradationPopupOpen: degradationPopup.opened
         onDateTimeClicked: {
             nightConditionsPopup.close()
+            degradationPopup.close()
             if (dateTimePopup.opened) {
                 dateTimePopup.cancel()
                 return
@@ -68,12 +71,23 @@ ApplicationWindow {
         }
         onNightConditionsClicked: {
             dateTimePopup.close()
+            degradationPopup.close()
             if (nightConditionsPopup.opened) {
                 nightConditionsPopup.cancel()
                 return
             }
 
             nightConditionsPopup.open()
+        }
+        onDegradationClicked: {
+            dateTimePopup.close()
+            nightConditionsPopup.close()
+            if (degradationPopup.opened) {
+                degradationPopup.cancel()
+                return
+            }
+
+            degradationPopup.open()
         }
     }
 
@@ -158,6 +172,7 @@ ApplicationWindow {
     function closeFooterPopups() {
         dateTimePopup.close()
         nightConditionsPopup.close()
+        degradationPopup.close()
     }
 
     onWidthChanged: Qt.callLater(collapseTimelineIfBothToolbarsOverlap)
@@ -251,6 +266,15 @@ ApplicationWindow {
         id: nightConditionsPopup
         skyContextController: skyContext
         popupRightMargin: 96
+        popupBottomMargin: 8
+        scrimTopMargin: dateTimePopup.scrimTopMargin
+    }
+
+    StatusDegradationPopup {
+        id: degradationPopup
+        skyContextController: skyContext
+        sceneModel: skyScene
+        popupRightMargin: 52
         popupBottomMargin: 8
         scrimTopMargin: dateTimePopup.scrimTopMargin
     }

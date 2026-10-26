@@ -1,20 +1,18 @@
-#include "catalog/stellarium/StellariumLineRefExtractor.hpp"
+#include "StellariumLineRefExtractor.hpp"
+#include "StellariumHipParser.hpp"
+#include "catalog/CatalogIdentifier.hpp"
 
-#include "catalog/stellarium/StellariumHipParser.hpp"
-
-#include <QJsonArray>
 #include <QJsonValue>
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <unordered_set>
 
 namespace skygate::ephemeris {
 
-std::vector<ConstellationLineRef> StellariumLineRefExtractor::extract(
-    const QJsonObject& rootObject
-)
+std::vector<ConstellationLineRef> StellariumLineRefExtractor::extract(const QJsonObject& rootObject)
 {
     std::vector<ConstellationLineRef> lineRefs;
     std::unordered_set<std::string> dedupKeys;
@@ -32,8 +30,8 @@ std::vector<ConstellationLineRef> StellariumLineRefExtractor::extract(
         }
 
         lineRefs.emplace_back(
-            "hip_" + std::to_string(startHip),
-            "hip_" + std::to_string(endHip)
+            CatalogIdentifier::hipBodyId(static_cast<std::uint64_t>(startHip)),
+            CatalogIdentifier::hipBodyId(static_cast<std::uint64_t>(endHip))
         );
     };
 
@@ -45,46 +43,17 @@ std::vector<ConstellationLineRef> StellariumLineRefExtractor::extract(
         }
     };
 
+    // An object entry may keep its polylines under `lines`/`line` or inside a
+    // nested payload; the shared collector walks either shape.
     const auto collectFromEntry = [&appendPolylines](const QJsonValue& entry) {
         std::vector<std::vector<int>> polylines;
-        if (entry.isObject()) {
-            const QJsonObject object = entry.toObject();
-            const QJsonValue linesValue = object.value("lines");
-            const QJsonValue lineValue = object.value("line");
-            if (!linesValue.isUndefined()) {
-                StellariumHipParser::collectHipPolylines(linesValue, polylines);
-            }
-            if (!lineValue.isUndefined()) {
-                StellariumHipParser::collectHipPolylines(lineValue, polylines);
-            }
-        } else if (entry.isArray()) {
-            StellariumHipParser::collectHipPolylines(entry, polylines);
-        }
+        StellariumHipParser::collectHipPolylines(entry, polylines);
         appendPolylines(polylines);
     };
 
-    const QJsonValue constellationsValue = rootObject.value("constellations");
-    if (constellationsValue.isArray()) {
-        for (const QJsonValue& entry : constellationsValue.toArray()) {
-            collectFromEntry(entry);
-        }
-    } else if (constellationsValue.isObject()) {
-        const QJsonObject constellationsObject = constellationsValue.toObject();
-        const QJsonValue linesValue = constellationsObject.value("lines");
-        const QJsonValue lineValue = constellationsObject.value("line");
-        if (!linesValue.isUndefined() || !lineValue.isUndefined()) {
-            if (!linesValue.isUndefined()) {
-                collectFromEntry(linesValue);
-            }
-            if (!lineValue.isUndefined()) {
-                collectFromEntry(lineValue);
-            }
-        } else {
-            for (auto it = constellationsObject.begin(); it != constellationsObject.end(); ++it) {
-                collectFromEntry(it.value());
-            }
-        }
-    }
+    StellariumHipParser::forEachConstellationEntry(
+        rootObject, [&collectFromEntry](const QJsonValue& entry, const QString&) { collectFromEntry(entry); }
+    );
 
     return lineRefs;
 }

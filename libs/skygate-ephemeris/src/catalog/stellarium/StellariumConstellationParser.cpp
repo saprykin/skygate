@@ -1,22 +1,25 @@
-#include "skygate/ephemeris/StellariumConstellationParser.hpp"
-
-#include "catalog/stellarium/StellariumLabelRefExtractor.hpp"
-#include "catalog/stellarium/StellariumLineRefExtractor.hpp"
+#include "StellariumConstellationParser.hpp"
+#include "StellariumAnchorGroupExtractor.hpp"
+#include "StellariumHipParser.hpp"
+#include "StellariumLineRefExtractor.hpp"
+#include "StringUtilities.hpp"
 
 #include <QByteArray>
-#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
-#include <QJsonValue>
 
 namespace skygate::ephemeris {
 namespace {
 
-bool looksLikeJsonPayload(const std::string_view payload)
+// True when the payload's first non-whitespace byte starts a JSON object or
+// array. A whitespace-only payload does not look like JSON. Whitespace is the
+// shared ASCII predicate, so JSON framing accepts the same leading bytes every
+// other payload probe does.
+[[nodiscard]] bool looksLikeJsonPayload(const std::string_view payload) noexcept
 {
     for (const char byte : payload) {
-        if (byte == ' ' || byte == '\t' || byte == '\n' || byte == '\r') {
+        if (StringUtilities::isAsciiWhitespace(byte)) {
             continue;
         }
         return byte == '{' || byte == '[';
@@ -25,21 +28,9 @@ bool looksLikeJsonPayload(const std::string_view payload)
     return false;
 }
 
-std::size_t inferConstellationCountFromJson(const QJsonObject& rootObject)
-{
-    const QJsonValue constellationsValue = rootObject.value("constellations");
-    if (constellationsValue.isArray()) {
-        return static_cast<std::size_t>(constellationsValue.toArray().size());
-    }
-
-    return 0;
-}
-
 }  // namespace
 
-StellariumConstellationParser::ParseResult StellariumConstellationParser::parse(
-    const std::string_view payload
-) const
+StellariumConstellationParser::ParseResult StellariumConstellationParser::parse(const std::string_view payload) const
 {
     ParseResult result;
     if (payload.empty()) {
@@ -59,8 +50,8 @@ StellariumConstellationParser::ParseResult StellariumConstellationParser::parse(
 
     const QJsonObject rootObject = document.object();
     result.lineRefs = StellariumLineRefExtractor::extract(rootObject);
-    result.labelRefs = StellariumLabelRefExtractor::extract(rootObject);
-    result.constellationCount = inferConstellationCountFromJson(rootObject);
+    result.anchorGroups = StellariumAnchorGroupExtractor::extract(rootObject);
+    result.constellationCount = StellariumHipParser::constellationArrayEntryCount(rootObject);
     return result;
 }
 

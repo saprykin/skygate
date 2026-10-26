@@ -1,0 +1,307 @@
+#include "CatalogSnapshotValidator.hpp"
+
+#include "CatalogBodyNormalization.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EquatorialCoordinate.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
+#include "StringUtilities.hpp"
+#include "catalog/CatalogCoordinateModel.hpp"
+#include "catalog/CatalogIdentifier.hpp"
+#include "catalog/CatalogStarAstrometry.hpp"
+#include "time/AstronomicalEpoch.hpp"
+#include "time/TimeScaleCodec.hpp"
+
+#include <cmath>
+#include <cstddef>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+namespace skygate::ephemeris {
+namespace {
+
+[[nodiscard]] bool isValidEpoch(const skygate::core::AstronomicalEpoch& epoch) noexcept
+{
+    return epoch.isFinite() && skygate::core::TimeScaleCodec::isKnown(epoch.timeScale);
+}
+
+[[nodiscard]] bool isKnownFiniteValue(const std::optional<double> value) noexcept
+{
+    return value.has_value() && std::isfinite(*value);
+}
+
+// Drops blank entries and trims the rest, keeping the source order of the
+// values that survive.
+[[nodiscard]] std::vector<std::string> trimNonEmpty(const std::vector<std::string>& values)
+{
+    std::vector<std::string> trimmed;
+    trimmed.reserve(values.size());
+    for (const std::string& value : values) {
+        const std::string_view text = StringUtilities::trimAsciiWhitespace(value);
+        if (!text.empty()) {
+            trimmed.emplace_back(text);
+        }
+    }
+    return trimmed;
+}
+
+void normalizeIdentity(CatalogObjectIdentity& identity)
+{
+    std::vector<CatalogIdentifier> identifiers;
+    identifiers.reserve(identity.externalIdentifiers.size());
+    for (const CatalogIdentifier& identifier : identity.externalIdentifiers) {
+        CatalogIdentifier normalized = CatalogIdentifier::make(identifier.namespaceName, identifier.value);
+        if (!normalized.empty()) {
+            identifiers.push_back(std::move(normalized));
+        }
+    }
+    identity.externalIdentifiers = std::move(identifiers);
+    identity.aliases = trimNonEmpty(identity.aliases);
+    identity.retainedCanonicalIds = trimNonEmpty(identity.retainedCanonicalIds);
+}
+
+void normalizeOwnGalaxyBody(OwnGalaxyCelestialBody& body)
+{
+    CatalogBodyNormalization::apply(body);
+    normalizeIdentity(body.identity);
+}
+
+void normalizeDistantBody(DistantCelestialBody& body)
+{
+    normalizeIdentity(body.identity);
+}
+
+[[nodiscard]] bool validateBody(const BaseCelestialBody& body, std::string& errorDetail)
+{
+    if (!CatalogSnapshotValidator::isKnownBodyKind(body.kind)) {
+        errorDetail = "catalog body has an unknown kind value.";
+        return false;
+    }
+    if (StringUtilities::trimAsciiWhitespace(body.id).empty()) {
+        errorDetail = "catalog body has an empty canonical id.";
+        return false;
+    }
+    if (std::isinf(body.visualMagnitude)) {
+        errorDetail = "catalog body '" + body.id + "' has an infinite visual magnitude.";
+        return false;
+    }
+    for (const CatalogIdentifier& identifier : body.identity.externalIdentifiers) {
+        if (identifier.empty()) {
+            errorDetail = "catalog body '" + body.id + "' has an incomplete external identifier.";
+            return false;
+        }
+    }
+    for (const std::string& retainedId : body.identity.retainedCanonicalIds) {
+        if (StringUtilities::trimAsciiWhitespace(retainedId).empty()) {
+            errorDetail = "catalog body '" + body.id + "' has an empty retained canonical id.";
+            return false;
+        }
+    }
+
+    if (const skygate::core::EquatorialCoordinate* fixed = body.fixedEquatorialCoordinate();
+        fixed != nullptr && !fixed->isValid()) {
+        errorDetail = "catalog body '" + body.id + "' has an invalid fixed equatorial coordinate.";
+        return false;
+    }
+
+    if (const CatalogStarAstrometry* astrometry = body.catalogStarAstrometry(); astrometry != nullptr) {
+        if (!astrometry->referenceEquatorial.isValid()) {
+            errorDetail = "catalog body '" + body.id + "' has an invalid astrometry reference coordinate.";
+            return false;
+        }
+        if (!isValidEpoch(astrometry->referenceEpoch)) {
+            errorDetail = "catalog body '" + body.id + "' has an invalid astrometry reference epoch.";
+            return false;
+        }
+        // A reference position that declares no epoch claims the same epoch as
+        // the body's fixed position, so a different direction is two unrelated
+        // coordinate descriptions rather than an epoch change. A declared
+        // reference epoch can legitimately differ from the fixed position's
+        // unstated epoch, so it is left to the composition merge instead of
+        // being rejected here.
+        if (const skygate::core::EquatorialCoordinate* fixed = body.fixedEquatorialCoordinate();
+            fixed != nullptr && !astrometry->referenceEpoch.hasExplicit()
+            && !CatalogCoordinateModel::sameDirection(*fixed, astrometry->referenceEquatorial)) {
+            errorDetail = "catalog body '" + body.id
+                          + "' mixes a fixed position with an unrelated astrometry reference position.";
+            return false;
+        }
+        if (!CatalogSnapshotValidator::isKnownOptionalValue(astrometry->properMotionRightAscensionMasPerYear)
+            || !CatalogSnapshotValidator::isKnownOptionalValue(astrometry->properMotionDeclinationMasPerYear)
+            || !CatalogSnapshotValidator::isKnownOptionalValue(astrometry->radialVelocityKmPerSecond)) {
+            errorDetail = "catalog body '" + body.id + "' has a non-finite astrometry value.";
+            return false;
+        }
+        if (!CatalogSnapshotValidator::isKnownPositiveOptionalValue(astrometry->stellarParallaxMas)) {
+            errorDetail = "catalog body '" + body.id + "' has a non-positive stellar parallax.";
+            return false;
+        }
+        if (astrometry->validityRange.has_value()
+            && (!isValidEpoch(astrometry->validityRange->start) || !isValidEpoch(astrometry->validityRange->end))) {
+            errorDetail = "catalog body '" + body.id + "' has an invalid astrometry validity range.";
+            return false;
+        }
+    }
+
+    if (const DeepSkyObjectInfo* info = body.deepSkyObjectInfo(); info != nullptr) {
+        if (!CatalogSnapshotValidator::isKnownDeepSkyObjectKind(info->kind)) {
+            errorDetail = "catalog body '" + body.id + "' has an unknown deep-sky object kind.";
+            return false;
+        }
+        if (!CatalogSnapshotValidator::isKnownPositiveOptionalValue(info->majorAxisArcmin)
+            || !CatalogSnapshotValidator::isKnownPositiveOptionalValue(info->minorAxisArcmin)) {
+            errorDetail = "catalog body '" + body.id + "' has a non-positive deep-sky object extent.";
+            return false;
+        }
+        if (!CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(info->positionAngleDeg)) {
+            errorDetail = "catalog body '" + body.id + "' has an invalid deep-sky object position angle.";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+[[nodiscard]] bool validateOrderEntries(
+    const std::span<const CelestialBodyCatalog::OrderEntry> orderedBodyIndexes,
+    const std::size_t ownGalaxyBodyCount,
+    const std::size_t distantBodyCount,
+    std::string& errorDetail
+)
+{
+    for (std::size_t index = 0; index < orderedBodyIndexes.size(); ++index) {
+        const CelestialBodyCatalog::OrderEntry& entry = orderedBodyIndexes[index];
+        if (!CatalogSnapshotValidator::isOrderEntryValid(
+                entry.domain, entry.bodyIndex, ownGalaxyBodyCount, distantBodyCount
+            )) {
+            errorDetail =
+                "order entry " + std::to_string(index) + " references an unknown domain or out-of-range body.";
+            return false;
+        }
+    }
+    return true;
+}
+
+}  // namespace
+
+bool CatalogSnapshotValidator::isKnownBodyKind(const BaseCelestialBody::Kind kind) noexcept
+{
+    switch (kind) {
+    case BaseCelestialBody::Kind::Star:
+    case BaseCelestialBody::Kind::Planet:
+    case BaseCelestialBody::Kind::Moon:
+    case BaseCelestialBody::Kind::Sun:
+    case BaseCelestialBody::Kind::Constellation:
+    case BaseCelestialBody::Kind::DeepSkyObject:
+        return true;
+    }
+    return false;
+}
+
+bool CatalogSnapshotValidator::isKnownDeepSkyObjectKind(const DeepSkyObjectInfo::Kind kind) noexcept
+{
+    switch (kind) {
+    case DeepSkyObjectInfo::Kind::Unknown:
+    case DeepSkyObjectInfo::Kind::Galaxy:
+    case DeepSkyObjectInfo::Kind::OpenCluster:
+    case DeepSkyObjectInfo::Kind::GlobularCluster:
+    case DeepSkyObjectInfo::Kind::Nebula:
+    case DeepSkyObjectInfo::Kind::PlanetaryNebula:
+    case DeepSkyObjectInfo::Kind::Asterism:
+        return true;
+    }
+    return false;
+}
+
+bool CatalogSnapshotValidator::isKnownIdScope(const CatalogObjectIdentity::IdScope idScope) noexcept
+{
+    switch (idScope) {
+    case CatalogObjectIdentity::IdScope::Global:
+    case CatalogObjectIdentity::IdScope::SourceLocal:
+        return true;
+    }
+    return false;
+}
+
+bool CatalogSnapshotValidator::isOrderEntryValid(
+    const CelestialBodyCatalog::BodyDomain domain,
+    const std::size_t bodyIndex,
+    const std::size_t ownGalaxyBodyCount,
+    const std::size_t distantBodyCount
+) noexcept
+{
+    switch (domain) {
+    case CelestialBodyCatalog::BodyDomain::OwnGalaxy:
+        return bodyIndex < ownGalaxyBodyCount;
+    case CelestialBodyCatalog::BodyDomain::Distant:
+        return bodyIndex < distantBodyCount;
+    }
+    return false;
+}
+
+bool CatalogSnapshotValidator::isKnownOptionalValue(const std::optional<double> value) noexcept
+{
+    return !value.has_value() || isKnownFiniteValue(value);
+}
+
+bool CatalogSnapshotValidator::isKnownPositiveOptionalValue(const std::optional<double> value) noexcept
+{
+    return !value.has_value() || (isKnownFiniteValue(value) && *value > 0.0);
+}
+
+bool CatalogSnapshotValidator::isKnownNonNegativeOptionalValue(const std::optional<double> value) noexcept
+{
+    return !value.has_value() || (isKnownFiniteValue(value) && *value >= 0.0);
+}
+
+CatalogSnapshotValidator::Report CatalogSnapshotValidator::validate(std::vector<OwnGalaxyCelestialBody>& bodies)
+{
+    Report report;
+    for (OwnGalaxyCelestialBody& body : bodies) {
+        normalizeOwnGalaxyBody(body);
+    }
+    for (const OwnGalaxyCelestialBody& body : bodies) {
+        if (!validateBody(body, report.errorDetail)) {
+            report.ok = false;
+            return report;
+        }
+    }
+    return report;
+}
+
+CatalogSnapshotValidator::Report CatalogSnapshotValidator::validate(
+    std::vector<OwnGalaxyCelestialBody>& ownGalaxyBodies,
+    std::vector<DistantCelestialBody>& distantBodies,
+    const std::vector<CelestialBodyCatalog::OrderEntry>& orderedBodyIndexes
+)
+{
+    Report report;
+    for (OwnGalaxyCelestialBody& body : ownGalaxyBodies) {
+        normalizeOwnGalaxyBody(body);
+    }
+    for (DistantCelestialBody& body : distantBodies) {
+        normalizeDistantBody(body);
+    }
+    for (const OwnGalaxyCelestialBody& body : ownGalaxyBodies) {
+        if (!validateBody(body, report.errorDetail)) {
+            report.ok = false;
+            return report;
+        }
+    }
+    for (const DistantCelestialBody& body : distantBodies) {
+        if (!validateBody(body, report.errorDetail)) {
+            report.ok = false;
+            return report;
+        }
+    }
+    if (!validateOrderEntries(orderedBodyIndexes, ownGalaxyBodies.size(), distantBodies.size(), report.errorDetail)) {
+        report.ok = false;
+        return report;
+    }
+    return report;
+}
+
+}  // namespace skygate::ephemeris

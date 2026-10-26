@@ -1,37 +1,24 @@
+#include "ConstellationReferenceCalculator.hpp"
+#include "HorizontalCoordinate.hpp"
 #include "SkyContextController.hpp"
+#include "StringUtilities.hpp"
+#include "diagnostics/SkyPerformanceLogging.hpp"
+#include "diagnostics/SkyPerformanceStageTimer.hpp"
+#include "selection/SkySelectionTargetKind.hpp"
 
-#include "SkyTimeController.hpp"
+#include <string>
 
-#include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
-
-#include <cmath>
+using skygate::ephemeris::StringUtilities;
 
 namespace {
 
-QString normalizedLookupKey(const QString& value)
+const skygate::ephemeris::CelestialBodyState*
+findBodyStateById(const skygate::ephemeris::EphemerisSnapshot& snapshot, const QString& targetId)
 {
-    return value.trimmed().toCaseFolded();
-}
-
-QString normalizedLookupKey(const std::string& value)
-{
-    return normalizedLookupKey(QString::fromStdString(value));
-}
-
-bool hasFiniteHorizontal(const skygate::core::HorizontalCoordinate& horizontal)
-{
-    return std::isfinite(horizontal.altitudeDeg) && std::isfinite(horizontal.azimuthDeg);
-}
-
-const skygate::ephemeris::CelestialBodyState* findBodyStateById(
-    const skygate::ephemeris::SkySnapshot& snapshot,
-    const QString& targetId
-)
-{
-    const QString normalizedTargetId = normalizedLookupKey(targetId);
+    const std::string normalizedTargetId = StringUtilities::normalizedLookupKey(targetId.toStdString());
     for (const auto& state : snapshot.states) {
         const auto& body = snapshot.bodyAt(state.bodyIndex);
-        if (normalizedLookupKey(body.id) == normalizedTargetId) {
+        if (StringUtilities::normalizedLookupKey(body.id) == normalizedTargetId) {
             return &state;
         }
     }
@@ -60,44 +47,56 @@ void SkyContextController::setSearchToolbarCollapsed(const bool searchToolbarCol
 
 bool SkyContextController::focusSearchTarget(const QString& targetKind, const QString& targetId)
 {
+    skygate::ui::SkyPerformanceStageTimer timer;
+
     const auto* engine = ephemerisEngine();
-    if (
-        engine == nullptr
-        || targetKind.trimmed().isEmpty()
-        || targetId.trimmed().isEmpty()
-    ) {
+    if (engine == nullptr || targetKind.trimmed().isEmpty() || targetId.trimmed().isEmpty()) {
         return false;
     }
 
-    const auto snapshot = engine->compute(m_location.context());
-    const QString normalizedTargetKind = normalizedLookupKey(targetKind);
-    if (normalizedTargetKind == "body") {
-        const auto* bodyState = findBodyStateById(snapshot, targetId);
-        if (bodyState == nullptr || !hasFiniteHorizontal(bodyState->horizontal)) {
+    const auto requestContext = ephemerisRequestContext();
+    const double requestContextMs = timer.stageMilliseconds();
+    if (skygate::ui::internal::SkySelectionTargetKind::isBody(targetKind)) {
+        const std::string trimmedTargetId = targetId.trimmed().toStdString();
+        const auto bodyState = engine->computeBodyState(requestContext.request, trimmedTargetId);
+        const double lookupMs = timer.stageMilliseconds();
+        if (!bodyState.has_value() || !bodyState->horizontal.isFinite()) {
             return false;
         }
 
-        if (
-            hasTrackedTarget()
-            && (
-                normalizedLookupKey(m_search.trackedTargetKind()) != "body"
-                || normalizedLookupKey(m_search.trackedTargetId()) != normalizedLookupKey(targetId)
-            )
-        ) {
+        if (hasTrackedTarget()
+            && (!skygate::ui::internal::SkySelectionTargetKind::isBody(m_search.trackedTargetKind())
+                || StringUtilities::normalizedLookupKey(m_search.trackedTargetId().toStdString())
+                       != StringUtilities::normalizedLookupKey(targetId.toStdString()))) {
             clearTrackedTarget();
         }
+        const double trackingMs = timer.stageMilliseconds();
 
-        setSelectedSearchTarget("body", targetId);
+        setSelectedSearchTarget(
+            skygate::ui::internal::SkySelectionTargetKind::token(
+                skygate::ui::internal::SkySelectionTargetKind::Type::Body
+            ),
+            targetId
+        );
+        const double selectedMs = timer.stageMilliseconds();
         setViewCenter(bodyState->horizontal.altitudeDeg, bodyState->horizontal.azimuthDeg);
+        const double centerMs = timer.stageMilliseconds();
+        if (skygate::ui::SkyPerformanceLogging::enabled()) {
+            qCInfo(skygate::ui::skygatePerfLog)
+                << "search focus elapsedMs=" << timer.elapsedMilliseconds() << "requestContextMs=" << requestContextMs
+                << "bodyLookupMs=" << lookupMs << "trackingMs=" << trackingMs << "selectedSignalMs=" << selectedMs
+                << "viewCenterMs=" << centerMs << "kind=" << targetKind << "id=" << targetId;
+        }
         return true;
     }
 
-    if (normalizedTargetKind == "constellationlabel") {
-        const auto center = skygate::ephemeris::ConstellationReferenceCalculator::labelCenter(
-            snapshot,
-            constellationLabelRefs(),
-            targetId.toStdString()
+    if (skygate::ui::internal::SkySelectionTargetKind::isConstellationLabel(targetKind)) {
+        const auto snapshot = engine->compute(requestContext.request);
+        const double snapshotMs = timer.stageMilliseconds();
+        const auto center = skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(
+            snapshot, resolvedConstellationAnchorGroups(), targetId.toStdString()
         );
+        const double centerLookupMs = timer.stageMilliseconds();
         if (!center.has_value()) {
             return false;
         }
@@ -105,9 +104,24 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
         if (hasTrackedTarget()) {
             clearTrackedTarget();
         }
+        const double trackingMs = timer.stageMilliseconds();
 
-        setSelectedSearchTarget("constellationLabel", targetId);
+        setSelectedSearchTarget(
+            skygate::ui::internal::SkySelectionTargetKind::token(
+                skygate::ui::internal::SkySelectionTargetKind::Type::ConstellationLabel
+            ),
+            targetId
+        );
+        const double selectedMs = timer.stageMilliseconds();
         setViewCenter(center->altitudeDeg, center->azimuthDeg);
+        const double centerMs = timer.stageMilliseconds();
+        if (skygate::ui::SkyPerformanceLogging::enabled()) {
+            qCInfo(skygate::ui::skygatePerfLog)
+                << "search focus elapsedMs=" << timer.elapsedMilliseconds() << "requestContextMs=" << requestContextMs
+                << "snapshotMs=" << snapshotMs << "labelLookupMs=" << centerLookupMs << "trackingMs=" << trackingMs
+                << "selectedSignalMs=" << selectedMs << "viewCenterMs=" << centerMs << "kind=" << targetKind
+                << "id=" << targetId;
+        }
         return true;
     }
 
@@ -117,54 +131,37 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
 bool SkyContextController::trackSearchTarget(const QString& targetKind, const QString& targetId)
 {
     const auto* engine = ephemerisEngine();
-    if (
-        engine == nullptr
-        || normalizedLookupKey(targetKind) != "body"
-        || targetId.trimmed().isEmpty()
-    ) {
+    if (engine == nullptr || !skygate::ui::internal::SkySelectionTargetKind::isBody(targetKind)
+        || targetId.trimmed().isEmpty()) {
         return false;
     }
 
-    const QDateTime currentUtc = currentUtcDateTime();
-    skygate::core::SkyContext trackingContext = m_location.context();
-    trackingContext.utcTime = skygate::ui::internal::SkyContextTimeCodec::toUtcTimePoint(
-        currentUtc.toUTC()
-    );
-    const auto snapshot = engine->compute(trackingContext);
+    skygate::core::ObservationContext trackingContext = m_location.context();
+    const auto requestContext = ephemerisRequestContextFor(trackingContext);
+    const auto snapshot = engine->compute(requestContext.request);
     const auto* bodyState = findBodyStateById(snapshot, targetId);
-    if (bodyState == nullptr || !hasFiniteHorizontal(bodyState->horizontal)) {
+    if (bodyState == nullptr || !bodyState->horizontal.isFinite()) {
         return false;
     }
 
     const auto& body = snapshot.bodyAt(bodyState->bodyIndex);
-    const QString displayText = !body.displayName.empty()
-        ? QString::fromStdString(body.displayName)
-        : targetId.trimmed();
-    const auto nextUtc = skygate::ui::internal::SkyContextTimeCodec::toUtcTimePoint(
-        currentUtc.toUTC()
-    );
-    const bool utcChanged = m_location.utcTime() != nextUtc;
+    const QString displayText =
+        !body.displayName.empty() ? QString::fromStdString(body.displayName) : targetId.trimmed();
     const bool shouldEmitLiveChanged = !m_timeline.live();
 
-    m_location.setUtcTime(nextUtc);
-    m_timeController->setUtcDateTime(currentUtc.toUTC());
     m_timeline.startLiveAtCurrentUtc();
-
-    if (utcChanged) {
-        emit utcDateTextChanged();
-        emit utcTimeTextChanged();
-    }
+    m_timeline.setCatchingUpToCurrentUtc(m_location.utcTime() < currentUtcTime());
+    m_liveClock.start(m_location.utcTime());
     if (shouldEmitLiveChanged) {
         emit liveChanged();
     }
 
-    setTrackedTarget("body", targetId, displayText);
-    setSelectedSearchTarget("body", targetId);
-    const bool viewChanged = setViewCenterInternal(
-        bodyState->horizontal.altitudeDeg,
-        bodyState->horizontal.azimuthDeg
-    );
-    if (utcChanged && !viewChanged) {
+    const QString bodyTargetKind =
+        skygate::ui::internal::SkySelectionTargetKind::token(skygate::ui::internal::SkySelectionTargetKind::Type::Body);
+    setTrackedTarget(bodyTargetKind, targetId, displayText);
+    setSelectedSearchTarget(bodyTargetKind, targetId);
+    const bool viewChanged = setViewCenterInternal(bodyState->horizontal.altitudeDeg, bodyState->horizontal.azimuthDeg);
+    if (!viewChanged) {
         emit skyContextChanged();
     }
 
@@ -183,14 +180,15 @@ bool SkyContextController::recenterTrackedTarget(const bool emitSkyContextChange
     }
 
     const auto* engine = ephemerisEngine();
-    if (engine == nullptr || normalizedLookupKey(m_search.trackedTargetKind()) != "body") {
+    if (engine == nullptr || !skygate::ui::internal::SkySelectionTargetKind::isBody(m_search.trackedTargetKind())) {
         clearTrackedTarget();
         return false;
     }
 
-    const auto snapshot = engine->compute(m_location.context());
+    const auto requestContext = ephemerisRequestContext();
+    const auto snapshot = engine->compute(requestContext.request);
     const auto* bodyState = findBodyStateById(snapshot, m_search.trackedTargetId());
-    if (bodyState == nullptr || !hasFiniteHorizontal(bodyState->horizontal)) {
+    if (bodyState == nullptr || !bodyState->horizontal.isFinite()) {
         clearTrackedTarget();
         return false;
     }
@@ -198,16 +196,11 @@ bool SkyContextController::recenterTrackedTarget(const bool emitSkyContextChange
     const auto& body = snapshot.bodyAt(bodyState->bodyIndex);
     if (!body.displayName.empty()) {
         setTrackedTarget(
-            m_search.trackedTargetKind(),
-            m_search.trackedTargetId(),
-            QString::fromStdString(body.displayName)
+            m_search.trackedTargetKind(), m_search.trackedTargetId(), QString::fromStdString(body.displayName)
         );
     }
 
-    const bool viewChanged = setViewCenterInternal(
-        bodyState->horizontal.altitudeDeg,
-        bodyState->horizontal.azimuthDeg
-    );
+    const bool viewChanged = setViewCenterInternal(bodyState->horizontal.altitudeDeg, bodyState->horizontal.azimuthDeg);
     if (!viewChanged && emitSkyContextChangedWhenUnchanged) {
         emit skyContextChanged();
     }

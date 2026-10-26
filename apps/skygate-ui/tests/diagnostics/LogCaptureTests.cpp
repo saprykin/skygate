@@ -1,12 +1,11 @@
-#include "LogCapture.hpp"
-#include "QmlWarningScope.hpp"
-
-#include <QtTest/QtTest>
+#include <skygate/testsupport/LogCapture.hpp>
+#include "support/QmlWarningScope.hpp"
 
 #include <QDebug>
 #include <QMessageLogContext>
 #include <QStringList>
 #include <QtGlobal>
+#include <QtTest/QtTest>
 
 #include <algorithm>
 #include <optional>
@@ -16,22 +15,14 @@ namespace {
 QStringList s_forwardedWarnings;
 int s_recursiveHandlerCalls = 0;
 
-void recordWarnings(
-    const QtMsgType type,
-    const QMessageLogContext& /*context*/,
-    const QString& message
-)
+void recordWarnings(const QtMsgType type, const QMessageLogContext& /*context*/, const QString& message)
 {
     if (type == QtWarningMsg) {
         s_forwardedWarnings.push_back(message);
     }
 }
 
-void recordAndRecurseOnce(
-    const QtMsgType type,
-    const QMessageLogContext& /*context*/,
-    const QString& message
-)
+void recordAndRecurseOnce(const QtMsgType type, const QMessageLogContext& /*context*/, const QString& message)
 {
     if (type != QtWarningMsg) {
         return;
@@ -46,10 +37,7 @@ void recordAndRecurseOnce(
 
 class MessageHandlerGuard final {
 public:
-    explicit MessageHandlerGuard(const QtMessageHandler handler) :
-        m_previousHandler(qInstallMessageHandler(handler))
-    {
-    }
+    explicit MessageHandlerGuard(const QtMessageHandler handler) : m_previousHandler(qInstallMessageHandler(handler)) {}
 
     ~MessageHandlerGuard()
     {
@@ -74,18 +62,18 @@ class LogCaptureTests final : public QObject {
 
 private slots:
     void logCaptureFiltersByMinimumSeverity();
-    void nestedLogCaptureFanOutsAndRestoresPreviousHandler();
+    void nestedCaptureFanOutsAndRestoresPreviousHandler();
     void interleavedHelpersRestorePreviousHandler();
-    void temporaryHandlerReplacementInsideScopeRestoresDispatcher();
-    void nestedQmlWarningScopesForwardThroughEnabledScopes();
-    void recursiveForwardingHandlerDoesNotReenterDispatcher();
-    void disabledQmlWarningScopeStopsForwardingToOuterScopes();
+    void temporaryHandlerReplacementRestoresDispatcher();
+    void nestedQmlWarningScopesForwardToOuterScopes();
+    void recursiveHandlerDoesNotReenterDispatcher();
+    void disabledQmlWarningScopeStopsOuterForwarding();
 };
 
 void LogCaptureTests::logCaptureFiltersByMinimumSeverity()
 {
-    skygate::ui::tests::LogCapture warningCapture;
-    skygate::ui::tests::LogCapture infoCapture(QtInfoMsg);
+    skygate::testsupport::LogCapture warningCapture;
+    skygate::testsupport::LogCapture infoCapture(QtInfoMsg);
 
     qInfo().noquote() << "threshold-info";
     qWarning().noquote() << "threshold-warning";
@@ -98,17 +86,17 @@ void LogCaptureTests::logCaptureFiltersByMinimumSeverity()
     QVERIFY(infoMessages.contains(QStringLiteral("threshold-warning")));
 }
 
-void LogCaptureTests::nestedLogCaptureFanOutsAndRestoresPreviousHandler()
+void LogCaptureTests::nestedCaptureFanOutsAndRestoresPreviousHandler()
 {
     s_forwardedWarnings.clear();
     MessageHandlerGuard handlerGuard(&recordWarnings);
 
     {
-        skygate::ui::tests::LogCapture outer;
+        skygate::testsupport::LogCapture outer;
         qWarning().noquote() << "outer-before";
 
         {
-            skygate::ui::tests::LogCapture inner;
+            skygate::testsupport::LogCapture inner;
             qWarning().noquote() << "nested-warning";
             QVERIFY(inner.joinedMessages().contains(QStringLiteral("nested-warning")));
         }
@@ -132,7 +120,7 @@ void LogCaptureTests::interleavedHelpersRestorePreviousHandler()
     MessageHandlerGuard handlerGuard(&recordWarnings);
 
     std::optional<skygate::ui::tests::QmlWarningScope> warnings;
-    std::optional<skygate::ui::tests::LogCapture> capture;
+    std::optional<skygate::testsupport::LogCapture> capture;
 
     warnings.emplace();
     capture.emplace();
@@ -148,7 +136,7 @@ void LogCaptureTests::interleavedHelpersRestorePreviousHandler()
     QCOMPARE(s_forwardedWarnings, QStringList({QStringLiteral("after-interleaved-helpers")}));
 }
 
-void LogCaptureTests::temporaryHandlerReplacementInsideScopeRestoresDispatcher()
+void LogCaptureTests::temporaryHandlerReplacementRestoresDispatcher()
 {
     s_forwardedWarnings.clear();
     MessageHandlerGuard handlerGuard(&recordWarnings);
@@ -176,7 +164,7 @@ void LogCaptureTests::temporaryHandlerReplacementInsideScopeRestoresDispatcher()
     );
 }
 
-void LogCaptureTests::nestedQmlWarningScopesForwardThroughEnabledScopes()
+void LogCaptureTests::nestedQmlWarningScopesForwardToOuterScopes()
 {
     s_forwardedWarnings.clear();
     MessageHandlerGuard handlerGuard(&recordWarnings);
@@ -208,7 +196,7 @@ void LogCaptureTests::nestedQmlWarningScopesForwardThroughEnabledScopes()
     );
 }
 
-void LogCaptureTests::recursiveForwardingHandlerDoesNotReenterDispatcher()
+void LogCaptureTests::recursiveHandlerDoesNotReenterDispatcher()
 {
     s_forwardedWarnings.clear();
     s_recursiveHandlerCalls = 0;
@@ -227,7 +215,7 @@ void LogCaptureTests::recursiveForwardingHandlerDoesNotReenterDispatcher()
     QCOMPARE(s_recursiveHandlerCalls, 1);
 }
 
-void LogCaptureTests::disabledQmlWarningScopeStopsForwardingToOuterScopes()
+void LogCaptureTests::disabledQmlWarningScopeStopsOuterForwarding()
 {
     s_forwardedWarnings.clear();
     MessageHandlerGuard handlerGuard(&recordWarnings);
@@ -236,13 +224,9 @@ void LogCaptureTests::disabledQmlWarningScopeStopsForwardingToOuterScopes()
     QStringList innerMessages;
 
     {
-        const skygate::ui::tests::QmlWarningScope outer(
-            skygate::ui::tests::QmlWarningScope::Forwarding::Disabled
-        );
+        const skygate::ui::tests::QmlWarningScope outer(skygate::ui::tests::QmlWarningScope::Forwarding::Disabled);
         {
-            const skygate::ui::tests::QmlWarningScope inner(
-                skygate::ui::tests::QmlWarningScope::Forwarding::Disabled
-            );
+            const skygate::ui::tests::QmlWarningScope inner(skygate::ui::tests::QmlWarningScope::Forwarding::Disabled);
             qWarning().noquote() << "suppressed-nested-qml-warning";
             innerMessages = inner.messages();
         }

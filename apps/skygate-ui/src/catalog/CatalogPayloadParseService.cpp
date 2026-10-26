@@ -1,32 +1,34 @@
 #include "CatalogPayloadParseService.hpp"
 
+#include "catalog/CatalogParseRequest.hpp"
+#include "catalog/CatalogPayloadParser.hpp"
+#include "catalog/SkyPayloadView.hpp"
+
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
 #include <QThreadPool>
 
-#include "skygate/ephemeris/CatalogPayloadParser.hpp"
-
+#include <cstddef>
 #include <memory>
-#include <string_view>
 #include <utility>
+
+using skygate::ui::internal::SkyPayloadView;
 
 void CatalogPayloadParseService::parseAsync(
     QByteArray payload,
     QObject* callbackContext,
-    skygate::ephemeris::CatalogSelectionOptions selectionOptions,
+    CatalogParseOptions parseOptions,
     ProgressHandler progressHandler,
     CompletionHandler completionHandler
 ) const
 {
     QPointer<QObject> safeContext(callbackContext);
-    auto task = QRunnable::create([
-        payload = std::move(payload),
-        safeContext,
-        selectionOptions,
-        progressHandler = std::move(progressHandler),
-        completionHandler = std::move(completionHandler)
-    ]() mutable {
+    auto task = QRunnable::create([payload = std::move(payload),
+                                   safeContext,
+                                   parseOptions = std::move(parseOptions),
+                                   progressHandler = std::move(progressHandler),
+                                   completionHandler = std::move(completionHandler)]() mutable {
         const auto reportProgress = [&safeContext, &progressHandler](const std::size_t parsedObjectCount) {
             if (!progressHandler) {
                 return;
@@ -39,21 +41,16 @@ void CatalogPayloadParseService::parseAsync(
 
             QMetaObject::invokeMethod(
                 contextObject,
-                [progressHandler, parsedObjectCount]() mutable {
-                    progressHandler(parsedObjectCount);
-                },
+                [progressHandler, parsedObjectCount]() mutable { progressHandler(parsedObjectCount); },
                 Qt::QueuedConnection
             );
         };
 
-        const std::string_view payloadView(
-            payload.constData(),
-            static_cast<std::size_t>(payload.size())
-        );
+        const skygate::ephemeris::CatalogParseRequest request =
+            parseOptions.makeRequest(SkyPayloadView::of(payload), reportProgress);
+
         const skygate::ephemeris::CatalogPayloadParser parser;
-        const auto parsedResult = std::make_shared<skygate::ephemeris::CatalogLoadResult>(
-            parser.parseResult(payloadView, reportProgress, selectionOptions)
-        );
+        const auto parsedResult = std::make_shared<skygate::ephemeris::CatalogLoadResult>(parser.parseResult(request));
 
         QObject* const contextObject = safeContext.data();
         if (contextObject == nullptr) {
@@ -62,9 +59,7 @@ void CatalogPayloadParseService::parseAsync(
 
         QMetaObject::invokeMethod(
             contextObject,
-            [completionHandler, parsedResult]() mutable {
-                completionHandler(std::move(*parsedResult));
-            },
+            [completionHandler, parsedResult]() mutable { completionHandler(std::move(*parsedResult)); },
             Qt::QueuedConnection
         );
     });

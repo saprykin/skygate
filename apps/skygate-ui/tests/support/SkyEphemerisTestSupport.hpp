@@ -1,15 +1,18 @@
 #pragma once
 
-#include "SkyContextController.hpp"
-#include "SkyTimeController.hpp"
+#include "EquatorialCoordinate.hpp"
+#include "ObservationContext.hpp"
+#include "TestHelpers.hpp"
+#include "app/SkyContextController.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "catalog/IStarCatalog.hpp"
+#include "engine/IEphemerisEngine.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
+#include "time/SkyTimeController.hpp"
 
-#include "skygate/core/SkyTypes.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
-#include "skygate/ephemeris/IStarCatalog.hpp"
-
+#include <QDateTime>
 #include <QString>
+#include <QTimeZone>
 
 #include <memory>
 #include <optional>
@@ -31,27 +34,34 @@ struct TestSkyContextConfig {
     bool applyUtcDateTime = true;
 };
 
-[[nodiscard]] inline ephemeris::CelestialBody makeBody(
+// Fixed "now" shared by the UI fixtures so a pinned time source, a controller
+// timeline, and the rendered scene all observe one deterministic instant.
+[[nodiscard]] inline QDateTime fixedNowUtc()
+{
+    return QDateTime(QDate(2026, 5, 6), QTime(9, 30, 0), QTimeZone::UTC);
+}
+
+[[nodiscard]] inline skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
     std::string id,
     std::string displayName,
-    const ephemeris::CelestialBodyType type,
+    const skygate::ephemeris::BaseCelestialBody::Kind type,
     const double visualMagnitude,
-    const std::optional<core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
+    const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
 )
 {
-    ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.type = type;
+    body.kind = type;
     body.visualMagnitude = visualMagnitude;
     body.fixedEquatorial = fixedEquatorial;
     return body;
 }
 
-[[nodiscard]] inline ephemeris::CelestialBody makeFixedBody(
+[[nodiscard]] inline skygate::ephemeris::OwnGalaxyCelestialBody makeFixedBody(
     std::string id,
     std::string displayName,
-    const ephemeris::CelestialBodyType type,
+    const skygate::ephemeris::BaseCelestialBody::Kind type,
     const double visualMagnitude,
     const double rightAscensionHours,
     const double declinationDeg
@@ -62,28 +72,23 @@ struct TestSkyContextConfig {
         std::move(displayName),
         type,
         visualMagnitude,
-        core::EquatorialCoordinate {
-            .rightAscensionHours = rightAscensionHours,
-            .declinationDeg = declinationDeg
+        skygate::core::EquatorialCoordinate{
+            .rightAscensionHours = rightAscensionHours, .declinationDeg = declinationDeg
         }
     );
 }
 
-[[nodiscard]] inline ephemeris::CelestialBody makeDeepSkyBody(
-    std::string id,
-    std::string displayName,
-    const double visualMagnitude,
-    std::vector<std::string> aliases = {}
+[[nodiscard]] inline skygate::ephemeris::DistantCelestialBody makeDeepSkyBody(
+    std::string id, std::string displayName, const double visualMagnitude, std::vector<std::string> aliases = {}
 )
 {
-    ephemeris::CelestialBody body = makeBody(
-        std::move(id),
-        std::move(displayName),
-        ephemeris::CelestialBodyType::DeepSkyObject,
-        visualMagnitude
-    );
-    body.deepSkyObject = ephemeris::DeepSkyObjectInfo {
-        .kind = ephemeris::DeepSkyObjectKind::Galaxy,
+    skygate::ephemeris::DistantCelestialBody body;
+    body.id = std::move(id);
+    body.displayName = std::move(displayName);
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
+    body.visualMagnitude = visualMagnitude;
+    body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo{
+        .kind = skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy,
         .aliases = std::move(aliases),
         .majorAxisArcmin = 8.0,
         .minorAxisArcmin = 4.0,
@@ -92,9 +97,7 @@ struct TestSkyContextConfig {
     return body;
 }
 
-[[nodiscard]] inline SkyContextController::InitializationOptions testControllerOptions(
-    const bool loadSettings = false
-)
+[[nodiscard]] inline SkyContextController::InitializationOptions testControllerOptions(const bool loadSettings = false)
 {
     SkyContextController::InitializationOptions initializationOptions;
     initializationOptions.loadSettings = loadSettings;
@@ -102,64 +105,52 @@ struct TestSkyContextConfig {
     return initializationOptions;
 }
 
-[[nodiscard]] inline std::unique_ptr<ephemeris::IStarCatalog> createTestCatalog(
-    std::vector<ephemeris::CelestialBody> bodies
-)
+[[nodiscard]] inline std::unique_ptr<skygate::ephemeris::IStarCatalog>
+createTestCatalog(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies)
 {
-    return ephemeris::createStarCatalogFromBodies(std::move(bodies));
+    return skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(std::move(bodies));
 }
 
-[[nodiscard]] inline std::unique_ptr<ephemeris::IEphemerisEngine> createTestEphemerisEngine(
-    const ephemeris::IStarCatalog& starCatalog
-)
+[[nodiscard]] inline std::unique_ptr<skygate::ephemeris::IStarCatalog>
+createTestCatalog(std::vector<skygate::ephemeris::DistantCelestialBody> bodies)
 {
-    return ephemeris::createEphemerisEngine(starCatalog);
+    std::vector<skygate::ephemeris::CelestialBodyCatalog::OrderEntry> order;
+    order.reserve(bodies.size());
+    for (std::uint32_t index = 0U; index < bodies.size(); ++index) {
+        order.push_back({.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = index});
+    }
+    return skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({}, std::move(bodies), std::move(order));
+}
+
+[[nodiscard]] inline std::unique_ptr<skygate::ephemeris::IEphemerisEngine>
+createTestEphemerisEngine(const skygate::ephemeris::IStarCatalog& starCatalog)
+{
+    return std::move(skygate::ephemeris::EphemerisEngineFactory::create(starCatalog).engine);
 }
 
 [[nodiscard]] inline std::unique_ptr<SkyContextController> createTestController(
-    std::unique_ptr<ephemeris::IStarCatalog> starCatalog,
-    std::unique_ptr<ephemeris::IEphemerisEngine> ephemerisEngine,
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine,
     const bool loadSettings = false
 )
 {
     return std::make_unique<SkyContextController>(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        testControllerOptions(loadSettings),
-        nullptr
+        std::move(starCatalog), std::move(ephemerisEngine), testControllerOptions(loadSettings), nullptr
     );
 }
 
-[[nodiscard]] inline std::unique_ptr<SkyContextController> createTestController(
-    std::vector<ephemeris::CelestialBody> bodies,
-    const bool loadSettings = false
-)
-{
-    auto starCatalog = createTestCatalog(std::move(bodies));
-    if (starCatalog == nullptr) {
-        return nullptr;
-    }
-
-    auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
-    if (ephemerisEngine == nullptr) {
-        return nullptr;
-    }
-
-    return createTestController(std::move(starCatalog), std::move(ephemerisEngine), loadSettings);
-}
-
-inline bool configureTestSkyContext(
-    SkyContextController& controller,
-    const TestSkyContextConfig& config = {}
-)
+inline bool configureTestSkyContext(SkyContextController& controller, const TestSkyContextConfig& config = {})
 {
     if (config.applyTimeZone && !controller.timeController()->setTimeZoneId(config.timeZoneId)) {
         return false;
     }
 
     controller.setLive(config.live);
-    if (config.applyUtcDateTime && !controller.setUtcDateTimeText(config.utcDate, config.utcTime)) {
-        return false;
+    if (config.applyUtcDateTime) {
+        controller.timeController()->setInitialTimeZoneId(QStringLiteral("UTC"));
+        if (!controller.timeController()->setDateTimeText(config.utcDate, config.utcTime)) {
+            return false;
+        }
     }
 
     controller.setLatitudeText(config.latitude);
@@ -168,18 +159,11 @@ inline bool configureTestSkyContext(
     return true;
 }
 
-[[nodiscard]] inline std::optional<ephemeris::CelestialBodyState> findBodyStateById(
-    const ephemeris::SkySnapshot& snapshot,
-    const std::string& bodyId
-)
+[[nodiscard]] inline std::optional<skygate::ephemeris::CelestialBodyState>
+findBodyStateById(const skygate::ephemeris::EphemerisSnapshot& snapshot, const std::string& bodyId)
 {
-    for (const ephemeris::CelestialBodyState& state : snapshot.states) {
-        if (snapshot.bodyAt(state.bodyIndex).id == bodyId) {
-            return state;
-        }
-    }
-
-    return std::nullopt;
+    const skygate::ephemeris::CelestialBodyState* state = skygate::ephemeris::tests::findStateById(snapshot, bodyId);
+    return state != nullptr ? std::optional<skygate::ephemeris::CelestialBodyState>(*state) : std::nullopt;
 }
 
 }  // namespace skygate::ui::tests

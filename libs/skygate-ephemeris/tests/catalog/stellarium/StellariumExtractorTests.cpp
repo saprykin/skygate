@@ -1,9 +1,9 @@
+#include "catalog/stellarium/StellariumAnchorGroupExtractor.hpp"
 #include "catalog/stellarium/StellariumHipParser.hpp"
-#include "catalog/stellarium/StellariumLabelRefExtractor.hpp"
 #include "catalog/stellarium/StellariumLineRefExtractor.hpp"
 
-#include <QJsonArray>
 #include <QByteArray>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
@@ -29,10 +29,8 @@ QJsonObject makeStellariumRoot()
             }
         }
     })";
-    const QJsonDocument document = QJsonDocument::fromJson(QByteArray(
-        kJsonPayload.data(),
-        static_cast<qsizetype>(kJsonPayload.size())
-    ));
+    const QJsonDocument document =
+        QJsonDocument::fromJson(QByteArray(kJsonPayload.data(), static_cast<qsizetype>(kJsonPayload.size())));
     return document.object();
 }
 
@@ -43,7 +41,7 @@ class StellariumExtractorTests final : public QObject {
 
 private slots:
     void extractsLineRefs();
-    void extractsLabelRefs();
+    void extractsAnchorGroups();
     void dropsMalformedAndDuplicateLineRefs();
     void mergesDuplicateLabelsAndUsesFallbackNames();
     void prefersCommonNameFieldsInOrder();
@@ -51,26 +49,23 @@ private slots:
     void parsesStrictHipText();
     void rejectsMalformedHipText();
     void parsesHipIdentifiersFromJsonValues();
-    void rejectsInvalidHipPolylinesAndCollectsNestedObjects();
+    void rejectsInvalidHipPolylinesAndCollectsNested();
+    void extractsPolylinesFromNestedObjectPayload();
 };
 
 void StellariumExtractorTests::extractsLineRefs()
 {
-    const auto lineRefs = skygate::ephemeris::StellariumLineRefExtractor::extract(
-        makeStellariumRoot()
-    );
+    const auto lineRefs = skygate::ephemeris::StellariumLineRefExtractor::extract(makeStellariumRoot());
 
     QVERIFY(lineRefs.size() == 4U);
 }
 
-void StellariumExtractorTests::extractsLabelRefs()
+void StellariumExtractorTests::extractsAnchorGroups()
 {
-    const auto labelRefs = skygate::ephemeris::StellariumLabelRefExtractor::extract(
-        makeStellariumRoot()
-    );
+    const auto anchorGroups = skygate::ephemeris::StellariumAnchorGroupExtractor::extract(makeStellariumRoot());
 
-    QVERIFY(labelRefs.size() == 2U);
-    QCOMPARE(labelRefs[0].first, std::string("Orion"));
+    QVERIFY(anchorGroups.size() == 2U);
+    QCOMPARE(anchorGroups[0].first, std::string("Orion"));
 }
 
 void StellariumExtractorTests::dropsMalformedAndDuplicateLineRefs()
@@ -88,14 +83,10 @@ void StellariumExtractorTests::dropsMalformedAndDuplicateLineRefs()
             }
         }
     })";
-    const QJsonDocument document = QJsonDocument::fromJson(QByteArray(
-        kJsonPayload.data(),
-        static_cast<qsizetype>(kJsonPayload.size())
-    ));
+    const QJsonDocument document =
+        QJsonDocument::fromJson(QByteArray(kJsonPayload.data(), static_cast<qsizetype>(kJsonPayload.size())));
 
-    const auto lineRefs = skygate::ephemeris::StellariumLineRefExtractor::extract(
-        document.object()
-    );
+    const auto lineRefs = skygate::ephemeris::StellariumLineRefExtractor::extract(document.object());
 
     QCOMPARE(lineRefs.size(), 2U);
     QCOMPARE(lineRefs[0].first, std::string("hip_1"));
@@ -121,23 +112,19 @@ void StellariumExtractorTests::mergesDuplicateLabelsAndUsesFallbackNames()
             }
         }
     })";
-    const QJsonDocument document = QJsonDocument::fromJson(QByteArray(
-        kJsonPayload.data(),
-        static_cast<qsizetype>(kJsonPayload.size())
-    ));
+    const QJsonDocument document =
+        QJsonDocument::fromJson(QByteArray(kJsonPayload.data(), static_cast<qsizetype>(kJsonPayload.size())));
 
-    const auto labelRefs = skygate::ephemeris::StellariumLabelRefExtractor::extract(
-        document.object()
-    );
+    const auto anchorGroups = skygate::ephemeris::StellariumAnchorGroupExtractor::extract(document.object());
 
-    QCOMPARE(labelRefs.size(), 2U);
-    QCOMPARE(labelRefs[0].first, std::string("Canis Minor"));
-    QCOMPARE(labelRefs[0].second.size(), 2U);
-    QCOMPARE(labelRefs[1].first, std::string("Ursa Major"));
-    QCOMPARE(labelRefs[1].second.size(), 3U);
-    QCOMPARE(labelRefs[1].second[0], std::string("hip_1"));
-    QCOMPARE(labelRefs[1].second[1], std::string("hip_2"));
-    QCOMPARE(labelRefs[1].second[2], std::string("hip_3"));
+    QCOMPARE(anchorGroups.size(), 2U);
+    QCOMPARE(anchorGroups[0].first, std::string("Canis Minor"));
+    QCOMPARE(anchorGroups[0].second.size(), 2U);
+    QCOMPARE(anchorGroups[1].first, std::string("Ursa Major"));
+    QCOMPARE(anchorGroups[1].second.size(), 3U);
+    QCOMPARE(anchorGroups[1].second[0], std::string("hip_1"));
+    QCOMPARE(anchorGroups[1].second[1], std::string("hip_2"));
+    QCOMPARE(anchorGroups[1].second[2], std::string("hip_3"));
 }
 
 void StellariumExtractorTests::prefersCommonNameFieldsInOrder()
@@ -153,17 +140,13 @@ void StellariumExtractorTests::prefersCommonNameFieldsInOrder()
             }
         }
     })";
-    const QJsonDocument document = QJsonDocument::fromJson(QByteArray(
-        kJsonPayload.data(),
-        static_cast<qsizetype>(kJsonPayload.size())
-    ));
+    const QJsonDocument document =
+        QJsonDocument::fromJson(QByteArray(kJsonPayload.data(), static_cast<qsizetype>(kJsonPayload.size())));
 
-    const auto labelRefs = skygate::ephemeris::StellariumLabelRefExtractor::extract(
-        document.object()
-    );
+    const auto anchorGroups = skygate::ephemeris::StellariumAnchorGroupExtractor::extract(document.object());
 
-    QCOMPARE(labelRefs.size(), 1U);
-    QCOMPARE(labelRefs[0].first, std::string("Native Demo"));
+    QCOMPARE(anchorGroups.size(), 1U);
+    QCOMPARE(anchorGroups[0].first, std::string("Native Demo"));
 }
 
 void StellariumExtractorTests::supportsArrayFormConstellations()
@@ -177,21 +160,15 @@ void StellariumExtractorTests::supportsArrayFormConstellations()
             [[4, 5]]
         ]
     })";
-    const QJsonDocument document = QJsonDocument::fromJson(QByteArray(
-        kJsonPayload.data(),
-        static_cast<qsizetype>(kJsonPayload.size())
-    ));
+    const QJsonDocument document =
+        QJsonDocument::fromJson(QByteArray(kJsonPayload.data(), static_cast<qsizetype>(kJsonPayload.size())));
 
-    const auto lineRefs = skygate::ephemeris::StellariumLineRefExtractor::extract(
-        document.object()
-    );
-    const auto labelRefs = skygate::ephemeris::StellariumLabelRefExtractor::extract(
-        document.object()
-    );
+    const auto lineRefs = skygate::ephemeris::StellariumLineRefExtractor::extract(document.object());
+    const auto anchorGroups = skygate::ephemeris::StellariumAnchorGroupExtractor::extract(document.object());
 
     QCOMPARE(lineRefs.size(), 3U);
-    QCOMPARE(labelRefs.size(), 1U);
-    QCOMPARE(labelRefs[0].first, std::string("Array Demo"));
+    QCOMPARE(anchorGroups.size(), 1U);
+    QCOMPARE(anchorGroups[0].first, std::string("Array Demo"));
 }
 
 void StellariumExtractorTests::parsesStrictHipText()
@@ -204,7 +181,7 @@ void StellariumExtractorTests::parsesStrictHipText()
 
 void StellariumExtractorTests::rejectsMalformedHipText()
 {
-    const std::vector<QString> malformedValues {
+    const std::vector<QString> malformedValues{
         "",
         "   ",
         "hip",
@@ -227,40 +204,37 @@ void StellariumExtractorTests::parsesHipIdentifiersFromJsonValues()
 
     QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonValue(123)), 123);
     QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonValue("hip 456")), 456);
-    QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonObject {{"HIP", 789}}), 789);
-    QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonObject {{"id", "hip_2468"}}), 2468);
-    QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonObject {{"star", QJsonObject {{"hip", 1357}}}}), 1357);
+    QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonObject{{"HIP", 789}}), 789);
+    QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonObject{{"id", "hip_2468"}}), 2468);
+    QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonObject{{"star", QJsonObject{{"hip", 1357}}}}), 1357);
 
     QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonValue(12.5)).has_value());
     QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonValue(-1)).has_value());
     QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonValue()).has_value());
-    QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonObject {{"other", 1}}).has_value());
-    QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonObject {{"hip", "bad"}}).has_value());
+    QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonObject{{"other", 1}}).has_value());
+    QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonObject{{"hip", "bad"}}).has_value());
 }
 
-void StellariumExtractorTests::rejectsInvalidHipPolylinesAndCollectsNestedObjects()
+void StellariumExtractorTests::rejectsInvalidHipPolylinesAndCollectsNested()
 {
     using skygate::ephemeris::StellariumHipParser;
 
-    QVERIFY(!StellariumHipParser::parseHipPolyline(QJsonArray {1}).has_value());
-    QVERIFY(!StellariumHipParser::parseHipPolyline(QJsonArray {1, "not_hip"}).has_value());
+    QVERIFY(!StellariumHipParser::parseHipPolyline(QJsonArray{1}).has_value());
+    QVERIFY(!StellariumHipParser::parseHipPolyline(QJsonArray{1, "not_hip"}).has_value());
 
-    const auto parsedPolyline = StellariumHipParser::parseHipPolyline(QJsonArray {
-        QJsonObject {{"hip", 1}},
-        "hip_2",
-        3
-    });
+    const auto parsedPolyline = StellariumHipParser::parseHipPolyline(QJsonArray{QJsonObject{{"hip", 1}}, "hip_2", 3});
     QVERIFY(parsedPolyline.has_value());
     QCOMPARE(*parsedPolyline, std::vector<int>({1, 2, 3}));
 
     std::vector<std::vector<int>> polylines;
     StellariumHipParser::collectHipPolylines(
-        QJsonObject {
-            {"constellations", QJsonArray {
-                QJsonObject {{"lines", QJsonArray {QJsonArray {10, 11, 12}}}},
-                QJsonObject {{"line", QJsonArray {QJsonArray {"hip 20", "hip_21"}}}},
-                QJsonObject {{"nested", QJsonObject {{"segments", QJsonArray {QJsonArray {30, 31}}}}}},
-            }}
+        QJsonObject{
+            {"constellations",
+             QJsonArray{
+                 QJsonObject{{"lines", QJsonArray{QJsonArray{10, 11, 12}}}},
+                 QJsonObject{{"line", QJsonArray{QJsonArray{"hip 20", "hip_21"}}}},
+                 QJsonObject{{"nested", QJsonObject{{"segments", QJsonArray{QJsonArray{30, 31}}}}}},
+             }}
         },
         polylines
     );
@@ -269,6 +243,35 @@ void StellariumExtractorTests::rejectsInvalidHipPolylinesAndCollectsNestedObject
     QCOMPARE(polylines[0], std::vector<int>({10, 11, 12}));
     QCOMPARE(polylines[1], std::vector<int>({20, 21}));
     QCOMPARE(polylines[2], std::vector<int>({30, 31}));
+}
+
+void StellariumExtractorTests::extractsPolylinesFromNestedObjectPayload()
+{
+    constexpr std::string_view kJsonPayload = R"({
+        "constellations": [
+            {
+                "name": "Nested Demo",
+                "shape": {
+                    "segments": [[1, 2], [2, 3]]
+                }
+            }
+        ]
+    })";
+    const QJsonDocument document =
+        QJsonDocument::fromJson(QByteArray(kJsonPayload.data(), static_cast<qsizetype>(kJsonPayload.size())));
+
+    const auto lineRefs = skygate::ephemeris::StellariumLineRefExtractor::extract(document.object());
+    const auto anchorGroups = skygate::ephemeris::StellariumAnchorGroupExtractor::extract(document.object());
+
+    QCOMPARE(lineRefs.size(), 2U);
+    QCOMPARE(lineRefs[0].first, std::string("hip_1"));
+    QCOMPARE(lineRefs[0].second, std::string("hip_2"));
+    QCOMPARE(lineRefs[1].first, std::string("hip_2"));
+    QCOMPARE(lineRefs[1].second, std::string("hip_3"));
+
+    QCOMPARE(anchorGroups.size(), 1U);
+    QCOMPARE(anchorGroups[0].first, std::string("Nested Demo"));
+    QCOMPARE(anchorGroups[0].second, std::vector<std::string>({"hip_1", "hip_2", "hip_3"}));
 }
 
 QTEST_APPLESS_MAIN(StellariumExtractorTests)

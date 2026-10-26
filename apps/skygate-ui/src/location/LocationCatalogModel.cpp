@@ -1,13 +1,23 @@
 #include "LocationCatalogModel.hpp"
+#include "TextParsingUtilities.hpp"
+#include "catalog/io/CatalogParsingUtilities.hpp"
+#include "diagnostics/SkyLoggingCategories.hpp"
 
 #include <QFile>
 #include <QIODevice>
+#include <QLoggingCategory>
 #include <QResource>
+#include <QStringList>
 #include <QTextStream>
 
 #include <algorithm>
+#include <optional>
+#include <string>
+#include <string_view>
 
 namespace {
+
+using skygate::ui::skygateLocationCatalogLog;
 
 constexpr auto kLocationCatalogResourcePath = ":/locations/major-cities.csv";
 
@@ -22,8 +32,17 @@ bool matchesFilter(const LocationCatalogEntry& entry, const QString& filterText)
         return true;
     }
 
-    return entry.cityName.toCaseFolded().contains(filterText)
-        || entry.countryName.toCaseFolded().contains(filterText);
+    return entry.cityName.toCaseFolded().contains(filterText) || entry.countryName.toCaseFolded().contains(filterText);
+}
+
+[[nodiscard]] QStringList splitCatalogFields(const QString& line)
+{
+    const std::string lineText = skygate::ephemeris::CatalogParsingUtilities::toUtf8String(line);
+    QStringList fields;
+    for (const std::string_view field : skygate::ephemeris::TextParsingUtilities::splitCommaSeparated(lineText)) {
+        fields.push_back(QString::fromUtf8(field.data(), static_cast<qsizetype>(field.size())));
+    }
+    return fields;
 }
 
 }  // namespace
@@ -38,11 +57,12 @@ QString LocationCatalogEntry::displayText() const
     return QString("%1, %2").arg(cityName, countryName);
 }
 
-LocationCatalogModel::LocationCatalogModel(QObject* parent)
-    : QAbstractListModel(parent)
+LocationCatalogModel::LocationCatalogModel(QObject* parent) : QAbstractListModel(parent)
 {
     ensureLocationCatalogResourcesLoaded();
-    (void)loadCatalog();
+    if (!loadCatalog()) {
+        qCWarning(skygateLocationCatalogLog) << "Failed to load the bundled location catalog.";
+    }
     rebuildRows();
 }
 
@@ -71,10 +91,6 @@ QVariant LocationCatalogModel::data(const QModelIndex& index, const int role) co
         return row.detailText;
     case CityIdRole:
         return row.kind == RowKind::City ? row.entry.id : QString();
-    case CountryNameRole:
-        return row.kind == RowKind::City ? row.entry.countryName : row.displayText;
-    case CityNameRole:
-        return row.kind == RowKind::City ? row.entry.cityName : QString();
     case LatitudeDegRole:
         return row.kind == RowKind::City ? QVariant(row.entry.latitudeDeg) : QVariant();
     case LongitudeDegRole:
@@ -93,8 +109,6 @@ QHash<int, QByteArray> LocationCatalogModel::roleNames() const
         {DisplayTextRole, "displayText"},
         {DetailTextRole, "detailText"},
         {CityIdRole, "cityId"},
-        {CountryNameRole, "countryName"},
-        {CityNameRole, "cityName"},
         {LatitudeDegRole, "latitudeDeg"},
         {LongitudeDegRole, "longitudeDeg"},
         {SelectableRole, "selectable"},
@@ -123,21 +137,16 @@ bool LocationCatalogModel::hasCityId(const QString& cityId) const
     return entryForCityId(cityId).has_value();
 }
 
-std::optional<LocationCatalogEntry> LocationCatalogModel::entryForCityId(
-    const QString& cityId
-) const
+std::optional<LocationCatalogEntry> LocationCatalogModel::entryForCityId(const QString& cityId) const
 {
     if (cityId.trimmed().isEmpty()) {
         return std::nullopt;
     }
 
-    const auto entryIterator = std::find_if(
-        m_entries.cbegin(),
-        m_entries.cend(),
-        [&cityId](const LocationCatalogEntry& entry) {
+    const auto entryIterator =
+        std::find_if(m_entries.cbegin(), m_entries.cend(), [&cityId](const LocationCatalogEntry& entry) {
             return entry.id == cityId;
-        }
-    );
+        });
     if (entryIterator == m_entries.cend()) {
         return std::nullopt;
     }
@@ -149,69 +158,88 @@ bool LocationCatalogModel::loadCatalog()
 {
     QFile catalogFile(QString::fromUtf8(kLocationCatalogResourcePath));
     if (!catalogFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qCWarning(skygateLocationCatalogLog).noquote()
+            << QStringLiteral("Unable to open the location catalog resource %1.")
+                   .arg(QString::fromUtf8(kLocationCatalogResourcePath));
         return false;
     }
 
     QTextStream stream(&catalogFile);
-    if (stream.atEnd()) {
+    const std::optional<QVector<LocationCatalogEntry>> parsedEntries = parseCatalog(stream.readAll());
+    if (!parsedEntries.has_value()) {
+        return false;
+    }
+    if (parsedEntries->isEmpty()) {
+        qCWarning(skygateLocationCatalogLog) << "The location catalog has no usable entries.";
         return false;
     }
 
-    const QStringList headers = stream.readLine().split(',');
-    const int idIndex = headers.indexOf("id");
-    const int countryNameIndex = headers.indexOf("countryName");
-    const int cityNameIndex = headers.indexOf("cityName");
-    const int latitudeIndex = headers.indexOf("latitudeDeg");
-    const int longitudeIndex = headers.indexOf("longitudeDeg");
-    if (
-        idIndex < 0
-        || countryNameIndex < 0
-        || cityNameIndex < 0
-        || latitudeIndex < 0
-        || longitudeIndex < 0
-    ) {
-        return false;
+    m_entries = *parsedEntries;
+    return true;
+}
+
+std::optional<QVector<LocationCatalogEntry>> LocationCatalogModel::parseCatalog(const QString& csvText)
+{
+    const QStringList lines = csvText.split(QLatin1Char('\n'));
+    const QStringList headers = splitCatalogFields(lines.constFirst());
+    const int idIndex = headers.indexOf(QStringLiteral("id"));
+    const int countryNameIndex = headers.indexOf(QStringLiteral("countryName"));
+    const int cityNameIndex = headers.indexOf(QStringLiteral("cityName"));
+    const int latitudeIndex = headers.indexOf(QStringLiteral("latitudeDeg"));
+    const int longitudeIndex = headers.indexOf(QStringLiteral("longitudeDeg"));
+    if (idIndex < 0 || countryNameIndex < 0 || cityNameIndex < 0 || latitudeIndex < 0 || longitudeIndex < 0) {
+        qCWarning(skygateLocationCatalogLog) << "The location catalog header is missing required columns.";
+        return std::nullopt;
     }
 
     QVector<LocationCatalogEntry> entries;
-    while (!stream.atEnd()) {
-        const QString line = stream.readLine().trimmed();
+    for (qsizetype lineIndex = 1; lineIndex < lines.size(); ++lineIndex) {
+        const QString line = lines.at(lineIndex).trimmed();
         if (line.isEmpty()) {
             continue;
         }
 
-        const QStringList fields = line.split(',');
+        const QStringList fields = splitCatalogFields(line);
         if (fields.size() != headers.size()) {
+            qCWarning(skygateLocationCatalogLog).noquote()
+                << QStringLiteral("Skipping location catalog line %1 with %2 fields instead of %3.")
+                       .arg(lineIndex + 1)
+                       .arg(fields.size())
+                       .arg(headers.size());
             continue;
         }
 
-        bool latitudeIsValid = false;
-        bool longitudeIsValid = false;
-        LocationCatalogEntry entry;
-        entry.id = fields.at(idIndex).trimmed();
-        entry.countryName = fields.at(countryNameIndex).trimmed();
-        entry.cityName = fields.at(cityNameIndex).trimmed();
-        entry.latitudeDeg = fields.at(latitudeIndex).trimmed().toDouble(&latitudeIsValid);
-        entry.longitudeDeg = fields.at(longitudeIndex).trimmed().toDouble(&longitudeIsValid);
-        if (
-            entry.id.isEmpty()
-            || entry.countryName.isEmpty()
-            || entry.cityName.isEmpty()
-            || !latitudeIsValid
-            || !longitudeIsValid
-        ) {
+        const QString cityId = fields.at(idIndex);
+        const QString countryName = fields.at(countryNameIndex);
+        const QString cityName = fields.at(cityNameIndex);
+        const std::optional<double> latitudeDeg =
+            skygate::ephemeris::CatalogParsingUtilities::parseFiniteDouble(fields.at(latitudeIndex));
+        const std::optional<double> longitudeDeg =
+            skygate::ephemeris::CatalogParsingUtilities::parseFiniteDouble(fields.at(longitudeIndex));
+        if (cityId.isEmpty() || countryName.isEmpty() || cityName.isEmpty()) {
+            qCWarning(skygateLocationCatalogLog).noquote()
+                << QStringLiteral("Skipping location catalog line %1 with missing values.").arg(lineIndex + 1);
+            continue;
+        }
+        if (!latitudeDeg.has_value() || !longitudeDeg.has_value()) {
+            qCWarning(skygateLocationCatalogLog).noquote()
+                << QStringLiteral("Skipping location catalog line %1 with non-finite coordinates.").arg(lineIndex + 1);
             continue;
         }
 
-        entries.push_back(entry);
+        entries.push_back(
+            LocationCatalogEntry{
+                .id = cityId,
+                .countryName = countryName,
+                .cityName = cityName,
+                .latitudeDeg = *latitudeDeg,
+                .longitudeDeg = *longitudeDeg,
+            }
+        );
     }
 
     std::sort(entries.begin(), entries.end(), [](const LocationCatalogEntry& lhs, const LocationCatalogEntry& rhs) {
-        const int countryCompare = QString::compare(
-            lhs.countryName,
-            rhs.countryName,
-            Qt::CaseInsensitive
-        );
+        const int countryCompare = QString::compare(lhs.countryName, rhs.countryName, Qt::CaseInsensitive);
         if (countryCompare != 0) {
             return countryCompare < 0;
         }
@@ -219,8 +247,7 @@ bool LocationCatalogModel::loadCatalog()
         return QString::compare(lhs.cityName, rhs.cityName, Qt::CaseInsensitive) < 0;
     });
 
-    m_entries = std::move(entries);
-    return !m_entries.isEmpty();
+    return entries;
 }
 
 void LocationCatalogModel::rebuildRows()
@@ -236,18 +263,22 @@ void LocationCatalogModel::rebuildRows()
 
         if (currentCountryName != entry.countryName) {
             currentCountryName = entry.countryName;
-            m_rows.push_back(Row {
-                .kind = RowKind::CountryHeader,
-                .displayText = currentCountryName,
-            });
+            m_rows.push_back(
+                Row{
+                    .kind = RowKind::CountryHeader,
+                    .displayText = currentCountryName,
+                }
+            );
         }
 
-        m_rows.push_back(Row {
-            .kind = RowKind::City,
-            .displayText = entry.cityName,
-            .detailText = entry.countryName,
-            .entry = entry,
-        });
+        m_rows.push_back(
+            Row{
+                .kind = RowKind::City,
+                .displayText = entry.cityName,
+                .detailText = entry.countryName,
+                .entry = entry,
+            }
+        );
     }
 
     endResetModel();

@@ -1,0 +1,268 @@
+#include "ApparentPlaceTestFixture.hpp"
+#include "EphemerisFixtureSupport.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
+#include "TestCalcephKernel.hpp"
+#include "time/CalendarTime.hpp"
+#include "engine/highprecision/ApparentPlaceCalculator.hpp"
+#include "engine/highprecision/ErfaFrameTransformer.hpp"
+#include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
+#include "engine/highprecision/HighPrecisionComputationInput.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
+#include "engine/ITimeScaleService.hpp"
+#include "engine/highprecision/SolarSystemStateCalculator.hpp"
+
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QtTest/QtTest>
+
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+
+namespace {
+
+using namespace skygate::ephemeris;
+using namespace skygate::ephemeris::highprecision;
+using namespace skygate::core;
+using skygate::ephemeris::tests::angularSeparationDegrees;
+using skygate::ephemeris::tests::ApparentPlaceTestFixture;
+using skygate::ephemeris::tests::EphemerisRaDecExpectation;
+using skygate::ephemeris::tests::EphemerisRaDecFixture;
+using skygate::ephemeris::tests::loadRaDecFixture;
+
+[[nodiscard]] QString apparentFixturePath()
+{
+    return QStringLiteral(SKYGATE_EPHEMERIS_TESTDATA_DIR "/ephemeris/apparent_solar_system_mars_smoke.json");
+}
+
+[[nodiscard]] OwnGalaxyCelestialBody makeMarsBody()
+{
+    OwnGalaxyCelestialBody body;
+    body.id = "mars";
+    body.displayName = "Mars";
+    body.kind = BaseCelestialBody::Kind::Planet;
+    return body;
+}
+
+[[nodiscard]] HighPrecisionComputationInput makeInput(const BaseCelestialBody& body, const EphemerisRequest& request)
+{
+    return {
+        .request = request,
+        .body = body,
+        .bodyIndex = 0U,
+    };
+}
+
+class SameInstantTimeScaleService final : public ITimeScaleService {
+public:
+    [[nodiscard]] TimeScaleConversionResult
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
+    {
+        TimeScaleConversionResult result;
+        result.epoch =
+            skygate::core::AstronomicalEpoch{
+                .julianDatePart1 = epoch.julianDatePart1,
+                .julianDatePart2 = epoch.julianDatePart2,
+                .timeScale = targetScale,
+            }
+                .normalized();
+        result.status = TimeScaleConversionStatus::Type::Valid;
+        return result;
+    }
+
+    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
+    ) const override
+    {
+        const std::optional<skygate::core::AstronomicalEpoch> epoch =
+            skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
+        if (!epoch.has_value()) {
+            TimeScaleConversionResult result;
+            result.status = TimeScaleConversionStatus::Type::Failed;
+            result.addWarning(TimeScaleConversionWarningCode::Type::UnsupportedConversion);
+            return result;
+        }
+        return convert(*epoch, targetScale);
+    }
+};
+
+struct ApparentValidationFixture {
+    EphemerisRaDecFixture raDec;
+    skygate::core::AstronomicalEpoch requestEpoch;
+    std::shared_ptr<skygate::ephemeris::tests::TestCalcephKernel> provider;
+};
+
+[[nodiscard]] Vector3d parseVector(const QJsonArray& array)
+{
+    Q_ASSERT(array.size() == 3);
+    return {
+        .x = array.at(0).toDouble(),
+        .y = array.at(1).toDouble(),
+        .z = array.at(2).toDouble(),
+    };
+}
+
+[[nodiscard]] ICalcephKernel::StateResult makeKernelState(const QJsonObject& object)
+{
+    ICalcephKernel::StateResult result;
+    result.positionAu = parseVector(object.value(QStringLiteral("positionAu")).toArray());
+    if (object.contains(QStringLiteral("velocityAuPerDay"))) {
+        result.velocityAuPerDay = parseVector(object.value(QStringLiteral("velocityAuPerDay")).toArray());
+    }
+    result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
+    result.metadata.dataSourceProvenance = "Self-derived apparent smoke fixture";
+    return result;
+}
+
+[[nodiscard]] std::optional<ApparentValidationFixture> loadApparentValidationFixture(QString* errorText)
+{
+    auto fail = [errorText](const QString& message) -> std::optional<ApparentValidationFixture> {
+        if (errorText != nullptr) {
+            *errorText = message;
+        }
+        return std::nullopt;
+    };
+
+    std::optional<EphemerisRaDecFixture> raDec = loadRaDecFixture(apparentFixturePath(), errorText);
+    if (!raDec.has_value()) {
+        return std::nullopt;
+    }
+
+    QFile file(apparentFixturePath());
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return fail(QStringLiteral("Could not reopen apparent fixture"));
+    }
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll());
+    if (!document.isObject()) {
+        return fail(QStringLiteral("Apparent fixture is not a JSON object"));
+    }
+    const QJsonObject root = document.object();
+    const QJsonObject request = root.value(QStringLiteral("request")).toObject();
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    ICalcephKernel::StateResult defaultResult;
+    defaultResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
+    defaultResult.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
+    defaultResult.metadata.dataSourceProvenance = "Self-derived apparent smoke fixture";
+    provider->setDefaultResult(std::move(defaultResult));
+
+    const QJsonArray kernelStates = root.value(QStringLiteral("kernelStates")).toArray();
+    if (kernelStates.isEmpty()) {
+        return fail(QStringLiteral("Apparent fixture has no kernel states"));
+    }
+    for (const QJsonValue& value : kernelStates) {
+        const QJsonObject state = value.toObject();
+        const QString role = state.value(QStringLiteral("role")).toString();
+        const std::pair key{
+            state.value(QStringLiteral("targetNaifId")).toInt(),
+            state.value(QStringLiteral("centerNaifId")).toInt(),
+        };
+        if (role == QStringLiteral("target-retarded")) {
+            provider->responseSequence(key.first, key.second).push_back(makeKernelState(state));
+        } else {
+            provider->response(key.first, key.second) = makeKernelState(state);
+        }
+    }
+
+    return ApparentValidationFixture{
+        .raDec = *raDec,
+        .requestEpoch =
+            {
+                .julianDatePart1 = request.value(QStringLiteral("julianDateTdb")).toDouble(),
+                .julianDatePart2 = 0.0,
+                .timeScale = skygate::core::TimeScale::Tdb,
+            },
+        .provider = provider,
+    };
+}
+
+}  // namespace
+
+class ApparentRaDecValidationTests final : public QObject {
+    Q_OBJECT
+
+private slots:
+    void geocentricApparentRaDecAgainstHorizonsFixture();
+};
+
+void ApparentRaDecValidationTests::geocentricApparentRaDecAgainstHorizonsFixture()
+{
+    QString errorText;
+    const std::optional<ApparentValidationFixture> loadedFixture = loadApparentValidationFixture(&errorText);
+    QVERIFY2(loadedFixture.has_value(), qPrintable(errorText));
+    const ApparentValidationFixture& fixture = *loadedFixture;
+    QVERIFY(fixture.raDec.metadata.apiParameters.contains(QStringLiteral("QUANTITIES='2'")));
+    QVERIFY(fixture.raDec.metadata.sourceFrame.contains(QStringLiteral("apparent"), Qt::CaseInsensitive));
+
+    EphemerisRequest request;
+    request.epoch = fixture.requestEpoch;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::apparent());
+    request.options.setEnableAtmosphericRefraction(false);
+
+    const OwnGalaxyCelestialBody mars = makeMarsBody();
+    const BaseCelestialBody marsCatalogBody(mars);
+    const HighPrecisionComputationInput input = makeInput(marsCatalogBody, request);
+    const SolarSystemStateCalculator solarSystemCalculator(fixture.provider);
+    const auto timeScaleService = std::make_shared<SameInstantTimeScaleService>();
+    const auto frameTransformer = std::make_shared<ErfaFrameTransformer>(timeScaleService);
+    const CelestialFrameTransformResult availabilityResult = ApparentPlaceTestFixture::transformSingleVector(
+        *frameTransformer,
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::TrueEquatorAndEquinox,
+        fixture.requestEpoch,
+        {.x = 1.0, .y = 0.0, .z = 0.0}
+    );
+    if (!availabilityResult.vector.has_value()) {
+        QSKIP("ERFA-backed apparent RA/Dec validation is not available in this build.");
+    }
+
+    const ApparentPlaceCalculator apparentPlaceCalculator(frameTransformer, timeScaleService, nullptr);
+
+    const HighPrecisionCalculatorResult astrometricResult = solarSystemCalculator.calculate(input);
+    const HighPrecisionCalculatorResult apparentResult = apparentPlaceCalculator.apply(input, astrometricResult);
+
+    QVERIFY(apparentResult.equatorial.has_value());
+    const EphemerisRaDecExpectation actual{
+        .rightAscensionHours = apparentResult.equatorial->rightAscensionHours,
+        .declinationDegrees = apparentResult.equatorial->declinationDeg,
+    };
+    const double angularErrorDegrees = angularSeparationDegrees(actual, fixture.raDec.expected);
+    QVERIFY2(
+        angularErrorDegrees <= fixture.raDec.toleranceDegrees,
+        qPrintable(QStringLiteral("angular error %1 deg exceeds tolerance %2 deg")
+                       .arg(angularErrorDegrees, 0, 'g', 12)
+                       .arg(fixture.raDec.toleranceDegrees, 0, 'g', 12))
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(apparentResult.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::lightTime()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::stellarAberration()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::gravitationalLightDeflection()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::precessionNutation()
+        )
+    );
+}
+
+QTEST_APPLESS_MAIN(ApparentRaDecValidationTests)
+
+#include "ApparentRaDecValidationTests.moc"

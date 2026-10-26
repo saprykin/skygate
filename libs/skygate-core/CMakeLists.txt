@@ -1,46 +1,91 @@
 add_library(skygate-core STATIC
-    include/skygate/core/IProjection.hpp
-    include/skygate/core/PreparedProjection.hpp
-    include/skygate/core/ITimeSource.hpp
-    include/skygate/core/ProjectionFactory.hpp
-    include/skygate/core/ProjectionTypes.hpp
-    include/skygate/core/SkyTypes.hpp
-    include/skygate/core/SystemTimeSource.hpp
-    include/skygate/core/Types.hpp
-    include/skygate/core/math/AngleMath.hpp
-    include/skygate/core/math/Geometry2d.hpp
-    include/skygate/core/math/LinePattern.hpp
-    include/skygate/core/math/MathConstants.hpp
-    include/skygate/core/math/ProjectedPolylineBuilder.hpp
-    include/skygate/core/math/SpatialIndex2d.hpp
-    include/skygate/core/math/SphericalGeometry.hpp
-    include/skygate/core/math/ViewportMath.hpp
-    include/skygate/core/projections/AzimuthalEquidistantProjection.hpp
-    include/skygate/core/projections/PerspectiveProjection.hpp
-    include/skygate/core/projections/StereographicProjection.hpp
-    src/SkyTypes.cpp
+    src/AsciiText.hpp
+    src/PreparedProjection.hpp
+    src/ITimeSource.hpp
+    src/EquatorialCoordinate.hpp
+    src/GeoLocation.hpp
+    src/HorizontalCoordinate.hpp
+    src/ProjectionParams.hpp
+    src/ProjectionStatus.hpp
+    src/ProjectionType.hpp
+    src/ScreenPoint.hpp
+    src/ObservationContext.hpp
+    src/SystemTimeSource.hpp
+    src/UtcTimeCodec.hpp
+    src/UtcTimePoint.hpp
+    src/NaifBodyIds.hpp
+    src/time/AstronomicalEpoch.hpp
+    src/time/AstronomicalEpochRange.hpp
+    src/time/AstronomicalTime.hpp
+    src/time/CalendarTime.hpp
+    src/time/CivilDateTime.hpp
+    src/time/EpochCodec.hpp
+    src/time/GregorianCalendar.hpp
+    src/time/TimeScale.hpp
+    src/time/TimeScaleCodec.hpp
+    src/math/AngleMath.hpp
+    src/math/CircleHitIndex.hpp
+    src/math/CircleHitTarget.hpp
+    src/math/Geometry2d.hpp
+    src/math/GridCellBuckets.hpp
+    src/math/GridCellRange.hpp
+    src/math/LineSegment2d.hpp
+    src/math/LinePattern.hpp
+    src/math/Matrix3x3.hpp
+    src/math/MathConstants.hpp
+    src/math/NumericTolerance.hpp
+    src/math/TimeConstants.hpp
+    src/math/PhysicalConstants.hpp
+    src/math/ProjectedPolylineBuilder.hpp
+    src/math/Rect2d.hpp
+    src/math/RectOccupancyGrid.hpp
+    src/math/SphericalGeometry.hpp
+    src/math/Vector2d.hpp
+    src/math/Vector3d.hpp
+    src/math/ViewportMath.hpp
+    src/math/Wgs84Geodesy.hpp
+    src/projections/ProjectionTypeCodec.hpp
+    src/EquatorialCoordinate.cpp
+    src/GeoLocation.cpp
+    src/HorizontalCoordinate.cpp
     src/PreparedProjection.cpp
-    src/ProjectionTypes.cpp
+    src/ProjectionParams.cpp
+    src/ScreenPoint.cpp
     src/SystemTimeSource.cpp
+    src/UtcTimeCodec.cpp
+    src/time/AstronomicalEpoch.cpp
+    src/time/AstronomicalEpochRange.cpp
+    src/time/AstronomicalTime.cpp
+    src/time/CalendarTime.cpp
+    src/time/EpochCodec.cpp
+    src/time/GregorianCalendar.cpp
+    src/time/TimeScaleCodec.cpp
+    src/hash/Fnv1a64Hasher.cpp
+    src/hash/Fnv1a64Hasher.hpp
+    src/hash/HashConstants.hpp
     src/math/AngleMath.cpp
+    src/math/CircleHitIndex.cpp
     src/math/Geometry2d.cpp
+    src/math/GridCellBuckets.cpp
     src/math/LinePattern.cpp
+    src/math/Matrix3x3.cpp
     src/math/ProjectedPolylineBuilder.cpp
-    src/math/SpatialIndex2d.cpp
+    src/math/RectOccupancyGrid.cpp
     src/math/SphericalGeometry.cpp
+    src/math/Vector3d.cpp
     src/math/ViewportMath.cpp
-    src/ProjectionFactory.cpp
+    src/math/Wgs84Geodesy.cpp
     src/projections/ProjectionAlgorithms.cpp
     src/projections/ProjectionAlgorithms.hpp
-    src/projections/AzimuthalEquidistantProjection.cpp
-    src/projections/PerspectiveProjection.cpp
+    src/projections/ProjectionFrame.hpp
     src/projections/ProjectionPipeline.cpp
-    src/projections/StereographicProjection.cpp
+    src/projections/ProjectionPipeline.hpp
+    src/projections/ProjectionTypeCodec.cpp
 )
 
 target_include_directories(skygate-core
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_compile_features(skygate-core PUBLIC cxx_std_20)

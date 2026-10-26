@@ -1,0 +1,149 @@
+#include "ErfaAstrometry.hpp"
+
+#include <cmath>
+
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+extern "C" {
+#include <erfa.h>
+}
+#endif
+
+namespace skygate::ephemeris::highprecision {
+namespace {
+
+[[nodiscard]] bool
+epochInScaleIsFinite(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale timeScale) noexcept
+{
+    return epoch.timeScale == timeScale && epoch.isFinite();
+}
+
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+[[nodiscard]] skygate::core::Matrix3x3 matrixFromErfaRows(const double matrix[3][3]) noexcept
+{
+    return {
+        {.x = matrix[0][0], .y = matrix[0][1], .z = matrix[0][2]},
+        {.x = matrix[1][0], .y = matrix[1][1], .z = matrix[1][2]},
+        {.x = matrix[2][0], .y = matrix[2][1], .z = matrix[2][2]},
+    };
+}
+#endif
+
+}  // namespace
+
+std::optional<skygate::core::Matrix3x3>
+ErfaAstrometry::celestialToIntermediateMatrix06A(const skygate::core::AstronomicalEpoch& terrestrialTime) noexcept
+{
+    if (!epochInScaleIsFinite(terrestrialTime, skygate::core::TimeScale::Tt)) {
+        return std::nullopt;
+    }
+
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    double matrix[3][3] = {};
+    eraC2i06a(terrestrialTime.julianDatePart1, terrestrialTime.julianDatePart2, matrix);
+
+    return matrixFromErfaRows(matrix);
+#else
+    return std::nullopt;
+#endif
+}
+
+std::optional<skygate::core::Matrix3x3>
+ErfaAstrometry::precessionNutationMatrix06A(const skygate::core::AstronomicalEpoch& terrestrialTime) noexcept
+{
+    if (!epochInScaleIsFinite(terrestrialTime, skygate::core::TimeScale::Tt)) {
+        return std::nullopt;
+    }
+
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    double matrix[3][3] = {};
+    eraPnm06a(terrestrialTime.julianDatePart1, terrestrialTime.julianDatePart2, matrix);
+
+    return matrixFromErfaRows(matrix);
+#else
+    return std::nullopt;
+#endif
+}
+
+std::optional<skygate::core::Matrix3x3>
+ErfaAstrometry::earthRotationMatrix00(const skygate::core::AstronomicalEpoch& universalTime1) noexcept
+{
+    if (!epochInScaleIsFinite(universalTime1, skygate::core::TimeScale::Ut1)) {
+        return std::nullopt;
+    }
+
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    return skygate::core::Matrix3x3::rotationZ(
+        eraEra00(universalTime1.julianDatePart1, universalTime1.julianDatePart2)
+    );
+#else
+    return std::nullopt;
+#endif
+}
+
+std::optional<double> ErfaAstrometry::tioLocatorS00(const skygate::core::AstronomicalEpoch& terrestrialTime) noexcept
+{
+    if (!epochInScaleIsFinite(terrestrialTime, skygate::core::TimeScale::Tt)) {
+        return std::nullopt;
+    }
+
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    return eraSp00(terrestrialTime.julianDatePart1, terrestrialTime.julianDatePart2);
+#else
+    return std::nullopt;
+#endif
+}
+
+std::optional<skygate::core::Matrix3x3> ErfaAstrometry::polarMotionMatrix00(
+    const double polarMotionXRadians, const double polarMotionYRadians, const double tioLocatorRadians
+) noexcept
+{
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    if (!std::isfinite(polarMotionXRadians) || !std::isfinite(polarMotionYRadians)
+        || !std::isfinite(tioLocatorRadians)) {
+        return std::nullopt;
+    }
+
+    double matrix[3][3] = {};
+    eraPom00(polarMotionXRadians, polarMotionYRadians, tioLocatorRadians, matrix);
+    return matrixFromErfaRows(matrix);
+#else
+    static_cast<void>(polarMotionXRadians);
+    static_cast<void>(polarMotionYRadians);
+    static_cast<void>(tioLocatorRadians);
+    return std::nullopt;
+#endif
+}
+
+std::optional<double> ErfaAstrometry::tdbMinusTtSeconds(
+    const skygate::core::AstronomicalEpoch& terrestrialTime,
+    const double ut1FractionOfDay,
+    const double eastLongitudeRadians,
+    const double distanceFromSpinAxisKm,
+    const double distanceNorthOfEquatorialPlaneKm
+) noexcept
+{
+    if (!epochInScaleIsFinite(terrestrialTime, skygate::core::TimeScale::Tt) || !std::isfinite(ut1FractionOfDay)
+        || !std::isfinite(eastLongitudeRadians) || !std::isfinite(distanceFromSpinAxisKm)
+        || !std::isfinite(distanceNorthOfEquatorialPlaneKm)) {
+        return std::nullopt;
+    }
+
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    return eraDtdb(
+        terrestrialTime.julianDatePart1,
+        terrestrialTime.julianDatePart2,
+        ut1FractionOfDay,
+        eastLongitudeRadians,
+        distanceFromSpinAxisKm,
+        distanceNorthOfEquatorialPlaneKm
+    );
+#else
+    static_cast<void>(ut1FractionOfDay);
+    static_cast<void>(eastLongitudeRadians);
+    static_cast<void>(distanceFromSpinAxisKm);
+    static_cast<void>(distanceNorthOfEquatorialPlaneKm);
+    return std::nullopt;
+#endif
+}
+
+}  // namespace skygate::ephemeris::highprecision

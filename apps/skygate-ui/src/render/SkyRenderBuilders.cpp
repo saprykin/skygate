@@ -1,9 +1,9 @@
 #include "SkyRenderBuilders.hpp"
-
 #include "SkyConstellationRenderBuilder.hpp"
 #include "SkyRenderBodyBuilder.hpp"
 #include "SkyRenderHorizontalLookup.hpp"
-#include "SkyRenderLabels.hpp"
+#include "SkyRenderLabelBuilder.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
 
 #include <optional>
 #include <string_view>
@@ -12,10 +12,10 @@
 using namespace skygate::ui::internal;
 
 SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
-    const skygate::ephemeris::SkySnapshot& snapshot,
+    const skygate::ephemeris::EphemerisSnapshot& snapshot,
     const skygate::core::PreparedProjection& projection,
     const std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs,
-    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
+    const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups,
     const double magnitudeCutoff,
     const double viewportWidth,
     const double viewportHeight,
@@ -27,8 +27,8 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     frame.lines.reserve(lineRefs.size());
 
     std::optional<SkyRenderHorizontalLookup> horizontalLookup;
-    if (!lineRefs.empty() || !labelRefs.empty()) {
-        horizontalLookup.emplace(lineRefs, labelRefs);
+    if (!lineRefs.empty() || !anchorGroups.empty()) {
+        horizontalLookup.emplace(lineRefs, anchorGroups);
     }
 
     const SkyRenderBodyBuilder bodyBuilder;
@@ -47,35 +47,21 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     const SkyConstellationRenderBuilder constellationBuilder;
     if (horizontalLookup.has_value() && overlayLayers.constellationLines) {
         constellationBuilder.appendLines(
-            frame,
-            *horizontalLookup,
-            projection,
-            lineRefs,
-            viewportWidth,
-            viewportHeight,
-            renderTheme
+            frame, *horizontalLookup, projection, lineRefs, viewportWidth, viewportHeight, renderTheme
         );
     }
 
     std::unordered_set<std::string_view> seenLabels;
-    frame.labels.reserve(labelRefs.size() + 16U);
+    frame.labels.reserve(anchorGroups.size() + 16U);
     constexpr double kEdgeMarginPx = 10.0;
     skygate::core::RectOccupancyGrid labelGrid(72.0);
 
-    appendBodyPointLabels(
-        frame,
-        snapshot,
-        viewportWidth,
-        viewportHeight,
-        renderTheme,
-        overlayLayers,
-        kEdgeMarginPx,
-        seenLabels,
-        labelGrid
+    SkyRenderLabelBuilder::appendBodyPointLabels(
+        frame, snapshot, viewportWidth, viewportHeight, renderTheme, overlayLayers, kEdgeMarginPx, seenLabels, labelGrid
     );
 
     if (overlayLayers.deepSkyLabels) {
-        appendDeepSkyLabels(
+        SkyRenderLabelBuilder::appendDeepSkyLabels(
             frame,
             snapshot,
             projection.params(),
@@ -93,7 +79,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
             frame,
             *horizontalLookup,
             projection,
-            labelRefs,
+            anchorGroups,
             viewportWidth,
             viewportHeight,
             renderTheme,

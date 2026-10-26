@@ -1,0 +1,63 @@
+#include "MoonEquatorialCalculator.hpp"
+#include "EclipticToEquatorialCalculator.hpp"
+#include "ReferenceEpochElements.hpp"
+#include "math/AngleMath.hpp"
+#include "math/SphericalGeometry.hpp"
+
+#include <cmath>
+
+namespace skygate::ephemeris {
+
+skygate::core::EquatorialCoordinate
+MoonEquatorialCalculator::compute(const skygate::core::UtcTimePoint& utcTime) const noexcept
+{
+    const double daysSinceJ2000 = ReferenceEpochElements::daysSinceJ2000(utcTime);
+    const double ascendingNodeDeg =
+        skygate::core::AngleMath::normalizeDegrees(125.1228 - 0.0529538083 * daysSinceJ2000);
+    const double inclinationDeg = 5.1454;
+    const double argumentOfPerigeeDeg =
+        skygate::core::AngleMath::normalizeDegrees(318.0634 + 0.1643573223 * daysSinceJ2000);
+    const double eccentricity = 0.0549;
+    const double meanAnomalyDeg = skygate::core::AngleMath::normalizeDegrees(115.3654 + 13.0649929509 * daysSinceJ2000);
+
+    const double meanAnomalyRad = skygate::core::AngleMath::toRadians(meanAnomalyDeg);
+    const double eccentricAnomalyDeg =
+        meanAnomalyDeg
+        + skygate::core::AngleMath::toDegrees(
+            eccentricity * std::sin(meanAnomalyRad) * (1.0 + eccentricity * std::cos(meanAnomalyRad))
+        );
+    const double eccentricAnomalyRad = skygate::core::AngleMath::toRadians(eccentricAnomalyDeg);
+
+    constexpr double kSemiMajorAxisEarthRadii = 60.2666;
+    const double xV = kSemiMajorAxisEarthRadii * (std::cos(eccentricAnomalyRad) - eccentricity);
+    const double yV =
+        kSemiMajorAxisEarthRadii * (std::sqrt(1.0 - eccentricity * eccentricity) * std::sin(eccentricAnomalyRad));
+
+    const double trueAnomalyDeg = skygate::core::AngleMath::toDegrees(std::atan2(yV, xV));
+    const double radius = std::sqrt(xV * xV + yV * yV);
+
+    const double longitudeArgumentRad = skygate::core::AngleMath::toRadians(trueAnomalyDeg + argumentOfPerigeeDeg);
+    const double ascendingNodeRad = skygate::core::AngleMath::toRadians(ascendingNodeDeg);
+    const double inclinationRad = skygate::core::AngleMath::toRadians(inclinationDeg);
+
+    const double xH = radius
+                      * (std::cos(ascendingNodeRad) * std::cos(longitudeArgumentRad)
+                         - std::sin(ascendingNodeRad) * std::sin(longitudeArgumentRad) * std::cos(inclinationRad));
+    const double yH = radius
+                      * (std::sin(ascendingNodeRad) * std::cos(longitudeArgumentRad)
+                         + std::cos(ascendingNodeRad) * std::sin(longitudeArgumentRad) * std::cos(inclinationRad));
+    const double zH = radius * std::sin(longitudeArgumentRad) * std::sin(inclinationRad);
+
+    // The ecliptic frame shares its longitude and latitude convention with the
+    // equatorial one, so the equatorial accessors return the ecliptic angles.
+    const skygate::core::EquatorialCoordinate eclipticAngles =
+        skygate::core::SphericalGeometry::equatorialFromUnitVector({.x = xH, .y = yH, .z = zH});
+
+    return EclipticToEquatorialCalculator::compute(
+        skygate::core::AngleMath::hoursToDegrees(eclipticAngles.rightAscensionHours),
+        eclipticAngles.declinationDeg,
+        ReferenceEpochElements::meanObliquityDeg(daysSinceJ2000)
+    );
+}
+
+}  // namespace skygate::ephemeris

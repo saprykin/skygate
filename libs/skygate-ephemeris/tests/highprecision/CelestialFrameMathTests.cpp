@@ -1,0 +1,122 @@
+#include "engine/highprecision/CelestialFrameMath.hpp"
+
+#include <QtTest/QtTest>
+
+#include <array>
+#include <cmath>
+#include <limits>
+
+using skygate::core::EquatorialCoordinate;
+using skygate::core::GeoLocation;
+using skygate::core::Vector3d;
+using skygate::ephemeris::highprecision::CelestialFrameMath;
+
+class CelestialFrameMathTests final : public QObject {
+    Q_OBJECT
+
+private slots:
+    void roundTripsEquatorialCoordinates();
+    void normalizesRightAscension();
+    void buildsEquatorialTangentBasis();
+    void rejectsZeroAndNonfiniteVectors();
+    void rejectsInvalidObserverAndZeroItrsVector();
+};
+
+void CelestialFrameMathTests::roundTripsEquatorialCoordinates()
+{
+    const std::array coordinates{
+        EquatorialCoordinate{0.0, 0.0},
+        EquatorialCoordinate{6.0, 90.0},
+        EquatorialCoordinate{18.0, -90.0},
+        EquatorialCoordinate{23.999, -45.0},
+        EquatorialCoordinate{7.25, 32.5},
+    };
+    for (const auto& coordinate : coordinates) {
+        const Vector3d vector = CelestialFrameMath::fromEquatorial(coordinate);
+        QVERIFY(std::abs(vector.length() - 1.0) < 1.0e-14);
+        const auto result = CelestialFrameMath::toEquatorial(vector);
+        QVERIFY(result.has_value());
+        QVERIFY(std::abs(result->rightAscensionHours - coordinate.rightAscensionHours) < 1.0e-12);
+        QVERIFY(std::abs(result->declinationDeg - coordinate.declinationDeg) < 1.0e-12);
+    }
+}
+
+void CelestialFrameMathTests::normalizesRightAscension()
+{
+    const auto result = CelestialFrameMath::toEquatorial(Vector3d{0.0, -2.0, 0.0});
+    QVERIFY(result.has_value());
+    QCOMPARE(result->rightAscensionHours, 18.0);
+    QCOMPARE(result->declinationDeg, 0.0);
+}
+
+void CelestialFrameMathTests::buildsEquatorialTangentBasis()
+{
+    const EquatorialCoordinate coordinate{5.5, 23.5};
+    const Vector3d reference = CelestialFrameMath::fromEquatorial(coordinate);
+    const Vector3d east = CelestialFrameMath::eastBasisFromEquatorial(coordinate);
+    const Vector3d north = CelestialFrameMath::northBasisFromEquatorial(coordinate);
+
+    QVERIFY(std::abs(east.length() - 1.0) < 1.0e-14);
+    QVERIFY(std::abs(north.length() - 1.0) < 1.0e-14);
+    QVERIFY(std::abs(east.dot(north)) < 1.0e-14);
+    QVERIFY(std::abs(east.dot(reference)) < 1.0e-14);
+    QVERIFY(std::abs(north.dot(reference)) < 1.0e-14);
+
+    const Vector3d zeroDecEast = CelestialFrameMath::eastBasisFromEquatorial(EquatorialCoordinate{0.0, 0.0});
+    QCOMPARE(zeroDecEast.x, 0.0);
+    QCOMPARE(zeroDecEast.y, 1.0);
+    QCOMPARE(zeroDecEast.z, 0.0);
+
+    const Vector3d zeroDecNorth = CelestialFrameMath::northBasisFromEquatorial(EquatorialCoordinate{0.0, 0.0});
+    QCOMPARE(zeroDecNorth.x, 0.0);
+    QCOMPARE(zeroDecNorth.y, 0.0);
+    QCOMPARE(zeroDecNorth.z, 1.0);
+}
+
+void CelestialFrameMathTests::rejectsZeroAndNonfiniteVectors()
+{
+    const double infinity = std::numeric_limits<double>::infinity();
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double tiny = std::numeric_limits<double>::denorm_min();
+    const std::array vectors{
+        Vector3d{},
+        Vector3d{tiny, 0.0, 0.0},
+        Vector3d{infinity, 0.0, 0.0},
+        Vector3d{0.0, nan, 0.0},
+        Vector3d{0.0, 0.0, -infinity},
+    };
+    for (const auto& vector : vectors) {
+        QVERIFY(!CelestialFrameMath::toEquatorial(vector).has_value());
+    }
+}
+
+void CelestialFrameMathTests::rejectsInvalidObserverAndZeroItrsVector()
+{
+    const GeoLocation observer{
+        .latitudeDeg = 37.7749,
+        .longitudeDeg = -122.4194,
+        .elevationMeters = 10.0,
+    };
+    const Vector3d itrsVector = CelestialFrameMath::fromEquatorial(EquatorialCoordinate{4.0, 20.0});
+
+    QVERIFY(CelestialFrameMath::horizontalFromItrsVector(itrsVector, observer).has_value());
+    QVERIFY(!CelestialFrameMath::horizontalFromItrsVector(Vector3d{}, observer).has_value());
+    QVERIFY(!CelestialFrameMath::horizontalFromItrsVector(
+                 Vector3d{std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0}, observer
+    )
+                 .has_value());
+
+    const std::array<GeoLocation, 3> invalidObservers{
+        GeoLocation{.latitudeDeg = 90.5, .longitudeDeg = 10.0, .elevationMeters = 0.0},
+        GeoLocation{.latitudeDeg = 10.0, .longitudeDeg = -180.5, .elevationMeters = 0.0},
+        GeoLocation{
+            .latitudeDeg = 10.0, .longitudeDeg = 10.0, .elevationMeters = std::numeric_limits<double>::infinity()
+        },
+    };
+    for (const GeoLocation& invalidObserver : invalidObservers) {
+        QVERIFY(!CelestialFrameMath::horizontalFromItrsVector(itrsVector, invalidObserver).has_value());
+    }
+}
+
+QTEST_APPLESS_MAIN(CelestialFrameMathTests)
+#include "CelestialFrameMathTests.moc"

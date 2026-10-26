@@ -1,24 +1,39 @@
-#include "skygate/ephemeris/CatalogPayloadParser.hpp"
-#include "catalog/io/zip/ZipCodec.hpp"
+#include "BaseCelestialBody.hpp"
+#include "CatalogArchiveTestSupport.hpp"
+#include "CatalogMergeTestSupport.hpp"
+#include "DistantCelestialBody.hpp"
+#include "catalog/CatalogIdentifier.hpp"
+#include "catalog/CatalogPayloadParser.hpp"
+#include "skygate/testsupport/PerformanceBudget.hpp"
+#include "catalog/io/CatalogZipEntrySelector.hpp"
 
 #include <QtTest/QtTest>
 
 #include <QElapsedTimer>
 
 #include <cmath>
-#include <cstdlib>
-#include <cstdint>
+#include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
+
+using skygate::ephemeris::BaseCelestialBody;
+using skygate::ephemeris::CatalogIdentifier;
+using skygate::ephemeris::DistantCelestialBody;
+using skygate::ephemeris::tests::CatalogMergeTestSupport;
+using skygate::ephemeris::tests::makeZip;
+using skygate::ephemeris::tests::ZipEntrySpec;
 
 class CatalogPerformanceGuardTests final : public QObject {
     Q_OBJECT
 
 private slots:
     void parsesModeratelyLargeHygCatalogWithinGuardrail();
-    void parsesModeratelyLargeOpenNgcCatalogWithinGuardrail();
+    void parsesLargeOpenNgcCatalogWithinGuardrail();
     void scansZipWithManyEntriesWithinGuardrail();
+    void mergesLargeFixtureWithoutAllPairsScan();
+    void wallClockBudgetsAreAdvisoryByDefault();
 };
 
 namespace {
@@ -26,154 +41,18 @@ namespace {
 constexpr qint64 kLargeCatalogParseBudgetMs = 15000;
 constexpr qint64 kZipScanBudgetMs = 5000;
 
-bool isStrictPerformanceGuardMode()
+void verifyElapsedBelow(const qint64 elapsedMs, const qint64 budgetMs, const char* operationName)
 {
-    const QString mode = QString::fromUtf8(
-        qgetenv("SKYGATE_PERFORMANCE_GUARD_MODE")
-    ).trimmed().toLower();
-    const QString legacyStrict = QString::fromUtf8(
-        qgetenv("SKYGATE_STRICT_PERFORMANCE_GUARDS")
-    ).trimmed().toLower();
-    return mode == QStringLiteral("strict")
-        || (
-            !legacyStrict.isEmpty()
-            && legacyStrict != QStringLiteral("0")
-            && legacyStrict != QStringLiteral("false")
-            && legacyStrict != QStringLiteral("no")
-            && legacyStrict != QStringLiteral("off")
-        );
-}
-
-QString performanceMetricMessage(
-    const qint64 elapsedMs,
-    const qint64 budgetMs,
-    const char* operationName,
-    const bool strictMode
-)
-{
-    const qint64 deltaMs = budgetMs - elapsedMs;
-    const double budgetPercent = budgetMs > 0
-        ? (static_cast<double>(elapsedMs) * 100.0 / static_cast<double>(budgetMs))
-        : 0.0;
-    return QStringLiteral(
-        "perf %1: %2 elapsed=%3 ms budget=%4 ms delta=%5 ms budget_used=%6% "
-        "strict=%7"
-    )
-        .arg(elapsedMs < budgetMs ? QStringLiteral("within-budget")
-                                  : QStringLiteral("over-budget"))
-        .arg(QString::fromUtf8(operationName))
-        .arg(elapsedMs)
-        .arg(budgetMs)
-        .arg(deltaMs)
-        .arg(QString::number(budgetPercent, 'f', 1))
-        .arg(strictMode ? QStringLiteral("on") : QStringLiteral("off"));
-}
-
-struct ZipEntrySpec final {
-    std::string path;
-    std::string data;
-};
-
-void appendLe16(std::string& data, const std::uint16_t value)
-{
-    data.push_back(static_cast<char>(value & 0xffU));
-    data.push_back(static_cast<char>((value >> 8U) & 0xffU));
-}
-
-void appendLe32(std::string& data, const std::uint32_t value)
-{
-    appendLe16(data, static_cast<std::uint16_t>(value & 0xffffU));
-    appendLe16(data, static_cast<std::uint16_t>((value >> 16U) & 0xffffU));
-}
-
-std::string makeZip(const std::vector<ZipEntrySpec>& entries)
-{
-    std::string zipData;
-    std::vector<std::uint32_t> localHeaderOffsets;
-    localHeaderOffsets.reserve(entries.size());
-
-    for (const ZipEntrySpec& entry : entries) {
-        localHeaderOffsets.push_back(static_cast<std::uint32_t>(zipData.size()));
-        appendLe32(zipData, 0x04034b50U);
-        appendLe16(zipData, 20U);
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe32(zipData, 0U);
-        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
-        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
-        appendLe16(zipData, static_cast<std::uint16_t>(entry.path.size()));
-        appendLe16(zipData, 0U);
-        zipData += entry.path;
-        zipData += entry.data;
-    }
-
-    const std::uint32_t centralDirectoryOffset = static_cast<std::uint32_t>(zipData.size());
-    for (std::size_t index = 0; index < entries.size(); ++index) {
-        const ZipEntrySpec& entry = entries[index];
-        appendLe32(zipData, 0x02014b50U);
-        appendLe16(zipData, 20U);
-        appendLe16(zipData, 20U);
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe32(zipData, 0U);
-        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
-        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
-        appendLe16(zipData, static_cast<std::uint16_t>(entry.path.size()));
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe32(zipData, 0U);
-        appendLe32(zipData, localHeaderOffsets[index]);
-        zipData += entry.path;
-    }
-
-    const std::uint32_t centralDirectorySize =
-        static_cast<std::uint32_t>(zipData.size()) - centralDirectoryOffset;
-    appendLe32(zipData, 0x06054b50U);
-    appendLe16(zipData, 0U);
-    appendLe16(zipData, 0U);
-    appendLe16(zipData, static_cast<std::uint16_t>(entries.size()));
-    appendLe16(zipData, static_cast<std::uint16_t>(entries.size()));
-    appendLe32(zipData, centralDirectorySize);
-    appendLe32(zipData, centralDirectoryOffset);
-    appendLe16(zipData, 0U);
-    return zipData;
-}
-
-void verifyElapsedBelow(
-    const qint64 elapsedMs,
-    const qint64 budgetMs,
-    const char* operationName
-)
-{
-    const bool strictMode = isStrictPerformanceGuardMode();
-    const QString message = performanceMetricMessage(
-        elapsedMs,
-        budgetMs,
-        operationName,
-        strictMode
+    const skygate::testsupport::PerformanceBudgetDecision decision =
+        skygate::testsupport::reportPerformanceBudget(elapsedMs, budgetMs, operationName);
+    QVERIFY2(
+        decision != skygate::testsupport::PerformanceBudgetDecision::StrictOverBudget,
+        qPrintable(
+            skygate::testsupport::strictPerformanceBudgetHint(
+                skygate::testsupport::performanceMetricMessage(elapsedMs, budgetMs, operationName, true)
+            )
+        )
     );
-
-    if (elapsedMs < budgetMs) {
-        qInfo().noquote() << message;
-        return;
-    }
-
-    const QString strictHint = QStringLiteral(
-        "%1; set SKYGATE_PERFORMANCE_GUARD_MODE=strict or "
-        "SKYGATE_STRICT_PERFORMANCE_GUARDS=1 to make advisory budgets fail"
-    ).arg(message);
-    if (!strictMode) {
-        qWarning().noquote() << strictHint;
-        return;
-    }
-
-    QVERIFY2(false, qPrintable(strictHint));
 }
 
 std::string makeLargeHygCatalog(const int rowCount)
@@ -202,10 +81,9 @@ std::string makeLargeHygCatalog(const int rowCount)
 
 std::string makeLargeOpenNgcCatalog(const int rowCount)
 {
-    std::string csv =
-        "Name;Type;RA;Dec;Const;MajAx;MinAx;PosAng;B-Mag;V-Mag;J-Mag;H-Mag;K-Mag;"
-        "SurfBr;Hubble;Cstar U-Mag;Cstar B-Mag;Cstar V-Mag;M;NGC;IC;Cstar Names;"
-        "Identifiers;Common names;NED notes;OpenNGC notes\n";
+    std::string csv = "Name;Type;RA;Dec;Const;MajAx;MinAx;PosAng;B-Mag;V-Mag;J-Mag;H-Mag;K-Mag;"
+                      "SurfBr;Hubble;Cstar U-Mag;Cstar B-Mag;Cstar V-Mag;M;NGC;IC;Cstar Names;"
+                      "Identifiers;Common names;NED notes;OpenNGC notes\n";
     csv.reserve(static_cast<std::size_t>(rowCount) * 96U);
     for (int index = 0; index < rowCount; ++index) {
         const int hour = (index / 3600) % 24;
@@ -219,15 +97,12 @@ std::string makeLargeOpenNgcCatalog(const int rowCount)
         csv += std::to_string(ngcId);
         csv += ";G;";
         csv += QStringLiteral("%1:%2:%3.00")
-            .arg(hour, 2, 10, QLatin1Char('0'))
-            .arg(minute, 2, 10, QLatin1Char('0'))
-            .arg(second, 2, 10, QLatin1Char('0'))
-            .toStdString();
+                   .arg(hour, 2, 10, QLatin1Char('0'))
+                   .arg(minute, 2, 10, QLatin1Char('0'))
+                   .arg(second, 2, 10, QLatin1Char('0'))
+                   .toStdString();
         csv += ';';
-        csv += QStringLiteral("%1%2:00:00.0")
-            .arg(QChar(sign))
-            .arg(absDecDeg, 2, 10, QLatin1Char('0'))
-            .toStdString();
+        csv += QStringLiteral("%1%2:00:00.0").arg(QChar(sign)).arg(absDecDeg, 2, 10, QLatin1Char('0')).toStdString();
         csv += ";Tst;1.5;1.0;0;;";
         csv += std::to_string(8.0 + static_cast<double>(index % 50) / 10.0);
         csv += ";;;;;;;;;";
@@ -264,7 +139,7 @@ void CatalogPerformanceGuardTests::parsesModeratelyLargeHygCatalogWithinGuardrai
     verifyElapsedBelow(elapsedMs, kLargeCatalogParseBudgetMs, "large HYG parse");
 }
 
-void CatalogPerformanceGuardTests::parsesModeratelyLargeOpenNgcCatalogWithinGuardrail()
+void CatalogPerformanceGuardTests::parsesLargeOpenNgcCatalogWithinGuardrail()
 {
     const std::string payload = makeLargeOpenNgcCatalog(12000);
     const skygate::ephemeris::CatalogPayloadParser parser;
@@ -285,25 +160,89 @@ void CatalogPerformanceGuardTests::scansZipWithManyEntriesWithinGuardrail()
     std::vector<ZipEntrySpec> entries;
     entries.reserve(3001U);
     for (int index = 0; index < 3000; ++index) {
-        entries.push_back(ZipEntrySpec {
-            .path = "notes/readme-" + std::to_string(index) + ".txt",
-            .data = "not a catalog\n"
-        });
+        entries.push_back(
+            ZipEntrySpec{.path = "notes/readme-" + std::to_string(index) + ".txt", .data = "not a catalog\n"}
+        );
     }
-    entries.push_back(ZipEntrySpec {
-        .path = "catalogs/hyg.csv",
-        .data = "id,hip,proper,ra,dec,mag\n1,42,Target,1.0,2.0,3.0\n"
-    });
+    entries.push_back(
+        ZipEntrySpec{.path = "catalogs/hyg.csv", .data = "id,hip,proper,ra,dec,mag\n1,42,Target,1.0,2.0,3.0\n"}
+    );
     const std::string zipData = makeZip(entries);
 
     QElapsedTimer timer;
     timer.start();
-    const auto extracted = skygate::ephemeris::ZipCodec {}.extractFirstCsvEntry(zipData);
+    const skygate::ephemeris::CatalogZipEntrySelection extracted =
+        skygate::ephemeris::CatalogZipEntrySelector::select(zipData, std::nullopt);
     const qint64 elapsedMs = timer.elapsed();
 
-    QVERIFY(extracted.has_value());
-    QVERIFY(extracted->find("Target") != std::string::npos);
+    QVERIFY(extracted.status == skygate::ephemeris::CatalogZipEntrySelection::Status::Selected);
+    QVERIFY(extracted.payload.find("Target") != std::string::npos);
     verifyElapsedBelow(elapsedMs, kZipScanBudgetMs, "large ZIP entry scan");
+}
+
+void CatalogPerformanceGuardTests::mergesLargeFixtureWithoutAllPairsScan()
+{
+    constexpr std::size_t kFixtureSize = 6000;
+
+    std::vector<DistantCelestialBody> primaryDso;
+    std::vector<DistantCelestialBody> deepSkyDso;
+    primaryDso.reserve(kFixtureSize);
+    deepSkyDso.reserve(kFixtureSize);
+
+    for (std::size_t index = 0; index < kFixtureSize; ++index) {
+        const std::string ngc = std::to_string(100000 + index);
+        primaryDso.push_back(
+            CatalogMergeTestSupport::makeDeepSkyObject(
+                "primary_" + ngc, "Primary " + ngc, {"NGC " + ngc}, {CatalogIdentifier::make("ngc", ngc)}, 1.0, 2.0
+            )
+        );
+        deepSkyDso.push_back(
+            CatalogMergeTestSupport::makeDeepSkyObject(
+                "secondary_" + ngc,
+                "Secondary " + ngc,
+                {"NGC " + ngc},
+                {CatalogIdentifier::make("ngc", ngc), CatalogIdentifier::make("ic", ngc)},
+                1.0,
+                2.0
+            )
+        );
+    }
+
+    const auto primary = CatalogMergeTestSupport::createCatalog({}, std::move(primaryDso));
+    const auto deepSky = CatalogMergeTestSupport::createCatalog({}, std::move(deepSkyDso));
+    QVERIFY(primary != nullptr);
+    QVERIFY(deepSky != nullptr);
+
+    const auto result = CatalogMergeTestSupport::composePrimaryWithDeepSky(*primary, *deepSky);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.deepSkyObjectCount, kFixtureSize);
+
+    const BaseCelestialBody* first =
+        CatalogMergeTestSupport::findBodyById(result.catalog->bodies(), "secondary_100000");
+    QVERIFY(first != nullptr);
+    QVERIFY(CatalogMergeTestSupport::hasIdentifier(*first, "ngc", "100000"));
+    QVERIFY(CatalogMergeTestSupport::hasIdentifier(*first, "ic", "100000"));
+
+    const BaseCelestialBody* last = CatalogMergeTestSupport::findBodyById(result.catalog->bodies(), "secondary_105999");
+    QVERIFY(last != nullptr);
+    QVERIFY(CatalogMergeTestSupport::hasIdentifier(*last, "ngc", "105999"));
+    QVERIFY(CatalogMergeTestSupport::hasIdentifier(*last, "ic", "105999"));
+
+    QCOMPARE(CatalogMergeTestSupport::countBodiesById(result.catalog->bodies(), "primary_100000"), std::size_t{0});
+}
+
+void CatalogPerformanceGuardTests::wallClockBudgetsAreAdvisoryByDefault()
+{
+    using skygate::testsupport::PerformanceBudgetDecision;
+
+    QCOMPARE(
+        skygate::testsupport::performanceBudgetDecision(200, 100, false), PerformanceBudgetDecision::AdvisoryOverBudget
+    );
+    QCOMPARE(
+        skygate::testsupport::performanceBudgetDecision(200, 100, true), PerformanceBudgetDecision::StrictOverBudget
+    );
+    QCOMPARE(skygate::testsupport::performanceBudgetDecision(99, 100, true), PerformanceBudgetDecision::WithinBudget);
 }
 
 QTEST_APPLESS_MAIN(CatalogPerformanceGuardTests)

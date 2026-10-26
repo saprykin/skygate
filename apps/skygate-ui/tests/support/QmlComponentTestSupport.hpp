@@ -1,8 +1,8 @@
 #pragma once
 
 #include "QmlTestPaths.hpp"
-#include "SkyContextController.hpp"
-#include "SkySceneModel.hpp"
+#include "app/SkyContextController.hpp"
+#include "scene/SkySceneModel.hpp"
 
 #include <QByteArray>
 #include <QCoreApplication>
@@ -42,11 +42,8 @@ inline bool writeFile(const QString& path, const QByteArray& contents)
     return file.write(contents) == contents.size();
 }
 
-inline std::unique_ptr<QObject> createFileComponent(
-    QQmlEngine& engine,
-    const QString& fileName,
-    const QVariantMap& initialProperties = {}
-)
+inline std::unique_ptr<QObject>
+createFileComponent(QQmlEngine& engine, const QString& fileName, const QVariantMap& initialProperties = {})
 {
     QQmlComponent component(&engine, QUrl::fromLocalFile(qmlSourcePath(fileName)));
     if (component.isLoading()) {
@@ -57,15 +54,11 @@ inline std::unique_ptr<QObject> createFileComponent(
         return {};
     }
 
-    return std::unique_ptr<QObject>(
-        component.createWithInitialProperties(initialProperties, engine.rootContext())
-    );
+    return std::unique_ptr<QObject>(component.createWithInitialProperties(initialProperties, engine.rootContext()));
 }
 
 inline std::unique_ptr<QObject> createInlineComponent(
-    QQmlEngine& engine,
-    const QString& source,
-    const QString& fileName = QStringLiteral("InlineTest.qml")
+    QQmlEngine& engine, const QString& source, const QString& fileName = QStringLiteral("InlineTest.qml")
 )
 {
     QQmlComponent component(&engine);
@@ -79,11 +72,7 @@ inline std::unique_ptr<QObject> createInlineComponent(
     return std::unique_ptr<QObject>(component.create(engine.rootContext()));
 }
 
-inline void setupEngine(
-    QQmlEngine& engine,
-    SkyContextController& controller,
-    SkySceneModel* sceneModel = nullptr
-)
+inline void setupEngine(QQmlEngine& engine, SkyContextController& controller, SkySceneModel* sceneModel = nullptr)
 {
     engine.addImportPath(QStringLiteral(SKYGATE_QML_SOURCE_DIR));
     engine.rootContext()->setContextProperty("skyContext", &controller);

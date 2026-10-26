@@ -1,43 +1,78 @@
 # AGENTS.md
 
 ## Purpose
-This file defines coding and collaboration rules for agents working in this
+
+This file defines repository-specific rules for coding agents working in this
 repository.
 
-## C++ Conventions
-- Use UTF-8 and prefer ASCII in source unless non-ASCII is required.
+## Repository Structure
+
+- Co-locate `.hpp` headers and their `.cpp` files under `src/` in every
+  module.
+- The `src/` directory serves as the public include root for library targets:
+  `target_include_directories(... PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)`.
+- Do not create a separate `include/` tree.
 - Prefer `.hpp` headers and `#pragma once`.
-- Prefer one class per header/source pair where practical.
-- Keep functions short and focused.
-- Use `const` correctness consistently.
-- Use `override` for overridden virtual functions.
-- Prefer `nullptr` over `0`/`NULL`.
-- Prefer `[[nodiscard]]` on query/factory APIs when ignoring the result is
-  likely a bug.
-- Namespace-level factory/helper APIs in public headers are acceptable when
-  they are part of the intended module interface. Avoid ad-hoc public free
-  functions that do not define a clear API boundary.
-- Prefer unnamed-namespace helpers for `.cpp`-local and test-local functions.
-- Keep public library headers under `libs/*/include/skygate/...`. Keep
-  internal-only helpers in `src/` where practical.
+- Use one enum, class, or struct per header/source pair.
+- Do not put multiple standalone struct, class, or enum definitions in the same
+  header file.
+- Nest a type inside another class only when it is tightly coupled and has no
+  standalone meaning outside that class.
+- Keep a type header-only when all of its members can be defined inline.
+  Create a `.cpp` file only when a member needs an out-of-line definition; do
+  not create empty companion `.cpp` files that only include the header.
+- Pure interface classes are always header-only.
+
+## Header Rules
+
+- Header files must not contain free functions.
+- Header files must not contain namespace-level helper functions.
+- If reusable helper behavior is required, create a focused class or struct and
+  expose the helper as a public static member.
+- If the helper is only needed by one `.cpp` file, keep it in that `.cpp` file
+  inside an unnamed namespace.
+- Do not use header helpers as a shortcut around proper ownership or
+  responsibility boundaries.
+
+## Naming Conventions
+
 - Types/classes: `PascalCase`.
-- Interface classes: prefix with `I` (example: `IRenderer`, `IProjection`).
+- Interface classes: prefix with `I`, for example `IRenderer` or
+  `IProjection`.
 - Methods/functions: `camelCase`.
 - Member variables: `m_camelCase`.
 - Local variables/parameters: `camelCase`.
-- Constants/macros: `kPascalCase` for constants, avoid macros unless necessary.
-- Setters are prefixed with `set` (example: `setLatitude(double latitude)`).
-- Getters use the property name directly (example: `latitude() const`).
-- Boolean getters may use `is`/`has` when clearer (example: `isPaused() const`).
+- Constants: `kPascalCase`.
+- Avoid macros unless necessary.
+- Do not create aliases for project namespaces.
+- Do not use partially qualified project namespaces such as `core::Type` or
+  `ephemeris::Type`. Use the full `skygate::...::Type` name, or use an
+  explicit `using namespace skygate::...` or `using skygate::...::Type`
+  declaration and then refer to the type unqualified.
+- Setters are prefixed with `set`, for example `setLatitude(double latitude)`.
+- Getters use the property name directly, for example `latitude() const`.
+- Boolean getters may use `is`/`has` when clearer, for example
+  `isPaused() const`.
 
-## Interfaces and Abstractions
-- Prefer abstract interfaces for replaceable subsystems.
-- Interface classes should:
-  - Have virtual destructors.
-  - Avoid data members.
-  - Be focused on a single responsibility.
+## Include Order
 
-## Qt/CMake Expectations
+Group `#include` directives into three blocks, each separated by a blank line:
+
+1. Current project includes using `"..."`.
+2. Non-project library includes, for example Qt `<Q...>`.
+3. System/compiler includes, for example `<utility>`.
+
+Rules:
+
+- Do not place blank lines inside an include block.
+- In a `.cpp` file, the corresponding header must be the first include in the
+  first block.
+- Sort the rest of each block alphabetically.
+- If includes with different nested levels are used, includes with lower nested
+  level come first.
+
+## Qt and CMake Expectations
+
 - Target Qt 6.5+ and C++20.
 - Use CMake for all build configuration.
 - Prefer the existing CMake presets and build targets when possible:
@@ -46,30 +81,94 @@ repository.
   `skygate-ui -> skygate-ephemeris -> skygate-core`.
 - Keep platform-specific code isolated behind interfaces.
 - Favor Qt abstractions when they preserve portability.
-- For QML-facing types, follow the established `QObject`/`Q_PROPERTY`/
+- For QML-facing types, follow the established `QObject`, `Q_PROPERTY`, and
   `Q_INVOKABLE` pattern instead of inventing alternate UI binding layers.
 
+## Core Library Usage
+
+- The `skygate-core` library contains math and geometry functions and
+  constants, physical constants, time and date conversion functions and
+  constants.
+- Before adding a new helper function, constant, or magic number, search the
+  codebase first.
+- If the needed functionality already exists, use it instead of duplicating it.
+- If the needed functionality does not exist, decide whether it is
+  generalizable.
+- If the needed functionality is generalizable, extend the existing core
+  classes or structs instead of adding isolated one-off logic.
+
+## Interfaces and Abstractions
+
+- Prefer abstract interfaces for replaceable subsystems.
+- Interface classes should:
+  - Have virtual destructors.
+  - Declare only virtual methods.
+  - Keep destructors and all methods inline or pure virtual in the header.
+  - Avoid data members.
+  - Be focused on a single responsibility.
+- Do not add abstraction layers without a clear need.
+- Preserve existing dependency direction and responsibility boundaries.
+
 ## Error Handling and Logging
+
 - Validate external inputs.
 - Fail fast on programmer errors in debug builds.
 - Return explicit error states where recovery is possible.
-- If adding diagnostics, use consistent Qt logging categories. Do not assume a
-  pre-existing project-wide category scheme where none exists yet.
+- When code can fail, for example because inputs are not found or a download is
+  cancelled, use existing logging capabilities to report the problem.
+- Do not write code that stays silent when a problem happens.
+- If adding diagnostics, use consistent Qt logging categories.
+- Do not assume a pre-existing project-wide logging category scheme where none
+  exists yet.
 
 ## Testing
+
 - Add or adjust Qt Test coverage for new logic, especially math/transform code.
 - Keep rendering-independent calculations testable without UI.
-- Prefer deterministic tests (fixed time/location inputs).
-- Register tests through the existing per-module CMake helpers / CTest flow.
+- Prefer deterministic tests with fixed time/location inputs.
+- Register tests through the existing per-module CMake helpers and CTest flow.
+- Keep test function names at most 48 characters.
+- Do not weaken, delete, or skip tests to make the build pass.
 
-## Agent Workflow
-- Make minimal, focused changes.
-- Do not rewrite unrelated files.
+## Formatting
+
 - After changing any C++ source or header, run `clang-format` on the touched
   C++ files before considering the change complete.
+- When editing Markdown files, `*.md`, keep line width at or below 80
+  characters unless a long path, URL, symbol, or name does not fit.
+- Use the humanizer skill when writing code comments and documentation.
+- Add code comments only when they carry information the code itself does
+  not. Keep code files clean.
+
+## Architecture Documentation
+
+- Architecture docs live in `docs/arch/`, one topic per file.
+  `docs/ARCHITECTURE.md` is only a hub that links to them.
+- When a change alters behavior, contracts, or architecture, update the
+  matching `docs/arch/*.md` file in the same change.
+- Write the docs for humans, not for agents:
+  - describe what the code does, not what was changed and when;
+  - no task identifiers, review guidelines, or line-count heuristics;
+  - no AI-flavored filler: no em dashes, one-line closers, bold labels,
+    forced triads, or "not X but Y" contrasts;
+  - sentence-case headings, plain language, code names in backticks.
+- Keep one topic per file. If a section grows into a distinct topic, split
+  it into its own file and link it from the hub.
+- Verify claims against the code when the relevant behavior changes; do
+  not let the docs drift.
+
+## Agent Workflow
+
+- Use cheaper flash models for subagents unless a larger model is explicitly
+  required by the task or requested by the user.
+- Make minimal, focused changes.
+- Do not rewrite unrelated files.
+- Do not reformat unrelated files.
 - Prefer existing presets and build trees over inventing new local workflow
   instructions.
 - Update documentation when behavior, contracts, or architecture meaningfully
   change.
-- If a rule conflicts with explicit user instruction, follow the user
+- After making required changes, always compile the project and make sure tests
+  are green.
+- If a rule conflicts with an explicit user instruction, follow the user
   instruction.

@@ -1,6 +1,8 @@
 #pragma once
 
-#include "SkySceneOverlayData.hpp"
+#include "SkyOverlayItem.hpp"
+#include "SkySelectedObjectInspector.hpp"
+#include "SkySelectionMarker.hpp"
 
 #include <QVariantList>
 #include <QVariantMap>
@@ -9,13 +11,7 @@
 
 class SkySceneOverlayAdapter final {
 public:
-    [[nodiscard]] QVariantList overlayItems(
-        std::span<const SkyOverlayItem> overlayItems
-    ) const;
-    [[nodiscard]] QVariantMap selectionMarker(
-        const SkySelectionMarker& marker
-    ) const;
-    [[nodiscard]] QVariantMap selectedObjectInspector(
-        const SkySelectedObjectInspector& inspector
-    ) const;
+    [[nodiscard]] QVariantList overlayItems(std::span<const SkyOverlayItem> overlayItems) const;
+    [[nodiscard]] QVariantMap selectionMarker(const SkySelectionMarker& marker) const;
+    [[nodiscard]] QVariantMap selectedObjectInspector(const SkySelectedObjectInspector& inspector) const;
 };

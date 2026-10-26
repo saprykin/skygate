@@ -1,18 +1,16 @@
 #pragma once
 
-#include "catalog/model/CatalogBodyParseResult.hpp"
-#include "skygate/ephemeris/CatalogLoader.hpp"
+#include "catalog/CatalogBodyParseResult.hpp"
+#include "catalog/ICatalogParser.hpp"
 
 #include <string_view>
 
 namespace skygate::ephemeris {
 
-class HygCatalogParser final {
+class HygCatalogParser final : public ICatalogParser {
 public:
-    [[nodiscard]] CatalogBodyParseResult parse(
-        std::string_view csvData,
-        const HygParseProgressCallback& progressCallback
-    ) const;
+    [[nodiscard]] CatalogBodyParseResult
+    parse(std::string_view data, const CatalogParseProgressCallback& progressCallback) const override;
 };
 
 }  // namespace skygate::ephemeris

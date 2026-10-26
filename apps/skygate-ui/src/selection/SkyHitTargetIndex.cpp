@@ -2,10 +2,15 @@
 
 #include <algorithm>
 
-void SkyHitTargetIndex::rebuild(
-    const SkyRenderFrame& frame,
-    const skygate::ephemeris::SkySnapshot& snapshot
-)
+namespace {
+
+constexpr double kPointHitTargetRadiusMinPx = 10.0;
+constexpr double kPointHitTargetRadiusPaddingPx = 5.0;
+constexpr double kGlyphHitTargetRadiusMinPx = 12.0;
+
+}  // namespace
+
+void SkyHitTargetIndex::rebuild(const SkyRenderFrame& frame, const skygate::ephemeris::EphemerisSnapshot& snapshot)
 {
     m_targets.clear();
     m_targets.reserve(frame.points.size() + frame.glyphs.size());
@@ -16,12 +21,14 @@ void SkyHitTargetIndex::rebuild(
             continue;
         }
 
-        m_targets.push_back(skygate::core::CircleHitTarget {
-            .x = point.x,
-            .y = point.y,
-            .radius = std::max(10.0, point.sizePx + 5.0),
-            .payloadId = point.bodyIndex
-        });
+        m_targets.push_back(
+            skygate::core::CircleHitTarget{
+                .x = point.x,
+                .y = point.y,
+                .radius = std::max(kPointHitTargetRadiusMinPx, point.sizePx + kPointHitTargetRadiusPaddingPx),
+                .payloadId = point.bodyIndex
+            }
+        );
     }
 
     for (const auto& glyph : frame.glyphs) {
@@ -30,12 +37,14 @@ void SkyHitTargetIndex::rebuild(
             continue;
         }
 
-        m_targets.push_back(skygate::core::CircleHitTarget {
-            .x = glyph.x,
-            .y = glyph.y,
-            .radius = std::max({glyph.radiusXPx, glyph.radiusYPx, 12.0}),
-            .payloadId = glyph.bodyIndex
-        });
+        m_targets.push_back(
+            skygate::core::CircleHitTarget{
+                .x = glyph.x,
+                .y = glyph.y,
+                .radius = glyph.extentRadiusPx(kGlyphHitTargetRadiusMinPx),
+                .payloadId = glyph.bodyIndex
+            }
+        );
     }
 
     m_hitIndex.rebuild(m_targets);
@@ -52,15 +61,10 @@ std::optional<std::uint32_t> SkyHitTargetIndex::bodyIndexAt(
     const double y,
     const double viewportWidth,
     const double viewportHeight,
-    const skygate::ephemeris::SkySnapshot& snapshot
+    const skygate::ephemeris::EphemerisSnapshot& snapshot
 ) const
 {
-    if (
-        viewportWidth <= 0.0
-        || viewportHeight <= 0.0
-        || m_targets.empty()
-        || snapshot.catalogBodies == nullptr
-    ) {
+    if (viewportWidth <= 0.0 || viewportHeight <= 0.0 || m_targets.empty() || snapshot.catalogBodies == nullptr) {
         return std::nullopt;
     }
 

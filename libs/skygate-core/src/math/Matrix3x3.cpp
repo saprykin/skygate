@@ -1,0 +1,71 @@
+#include "Matrix3x3.hpp"
+
+#include <cassert>
+#include <cmath>
+
+namespace skygate::core {
+namespace {
+
+constexpr std::size_t kDimension = 3U;
+
+[[nodiscard]] std::size_t valueIndex(const std::size_t rowIndex, const std::size_t columnIndex) noexcept
+{
+    assert(rowIndex < kDimension);
+    assert(columnIndex < kDimension);
+    return (rowIndex * kDimension) + columnIndex;
+}
+
+}  // namespace
+
+Matrix3x3::Matrix3x3(const Vector3d& firstRow, const Vector3d& secondRow, const Vector3d& thirdRow) noexcept
+    : m_values{
+          firstRow.x,
+          firstRow.y,
+          firstRow.z,
+          secondRow.x,
+          secondRow.y,
+          secondRow.z,
+          thirdRow.x,
+          thirdRow.y,
+          thirdRow.z,
+      }
+{
+}
+
+Matrix3x3 Matrix3x3::rotationZ(const double radians) noexcept
+{
+    // Positive radians turn clockwise in the xy-plane seen from +Z, the
+    // opposite sign of Geometry2d::rotatePoint2d.
+    const double sine = std::sin(radians);
+    const double cosine = std::cos(radians);
+    return {
+        {.x = cosine, .y = sine, .z = 0.0},
+        {.x = -sine, .y = cosine, .z = 0.0},
+        {.x = 0.0, .y = 0.0, .z = 1.0},
+    };
+}
+
+double Matrix3x3::value(const std::size_t rowIndex, const std::size_t columnIndex) const noexcept
+{
+    return m_values[valueIndex(rowIndex, columnIndex)];
+}
+
+Vector3d Matrix3x3::multiplied(const Vector3d& vector) const noexcept
+{
+    return {
+        .x = value(0U, 0U) * vector.x + value(0U, 1U) * vector.y + value(0U, 2U) * vector.z,
+        .y = value(1U, 0U) * vector.x + value(1U, 1U) * vector.y + value(1U, 2U) * vector.z,
+        .z = value(2U, 0U) * vector.x + value(2U, 1U) * vector.y + value(2U, 2U) * vector.z,
+    };
+}
+
+Vector3d Matrix3x3::transposeMultiplied(const Vector3d& vector) const noexcept
+{
+    return {
+        .x = value(0U, 0U) * vector.x + value(1U, 0U) * vector.y + value(2U, 0U) * vector.z,
+        .y = value(0U, 1U) * vector.x + value(1U, 1U) * vector.y + value(2U, 1U) * vector.z,
+        .z = value(0U, 2U) * vector.x + value(1U, 2U) * vector.y + value(2U, 2U) * vector.z,
+    };
+}
+
+}  // namespace skygate::core

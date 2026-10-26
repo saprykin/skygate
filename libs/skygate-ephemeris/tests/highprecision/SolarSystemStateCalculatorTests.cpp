@@ -1,0 +1,808 @@
+#include "TestHelpers.hpp"
+#include "CelestialBodyCatalog.hpp"
+#include "EphemerisFixtureSupport.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
+#include "TestCalcephKernel.hpp"
+#include "math/MathConstants.hpp"
+#include "math/PhysicalConstants.hpp"
+#include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
+#include "engine/highprecision/HighPrecisionComputationInput.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
+#include "engine/highprecision/SolarSystemStateCalculator.hpp"
+
+#include <QFile>
+#include <QStringList>
+#include <QtTest/QtTest>
+
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+namespace {
+
+using namespace skygate::ephemeris;
+using namespace skygate::ephemeris::highprecision;
+using namespace skygate::core;
+using skygate::ephemeris::tests::makeSunBody;
+
+[[nodiscard]] EphemerisRequest makeRequest()
+{
+    EphemerisRequest request;
+    request.epoch = {
+        .julianDatePart1 = 2'460'310.0,
+        .julianDatePart2 = 0.5,
+        .timeScale = skygate::core::TimeScale::Tdb,
+    };
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::geometric());
+    return request;
+}
+
+[[nodiscard]] OwnGalaxyCelestialBody makePlanetBody(std::string id)
+{
+    OwnGalaxyCelestialBody body;
+    body.id = std::move(id);
+    body.displayName = "Planet";
+    body.kind = BaseCelestialBody::Kind::Planet;
+    return body;
+}
+
+[[nodiscard]] OwnGalaxyCelestialBody makeDeepSkyBody()
+{
+    OwnGalaxyCelestialBody body;
+    body.id = "m31";
+    body.displayName = "M31";
+    body.kind = BaseCelestialBody::Kind::DeepSkyObject;
+    return body;
+}
+
+[[nodiscard]] HighPrecisionComputationInput makeInput(const BaseCelestialBody& body, const EphemerisRequest& request)
+{
+    return {
+        .request = request,
+        .body = body,
+        .bodyIndex = 4U,
+    };
+}
+
+[[nodiscard]] HighPrecisionCalculatorResult calculateBody(
+    const SolarSystemStateCalculator& calculator, OwnGalaxyCelestialBody body, const EphemerisRequest& request
+)
+{
+    std::vector<OwnGalaxyCelestialBody> bodies;
+    bodies.push_back(std::move(body));
+    const CelestialBodyCatalog catalog(std::move(bodies));
+    return calculator.calculate(makeInput(catalog.bodyAt(0U), request));
+}
+
+[[nodiscard]] ICalcephKernel::StateResult
+makeKernelVector(const Vector3d& vector, const std::optional<Vector3d>& velocity = std::nullopt)
+{
+    ICalcephKernel::StateResult result;
+    result.positionAu = vector;
+    result.velocityAuPerDay = velocity;
+    result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
+    result.metadata.dataSourceProvenance = "Horizons ICRF geometric fixture";
+    return result;
+}
+
+struct GeometricFixture {
+    int targetNaifId = 0;
+    int centerNaifId = 0;
+    skygate::core::AstronomicalEpoch epoch;
+    Vector3d vector;
+    double expectedRightAscensionHours = 0.0;
+    double expectedDeclinationDeg = 0.0;
+    double toleranceDeg = 0.0;
+};
+
+struct LightTimeTargetState {
+    skygate::core::AstronomicalEpoch epoch;
+    Vector3d vector;
+};
+
+struct LightTimeFixture {
+    int targetNaifId = 0;
+    int earthNaifId = 0;
+    int barycenterNaifId = 0;
+    skygate::core::AstronomicalEpoch receiveEpoch;
+    Vector3d geometricVector;
+    Vector3d earthReceiveVector;
+    std::vector<LightTimeTargetState> retardedTargetStates;
+    double expectedRightAscensionHours = 0.0;
+    double expectedDeclinationDeg = 0.0;
+    double tolerance = 0.0;
+};
+
+[[nodiscard]] GeometricFixture loadSmokeFixture()
+{
+    QFile file(QStringLiteral(SKYGATE_EPHEMERIS_TESTDATA_DIR "/ephemeris/geometric_solar_system_smoke.csv"));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qFatal("Unable to open geometric solar-system smoke fixture.");
+    }
+
+    while (!file.atEnd()) {
+        const QString line = QString::fromUtf8(file.readLine()).trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#'))) {
+            continue;
+        }
+
+        const QStringList fields = line.split(QLatin1Char(','));
+        Q_ASSERT(fields.size() == 10);
+        return GeometricFixture{
+            .targetNaifId = fields[1].toInt(),
+            .centerNaifId = fields[2].toInt(),
+            .epoch =
+                {.julianDatePart1 = fields[3].toDouble(),
+                 .julianDatePart2 = 0.0,
+                 .timeScale = skygate::core::TimeScale::Tdb},
+            .vector =
+                {
+                    .x = fields[4].toDouble(),
+                    .y = fields[5].toDouble(),
+                    .z = fields[6].toDouble(),
+                },
+            .expectedRightAscensionHours = fields[7].toDouble(),
+            .expectedDeclinationDeg = fields[8].toDouble(),
+            .toleranceDeg = fields[9].toDouble(),
+        };
+    }
+
+    Q_UNREACHABLE();
+}
+
+[[nodiscard]] LightTimeFixture loadLightTimeFixture()
+{
+    QFile file(QStringLiteral(SKYGATE_EPHEMERIS_TESTDATA_DIR "/ephemeris/light_time_solar_system_mars.csv"));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qFatal("Unable to open light-time solar-system smoke fixture.");
+    }
+
+    LightTimeFixture fixture;
+    while (!file.atEnd()) {
+        const QString line = QString::fromUtf8(file.readLine()).trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#'))) {
+            continue;
+        }
+
+        const QStringList fields = line.split(QLatin1Char(','));
+        Q_ASSERT(fields.size() == 11);
+        const QString role = fields[1];
+        const int targetNaifId = fields[2].toInt();
+        const int centerNaifId = fields[3].toInt();
+        const skygate::core::AstronomicalEpoch epoch{
+            .julianDatePart1 = fields[4].toDouble(),
+            .julianDatePart2 = 0.0,
+            .timeScale = skygate::core::TimeScale::Tdb,
+        };
+        const Vector3d vector{
+            .x = fields[5].toDouble(),
+            .y = fields[6].toDouble(),
+            .z = fields[7].toDouble(),
+        };
+
+        if (role == QStringLiteral("geometric")) {
+            fixture.targetNaifId = targetNaifId;
+            fixture.earthNaifId = centerNaifId;
+            fixture.receiveEpoch = epoch;
+            fixture.geometricVector = vector;
+        } else if (role == QStringLiteral("earth-receive")) {
+            fixture.earthNaifId = targetNaifId;
+            fixture.barycenterNaifId = centerNaifId;
+            fixture.earthReceiveVector = vector;
+        } else if (role == QStringLiteral("target-retarded")) {
+            fixture.retardedTargetStates.push_back({
+                .epoch = epoch,
+                .vector = vector,
+            });
+        } else if (role == QStringLiteral("expected-light-time")) {
+            fixture.expectedRightAscensionHours = fields[8].toDouble();
+            fixture.expectedDeclinationDeg = fields[9].toDouble();
+            fixture.tolerance = fields[10].toDouble();
+        } else {
+            Q_UNREACHABLE();
+        }
+    }
+
+    Q_ASSERT(fixture.targetNaifId != 0);
+    Q_ASSERT(fixture.earthNaifId != 0);
+    Q_ASSERT(fixture.barycenterNaifId == 0);
+    Q_ASSERT(!fixture.retardedTargetStates.empty());
+    Q_ASSERT(fixture.tolerance > 0.0);
+    return fixture;
+}
+
+[[nodiscard]] double epochTotal(const skygate::core::AstronomicalEpoch& epoch) noexcept
+{
+    return epoch.julianDatePart1 + epoch.julianDatePart2;
+}
+
+}  // namespace
+
+class SolarSystemStateCalculatorTests final : public QObject {
+    Q_OBJECT
+
+private slots:
+    void computesGeometricRaDecFromKernelVector();
+    void computesGeometricRaDecAgainstSmokeFixture();
+    void mapsSupportedBodiesToNaifIds();
+    void fallsBackToBarycenterWhenBodyCenterMissing();
+    void prefersPlanetarySystemBarycenterWhenConfigured();
+    void usesBodyCentersWhenBarycenterPreferred();
+    void appliesLightTimeFromRetardedTargetAndEarth();
+    void computesLightTimeRaDecAgainstHorizonsFixture();
+    void normalizesRetardedEpochAcrossDayBoundary();
+    void unavailableLightTimeInputsKeepGeometric();
+    void appliesStellarAberrationFromEarthVelocity();
+    void skipsStellarAberrationWhenDisabled();
+    void unavailableStellarAberrationInputsKeepGeometric();
+    void appliesSolarGravitationalLightDeflection();
+    void skipsSolarGravitationalDeflectionWhenDisabled();
+    void unavailableSolarDeflectionInputsKeepGeometric();
+    void reportsUnsupportedPlanetIdsWithoutCallingKernel();
+    void reportsMissingKernelProvider();
+    void propagatesOutOfRangeKernelStatus();
+    void rejectsNonTdbEpochs();
+};
+
+void SolarSystemStateCalculatorTests::computesGeometricRaDecFromKernelVector()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->defaultResult() = makeKernelVector({.x = 0.0, .y = 1.0, .z = 1.0});
+    const SolarSystemStateCalculator calculator(provider);
+    const OwnGalaxyCelestialBody mars = makePlanetBody("mars");
+    const EphemerisRequest request = makeRequest();
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, mars, request);
+
+    QCOMPARE(provider->callCount(), 1);
+    QCOMPARE(provider->lastTargetNaifId(), 499);
+    QCOMPARE(provider->lastCenterNaifId(), 399);
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(result.observerRelativePositionAu.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
+    QVERIFY(std::abs(result.equatorial->declinationDeg - 45.0) < 1.0e-12);
+    QCOMPARE(result.observerRelativePositionAu->x, 0.0);
+    QCOMPARE(result.observerRelativePositionAu->y, 1.0);
+    QCOMPARE(result.observerRelativePositionAu->z, 1.0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(result.metadata.appliedCorrections),
+        static_cast<std::uint32_t>(EphemerisCorrectionFlags::geometric())
+    );
+    QVERIFY(result.metadata.dataSourceProvenance == std::string{"Horizons ICRF geometric fixture"});
+}
+
+void SolarSystemStateCalculatorTests::computesGeometricRaDecAgainstSmokeFixture()
+{
+    const GeometricFixture fixture = loadSmokeFixture();
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->defaultResult() = makeKernelVector(fixture.vector);
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.epoch = fixture.epoch;
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
+
+    QCOMPARE(provider->lastTargetNaifId(), fixture.targetNaifId);
+    QCOMPARE(provider->lastCenterNaifId(), fixture.centerNaifId);
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(
+        std::abs(
+            skygate::ephemeris::tests::rightAscensionHoursToDegrees(result.equatorial->rightAscensionHours)
+            - skygate::ephemeris::tests::rightAscensionHoursToDegrees(fixture.expectedRightAscensionHours)
+        )
+        < fixture.toleranceDeg
+    );
+    QVERIFY(std::abs(result.equatorial->declinationDeg - fixture.expectedDeclinationDeg) < fixture.toleranceDeg);
+}
+
+void SolarSystemStateCalculatorTests::mapsSupportedBodiesToNaifIds()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->defaultResult() = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    const SolarSystemStateCalculator calculator(provider);
+    const EphemerisRequest request = makeRequest();
+
+    struct Case {
+        OwnGalaxyCelestialBody body;
+        int naifId = 0;
+    };
+    const std::array cases{
+        Case{.body = makeSunBody(), .naifId = 10},
+        Case{.body = makePlanetBody("mercury"), .naifId = 199},
+        Case{.body = makePlanetBody("venus"), .naifId = 299},
+        Case{.body = makePlanetBody("MARS"), .naifId = 499},
+        Case{.body = makePlanetBody("jupiter"), .naifId = 599},
+        Case{.body = makePlanetBody("saturn"), .naifId = 699},
+        Case{.body = makePlanetBody("uranus"), .naifId = 799},
+        Case{.body = makePlanetBody("neptune"), .naifId = 899},
+        Case{.body = makePlanetBody("pluto"), .naifId = 999},
+    };
+
+    for (const Case& item : cases) {
+        const HighPrecisionCalculatorResult result = calculateBody(calculator, item.body, request);
+
+        QVERIFY(result.equatorial.has_value());
+        QCOMPARE(provider->lastTargetNaifId(), item.naifId);
+        QCOMPARE(provider->lastCenterNaifId(), 399);
+    }
+}
+
+void SolarSystemStateCalculatorTests::fallsBackToBarycenterWhenBodyCenterMissing()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    ICalcephKernel::StateResult missingBodyCenter;
+    missingBodyCenter.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
+    missingBodyCenter.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+    provider->response(499, 399) = missingBodyCenter;
+    provider->response(4, 399) = makeKernelVector({.x = 0.0, .y = 1.0, .z = 0.0});
+    const SolarSystemStateCalculator calculator(provider);
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
+
+    QCOMPARE(provider->callCount(), 2);
+    QCOMPARE(provider->calls()[0].targetNaifId, 499);
+    QCOMPARE(provider->calls()[1].targetNaifId, 4);
+    QCOMPARE(provider->lastCenterNaifId(), 399);
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::BarycenterFallback));
+    QVERIFY(result.metadata.dataSourceProvenance.find("mars body center (499)") != std::string::npos);
+    QVERIFY(result.metadata.dataSourceProvenance.find("planetary-system barycenter (4)") != std::string::npos);
+}
+
+void SolarSystemStateCalculatorTests::prefersPlanetarySystemBarycenterWhenConfigured()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->response(499, 399) = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    provider->response(4, 399) = makeKernelVector({.x = 0.0, .y = 1.0, .z = 0.0});
+    const SolarSystemStateCalculator calculator(provider, true);
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
+
+    QCOMPARE(provider->callCount(), 1);
+    QCOMPARE(provider->lastTargetNaifId(), 4);
+    QCOMPARE(provider->lastCenterNaifId(), 399);
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+    );
+    QVERIFY(!result.metadata.hasWarning(EphemerisEngineWarning::Code::BarycenterFallback));
+    QVERIFY(result.metadata.dataSourceProvenance == std::string{"Horizons ICRF geometric fixture"});
+}
+
+void SolarSystemStateCalculatorTests::usesBodyCentersWhenBarycenterPreferred()
+{
+    struct Case {
+        std::string_view id;
+        int bodyCenterNaifId = 0;
+        int barycenterNaifId = 0;
+    };
+    const std::array cases{
+        Case{.id = "mercury", .bodyCenterNaifId = 199, .barycenterNaifId = 1},
+        Case{.id = "venus", .bodyCenterNaifId = 299, .barycenterNaifId = 2},
+    };
+
+    for (const Case& item : cases) {
+        const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+        provider->response(item.bodyCenterNaifId, 399) = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+        provider->response(item.barycenterNaifId, 399) = makeKernelVector({.x = 0.0, .y = 1.0, .z = 0.0});
+        const SolarSystemStateCalculator calculator(provider, true);
+
+        const HighPrecisionCalculatorResult result =
+            calculateBody(calculator, makePlanetBody(std::string{item.id}), makeRequest());
+
+        QCOMPARE(provider->callCount(), 1);
+        QCOMPARE(provider->lastTargetNaifId(), item.bodyCenterNaifId);
+        QCOMPARE(provider->lastCenterNaifId(), 399);
+        QVERIFY(result.equatorial.has_value());
+        QCOMPARE(
+            static_cast<std::uint8_t>(result.metadata.status),
+            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+        );
+        QVERIFY(!result.metadata.hasWarning(EphemerisEngineWarning::Code::BarycenterFallback));
+    }
+}
+
+void SolarSystemStateCalculatorTests::appliesLightTimeFromRetardedTargetAndEarth()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->response(499, 399) = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    provider->response(399, 0) = makeKernelVector({.x = 10.0, .y = 0.0, .z = 0.0});
+    provider->response(499, 0) = makeKernelVector({.x = 10.0, .y = 1.0, .z = 1.0});
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
+
+    QVERIFY(provider->callCount() >= 3);
+    QCOMPARE(provider->calls().front().targetNaifId, 499);
+    QCOMPARE(provider->calls().front().centerNaifId, 399);
+    QCOMPARE(provider->calls()[1].targetNaifId, 399);
+    QCOMPARE(provider->calls()[1].centerNaifId, 0);
+    QCOMPARE(provider->lastTargetNaifId(), 499);
+    QCOMPARE(provider->lastCenterNaifId(), 0);
+    QVERIFY(
+        provider->lastEpoch().julianDatePart1 + provider->lastEpoch().julianDatePart2
+        < request.epoch.julianDatePart1 + request.epoch.julianDatePart2
+    );
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(result.observerRelativePositionAu.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
+    QVERIFY(std::abs(result.equatorial->declinationDeg - 45.0) < 1.0e-12);
+    QCOMPARE(result.observerRelativePositionAu->x, 0.0);
+    QCOMPARE(result.observerRelativePositionAu->y, 1.0);
+    QCOMPARE(result.observerRelativePositionAu->z, 1.0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::lightTime()
+        )
+    );
+}
+
+void SolarSystemStateCalculatorTests::computesLightTimeRaDecAgainstHorizonsFixture()
+{
+    const LightTimeFixture fixture = loadLightTimeFixture();
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->response(fixture.targetNaifId, fixture.earthNaifId) = makeKernelVector(fixture.geometricVector);
+    provider->response(fixture.earthNaifId, fixture.barycenterNaifId) = makeKernelVector(fixture.earthReceiveVector);
+    for (const LightTimeTargetState& targetState : fixture.retardedTargetStates) {
+        provider->responseSequence(fixture.targetNaifId, fixture.barycenterNaifId)
+            .push_back(makeKernelVector(targetState.vector));
+    }
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.epoch = fixture.receiveEpoch;
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
+
+    QCOMPARE(provider->callCount(), 2 + static_cast<int>(fixture.retardedTargetStates.size()));
+    QCOMPARE(provider->calls()[0].targetNaifId, fixture.targetNaifId);
+    QCOMPARE(provider->calls()[0].centerNaifId, fixture.earthNaifId);
+    QCOMPARE(provider->calls()[1].targetNaifId, fixture.earthNaifId);
+    QCOMPARE(provider->calls()[1].centerNaifId, fixture.barycenterNaifId);
+    for (std::size_t index = 0; index < fixture.retardedTargetStates.size(); ++index) {
+        const skygate::ephemeris::tests::TestCalcephKernel::Call& call = provider->calls()[index + 2U];
+        QCOMPARE(call.targetNaifId, fixture.targetNaifId);
+        QCOMPARE(call.centerNaifId, fixture.barycenterNaifId);
+        QVERIFY(std::abs(epochTotal(call.epoch) - epochTotal(fixture.retardedTargetStates[index].epoch)) < 1.0e-9);
+    }
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(
+        std::abs(
+            skygate::ephemeris::tests::rightAscensionHoursToDegrees(result.equatorial->rightAscensionHours)
+            - skygate::ephemeris::tests::rightAscensionHoursToDegrees(fixture.expectedRightAscensionHours)
+        )
+        < fixture.tolerance
+    );
+    QVERIFY(std::abs(result.equatorial->declinationDeg - fixture.expectedDeclinationDeg) < fixture.tolerance);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::lightTime()
+        )
+    );
+}
+
+void SolarSystemStateCalculatorTests::normalizesRetardedEpochAcrossDayBoundary()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    const Vector3d lightTimeVector{
+        .x = PhysicalConstants::kSpeedOfLightAuPerDay * 0.25,
+        .y = 0.0,
+        .z = 0.0,
+    };
+    provider->response(499, 399) = makeKernelVector(lightTimeVector);
+    provider->response(399, 0) = makeKernelVector({.x = 0.0, .y = 0.0, .z = 0.0});
+    provider->response(499, 0) = makeKernelVector(lightTimeVector);
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.epoch = {
+        .julianDatePart1 = 2'460'310.0,
+        .julianDatePart2 = 0.1,
+        .timeScale = skygate::core::TimeScale::Tdb,
+    };
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
+
+    QCOMPARE(provider->callCount(), 5);
+    for (std::size_t index = 2U; index < provider->calls().size(); ++index) {
+        const skygate::ephemeris::tests::TestCalcephKernel::Call& call = provider->calls()[index];
+        QCOMPARE(call.centerNaifId, 0);
+        QCOMPARE(call.epoch.julianDatePart1, 2'460'309.0);
+        QVERIFY(std::abs(call.epoch.julianDatePart2 - 0.85) < 1.0e-12);
+        QCOMPARE(
+            static_cast<std::uint8_t>(call.epoch.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tdb)
+        );
+    }
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::lightTime()
+        )
+    );
+}
+
+void SolarSystemStateCalculatorTests::unavailableLightTimeInputsKeepGeometric()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->response(499, 399) = makeKernelVector({.x = 0.0, .y = 1.0, .z = 0.0});
+    provider->response(399, 0).metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
+    provider->response(399, 0).metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
+
+    QCOMPARE(provider->callCount(), 2);
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
+    QVERIFY(std::abs(result.equatorial->declinationDeg) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.unavailableCorrections, EphemerisCorrectionFlags::lightTime()
+        )
+    );
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::lightTime()
+    ));
+}
+
+void SolarSystemStateCalculatorTests::appliesStellarAberrationFromEarthVelocity()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->response(499, 399) = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    provider->response(399, 0) = makeKernelVector(
+        {.x = 0.0, .y = 0.0, .z = 0.0},
+        Vector3d{.x = 0.0, .y = PhysicalConstants::kSpeedOfLightAuPerDay * 1.0e-4, .z = 0.0}
+    );
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::stellarAberration());
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
+
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(result.equatorial->rightAscensionHours > 0.0);
+    QVERIFY(result.equatorial->rightAscensionHours < 1.0e-3);
+    QVERIFY(std::abs(result.equatorial->declinationDeg) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::stellarAberration()
+        )
+    );
+}
+
+void SolarSystemStateCalculatorTests::skipsStellarAberrationWhenDisabled()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->response(499, 399) = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    provider->response(399, 0) = makeKernelVector(
+        {.x = 0.0, .y = 0.0, .z = 0.0},
+        Vector3d{.x = 0.0, .y = PhysicalConstants::kSpeedOfLightAuPerDay * 1.0e-4, .z = 0.0}
+    );
+    const SolarSystemStateCalculator calculator(provider);
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
+
+    QVERIFY(result.equatorial.has_value());
+    QCOMPARE(result.equatorial->rightAscensionHours, 0.0);
+    QCOMPARE(result.equatorial->declinationDeg, 0.0);
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::stellarAberration()
+    ));
+}
+
+void SolarSystemStateCalculatorTests::unavailableStellarAberrationInputsKeepGeometric()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->response(499, 399) = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    provider->response(399, 0) = makeKernelVector({.x = 0.0, .y = 0.0, .z = 0.0});
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::stellarAberration());
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
+
+    QVERIFY(result.equatorial.has_value());
+    QCOMPARE(result.equatorial->rightAscensionHours, 0.0);
+    QCOMPARE(result.equatorial->declinationDeg, 0.0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.unavailableCorrections, EphemerisCorrectionFlags::stellarAberration()
+        )
+    );
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::stellarAberration()
+    ));
+}
+
+void SolarSystemStateCalculatorTests::appliesSolarGravitationalLightDeflection()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->response(499, 399) = makeKernelVector({.x = std::cos(0.1), .y = std::sin(0.1), .z = 0.0});
+    provider->response(10, 399) = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::gravitationalLightDeflection());
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
+
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(result.equatorial->rightAscensionHours > (0.1 * 12.0 / MathConstants::kPi));
+    QVERIFY(std::abs(result.equatorial->declinationDeg) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::gravitationalLightDeflection()
+        )
+    );
+}
+
+void SolarSystemStateCalculatorTests::skipsSolarGravitationalDeflectionWhenDisabled()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->response(499, 399) = makeKernelVector({.x = std::cos(0.1), .y = std::sin(0.1), .z = 0.0});
+    provider->response(10, 399) = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    const SolarSystemStateCalculator calculator(provider);
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
+
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - (0.1 * 12.0 / MathConstants::kPi)) < 1.0e-12);
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::gravitationalLightDeflection()
+    ));
+}
+
+void SolarSystemStateCalculatorTests::unavailableSolarDeflectionInputsKeepGeometric()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->response(499, 399) = makeKernelVector({.x = 0.0, .y = 1.0, .z = 0.0});
+    provider->response(10, 399).metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
+    provider->response(10, 399).metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::gravitationalLightDeflection());
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
+
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
+    QVERIFY(std::abs(result.equatorial->declinationDeg) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.unavailableCorrections, EphemerisCorrectionFlags::gravitationalLightDeflection()
+        )
+    );
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::gravitationalLightDeflection()
+    ));
+}
+
+void SolarSystemStateCalculatorTests::reportsUnsupportedPlanetIdsWithoutCallingKernel()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->defaultResult() = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    const SolarSystemStateCalculator calculator(provider);
+
+    const HighPrecisionCalculatorResult unknownPlanet =
+        calculateBody(calculator, makePlanetBody("planet_x"), makeRequest());
+    const HighPrecisionCalculatorResult deepSky = calculateBody(calculator, makeDeepSkyBody(), makeRequest());
+
+    QCOMPARE(provider->callCount(), 0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(unknownPlanet.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported)
+    );
+    QVERIFY(unknownPlanet.metadata.hasWarning(EphemerisEngineWarning::Code::UnsupportedBody));
+    QCOMPARE(
+        static_cast<std::uint8_t>(deepSky.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported)
+    );
+}
+
+void SolarSystemStateCalculatorTests::reportsMissingKernelProvider()
+{
+    const SolarSystemStateCalculator calculator(nullptr);
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
+    QVERIFY(!result.equatorial.has_value());
+}
+
+void SolarSystemStateCalculatorTests::propagatesOutOfRangeKernelStatus()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->defaultResult().metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
+    provider->defaultResult().metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+    const SolarSystemStateCalculator calculator(provider);
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
+
+    QCOMPARE(provider->callCount(), 1);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
+    QVERIFY(!result.equatorial.has_value());
+}
+
+void SolarSystemStateCalculatorTests::rejectsNonTdbEpochs()
+{
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    provider->defaultResult() = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.epoch.timeScale = skygate::core::TimeScale::Utc;
+
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
+
+    QCOMPARE(provider->callCount(), 0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
+}
+
+QTEST_APPLESS_MAIN(SolarSystemStateCalculatorTests)
+
+#include "SolarSystemStateCalculatorTests.moc"

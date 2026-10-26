@@ -1,8 +1,10 @@
 #include "TestHelpers.hpp"
-#include "skygate/ephemeris/CatalogLoader.hpp"
+#include "catalog/CatalogLoader.hpp"
+#include "catalog/CatalogStarAstrometry.hpp"
 
 #include <QtTest/QtTest>
 
+#include <cmath>
 #include <string>
 
 class HygCatalogParserTests final : public QObject {
@@ -10,14 +12,18 @@ class HygCatalogParserTests final : public QObject {
 
 private slots:
     void parsesBasicRows();
+    void parsesAstrometryColumns();
+    void treatsMissingDistanceSentinelAsAbsentParallax();
     void supportsFallbackIdsAndQuotedFields();
     void keepsWholeCatalogByDefault();
     void rejectsMalformedInput();
+    void skipsNonNumericHipValues();
+    void keepsLargeHipNumbersExact();
 };
 
 void HygCatalogParserTests::parsesBasicRows()
 {
-    auto result = skygate::ephemeris::loadStarCatalog(
+    auto result = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,hip,proper,ra,dec,mag\n"
         "1,32349,Sirius,6.7525,-16.7161,-1.46\n"
@@ -29,21 +35,65 @@ void HygCatalogParserTests::parsesBasicRows()
 
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 2U);
-    QVERIFY(bodies[0].id == "hip_32349");
-    QVERIFY(bodies[0].fixedEquatorial.has_value());
-    QCOMPARE(
-        bodies[0].ephemerisSource,
-        skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+    QVERIFY(bodies[0]->id == "hip_32349");
+    QVERIFY(bodies[0]->fixedEquatorialValue().has_value());
+    QCOMPARE(bodies[0]->kind, skygate::ephemeris::BaseCelestialBody::Kind::Star);
+}
+
+void HygCatalogParserTests::parsesAstrometryColumns()
+{
+    auto result = skygate::ephemeris::CatalogLoader::load(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
+        "id,hip,proper,ra,dec,mag,pmra,pmdec,rv,dist\n"
+        "1,32349,Sirius,6.7525,-16.7161,-1.46,-546.01,-1223.07,-5.5,2.637\n"
     );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
+    QVERIFY(catalog != nullptr);
+
+    const auto bodies = catalog->bodies();
+    QVERIFY(bodies.size() == 1U);
+    QVERIFY(bodies[0]->starAstrometryValue().has_value());
+    const auto& astrometry = *bodies[0]->starAstrometryValue();
+    QCOMPARE(astrometry.referenceEquatorial.rightAscensionHours, 6.7525);
+    QCOMPARE(astrometry.referenceEquatorial.declinationDeg, -16.7161);
+    QCOMPARE(astrometry.properMotionRightAscensionMasPerYear.value_or(0.0), -546.01);
+    QCOMPARE(astrometry.properMotionDeclinationMasPerYear.value_or(0.0), -1223.07);
+    QCOMPARE(astrometry.radialVelocityKmPerSecond.value_or(0.0), -5.5);
+    QVERIFY(astrometry.stellarParallaxMas.has_value());
+    QVERIFY(std::abs(*astrometry.stellarParallaxMas - 379.219) < 0.001);
+    QCOMPARE(
+        skygate::ephemeris::CatalogStarAstrometry::distanceParsecsFromParallaxMas(*astrometry.stellarParallaxMas), 2.637
+    );
+}
+
+void HygCatalogParserTests::treatsMissingDistanceSentinelAsAbsentParallax()
+{
+    auto result = skygate::ephemeris::CatalogLoader::load(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
+        "id,hip,proper,ra,dec,mag,pmra,pmdec,rv,dist\n"
+        "1,999,Sentinel,1.0,45.0,5.0,12.0,-3.0,20.0,100000\n"
+    );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
+    QVERIFY(catalog != nullptr);
+
+    const auto bodies = catalog->bodies();
+    QVERIFY(bodies.size() == 1U);
+    QVERIFY(bodies[0]->starAstrometryValue().has_value());
+    const auto& astrometry = *bodies[0]->starAstrometryValue();
+    QCOMPARE(astrometry.properMotionRightAscensionMasPerYear.value_or(0.0), 12.0);
+    QCOMPARE(astrometry.properMotionDeclinationMasPerYear.value_or(0.0), -3.0);
+    QCOMPARE(astrometry.radialVelocityKmPerSecond.value_or(0.0), 20.0);
+    QVERIFY(!astrometry.stellarParallaxMas.has_value());
 }
 
 void HygCatalogParserTests::supportsFallbackIdsAndQuotedFields()
 {
     QTest::ignoreMessage(
-        QtWarningMsg,
-        "HYG CSV skipped 1 rows with invalid numeric values; samples: row 7 ra='1.0' dec='2.0' mag=''"
+        QtWarningMsg, "HYG CSV skipped 1 rows with invalid numeric values; samples: row 7 ra='1.0' dec='2.0' mag=''"
     );
-    auto result = skygate::ephemeris::loadStarCatalog(
+    auto result = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "hip,id,proper,bf,ra,dec,mag\n"
         ",,Unnamed,,1.0,2.0,3.0\n"
@@ -80,7 +130,7 @@ void HygCatalogParserTests::supportsFallbackIdsAndQuotedFields()
     const auto* escapedQuoteBody = findBodyById(bodies, "hip_3");
     QVERIFY(escapedQuoteBody != nullptr);
     QVERIFY(escapedQuoteBody->displayName == "Quote \"Star\"");
-    QVERIFY(escapedQuoteBody->fixedEquatorial.has_value());
+    QVERIFY(escapedQuoteBody->fixedEquatorialValue().has_value());
 }
 
 void HygCatalogParserTests::keepsWholeCatalogByDefault()
@@ -104,10 +154,8 @@ void HygCatalogParserTests::keepsWholeCatalogByDefault()
     }
 
     std::size_t lastProgress = 0;
-    auto loadResult = skygate::ephemeris::loadStarCatalog(
-        skygate::ephemeris::CatalogSourceType::HygCsv,
-        csv,
-        [&lastProgress](const std::size_t parsedObjectCount) {
+    auto loadResult = skygate::ephemeris::CatalogLoader::load(
+        skygate::ephemeris::CatalogSourceType::HygCsv, csv, [&lastProgress](const std::size_t parsedObjectCount) {
             lastProgress = parsedObjectCount;
         }
     );
@@ -129,26 +177,60 @@ void HygCatalogParserTests::keepsWholeCatalogByDefault()
 
 void HygCatalogParserTests::rejectsMalformedInput()
 {
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "HYG CSV parse failed: HYG CSV payload does not contain any valid star rows."
-    );
-    const auto headerOnlyResult = skygate::ephemeris::loadStarCatalog(
-        skygate::ephemeris::CatalogSourceType::HygCsv,
-        "hip,id,proper,ra,dec,mag\n"
+    QTest::ignoreMessage(QtWarningMsg, "HYG CSV parse failed: HYG CSV payload does not contain any valid star rows.");
+    const auto headerOnlyResult = skygate::ephemeris::CatalogLoader::load(
+        skygate::ephemeris::CatalogSourceType::HygCsv, "hip,id,proper,ra,dec,mag\n"
     );
     QVERIFY(!headerOnlyResult.isSuccess());
 
     QTest::ignoreMessage(
-        QtWarningMsg,
-        "HYG CSV parse failed: HYG CSV payload is missing one of the required columns: ra, dec, mag."
+        QtWarningMsg, "HYG CSV parse failed: HYG CSV payload is missing one of the required columns: ra, dec, mag."
     );
-    const auto malformedResult = skygate::ephemeris::loadStarCatalog(
+    const auto malformedResult = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,name\n"
         "1,NoCoordinates\n"
     );
     QVERIFY(!malformedResult.isSuccess());
+}
+
+void HygCatalogParserTests::skipsNonNumericHipValues()
+{
+    QTest::ignoreMessage(QtWarningMsg, "HYG CSV skipped 1 rows with invalid numeric values; samples: row 3 hip='abc'");
+    auto result = skygate::ephemeris::CatalogLoader::load(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
+        "hip,id,proper,ra,dec,mag\n"
+        "77,,Kept,1.0,2.0,3.0\n"
+        "abc,9,Skipped,3.0,4.0,5.0\n"
+    );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
+    QVERIFY(catalog != nullptr);
+
+    const auto bodies = catalog->bodies();
+    QVERIFY(bodies.size() == 1U);
+    QVERIFY(bodies[0]->id == "hip_77");
+}
+
+void HygCatalogParserTests::keepsLargeHipNumbersExact()
+{
+    // 2^53 + 1 is the first whole number a double cannot represent, and
+    // UINT64_MAX is the largest number the column parser accepts, so both ids
+    // survive only while the hip column keeps its whole-number type.
+    auto result = skygate::ephemeris::CatalogLoader::load(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
+        "hip,id,proper,ra,dec,mag\n"
+        "9007199254740993,,Odd,1.0,2.0,3.0\n"
+        "18446744073709551615,,Max,4.0,5.0,6.0\n"
+    );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
+    QVERIFY(catalog != nullptr);
+
+    const auto bodies = catalog->bodies();
+    QVERIFY(bodies.size() == 2U);
+    QVERIFY(bodies[0]->id == "hip_9007199254740993");
+    QVERIFY(bodies[1]->id == "hip_18446744073709551615");
 }
 
 QTEST_APPLESS_MAIN(HygCatalogParserTests)

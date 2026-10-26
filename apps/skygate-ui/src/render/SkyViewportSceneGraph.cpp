@@ -1,6 +1,7 @@
 #include "SkyViewportSceneGraph.hpp"
-
-#include "skygate/core/math/Geometry2d.hpp"
+#include "SkyRenderPoint.hpp"
+#include "SkyViewportLineSegment.hpp"
+#include "math/Geometry2d.hpp"
 
 #include <QSGFlatColorMaterial>
 #include <QSGGeometry>
@@ -9,20 +10,49 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <ranges>
 #include <vector>
 
 namespace {
 
+// Widths are quantized to hundredths of a pixel so float rounding in computed
+// widths does not split one intended width across buckets.
+constexpr float kWidthKeyScale = 100.0F;
+
+// Buckets sort by the packed value ((rgba & 0x00ffffff) << 8) ^ widthKey
+// that previously ordered lines on its own. Alpha breaks ties between keys
+// that packed value merges, and the raw fields keep the order total.
+struct LineBucketKey final {
+    std::uint32_t rgba = 0U;
+    std::uint32_t widthKey = 0U;
+
+    [[nodiscard]] bool operator<(const LineBucketKey& other) const noexcept
+    {
+        const std::uint32_t packedKey = ((rgba & 0x00ffffffU) << 8U) ^ widthKey;
+        const std::uint32_t otherPackedKey = ((other.rgba & 0x00ffffffU) << 8U) ^ other.widthKey;
+        if (packedKey != otherPackedKey) {
+            return packedKey < otherPackedKey;
+        }
+
+        const std::uint32_t alpha = rgba >> 24U;
+        const std::uint32_t otherAlpha = other.rgba >> 24U;
+        if (alpha != otherAlpha) {
+            return alpha < otherAlpha;
+        }
+
+        if (rgba != other.rgba) {
+            return rgba < other.rgba;
+        }
+        return widthKey < other.widthKey;
+    }
+};
+
 struct VertexBucket final {
     QColor color;
-    float widthPx = 1.0F;
     std::vector<float> coordinates;
 };
 
-void appendBucketNode(
-    QSGNode* rootNode,
-    const VertexBucket& bucket
-)
+void appendBucketNode(QSGNode* rootNode, const VertexBucket& bucket)
 {
     const int vertexCount = static_cast<int>(bucket.coordinates.size() / 2U);
     if (vertexCount <= 0) {
@@ -30,19 +60,13 @@ void appendBucketNode(
     }
 
     QSGGeometryNode* node = new QSGGeometryNode();
-    QSGGeometry* geometry = new QSGGeometry(
-        QSGGeometry::defaultAttributes_Point2D(),
-        vertexCount
-    );
+    QSGGeometry* geometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), vertexCount);
     geometry->setDrawingMode(QSGGeometry::DrawTriangles);
 
     auto* vertices = geometry->vertexDataAsPoint2D();
     for (int vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
         const std::size_t coordinateOffset = static_cast<std::size_t>(vertexIndex) * 2U;
-        vertices[vertexIndex].set(
-            bucket.coordinates[coordinateOffset],
-            bucket.coordinates[coordinateOffset + 1U]
-        );
+        vertices[vertexIndex].set(bucket.coordinates[coordinateOffset], bucket.coordinates[coordinateOffset + 1U]);
     }
 
     QSGFlatColorMaterial* material = new QSGFlatColorMaterial();
@@ -59,25 +83,7 @@ void appendBucketNode(
 
 namespace skygate::ui::internal {
 
-SkyViewportSceneRootNode::SkyViewportSceneRootNode()
-{
-    m_lineRoot = new QSGNode();
-    m_pointRoot = new QSGNode();
-    appendChildNode(m_lineRoot);
-    appendChildNode(m_pointRoot);
-}
-
-QSGNode* SkyViewportSceneRootNode::lineRoot() const noexcept
-{
-    return m_lineRoot;
-}
-
-QSGNode* SkyViewportSceneRootNode::pointRoot() const noexcept
-{
-    return m_pointRoot;
-}
-
-void clearSkyViewportChildNodes(QSGNode* rootNode)
+void SkyViewportSceneGraph::clearChildNodes(QSGNode* rootNode)
 {
     if (rootNode == nullptr) {
         return;
@@ -92,32 +98,24 @@ void clearSkyViewportChildNodes(QSGNode* rootNode)
     }
 }
 
-void syncSkyViewportLineNodes(
-    QSGNode* rootNode,
-    const std::span<const SkyViewportLineSegment> lineSegments
-)
+void SkyViewportSceneGraph::syncLineNodes(QSGNode* rootNode, const std::span<const SkyViewportLineSegment> lineSegments)
 {
     if (rootNode == nullptr) {
         return;
     }
 
-    std::map<std::uint32_t, VertexBucket> buckets;
+    std::map<LineBucketKey, VertexBucket> buckets;
     for (const auto& lineSegment : lineSegments) {
-        const std::uint32_t colorKey = static_cast<std::uint32_t>(lineSegment.color.rgba());
-        const std::uint32_t widthKey = static_cast<std::uint32_t>(lineSegment.widthPx * 100.0F);
-        const std::uint32_t bucketKey = (colorKey << 8U) ^ widthKey;
+        const LineBucketKey bucketKey{
+            .rgba = static_cast<std::uint32_t>(lineSegment.color.rgba()),
+            .widthKey = static_cast<std::uint32_t>(lineSegment.widthPx * kWidthKeyScale)
+        };
         auto& bucket = buckets[bucketKey];
         bucket.color = lineSegment.color;
-        bucket.widthPx = lineSegment.widthPx;
 
-        const std::optional<skygate::core::Vector2d> offset =
-            skygate::core::perpendicularOffset2d(
-                lineSegment.x1,
-                lineSegment.y1,
-                lineSegment.x2,
-                lineSegment.y2,
-                lineSegment.widthPx * 0.5F
-            );
+        const std::optional<skygate::core::Vector2d> offset = skygate::core::Geometry2d::perpendicularOffset2d(
+            lineSegment.x1, lineSegment.y1, lineSegment.x2, lineSegment.y2, lineSegment.widthPx * 0.5F
+        );
         if (!offset.has_value()) {
             continue;
         }
@@ -149,16 +147,12 @@ void syncSkyViewportLineNodes(
         bucket.coordinates.push_back(endLeftY);
     }
 
-    for (const auto& [bucketKey, bucket] : buckets) {
-        (void) bucketKey;
+    for (const auto& bucket : buckets | std::views::values) {
         appendBucketNode(rootNode, bucket);
     }
 }
 
-void syncSkyViewportPointNodes(
-    QSGNode* rootNode,
-    const std::span<const SkyRenderPoint> points
-)
+void SkyViewportSceneGraph::syncPointNodes(QSGNode* rootNode, const std::span<const SkyRenderPoint> points)
 {
     if (rootNode == nullptr) {
         return;
@@ -191,8 +185,7 @@ void syncSkyViewportPointNodes(
         bucket.coordinates.push_back(bottom);
     }
 
-    for (const auto& [colorKey, bucket] : buckets) {
-        (void) colorKey;
+    for (const auto& bucket : buckets | std::views::values) {
         appendBucketNode(rootNode, bucket);
     }
 }

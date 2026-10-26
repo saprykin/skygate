@@ -1,123 +1,120 @@
-#include "skygate/ephemeris/NightConditionsCalculator.hpp"
+#include "NightConditionsCalculator.hpp"
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "MoonPhaseCalculator.hpp"
+#include "ObservationEventCalculator.hpp"
+#include "SolarAltitudeThresholds.hpp"
+#include "engine/EphemerisPrecisionPolicy.hpp"
+#include "engine/IEphemerisEngine.hpp"
 
-#include "engine/AstronomicalTime.hpp"
-#include "skygate/core/math/MathConstants.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
-
-#include <algorithm>
-#include <cmath>
+#include <cstdint>
+#include <memory>
+#include <utility>
 
 namespace skygate::ephemeris {
 namespace {
 
-constexpr double kSunriseSunsetAltitudeDeg = -0.833;
-constexpr double kCivilTwilightAltitudeDeg = -6.0;
-constexpr double kNauticalTwilightAltitudeDeg = -12.0;
-constexpr double kAstronomicalTwilightAltitudeDeg = -18.0;
-constexpr double kKnownNewMoonJulianDay = 2451550.1;
-constexpr double kSynodicMonthDays = 29.530588853;
-
-[[nodiscard]] ObservationEvent unavailableEvent() noexcept
+[[nodiscard]] ObservationEventSummary computeEventSummaryForNightConditions(
+    const ObservationEventCalculator& eventCalculator,
+    const IEphemerisEngine& ephemerisEngine,
+    const EphemerisRequest& request,
+    const std::uint32_t bodyIndex,
+    const BaseCelestialBody* body,
+    const double crossingAltitudeDeg
+)
 {
-    return ObservationEvent{.status = ObservationEventStatus::Unresolved};
-}
-
-[[nodiscard]] double normalizedLunarCycleFraction(const core::UtcTimePoint& utcTime) noexcept
-{
-    const double daysSinceKnownNewMoon = AstronomicalTime::julianDayFromUtc(utcTime) - kKnownNewMoonJulianDay;
-    double fraction = std::fmod(daysSinceKnownNewMoon / kSynodicMonthDays, 1.0);
-    if (fraction < 0.0) {
-        fraction += 1.0;
-    }
-    return fraction;
-}
-
-[[nodiscard]] double moonIlluminationPercent(const double lunarCycleFraction) noexcept
-{
-    return std::clamp((1.0 - std::cos(core::MathConstants::kTwoPi * lunarCycleFraction)) * 50.0, 0.0, 100.0);
-}
-
-[[nodiscard]] std::string moonPhaseName(const double lunarCycleFraction)
-{
-    if (lunarCycleFraction < 1.0 / 16.0 || lunarCycleFraction >= 15.0 / 16.0) {
-        return "New Moon";
-    }
-    if (lunarCycleFraction < 3.0 / 16.0) {
-        return "Waxing crescent";
-    }
-    if (lunarCycleFraction < 5.0 / 16.0) {
-        return "First quarter";
-    }
-    if (lunarCycleFraction < 7.0 / 16.0) {
-        return "Waxing gibbous";
-    }
-    if (lunarCycleFraction < 9.0 / 16.0) {
-        return "Full Moon";
-    }
-    if (lunarCycleFraction < 11.0 / 16.0) {
-        return "Waning gibbous";
-    }
-    if (lunarCycleFraction < 13.0 / 16.0) {
-        return "Last quarter";
-    }
-    return "Waning crescent";
+    const EphemerisRequest eventRequest = EphemerisRequest::fromPrecisionPolicy(
+        request, EphemerisPrecisionPolicy::NightConditionsApproximate, ephemerisEngine
+    );
+    return eventCalculator.compute(
+        ephemerisEngine,
+        eventRequest,
+        bodyIndex,
+        body,
+        crossingAltitudeDeg,
+        ObservationEventCalculator::SearchMode::GuidedApproximate
+    );
 }
 
 }  // namespace
 
+NightConditionsCalculator::NightConditionsCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy)
+    : m_guidanceStrategy(std::move(guidanceStrategy))
+{
+}
+
 NightConditions NightConditionsCalculator::compute(
     const IEphemerisEngine& ephemerisEngine,
-    const core::SkyContext& context,
+    const EphemerisRequest& request,
     const std::uint32_t sunBodyIndex,
-    const std::uint32_t moonBodyIndex
+    const BaseCelestialBody* sunBody,
+    const std::uint32_t moonBodyIndex,
+    const BaseCelestialBody* moonBody
 ) const
 {
     NightConditions conditions;
-    conditions.sunrise = unavailableEvent();
-    conditions.sunset = unavailableEvent();
-    conditions.civilDawn = unavailableEvent();
-    conditions.civilDusk = unavailableEvent();
-    conditions.nauticalDawn = unavailableEvent();
-    conditions.nauticalDusk = unavailableEvent();
-    conditions.astronomicalDawn = unavailableEvent();
-    conditions.astronomicalDusk = unavailableEvent();
-    conditions.moonrise = unavailableEvent();
-    conditions.moonset = unavailableEvent();
-
+    const skygate::core::ObservationContext& context = request.context;
     if (!context.observer.isValid()) {
         return conditions;
     }
 
-    const auto sunState = ephemerisEngine.computeBodyState(context, sunBodyIndex);
-    const auto moonState = ephemerisEngine.computeBodyState(context, moonBodyIndex);
+    const auto sunState = ephemerisEngine.computeBodyState(request, static_cast<std::size_t>(sunBodyIndex));
+    const auto moonState = ephemerisEngine.computeBodyState(request, static_cast<std::size_t>(moonBodyIndex));
     if (!sunState.has_value() || !sunState->horizontal.isFinite() || !moonState.has_value()
         || !moonState->horizontal.isFinite()) {
         return conditions;
     }
 
-    const ObservationEventCalculator eventCalculator;
-    const auto sunHorizon = eventCalculator.compute(ephemerisEngine, context, sunBodyIndex, kSunriseSunsetAltitudeDeg);
-    const auto civil = eventCalculator.compute(ephemerisEngine, context, sunBodyIndex, kCivilTwilightAltitudeDeg);
-    const auto nautical = eventCalculator.compute(ephemerisEngine, context, sunBodyIndex, kNauticalTwilightAltitudeDeg);
-    const auto astronomical =
-        eventCalculator.compute(ephemerisEngine, context, sunBodyIndex, kAstronomicalTwilightAltitudeDeg);
-    const auto moonHorizon = eventCalculator.compute(ephemerisEngine, context, moonBodyIndex);
+    const ObservationEventCalculator eventCalculator(m_guidanceStrategy);
+    const auto sunHorizon = computeEventSummaryForNightConditions(
+        eventCalculator,
+        ephemerisEngine,
+        request,
+        sunBodyIndex,
+        sunBody,
+        SolarAltitudeThresholds::kSunriseSunsetAltitudeDeg
+    );
+    const auto civil = computeEventSummaryForNightConditions(
+        eventCalculator,
+        ephemerisEngine,
+        request,
+        sunBodyIndex,
+        sunBody,
+        SolarAltitudeThresholds::kCivilTwilightAltitudeDeg
+    );
+    const auto nautical = computeEventSummaryForNightConditions(
+        eventCalculator,
+        ephemerisEngine,
+        request,
+        sunBodyIndex,
+        sunBody,
+        SolarAltitudeThresholds::kNauticalTwilightAltitudeDeg
+    );
+    const auto astronomical = computeEventSummaryForNightConditions(
+        eventCalculator,
+        ephemerisEngine,
+        request,
+        sunBodyIndex,
+        sunBody,
+        SolarAltitudeThresholds::kAstronomicalTwilightAltitudeDeg
+    );
+    const auto moonHorizon =
+        computeEventSummaryForNightConditions(eventCalculator, ephemerisEngine, request, moonBodyIndex, moonBody, 0.0);
 
-    const double lunarCycleFraction = normalizedLunarCycleFraction(context.utcTime);
+    const MoonPhaseCalculator moonPhaseCalculator;
+    const MoonPhase moonPhase = moonPhaseCalculator.compute(request.epoch);
+
     conditions.valid = true;
-    conditions.sunAltitudeDeg = sunState->horizontal.altitudeDeg;
     conditions.sunrise = sunHorizon.nextRise;
     conditions.sunset = sunHorizon.nextSet;
-    conditions.civilDawn = civil.nextRise;
     conditions.civilDusk = civil.nextSet;
-    conditions.nauticalDawn = nautical.nextRise;
     conditions.nauticalDusk = nautical.nextSet;
     conditions.astronomicalDawn = astronomical.nextRise;
     conditions.astronomicalDusk = astronomical.nextSet;
     conditions.moonrise = moonHorizon.nextRise;
     conditions.moonset = moonHorizon.nextSet;
-    conditions.moonIlluminationPercent = moonIlluminationPercent(lunarCycleFraction);
-    conditions.moonPhaseName = moonPhaseName(lunarCycleFraction);
+    conditions.moonIlluminationPercent = moonPhase.illuminationPercent;
+    conditions.moonPhaseName = moonPhase.phaseName;
     return conditions;
 }
 

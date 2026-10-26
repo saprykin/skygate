@@ -1,33 +1,66 @@
 #pragma once
 
+#include "GeoLocation.hpp"
+#include "ObservationContext.hpp"
+#include "ProjectionType.hpp"
+#include "SkyContextLocationSource.hpp"
+#include "SkyLocationController.hpp"
+#include "SkySearchController.hpp"
+#include "SkyTimelineController.hpp"
+#include "SkyViewController.hpp"
+#include "SystemTimeSource.hpp"
+#include "UtcTimePoint.hpp"
+#include "catalog/IStarCatalog.hpp"
+#include "engine/EphemerisDataManifest.hpp"
+#include "engine/IEphemerisEngine.hpp"
+#include "engine/IEphemerisGuidanceStrategy.hpp"
+#include "ephemeris/SkyEphemerisSession.hpp"
+#include "settings/SkyEphemerisUserSettingsSnapshot.hpp"
+#include "theme/SkyOverlayLayerVisibility.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
+#include "time/SkyLiveClock.hpp"
+#include "time/SkyTimeController.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
+
 #include <QAbstractItemModel>
+#include <QHash>
 #include <QObject>
 #include <QStringList>
 #include <QTimer>
 #include <QVariantMap>
 
-#include "skygate/core/Types.hpp"
-#include "skygate/core/SystemTimeSource.hpp"
-#include "skygate/ephemeris/ConstellationData.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
-#include "skygate/ephemeris/IStarCatalog.hpp"
-
-#include "SkyContextControllerSupport.hpp"
-#include "SkyContextDomainControllers.hpp"
-#include "SkyOverlayLayerVisibility.hpp"
-#include "SkyTimeController.hpp"
-
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
-#include <utility>
 #include <vector>
 
+namespace skygate::ephemeris {
+class BaseCelestialBody;
+class IEarthOrientationProvider;
+class IEphemerisDataSnapshot;
+class IEphemerisDiagnosticsSink;
+class ITimeScaleService;
+namespace highprecision {
+class ICalcephKernelProvider;
+}
+}  // namespace skygate::ephemeris
+
+namespace skygate::ui::internal {
+class SkyCatalogSourceCollectionModel;
+class SkyCatalogSourcePresetModel;
+class SkyDeviceLocationAcquisition;
+class SkyThemePalette;
+class SkyThemeRepository;
+}  // namespace skygate::ui::internal
+
 class QDateTime;
-class QGeoPositionInfo;
+class QGeoCoordinate;
 class QGeoPositionInfoSource;
 class LocationCatalogModel;
 class SkyCatalogManager;
+class SkyEphemerisDataManager;
+class SkyEphemerisUpdateWorkflow;
 class SkyObjectSearchModel;
 class SkyOverlayLayerSettings;
 class SkySettingsStore;
@@ -70,6 +103,7 @@ class SkyContextController final : public QObject {
         NOTIFY selectedCityDisplayTextChanged
     )
     Q_PROPERTY(QAbstractItemModel* cityCatalogModel READ cityCatalogModel CONSTANT)
+    Q_PROPERTY(QStringList projectionTypeOptions READ projectionTypeOptions CONSTANT)
     Q_PROPERTY(QString projectionTypeText READ projectionTypeText NOTIFY projectionTypeChanged)
     Q_PROPERTY(QString themeId READ themeId WRITE setThemeId NOTIFY themeChanged)
     Q_PROPERTY(QVariantList themeOptions READ themeOptions NOTIFY themeOptionsChanged)
@@ -78,12 +112,92 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(bool logToTerminal READ logToTerminal WRITE setLogToTerminal NOTIFY loggingChanged)
     Q_PROPERTY(bool logToFile READ logToFile WRITE setLogToFile NOTIFY loggingChanged)
     Q_PROPERTY(QString logFilePath READ logFilePath WRITE setLogFilePath NOTIFY loggingChanged)
+    Q_PROPERTY(int ephemerisEngineKindIndex READ ephemerisEngineKindIndex WRITE setEphemerisEngineKindIndex NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(QStringList ephemerisEngineLabels READ ephemerisEngineLabels CONSTANT)
+    Q_PROPERTY(int ephemerisCorrectionPresetIndex READ ephemerisCorrectionPresetIndex WRITE setEphemerisCorrectionPresetIndex NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(bool ephemerisRefractionEnabled READ ephemerisRefractionEnabled WRITE setEphemerisRefractionEnabled NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(QString ephemerisAtmosphericPressureText READ ephemerisAtmosphericPressureText WRITE setEphemerisAtmosphericPressureText NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(QString ephemerisAtmosphericTemperatureText READ ephemerisAtmosphericTemperatureText WRITE setEphemerisAtmosphericTemperatureText NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(QString ephemerisRelativeHumidityText READ ephemerisRelativeHumidityText WRITE setEphemerisRelativeHumidityText NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(QString ephemerisWavelengthText READ ephemerisWavelengthText WRITE setEphemerisWavelengthText NOTIFY ephemerisSettingsChanged)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
     Q_PROPERTY(QString catalogStatusText READ catalogStatusText NOTIFY catalogStatusTextChanged)
+    Q_PROPERTY(QString catalogStatusTextPrefix READ catalogStatusTextPrefix CONSTANT)
+    Q_PROPERTY(
+        QString ephemerisDataStatusText
+        READ ephemerisDataStatusText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(QString ephemerisDataStatusTextPrefix READ ephemerisDataStatusTextPrefix CONSTANT)
+    Q_PROPERTY(
+        QString ephemerisEngineStatusText
+        READ ephemerisEngineStatusText
+        NOTIFY ephemerisEngineStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisShortRangeKernelStatusText
+        READ ephemerisShortRangeKernelStatusText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisKernelDisplayText
+        READ ephemerisKernelDisplayText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisEarthOrientationStatusText
+        READ ephemerisEarthOrientationStatusText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisLeapSecondStatusText
+        READ ephemerisLeapSecondStatusText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisDeltaTStatusText
+        READ ephemerisDeltaTStatusText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisDataLastUpdateResultText
+        READ ephemerisDataLastUpdateResultText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisPlanetaryKernelCacheSizeText
+        READ ephemerisPlanetaryKernelCacheSizeText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisSupportDataCacheSizeText
+        READ ephemerisSupportDataCacheSizeText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        bool ephemerisDataUpdateEnabled
+        READ ephemerisDataUpdateEnabled
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        bool ephemerisDataUpdateInProgress
+        READ ephemerisDataUpdateInProgress
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        double ephemerisDataUpdateProgress
+        READ ephemerisDataUpdateProgress
+        NOTIFY ephemerisDataStatusTextChanged
+    )
     Q_PROPERTY(
         QString catalogDatasetInfoText
         READ catalogDatasetInfoText
         NOTIFY catalogDatasetInfoTextChanged
+    )
+    Q_PROPERTY(
+        QString catalogParticipationSummary
+        READ catalogParticipationSummary
+        NOTIFY catalogParticipationSummaryChanged
     )
     Q_PROPERTY(
         QString deepSkyCatalogInfoText
@@ -91,6 +205,8 @@ class SkyContextController final : public QObject {
         NOTIFY deepSkyCatalogInfoTextChanged
     )
     Q_PROPERTY(QAbstractItemModel* objectSearchModel READ objectSearchModel CONSTANT)
+    Q_PROPERTY(QAbstractItemModel* catalogSourcePresetModel READ catalogSourcePresetModel CONSTANT)
+    Q_PROPERTY(QAbstractItemModel* catalogSourceCollectionModel READ catalogSourceCollectionModel CONSTANT)
     Q_PROPERTY(bool downloadingCatalog READ downloadingCatalog NOTIFY downloadingCatalogChanged)
     Q_PROPERTY(bool catalogProcessing READ catalogProcessing NOTIFY catalogProcessingChanged)
     Q_PROPERTY(
@@ -128,15 +244,30 @@ class SkyContextController final : public QObject {
 
 public:
     using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
-    using ConstellationLabelRef = skygate::ephemeris::ConstellationLabelRef;
+    using ConstellationAnchorGroup = skygate::ephemeris::ConstellationAnchorGroup;
 
 public:
+    using EphemerisRequestContext = SkyEphemerisSession::RequestContext;
+
     struct InitializationOptions final {
+        struct EphemerisFactoryInputs final {
+            const skygate::ephemeris::EphemerisDatasetInfo* datasetManifest = nullptr;
+            const skygate::ephemeris::EphemerisDataManifest* dataManifest = nullptr;
+            std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService;
+            std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider;
+            std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelProvider> calcephKernelProvider;
+            skygate::ephemeris::IEphemerisDiagnosticsSink* diagnosticsSink = nullptr;
+            QString updateResourceRoot;
+            QString writableCacheRoot;
+        };
+
         bool loadSettings = true;
         bool initializeLocation = true;
         QGeoPositionInfoSource* positionSource = nullptr;
         bool requestLocationPermission = true;
         const skygate::core::ITimeSource* timeSource = nullptr;
+        bool rebuildEphemerisEngineOnStartup = true;
+        EphemerisFactoryInputs ephemerisFactoryInputs;
     };
 
     explicit SkyContextController(
@@ -170,6 +301,7 @@ public:
     [[nodiscard]] QString selectedCityId() const;
     [[nodiscard]] QString selectedCityDisplayText() const;
     [[nodiscard]] QAbstractItemModel* cityCatalogModel() const noexcept;
+    [[nodiscard]] QStringList projectionTypeOptions() const;
     [[nodiscard]] QString projectionTypeText() const;
     [[nodiscard]] QString themeId() const;
     [[nodiscard]] QVariantList themeOptions() const;
@@ -179,11 +311,41 @@ public:
     [[nodiscard]] bool logToTerminal() const noexcept;
     [[nodiscard]] bool logToFile() const noexcept;
     [[nodiscard]] QString logFilePath() const;
+    [[nodiscard]] int ephemerisEngineKindIndex() const noexcept;
+    [[nodiscard]] QStringList ephemerisEngineLabels() const;
+    Q_INVOKABLE bool ephemerisEngineSupportsCorrections(int engineKindIndex) const noexcept;
+    Q_INVOKABLE bool ephemerisEngineSupportsAtmosphereSettings(int engineKindIndex) const noexcept;
+    Q_INVOKABLE int ephemerisEngineDefaultCorrectionPresetIndex(int engineKindIndex) const noexcept;
+    Q_INVOKABLE bool ephemerisEngineDefaultRefractionEnabled(int engineKindIndex) const noexcept;
+    [[nodiscard]] int ephemerisCorrectionPresetIndex() const noexcept;
+    [[nodiscard]] bool ephemerisRefractionEnabled() const noexcept;
+    [[nodiscard]] QString ephemerisAtmosphericPressureText() const;
+    [[nodiscard]] QString ephemerisAtmosphericTemperatureText() const;
+    [[nodiscard]] QString ephemerisRelativeHumidityText() const;
+    [[nodiscard]] QString ephemerisWavelengthText() const;
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
+    [[nodiscard]] QString catalogStatusTextPrefix() const;
+    [[nodiscard]] QString ephemerisDataStatusText() const;
+    [[nodiscard]] QString ephemerisDataStatusTextPrefix() const;
+    [[nodiscard]] QString ephemerisEngineStatusText() const;
+    [[nodiscard]] QString ephemerisShortRangeKernelStatusText() const;
+    [[nodiscard]] QString ephemerisKernelDisplayText() const;
+    [[nodiscard]] QString ephemerisEarthOrientationStatusText() const;
+    [[nodiscard]] QString ephemerisLeapSecondStatusText() const;
+    [[nodiscard]] QString ephemerisDeltaTStatusText() const;
+    [[nodiscard]] QString ephemerisDataLastUpdateResultText() const;
+    [[nodiscard]] QString ephemerisPlanetaryKernelCacheSizeText() const;
+    [[nodiscard]] QString ephemerisSupportDataCacheSizeText() const;
+    [[nodiscard]] bool ephemerisDataUpdateEnabled() const noexcept;
+    [[nodiscard]] bool ephemerisDataUpdateInProgress() const noexcept;
+    [[nodiscard]] double ephemerisDataUpdateProgress() const noexcept;
     [[nodiscard]] QString catalogDatasetInfoText() const;
+    [[nodiscard]] QString catalogParticipationSummary() const;
     [[nodiscard]] QString deepSkyCatalogInfoText() const;
     [[nodiscard]] QAbstractItemModel* objectSearchModel() const noexcept;
+    [[nodiscard]] QAbstractItemModel* catalogSourcePresetModel() const noexcept;
+    [[nodiscard]] QAbstractItemModel* catalogSourceCollectionModel() const noexcept;
     [[nodiscard]] bool downloadingCatalog() const noexcept;
     [[nodiscard]] bool catalogProcessing() const noexcept;
     [[nodiscard]] QString selectedSearchTargetKind() const;
@@ -194,18 +356,27 @@ public:
     [[nodiscard]] QString trackedTargetDisplayText() const;
     [[nodiscard]] QVariantMap nightConditions() const;
     [[nodiscard]] QString nightConditionsIconKind() const;
-    [[nodiscard]] const skygate::core::SkyContext& skyContext() const noexcept;
+    [[nodiscard]] const skygate::core::ObservationContext& skyContext() const noexcept;
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
     [[nodiscard]] double viewFieldOfViewDeg() const noexcept;
     [[nodiscard]] skygate::core::ProjectionType projectionType() const noexcept;
     [[nodiscard]] const skygate::ui::internal::SkyThemeRenderPalette& renderTheme() const noexcept;
     [[nodiscard]] const SkyOverlayLayerVisibility& overlayLayerVisibility() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IEphemerisEngine* ephemerisEngine() const noexcept;
-    [[nodiscard]] std::span<const skygate::ephemeris::CelestialBody> catalogBodies() const noexcept;
-    [[nodiscard]] QStringList catalogSourceLabels() const;
-    [[nodiscard]] std::span<const std::uint8_t> catalogSourceIds() const noexcept;
-    [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
-    [[nodiscard]] std::span<const ConstellationLabelRef> constellationLabelRefs() const noexcept;
+    [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> ephemerisEngineHandle() const;
+    [[nodiscard]] std::shared_ptr<skygate::ephemeris::IEphemerisGuidanceStrategy>
+    ephemerisGuidanceStrategy() const noexcept;
+    [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>
+    activeEphemerisDataSnapshot() const noexcept;
+    [[nodiscard]] std::uint64_t ephemerisDataRevision() const noexcept;
+    [[nodiscard]] EphemerisRequestContext ephemerisRequestContext() const;
+    [[nodiscard]] std::span<const skygate::ephemeris::BaseCelestialBody* const> catalogBodies() const noexcept;
+    [[nodiscard]] QHash<QString, QString> catalogSourceTitles() const;
+    [[nodiscard]] std::span<const QString> catalogSourceIds() const noexcept;
+    [[nodiscard]] const std::vector<QStringList>& catalogSourceContributorIds() const noexcept;
+    [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
+    [[nodiscard]] std::span<const ConstellationLineRef> resolvedConstellationLineRefs() const;
+    [[nodiscard]] std::span<const ConstellationAnchorGroup> resolvedConstellationAnchorGroups() const;
 
     Q_INVOKABLE void setLive(bool live);
     Q_INVOKABLE void setTimelineToolbarCollapsed(bool timelineToolbarCollapsed);
@@ -222,11 +393,6 @@ public:
     Q_INVOKABLE void resetViewDirection();
     Q_INVOKABLE void stepForward();
     Q_INVOKABLE void stepBackward();
-    [[nodiscard]] QString validateUtcDateTimeText(
-        const QString& utcDateText,
-        const QString& utcTimeText
-    ) const;
-    [[nodiscard]] bool setUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText);
     Q_INVOKABLE void setLatitudeText(const QString& latitudeText);
     Q_INVOKABLE void setLongitudeText(const QString& longitudeText);
     Q_INVOKABLE void setElevationText(const QString& elevationText);
@@ -238,14 +404,29 @@ public:
     Q_INVOKABLE void setLogToTerminal(bool logToTerminal);
     Q_INVOKABLE void setLogToFile(bool logToFile);
     Q_INVOKABLE void setLogFilePath(const QString& logFilePath);
+    Q_INVOKABLE void setEphemerisEngineKindIndex(int engineKindIndex);
+    Q_INVOKABLE void setEphemerisCorrectionPresetIndex(int correctionPresetIndex);
+    Q_INVOKABLE void setEphemerisRefractionEnabled(bool enabled);
+    Q_INVOKABLE void setEphemerisAtmosphericPressureText(const QString& pressureText);
+    Q_INVOKABLE void setEphemerisAtmosphericTemperatureText(const QString& temperatureText);
+    Q_INVOKABLE void setEphemerisRelativeHumidityText(const QString& humidityText);
+    Q_INVOKABLE void setEphemerisWavelengthText(const QString& wavelengthText);
     Q_INVOKABLE bool saveSettings() const;
     Q_INVOKABLE bool loadSettings();
-    Q_INVOKABLE bool clearCatalogCache();
-    Q_INVOKABLE bool clearDeepSkyCatalogCache();
-    Q_INVOKABLE void loadCatalogPreset(const QString& presetId);
-    Q_INVOKABLE void downloadCatalogFromUrl(const QString& urlText);
-    Q_INVOKABLE void loadDeepSkyCatalogPreset(const QString& presetId);
-    Q_INVOKABLE void downloadDeepSkyCatalogFromUrl(const QString& urlText);
+    Q_INVOKABLE bool clearPlanetaryKernelCache();
+    Q_INVOKABLE bool clearSupportDataCache();
+    Q_INVOKABLE bool updateEphemerisDataProfile(const QString& profileId);
+    Q_INVOKABLE bool checkEphemerisSupportDataUpdates();
+    Q_INVOKABLE void cancelActiveDownload();
+    Q_INVOKABLE void setEphemerisDataOnlineUpdatesEnabled(bool enabled);
+    Q_INVOKABLE void addCatalogSourcePreset(const QString& presetId);
+    Q_INVOKABLE void addCatalogSourceUrl(const QString& urlText, const QString& category);
+    Q_INVOKABLE void enableCatalogSource(const QString& instanceId);
+    Q_INVOKABLE void disableCatalogSource(const QString& instanceId);
+    Q_INVOKABLE void removeCatalogSource(const QString& instanceId);
+    Q_INVOKABLE void moveCatalogSource(const QString& instanceId, int targetIndex);
+    Q_INVOKABLE void retryCatalogSource(const QString& instanceId);
+    Q_INVOKABLE bool clearCatalogSourceCache(const QString& instanceId);
     Q_INVOKABLE int catalogPresetIndex() const noexcept;
     Q_INVOKABLE void setCatalogPresetIndex(int catalogPresetIndex);
     Q_INVOKABLE QString catalogUrlText() const;
@@ -254,6 +435,9 @@ public:
     Q_INVOKABLE void setDeepSkyCatalogPresetIndex(int deepSkyCatalogPresetIndex);
     Q_INVOKABLE QString deepSkyCatalogUrlText() const;
     Q_INVOKABLE void setDeepSkyCatalogUrlText(const QString& deepSkyCatalogUrlText);
+    Q_INVOKABLE QString catalogSourcePresetId(int index) const;
+    Q_INVOKABLE QString catalogSourcePresetCategory(int index) const;
+    Q_INVOKABLE bool catalogSourcePresetIsCustom(int index) const;
     Q_INVOKABLE bool focusSearchTarget(const QString& targetKind, const QString& targetId);
     Q_INVOKABLE void clearSelectedSearchTarget();
     Q_INVOKABLE bool trackSearchTarget(const QString& targetKind, const QString& targetId);
@@ -268,8 +452,6 @@ signals:
     void stepSecondsChanged();
     void magnitudeCutoffChanged();
     void viewDirectionChanged();
-    void utcDateTextChanged();
-    void utcTimeTextChanged();
     void latitudeTextChanged();
     void longitudeTextChanged();
     void elevationTextChanged();
@@ -280,9 +462,13 @@ signals:
     void themeChanged();
     void themeOptionsChanged();
     void loggingChanged();
+    void ephemerisSettingsChanged();
     void locationStatusTextChanged();
     void catalogStatusTextChanged();
+    void ephemerisDataStatusTextChanged();
+    void ephemerisEngineStatusTextChanged();
     void catalogDatasetInfoTextChanged();
+    void catalogParticipationSummaryChanged();
     void deepSkyCatalogInfoTextChanged();
     void downloadingCatalogChanged();
     void catalogProcessingChanged();
@@ -292,16 +478,19 @@ signals:
     void skyContextChanged();
 
 private:
-    [[nodiscard]] QDateTime currentUtcDateTime() const;
+    [[nodiscard]] skygate::core::UtcTimePoint currentUtcTime() const;
+    [[nodiscard]] bool liveRecomputeThrottleApplies() const;
+    [[nodiscard]] bool liveRecomputeThrottled(const skygate::core::UtcTimePoint& nextUtc) const;
+    void markLiveRecomputeTick(const skygate::core::UtcTimePoint& nextUtc);
     void tickUtcTime();
     void stepBySeconds(int stepSeconds);
     void setCurrentUtc(const QDateTime& utcTime);
+    void setCurrentUtcTime(const skygate::core::UtcTimePoint& utcTime);
     [[nodiscard]] bool setViewCenterInternal(double altitudeDeg, double azimuthDeg);
     [[nodiscard]] bool recenterTrackedTarget(bool emitSkyContextChangedWhenUnchanged = false);
     void setViewFieldOfViewDeg(double viewFieldOfViewDeg);
     void applyObserverLocation(const skygate::core::GeoLocation& observer);
-    void initializeCurrentLocation();
-    void applyCurrentLocation(const QGeoPositionInfo& positionInfo);
+    void applyCurrentLocation(const QGeoCoordinate& coordinate);
     void setLocationSource(skygate::ui::internal::SkyContextLocationSource locationSource);
     void clearSelectedCity();
     [[nodiscard]] bool applySelectedCityId(const QString& cityId);
@@ -309,13 +498,16 @@ private:
     void updateLocationStatusText();
     void setProjectionType(skygate::core::ProjectionType projectionType);
     void refreshObjectSearchModel();
+    void refreshCatalogSourceCollectionModel();
     void applyLoggingConfiguration();
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
-    void setTrackedTarget(
-        const QString& targetKind,
-        const QString& targetId,
-        const QString& displayText
-    );
+    void setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
+    [[nodiscard]] EphemerisRequestContext
+    ephemerisRequestContextFor(const skygate::core::ObservationContext& skyContext) const;
+    void applyEphemerisUserSettings(const SkyEphemerisUserSettingsSnapshot& settings);
+    void setEphemerisEngineStatusText(QString statusText);
+    [[nodiscard]] const skygate::ephemeris::EphemerisDataManifest* activeEphemerisDataManifest() const noexcept;
+    void rebuildEphemerisEngine();
 
 private:
     skygate::core::SystemTimeSource m_systemTimeSource;
@@ -323,16 +515,26 @@ private:
     skygate::ui::internal::SkyTimelineController m_timeline;
     skygate::ui::internal::SkyViewController m_view;
     skygate::ui::internal::SkyLocationController m_location;
+    std::unique_ptr<skygate::ui::internal::SkyDeviceLocationAcquisition> m_deviceLocationAcquisition;
     skygate::ui::internal::SkySearchController m_search;
     QTimer m_timer;
+    std::optional<skygate::core::UtcTimePoint> m_lastLiveRecomputeUtc;
+    SkyLiveClock m_liveClock;
     std::unique_ptr<LocationCatalogModel> m_locationCatalogModel;
     std::unique_ptr<skygate::ui::internal::SkyThemePalette> m_themePalette;
     std::unique_ptr<skygate::ui::internal::SkyThemeRepository> m_themeRepository;
     std::unique_ptr<SkyTimeController> m_timeController;
     std::unique_ptr<SkyOverlayLayerSettings> m_overlayLayerSettings;
     std::unique_ptr<SkySettingsStore> m_settingsStore;
+    std::unique_ptr<SkyEphemerisDataManager> m_ephemerisDataManager;
+    std::unique_ptr<SkyEphemerisUpdateWorkflow> m_ephemerisUpdateWorkflow;
+    std::unique_ptr<SkyEphemerisSession> m_ephemerisSession;
+    SkyEphemerisUserSettingsSnapshot m_ephemerisUserSettings;
+    QString m_ephemerisEngineStatusText;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;
+    std::unique_ptr<skygate::ui::internal::SkyCatalogSourcePresetModel> m_catalogSourcePresetModel;
+    std::unique_ptr<skygate::ui::internal::SkyCatalogSourceCollectionModel> m_catalogSourceCollectionModel;
     QVariantList m_themeOptions;
     bool m_logToTerminal = true;
     bool m_logToFile = false;

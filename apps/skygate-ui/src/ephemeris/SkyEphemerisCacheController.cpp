@@ -1,0 +1,397 @@
+#include "SkyEphemerisCacheController.hpp"
+#include "SkyEphemerisDataCacheSnapshotPolicy.hpp"
+#include "SkyEphemerisPathSegmentPolicy.hpp"
+
+#include "diagnostics/SkyLoggingCategories.hpp"
+#include "engine/EphemerisDataActivation.hpp"
+#include "engine/EphemerisDataFileUtilities.hpp"
+#include "engine/EphemerisStagedUpdateVerification.hpp"
+#include "settings/SkySettingsStore.hpp"
+
+#include <QLoggingCategory>
+#include <QStringList>
+
+#include <algorithm>
+#include <filesystem>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
+
+using namespace skygate::ui::internal;
+
+namespace {
+
+using EphemerisDataCacheSnapshot = SkyEphemerisDataCacheSnapshot;
+using StagedUpdateActivationRequest = SkyEphemerisCacheController::StagedUpdateActivationRequest;
+using StagedUpdateActivationResult = SkyEphemerisCacheController::StagedUpdateActivationResult;
+using StagedUpdateActivationStatus = SkyEphemerisCacheController::StagedUpdateActivationStatus;
+using skygate::ephemeris::EphemerisDataActivationRequest;
+using skygate::ephemeris::EphemerisDataFileUtilities;
+using skygate::ephemeris::EphemerisDataManifest;
+using skygate::ephemeris::EphemerisStagedUpdateVerificationRequest;
+using skygate::ephemeris::EphemerisStagedUpdateVerificationResult;
+using skygate::ephemeris::EphemerisStagedUpdateVerificationStatus;
+using skygate::ui::skygateEphemerisDataLog;
+using skygate::ui::internal::SkyEphemerisDataCacheSnapshotPolicy;
+
+void addDiagnostic(StagedUpdateActivationResult& result, QString diagnostic)
+{
+    if (!diagnostic.trimmed().isEmpty()) {
+        qCWarning(skygateEphemerisDataLog).noquote() << diagnostic;
+        result.diagnostics.push_back(std::move(diagnostic));
+    }
+}
+
+void addDiagnostics(StagedUpdateActivationResult& result, const std::vector<std::string>& diagnostics)
+{
+    for (const std::string& diagnostic : diagnostics) {
+        addDiagnostic(result, EphemerisDataFileUtilities::stringToQString(diagnostic));
+    }
+}
+
+void markCanceled(StagedUpdateActivationResult& result, QString diagnostic)
+{
+    result.status = StagedUpdateActivationStatus::Canceled;
+    result.verificationStatus = EphemerisStagedUpdateVerificationStatus::Canceled;
+    addDiagnostic(result, std::move(diagnostic));
+}
+
+QString defaultRevisionToken(const EphemerisDataManifest& manifest, const EphemerisDataManifest::Profile& profile)
+{
+    QStringList parts;
+    if (!manifest.dataSetInfo.id.empty()) {
+        parts.push_back(EphemerisDataFileUtilities::stringToQString(manifest.dataSetInfo.id));
+    }
+    if (!manifest.dataSetInfo.version.empty()) {
+        parts.push_back(EphemerisDataFileUtilities::stringToQString(manifest.dataSetInfo.version));
+    }
+    if (!profile.id.empty()) {
+        parts.push_back(EphemerisDataFileUtilities::stringToQString(profile.id));
+    }
+    return SkyEphemerisPathSegmentPolicy::spellPathSegment(
+        parts.isEmpty() ? QStringLiteral("update") : parts.join(QLatin1Char('-')), QStringLiteral("update")
+    );
+}
+
+bool pathContains(const std::filesystem::path& root, const QString& path)
+{
+    if (path.isEmpty()) {
+        return false;
+    }
+
+    const std::filesystem::path normalizedRoot = root.lexically_normal();
+    const std::filesystem::path normalizedPath = EphemerisDataFileUtilities::pathFromQString(path).lexically_normal();
+    auto rootIt = normalizedRoot.begin();
+    auto pathIt = normalizedPath.begin();
+    for (; rootIt != normalizedRoot.end() && pathIt != normalizedPath.end(); ++rootIt, ++pathIt) {
+        if (*rootIt != *pathIt) {
+            return false;
+        }
+    }
+    return rootIt == normalizedRoot.end();
+}
+
+bool cacheRootContainsActivePath(const std::filesystem::path& root, const EphemerisDataCacheSnapshot& activeSnapshot)
+{
+    for (const QString& path : EphemerisDataCacheSnapshot::installedPayloadPaths(activeSnapshot)) {
+        if (pathContains(root, path)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void cleanupInactiveActivationRoot(
+    const std::filesystem::path& activationRoot,
+    const EphemerisDataCacheSnapshot& activeSnapshot,
+    StagedUpdateActivationResult& result
+)
+{
+    if (activationRoot.empty() || cacheRootContainsActivePath(activationRoot, activeSnapshot)) {
+        return;
+    }
+
+    std::error_code error;
+    std::filesystem::remove_all(activationRoot, error);
+    if (error) {
+        addDiagnostic(
+            result,
+            QStringLiteral("Unable to clean failed ephemeris activation cache: %1")
+                .arg(QString::fromStdString(error.message()))
+        );
+    }
+}
+
+void cleanupCanceledStagingRoot(
+    const StagedUpdateActivationRequest& request,
+    const EphemerisDataCacheSnapshot& activeSnapshot,
+    StagedUpdateActivationResult& result
+)
+{
+    if (request.retainStagedResourcesOnCancellation || request.stagedResourceRoot.trimmed().isEmpty()) {
+        return;
+    }
+
+    const std::filesystem::path stagedRoot = EphemerisDataFileUtilities::pathFromQString(request.stagedResourceRoot);
+    if (cacheRootContainsActivePath(stagedRoot, activeSnapshot)) {
+        addDiagnostic(
+            result, QStringLiteral("Canceled ephemeris staging root was retained because it contains active data.")
+        );
+        return;
+    }
+
+    std::error_code error;
+    std::filesystem::remove_all(stagedRoot, error);
+    if (error) {
+        addDiagnostic(
+            result,
+            QStringLiteral("Unable to clean canceled ephemeris staging root: %1")
+                .arg(QString::fromStdString(error.message()))
+        );
+    }
+}
+
+std::filesystem::path activationCacheRoot(
+    const std::filesystem::path& writableCacheRoot,
+    const QString& revisionToken,
+    const EphemerisDataCacheSnapshot& activeSnapshot
+)
+{
+    const std::filesystem::path updatesRoot = writableCacheRoot / "updates";
+    const std::filesystem::path baseRoot = updatesRoot / revisionToken.toStdString();
+    if (!cacheRootContainsActivePath(baseRoot, activeSnapshot)) {
+        return baseRoot;
+    }
+
+    for (int suffix = 1; suffix < 1000; ++suffix) {
+        const QString candidateToken = suffix == 1 ? QStringLiteral("%1-activation").arg(revisionToken)
+                                                   : QStringLiteral("%1-activation-%2").arg(revisionToken).arg(suffix);
+        std::filesystem::path candidateRoot = updatesRoot / candidateToken.toStdString();
+        if (!cacheRootContainsActivePath(candidateRoot, activeSnapshot)) {
+            return candidateRoot;
+        }
+    }
+
+    return updatesRoot / QStringLiteral("%1-activation-overflow").arg(revisionToken).toStdString();
+}
+
+EphemerisDataCacheSnapshot cacheSnapshotForActivatedProfile(
+    const EphemerisDataManifest& manifest,
+    const EphemerisDataManifest::Profile& profile,
+    const std::vector<std::pair<std::string, std::filesystem::path>>& activePaths,
+    const EphemerisDataCacheSnapshot& baseSnapshot,
+    const QString& revisionToken
+)
+{
+    EphemerisDataCacheSnapshot snapshot = baseSnapshot;
+    snapshot.dataRevisionToken = revisionToken;
+    snapshot.lastUpdateResult =
+        QStringLiteral("Installed %1")
+            .arg(
+                profile.displayName.empty() ? EphemerisDataFileUtilities::stringToQString(profile.id)
+                                            : EphemerisDataFileUtilities::stringToQString(profile.displayName)
+            );
+
+    for (const std::string& assetId : profile.assetIds) {
+        const EphemerisDataManifest::Asset* asset = manifest.asset(assetId);
+        if (asset == nullptr) {
+            continue;
+        }
+        const auto activePath = std::find_if(activePaths.begin(), activePaths.end(), [asset](const auto& entry) {
+            return entry.first == asset->id;
+        });
+
+        switch (asset->kind) {
+        case EphemerisDataManifest::AssetKind::SolarSystemKernel:
+            snapshot.installedKernelAssetId = EphemerisDataFileUtilities::stringToQString(asset->id);
+            snapshot.installedKernelProfileId = EphemerisDataFileUtilities::stringToQString(asset->profileId);
+            snapshot.installedKernelVersion = EphemerisDataFileUtilities::stringToQString(asset->version);
+            snapshot.installedKernelLongRange = profile.longRange;
+            if (activePath != activePaths.end()) {
+                snapshot.installedKernelPath = EphemerisDataFileUtilities::pathToQString(activePath->second);
+            }
+            break;
+        case EphemerisDataManifest::AssetKind::EarthOrientationData:
+            snapshot.installedEarthOrientationVersion = EphemerisDataFileUtilities::stringToQString(asset->version);
+            if (activePath != activePaths.end()) {
+                snapshot.installedEarthOrientationPath = EphemerisDataFileUtilities::pathToQString(activePath->second);
+            }
+            break;
+        case EphemerisDataManifest::AssetKind::LeapSecondTable:
+            snapshot.installedLeapSecondTableVersion = EphemerisDataFileUtilities::stringToQString(asset->version);
+            if (activePath != activePaths.end()) {
+                snapshot.installedLeapSecondTablePath = EphemerisDataFileUtilities::pathToQString(activePath->second);
+            }
+            break;
+        case EphemerisDataManifest::AssetKind::DeltaTData:
+            snapshot.installedDeltaTDataVersion = EphemerisDataFileUtilities::stringToQString(asset->version);
+            if (activePath != activePaths.end()) {
+                snapshot.installedDeltaTDataPath = EphemerisDataFileUtilities::pathToQString(activePath->second);
+            }
+            break;
+        }
+    }
+
+    return snapshot;
+}
+
+}  // namespace
+
+SkyEphemerisCacheController::StagedUpdateActivationResult SkyEphemerisCacheController::activate(
+    const StagedUpdateActivationRequest& request,
+    const EphemerisDataCacheSnapshot& activeSnapshot,
+    SkySettingsStore* settingsStore
+) const
+{
+    StagedUpdateActivationResult result;
+    const auto isCanceled = [&request] {
+        return EphemerisDataFileUtilities::cancellationRequested(request.cancellationRequested);
+    };
+    if (isCanceled()) {
+        markCanceled(result, QStringLiteral("Ephemeris staged update activation was canceled before verification."));
+        cleanupCanceledStagingRoot(request, activeSnapshot, result);
+        return result;
+    }
+    if (request.manifest == nullptr) {
+        addDiagnostic(result, QStringLiteral("Ephemeris staged update activation requires a manifest."));
+        return result;
+    }
+    const std::string profileId = request.profileId.trimmed().toStdString();
+    if (profileId.empty()) {
+        addDiagnostic(result, QStringLiteral("Ephemeris staged update activation requires a profile id."));
+        return result;
+    }
+    if (request.stagedResourceRoot.trimmed().isEmpty()) {
+        addDiagnostic(result, QStringLiteral("Ephemeris staged update activation requires a staging root."));
+        return result;
+    }
+    if (request.writableCacheRoot.trimmed().isEmpty()) {
+        addDiagnostic(result, QStringLiteral("Ephemeris staged update activation requires a writable cache root."));
+        return result;
+    }
+
+    EphemerisStagedUpdateVerificationRequest verificationRequest{
+        .manifest = request.manifest,
+        .profileId = profileId,
+        .stagedResourceRoot = EphemerisDataFileUtilities::pathFromQString(request.stagedResourceRoot),
+        .requiredKinds = request.requiredKinds,
+        .expectedComponents = request.expectedComponents,
+        .cancellationRequested = isCanceled,
+    };
+
+    const EphemerisStagedUpdateVerificationResult verificationResult =
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest);
+    result.verificationStatus = verificationResult.status;
+    if (verificationResult.status == EphemerisStagedUpdateVerificationStatus::Canceled) {
+        result.status = StagedUpdateActivationStatus::Canceled;
+        addDiagnostics(result, verificationResult.diagnostics);
+        if (result.diagnostics.empty()) {
+            addDiagnostic(result, QStringLiteral("Ephemeris staged update verification was canceled."));
+        }
+        cleanupCanceledStagingRoot(request, activeSnapshot, result);
+        return result;
+    }
+    if (!verificationResult.isSuccess()) {
+        result.status = StagedUpdateActivationStatus::VerificationFailed;
+        addDiagnostics(result, verificationResult.diagnostics);
+        return result;
+    }
+    if (isCanceled()) {
+        result.status = StagedUpdateActivationStatus::Canceled;
+        addDiagnostic(result, QStringLiteral("Ephemeris staged update activation was canceled before install."));
+        cleanupCanceledStagingRoot(request, activeSnapshot, result);
+        return result;
+    }
+
+    const EphemerisDataManifest::Profile* profile = request.manifest->profile(profileId);
+    if (profile == nullptr) {
+        result.status = StagedUpdateActivationStatus::VerificationFailed;
+        result.verificationStatus = EphemerisStagedUpdateVerificationStatus::UnsupportedProfile;
+        addDiagnostic(result, QStringLiteral("Verified ephemeris staged update profile is no longer available."));
+        return result;
+    }
+
+    const QString revisionToken = SkyEphemerisPathSegmentPolicy::spellPathSegment(
+        request.revisionToken.trimmed().isEmpty() ? defaultRevisionToken(*request.manifest, *profile)
+                                                  : request.revisionToken,
+        QStringLiteral("update")
+    );
+    const std::filesystem::path revisionCacheRoot = activationCacheRoot(
+        EphemerisDataFileUtilities::pathFromQString(request.writableCacheRoot), revisionToken, activeSnapshot
+    );
+
+    std::vector<std::pair<std::string, std::filesystem::path>> activePaths;
+    activePaths.reserve(profile->assetIds.size());
+    for (const std::string& assetId : profile->assetIds) {
+        const EphemerisDataManifest::Asset* asset = request.manifest->asset(assetId);
+        if (asset == nullptr) {
+            result.status = StagedUpdateActivationStatus::ActivationFailed;
+            addDiagnostic(result, QStringLiteral("Verified ephemeris staged update references a missing asset."));
+            return result;
+        }
+
+        const EphemerisDataActivationRequest activationRequest{
+            .asset = asset,
+            .bundledResourceRoot = EphemerisDataFileUtilities::pathFromQString(request.stagedResourceRoot),
+            .writableCacheRoot = revisionCacheRoot,
+            .allowQtResourceKernelAssets = request.allowQtResourceKernelAssets,
+            .largeKernelResourceThresholdBytes = request.largeKernelResourceThresholdBytes,
+            .cancellationRequested = isCanceled,
+        };
+        const skygate::ephemeris::EphemerisDataActivationResult activationResult =
+            skygate::ephemeris::EphemerisDataActivation::activate(activationRequest);
+        result.activationStatus = activationResult.status;
+        if (activationResult.status == skygate::ephemeris::EphemerisDataActivationStatus::Canceled) {
+            result.status = StagedUpdateActivationStatus::Canceled;
+            addDiagnostics(result, activationResult.diagnostics);
+            if (result.diagnostics.empty()) {
+                addDiagnostic(result, QStringLiteral("Ephemeris staged update activation was canceled."));
+            }
+            if (request.cleanupFailedActivationCache) {
+                cleanupInactiveActivationRoot(revisionCacheRoot, activeSnapshot, result);
+            }
+            cleanupCanceledStagingRoot(request, activeSnapshot, result);
+            return result;
+        }
+        if (!activationResult.isSuccess()) {
+            result.status = StagedUpdateActivationStatus::ActivationFailed;
+            addDiagnostics(result, activationResult.diagnostics);
+            if (result.diagnostics.empty()) {
+                addDiagnostic(result, QStringLiteral("Ephemeris staged update asset activation failed."));
+            }
+            if (request.cleanupFailedActivationCache) {
+                cleanupInactiveActivationRoot(revisionCacheRoot, activeSnapshot, result);
+            }
+            return result;
+        }
+
+        activePaths.emplace_back(asset->id, activationResult.activePath);
+        result.activatedAssetIds.push_back(EphemerisDataFileUtilities::stringToQString(asset->id));
+        if (isCanceled()) {
+            result.status = StagedUpdateActivationStatus::Canceled;
+            addDiagnostic(result, QStringLiteral("Ephemeris staged update activation was canceled before metadata."));
+            if (request.cleanupFailedActivationCache) {
+                cleanupInactiveActivationRoot(revisionCacheRoot, activeSnapshot, result);
+            }
+            cleanupCanceledStagingRoot(request, activeSnapshot, result);
+            return result;
+        }
+    }
+
+    EphemerisDataCacheSnapshot newSnapshot =
+        cacheSnapshotForActivatedProfile(*request.manifest, *profile, activePaths, activeSnapshot, revisionToken);
+    newSnapshot = SkyEphemerisDataCacheSnapshotPolicy::normalizedSnapshot(std::move(newSnapshot));
+    if (settingsStore == nullptr || !settingsStore->saveEphemerisDataCache(newSnapshot)) {
+        result.status = StagedUpdateActivationStatus::PersistenceFailed;
+        addDiagnostic(result, QStringLiteral("Unable to persist activated ephemeris data metadata."));
+        if (request.cleanupFailedActivationCache) {
+            cleanupInactiveActivationRoot(revisionCacheRoot, activeSnapshot, result);
+        }
+        return result;
+    }
+
+    result.cacheSnapshot = std::move(newSnapshot);
+    result.status = StagedUpdateActivationStatus::Activated;
+    return result;
+}

@@ -1,20 +1,17 @@
 #pragma once
 
-#include "skygate/ephemeris/CatalogComposer.hpp"
+#include "BaseCelestialBody.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 
-#include <span>
 #include <vector>
 
 namespace skygate::ephemeris {
 
-struct CatalogAugmentationResult final {
-    std::vector<CelestialBody> bodies;
-    std::vector<CatalogCompositionSource> sourceKinds;
-};
-
 class CoreBodyCatalogAugmenter final {
 public:
-    [[nodiscard]] static CatalogAugmentationResult augment(std::span<const CelestialBody> bodies);
+    // The bundled bright-star fallback bodies used when a composition has no
+    // other star source.
+    [[nodiscard]] static std::vector<OwnGalaxyCelestialBody> bundledBrightStars();
 };
 
 }  // namespace skygate::ephemeris

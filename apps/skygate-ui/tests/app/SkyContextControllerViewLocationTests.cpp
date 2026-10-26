@@ -1,4 +1,7 @@
-#include "SkyContextControllerTestSupport.hpp"
+#include "location/SkyDeviceLocationAcquisition.hpp"
+#include "settings/SkyPersistedStateSnapshot.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/SkyContextControllerTestSupport.hpp"
 
 class SkyContextControllerViewLocationTests final : public QObject {
     Q_OBJECT
@@ -8,12 +11,13 @@ private slots:
     void init();
     void pinchZoomScaleDeltaAdjustsAndClampsFieldOfView();
     void pinchZoomScaleDeltaIgnoresInvalidValues();
-    void selectingCityUpdatesCoordinatesAndPreservesElevation();
+    void selectingCityUpdatesCoordinatesKeepsElevation();
     void manualCoordinateEditSwitchesToCustom();
     void invalidSavedCityFallsBackToCustom();
+    void defaultsMatchPersistedState();
     void defaultsLocationSourceByPositioningAvailability();
     void currentDevicePositionSourceAppliesUpdates();
-    void currentDevicePositionSourceReportsErrorsAndIgnoresInvalidUpdates();
+    void devicePositionSourceReportsErrorsIgnoresInvalid();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -37,16 +41,10 @@ void SkyContextControllerViewLocationTests::pinchZoomScaleDeltaAdjustsAndClampsF
     QCOMPARE(controller->viewFieldOfViewDeg(), 80.0);
 
     controller->zoomViewByScaleDelta(0.5);
-    QCOMPARE(
-        controller->viewFieldOfViewDeg(),
-        skygate::core::ViewportMath::kFieldOfViewMaxDeg
-    );
+    QCOMPARE(controller->viewFieldOfViewDeg(), skygate::core::ViewportMath::kFieldOfViewMaxDeg);
 
     controller->zoomViewByScaleDelta(200.0);
-    QCOMPARE(
-        controller->viewFieldOfViewDeg(),
-        skygate::core::ViewportMath::kFieldOfViewMinDeg
-    );
+    QCOMPARE(controller->viewFieldOfViewDeg(), skygate::core::ViewportMath::kFieldOfViewMinDeg);
 }
 
 void SkyContextControllerViewLocationTests::pinchZoomScaleDeltaIgnoresInvalidValues()
@@ -63,7 +61,7 @@ void SkyContextControllerViewLocationTests::pinchZoomScaleDeltaIgnoresInvalidVal
     QCOMPARE(controller->viewFieldOfViewDeg(), initialFieldOfViewDeg);
 }
 
-void SkyContextControllerViewLocationTests::selectingCityUpdatesCoordinatesAndPreservesElevation()
+void SkyContextControllerViewLocationTests::selectingCityUpdatesCoordinatesKeepsElevation()
 {
     const auto controller = createController();
 
@@ -97,7 +95,7 @@ void SkyContextControllerViewLocationTests::manualCoordinateEditSwitchesToCustom
 void SkyContextControllerViewLocationTests::invalidSavedCityFallsBackToCustom()
 {
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.locationSourceText = "City";
     snapshot.selectedCityId = "missing-city";
     snapshot.latitudeDeg = 12.345678;
@@ -112,6 +110,15 @@ void SkyContextControllerViewLocationTests::invalidSavedCityFallsBackToCustom()
     QCOMPARE(controller->latitudeText(), QString("12.345678"));
     QCOMPARE(controller->longitudeText(), QString("98.765432"));
     QCOMPARE(controller->elevationText(), QString("150.0"));
+}
+
+void SkyContextControllerViewLocationTests::defaultsMatchPersistedState()
+{
+    const auto controller = createController();
+
+    QCOMPARE(controller->stepSeconds(), SkyPersistedStateSnapshot::kDefaultStepSeconds);
+    QCOMPARE(controller->magnitudeCutoff(), SkyPersistedStateSnapshot::kDefaultMagnitudeCutoff);
+    QCOMPARE(controller->viewFieldOfViewDeg(), SkyPersistedStateSnapshot::kDefaultFieldOfViewDeg);
 }
 
 void SkyContextControllerViewLocationTests::defaultsLocationSourceByPositioningAvailability()
@@ -129,28 +136,22 @@ void SkyContextControllerViewLocationTests::currentDevicePositionSourceAppliesUp
 {
 #if SKYGATE_HAS_POSITIONING
     FakePositionSource positionSource;
-    auto controller = createControllerWithOptions({
-        .loadSettings = false,
-        .initializeLocation = false,
-        .positionSource = &positionSource,
-        .requestLocationPermission = false
-    });
+    auto controller = createControllerWithOptions(
+        {.loadSettings = false,
+         .initializeLocation = false,
+         .positionSource = &positionSource,
+         .requestLocationPermission = false}
+    );
     QVERIFY(controller != nullptr);
     QSignalSpy skyContextSpy(controller.get(), &SkyContextController::skyContextChanged);
-    QSignalSpy locationStatusSpy(
-        controller.get(),
-        &SkyContextController::locationStatusTextChanged
-    );
+    QSignalSpy locationStatusSpy(controller.get(), &SkyContextController::locationStatusTextChanged);
 
     controller->setLocationSourceText(QStringLiteral("Current Device"));
     controller->refreshCurrentLocation();
 
     QCOMPARE(controller->locationSourceText(), QString("Current Device"));
     QCOMPARE(positionSource.requestCount(), 1);
-    QCOMPARE(
-        positionSource.lastTimeoutMs(),
-        skygate::ui::internal::SkyContextControllerConstants::kLocationUpdateTimeoutMs
-    );
+    QCOMPARE(positionSource.lastTimeoutMs(), skygate::ui::internal::SkyDeviceLocationAcquisition::kUpdateTimeoutMs);
     QCOMPARE(controller->locationStatusText(), QString("Location: Locating"));
 
     positionSource.publishPosition(51.5074, -0.1278, 35.0);
@@ -166,16 +167,16 @@ void SkyContextControllerViewLocationTests::currentDevicePositionSourceAppliesUp
 #endif
 }
 
-void SkyContextControllerViewLocationTests::currentDevicePositionSourceReportsErrorsAndIgnoresInvalidUpdates()
+void SkyContextControllerViewLocationTests::devicePositionSourceReportsErrorsIgnoresInvalid()
 {
 #if SKYGATE_HAS_POSITIONING
     FakePositionSource positionSource;
-    auto controller = createControllerWithOptions({
-        .loadSettings = false,
-        .initializeLocation = false,
-        .positionSource = &positionSource,
-        .requestLocationPermission = false
-    });
+    auto controller = createControllerWithOptions(
+        {.loadSettings = false,
+         .initializeLocation = false,
+         .positionSource = &positionSource,
+         .requestLocationPermission = false}
+    );
     QVERIFY(controller != nullptr);
     controller->setLatitudeText(QStringLiteral("12.000000"));
     controller->setLongitudeText(QStringLiteral("34.000000"));

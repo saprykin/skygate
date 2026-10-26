@@ -1,0 +1,17 @@
+#pragma once
+
+#include "BaseCelestialBody.hpp"
+#include "DeepSkyObjectInfo.hpp"
+
+#include <optional>
+
+namespace skygate::ephemeris {
+
+class DistantCelestialBody : public BaseCelestialBody {
+public:
+    [[nodiscard]] const std::optional<DeepSkyObjectInfo>& deepSkyObjectValue() const noexcept override;
+
+    std::optional<DeepSkyObjectInfo> deepSkyObject;
+};
+
+}  // namespace skygate::ephemeris

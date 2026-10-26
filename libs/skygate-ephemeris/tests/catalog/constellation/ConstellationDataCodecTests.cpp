@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/ConstellationDataCodec.hpp"
+#include "catalog/constellation/ConstellationDataCodec.hpp"
 
 #include <QtTest/QtTest>
 
@@ -10,25 +10,22 @@ class ConstellationDataCodecTests final : public QObject {
 
 private slots:
     void lineRowsRoundTripAndSkipMalformedRows();
-    void labelRowsRoundTripSanitizeAndSkipMalformedRows();
+    void anchorGroupRowsRoundTripSanitizeAndSkipMalformed();
 };
 
 void ConstellationDataCodecTests::lineRowsRoundTripAndSkipMalformedRows()
 {
-    const std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs {
+    const std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs{
         {"hip_1", "hip_2"},
         {"", "hip_3"},
         {"hip_4", "hip_5"},
     };
 
-    const std::string rows = skygate::ephemeris::ConstellationDataCodec::serializeLineRows(
-        lineRefs
-    );
+    const std::string rows = skygate::ephemeris::ConstellationDataCodec::serializeLineRows(lineRefs);
     QVERIFY(rows == "hip_1|hip_2\nhip_4|hip_5\n");
 
-    const auto parsed = skygate::ephemeris::ConstellationDataCodec::parseLineRows(
-        "bad\nhip_1|hip_2\n|missing\nmissing|\nhip_4|hip_5"
-    );
+    const auto parsed =
+        skygate::ephemeris::ConstellationDataCodec::parseLineRows("bad\nhip_1|hip_2\n|missing\nmissing|\nhip_4|hip_5");
     QCOMPARE(parsed.size(), 2U);
     QVERIFY(parsed[0].first == "hip_1");
     QVERIFY(parsed[0].second == "hip_2");
@@ -36,20 +33,18 @@ void ConstellationDataCodecTests::lineRowsRoundTripAndSkipMalformedRows()
     QVERIFY(parsed[1].second == "hip_5");
 }
 
-void ConstellationDataCodecTests::labelRowsRoundTripSanitizeAndSkipMalformedRows()
+void ConstellationDataCodecTests::anchorGroupRowsRoundTripSanitizeAndSkipMalformed()
 {
-    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs {
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups{
         {"  Canis|Major\n ", {"hip_1", "", "hip_2"}},
         {"", {"hip_3"}},
         {"Orion", {}},
     };
 
-    const std::string rows = skygate::ephemeris::ConstellationDataCodec::serializeLabelRows(
-        labelRefs
-    );
+    const std::string rows = skygate::ephemeris::ConstellationDataCodec::serializeAnchorGroupRows(anchorGroups);
     QVERIFY(rows == "Canis/Major|hip_1,hip_2\n");
 
-    const auto parsed = skygate::ephemeris::ConstellationDataCodec::parseLabelRows(
+    const auto parsed = skygate::ephemeris::ConstellationDataCodec::parseAnchorGroupRows(
         "bad\nCanis/Major|hip_1,,hip_2\nMissing|\n|hip_3"
     );
     QCOMPARE(parsed.size(), 1U);

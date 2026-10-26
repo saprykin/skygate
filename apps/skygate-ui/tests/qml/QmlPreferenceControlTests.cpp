@@ -1,4 +1,4 @@
-#include "QmlTestSupport.hpp"
+#include "support/QmlTestSupport.hpp"
 
 using namespace skygate::ui::tests;
 
@@ -12,10 +12,57 @@ QQuickItem* cityDelegate(QObject* root)
 void clickItemCenter(QWindow* window, QQuickItem* item)
 {
     QVERIFY(item != nullptr);
-    const QPoint clickPoint = item->mapToScene(
-        QPointF(item->width() * 0.5, item->height() * 0.5)
-    ).toPoint();
+    const QPoint clickPoint = item->mapToScene(QPointF(item->width() * 0.5, item->height() * 0.5)).toPoint();
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, clickPoint);
+}
+
+void openComboPopup(QObject* combo)
+{
+    QVERIFY(combo != nullptr);
+    QObject* popup = qvariant_cast<QObject*>(combo->property("popup"));
+    QVERIFY(popup != nullptr);
+    QVERIFY(QMetaObject::invokeMethod(popup, "open"));
+    QTRY_VERIFY(popup->property("opened").toBool());
+}
+
+void closeComboPopup(QObject* combo)
+{
+    QVERIFY(combo != nullptr);
+    QObject* popup = qvariant_cast<QObject*>(combo->property("popup"));
+    QVERIFY(popup != nullptr);
+    QVERIFY(QMetaObject::invokeMethod(popup, "close"));
+    QTRY_VERIFY(!popup->property("opened").toBool());
+}
+
+QString popupDelegateText(QObject* combo, const int index)
+{
+    QObject* popup = qvariant_cast<QObject*>(combo->property("popup"));
+    if (popup == nullptr) {
+        return QString();
+    }
+
+    QObject* listView = qvariant_cast<QObject*>(popup->property("contentItem"));
+    if (listView == nullptr) {
+        return QString();
+    }
+
+    QQuickItem* delegate = nullptr;
+    if (!QMetaObject::invokeMethod(listView, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, delegate), Q_ARG(int, index))
+        || delegate == nullptr) {
+        return QString();
+    }
+
+    QObject* label = qvariant_cast<QObject*>(delegate->property("contentItem"));
+    return label != nullptr ? label->property("text").toString() : QString();
+}
+
+QStringList popupDelegateTexts(QObject* combo, const int count)
+{
+    QStringList texts;
+    for (int index = 0; index < count; ++index) {
+        texts.push_back(popupDelegateText(combo, index));
+    }
+    return texts;
 }
 
 }  // namespace
@@ -26,10 +73,14 @@ class QmlPreferenceControlTests final : public QObject {
 private slots:
     void initTestCase();
     void init();
-    void preferencesTextFieldEditsAcceptsAndTracksEnabledState();
+    void preferencesTextFieldEditsAndTracksEnabledState();
     void preferencesComboBoxActivatesAndShowsPopup();
-    void preferencesCityPickerFiltersChoosesAndClearsModelFilter();
-    void preferencesButtonCheckboxAndSectionControlsRespond();
+    void preferencesComboBoxPopupRowsShowModelText();
+    void preferencesCityPickerFiltersChoosesAndClears();
+    void preferencesCityPickerPlacesPopupBySpace_data();
+    void preferencesCityPickerPlacesPopupBySpace();
+    void preferencesCityPickerShowsEmptyState();
+    void preferencesButtonCheckboxSectionControlsWork();
 
 private:
     QmlSettingsFixture m_settings;
@@ -45,7 +96,7 @@ void QmlPreferenceControlTests::init()
     m_settings.resetForCurrentTest();
 }
 
-void QmlPreferenceControlTests::preferencesTextFieldEditsAcceptsAndTracksEnabledState()
+void QmlPreferenceControlTests::preferencesTextFieldEditsAndTracksEnabledState()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -54,7 +105,9 @@ void QmlPreferenceControlTests::preferencesTextFieldEditsAcceptsAndTracksEnabled
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -63,15 +116,19 @@ void QmlPreferenceControlTests::preferencesTextFieldEditsAcceptsAndTracksEnabled
             property int acceptedCount: 0
             property string lastText: ""
             PreferencesTextField {
+                theme: skyContext.theme
                 id: field
                 anchors.fill: parent
                 placeholderText: "Type here"
+                suffix: "hPa"
                 onTextEdited: root.lastText = text
                 onAccepted: ++root.acceptedCount
             }
             property alias field: field
         }
-    )"), QStringLiteral("PreferencesTextFieldBehaviorTest.qml"));
+    )"),
+        QStringLiteral("PreferencesTextFieldBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -79,6 +136,7 @@ void QmlPreferenceControlTests::preferencesTextFieldEditsAcceptsAndTracksEnabled
     ExposedQuickWindow exposed(root);
     auto* field = qobject_cast<QQuickItem*>(qvariant_cast<QObject*>(root->property("field")));
     QVERIFY(field != nullptr);
+    QCOMPARE(field->property("suffix").toString(), QString("hPa"));
 
     QVERIFY(QMetaObject::invokeMethod(field, "forceActiveFocus"));
     commitText(exposed.window(), QStringLiteral("hello"));
@@ -102,7 +160,9 @@ void QmlPreferenceControlTests::preferencesComboBoxActivatesAndShowsPopup()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -110,6 +170,7 @@ void QmlPreferenceControlTests::preferencesComboBoxActivatesAndShowsPopup()
             height: 80
             property int activatedIndex: -1
             PreferencesComboBox {
+                theme: skyContext.theme
                 id: combo
                 width: 220
                 model: ["One", "Two", "Three"]
@@ -117,7 +178,9 @@ void QmlPreferenceControlTests::preferencesComboBoxActivatesAndShowsPopup()
             }
             property alias combo: combo
         }
-    )"), QStringLiteral("PreferencesComboBoxBehaviorTest.qml"));
+    )"),
+        QStringLiteral("PreferencesComboBoxBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -142,7 +205,91 @@ void QmlPreferenceControlTests::preferencesComboBoxActivatesAndShowsPopup()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClearsModelFilter()
+void QmlPreferenceControlTests::preferencesComboBoxPopupRowsShowModelText()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 260
+            height: 240
+            PreferencesComboBox {
+                theme: skyContext.theme
+                id: arrayCombo
+                width: 220
+                model: ["One", "Two", "Three"]
+            }
+            PreferencesComboBox {
+                theme: skyContext.theme
+                id: engineLabelsCombo
+                width: 220
+                model: skyContext.ephemerisEngineLabels
+            }
+            PreferencesComboBox {
+                theme: skyContext.theme
+                id: titledCombo
+                width: 220
+                textRole: "title"
+                model: ListModel {
+                    ListElement { title: "Alpha" }
+                    ListElement { title: "Beta" }
+                }
+            }
+            property alias arrayCombo: arrayCombo
+            property alias engineLabelsCombo: engineLabelsCombo
+            property alias titledCombo: titledCombo
+        }
+    )"),
+        QStringLiteral("PreferencesComboBoxPopupTextTest.qml")
+    );
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+
+    ExposedQuickWindow exposed(root);
+    (void)exposed;
+
+    // A string-list model renders the row strings themselves. The delegate's
+    // injected required model is the per-row data, read through the combo's
+    // text role, which stays empty for string models.
+    QObject* arrayCombo = qvariant_cast<QObject*>(root->property("arrayCombo"));
+    QVERIFY(arrayCombo != nullptr);
+    openComboPopup(arrayCombo);
+    QTRY_COMPARE(
+        popupDelegateTexts(arrayCombo, 3),
+        QStringList({QStringLiteral("One"), QStringLiteral("Two"), QStringLiteral("Three")})
+    );
+    closeComboPopup(arrayCombo);
+
+    QObject* engineLabelsCombo = qvariant_cast<QObject*>(root->property("engineLabelsCombo"));
+    QVERIFY(engineLabelsCombo != nullptr);
+    const QStringList engineLabels = controller->ephemerisEngineLabels();
+    QVERIFY(!engineLabels.isEmpty());
+    QCOMPARE(engineLabelsCombo->property("count").toInt(), static_cast<int>(engineLabels.size()));
+    openComboPopup(engineLabelsCombo);
+    QTRY_COMPARE(popupDelegateTexts(engineLabelsCombo, static_cast<int>(engineLabels.size())), engineLabels);
+    closeComboPopup(engineLabelsCombo);
+
+    // Object models keep resolving their text role.
+    QObject* titledCombo = qvariant_cast<QObject*>(root->property("titledCombo"));
+    QVERIFY(titledCombo != nullptr);
+    openComboPopup(titledCombo);
+    QTRY_COMPARE(popupDelegateTexts(titledCombo, 2), QStringList({QStringLiteral("Alpha"), QStringLiteral("Beta")}));
+    closeComboPopup(titledCombo);
+
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClears()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -153,7 +300,9 @@ void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClearsMode
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -164,6 +313,7 @@ void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClearsMode
             property real chosenLatitude: 0
             property real chosenLongitude: 0
             PreferencesCityPicker {
+                theme: skyContext.theme
                 id: picker
                 width: 320
                 height: 32
@@ -178,7 +328,9 @@ void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClearsMode
             }
             property alias picker: picker
         }
-    )"), QStringLiteral("PreferencesCityPickerBehaviorTest.qml"));
+    )"),
+        QStringLiteral("PreferencesCityPickerBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -198,9 +350,8 @@ void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClearsMode
 
     auto* zurichDelegate = cityDelegate(root);
     QVERIFY(zurichDelegate != nullptr);
-    const QPoint clickPoint = zurichDelegate->mapToScene(
-        QPointF(zurichDelegate->width() * 0.5, zurichDelegate->height() * 0.5)
-    ).toPoint();
+    const QPoint clickPoint =
+        zurichDelegate->mapToScene(QPointF(zurichDelegate->width() * 0.5, zurichDelegate->height() * 0.5)).toPoint();
     QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, clickPoint);
     QTRY_VERIFY(!root->property("chosenCityId").toString().isEmpty());
     QVERIFY(root->property("chosenDisplayText").toString().contains(QStringLiteral("Zurich")));
@@ -210,7 +361,119 @@ void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClearsMode
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlPreferenceControlTests::preferencesButtonCheckboxAndSectionControlsRespond()
+void QmlPreferenceControlTests::preferencesCityPickerPlacesPopupBySpace_data()
+{
+    QTest::addColumn<int>("pickerY");
+    QTest::addColumn<bool>("expectAbove");
+
+    QTest::newRow("above") << 600 << true;
+    QTest::newRow("below") << 10 << false;
+}
+
+void QmlPreferenceControlTests::preferencesCityPickerPlacesPopupBySpace()
+{
+    QFETCH(int, pickerY);
+    QFETCH(bool, expectAbove);
+
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 900
+            height: 640
+            PreferencesCityPicker {
+                theme: skyContext.theme
+                x: 10
+                y: %1
+                width: 320
+                height: 32
+                catalogModel: skyContext.cityCatalogModel
+            }
+        }
+    )")
+            .arg(pickerY),
+        QStringLiteral("PreferencesCityPickerPlacementTest.qml")
+    );
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+
+    ExposedQuickWindow exposed(root);
+    auto* pickerMouse = firstQuickItemWithObjectName(root, QStringLiteral("cityPickerMouse"));
+    QVERIFY(pickerMouse != nullptr);
+    clickItemCenter(exposed.window(), pickerMouse);
+
+    auto* filterField = firstQuickItemWithObjectName(root, QStringLiteral("citySearchField"));
+    QVERIFY(filterField != nullptr);
+    QTRY_VERIFY(filterField->hasActiveFocus());
+    const qreal filterFieldY = filterField->mapToScene(QPointF()).y();
+    const qreal pickerYInScene = pickerMouse->mapToScene(QPointF()).y();
+    QCOMPARE(filterFieldY < pickerYInScene, expectAbove);
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlPreferenceControlTests::preferencesCityPickerShowsEmptyState()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    auto* cityModel = controller->cityCatalogModel();
+    QVERIFY(cityModel != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 900
+            height: 640
+            PreferencesCityPicker {
+                theme: skyContext.theme
+                x: 10
+                y: 10
+                width: 320
+                height: 32
+                catalogModel: skyContext.cityCatalogModel
+            }
+        }
+    )"),
+        QStringLiteral("PreferencesCityPickerEmptyStateTest.qml")
+    );
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+
+    ExposedQuickWindow exposed(root);
+    auto* pickerMouse = firstQuickItemWithObjectName(root, QStringLiteral("cityPickerMouse"));
+    QVERIFY(pickerMouse != nullptr);
+    clickItemCenter(exposed.window(), pickerMouse);
+
+    auto* filterField = firstQuickItemWithObjectName(root, QStringLiteral("citySearchField"));
+    QVERIFY(filterField != nullptr);
+    QTRY_VERIFY(filterField->hasActiveFocus());
+    replaceText(exposed.window(), filterField, QStringLiteral("no such city"));
+    QTRY_COMPARE(cityModel->property("filterText").toString(), QString("no such city"));
+
+    auto* emptyLabel = firstQuickItemWithObjectName(root, QStringLiteral("cityEmptyLabel"));
+    QVERIFY(emptyLabel != nullptr);
+    QTRY_VERIFY(emptyLabel->isVisible());
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlPreferenceControlTests::preferencesButtonCheckboxSectionControlsWork()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -219,7 +482,9 @@ void QmlPreferenceControlTests::preferencesButtonCheckboxAndSectionControlsRespo
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -228,6 +493,7 @@ void QmlPreferenceControlTests::preferencesButtonCheckboxAndSectionControlsRespo
             property int actionClicks: 0
             property int sectionClicks: 0
             PreferencesActionButton {
+                theme: skyContext.theme
                 id: actionButton
                 x: 10
                 y: 10
@@ -236,11 +502,13 @@ void QmlPreferenceControlTests::preferencesButtonCheckboxAndSectionControlsRespo
                 onClicked: ++root.actionClicks
             }
             PreferencesCheckBox {
+                theme: skyContext.theme
                 id: checkBox
                 x: 10
                 y: 56
             }
             PreferencesSectionButton {
+                theme: skyContext.theme
                 id: sectionButton
                 x: 10
                 y: 94
@@ -256,21 +524,17 @@ void QmlPreferenceControlTests::preferencesButtonCheckboxAndSectionControlsRespo
             property alias checkBox: checkBox
             property alias sectionButton: sectionButton
         }
-    )"), QStringLiteral("PreferencesSmallControlBehaviorTest.qml"));
+    )"),
+        QStringLiteral("PreferencesSmallControlBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
 
     ExposedQuickWindow exposed(root);
-    auto* actionButton = qobject_cast<QQuickItem*>(
-        qvariant_cast<QObject*>(root->property("actionButton"))
-    );
-    auto* checkBox = qobject_cast<QQuickItem*>(
-        qvariant_cast<QObject*>(root->property("checkBox"))
-    );
-    auto* sectionButton = qobject_cast<QQuickItem*>(
-        qvariant_cast<QObject*>(root->property("sectionButton"))
-    );
+    auto* actionButton = qobject_cast<QQuickItem*>(qvariant_cast<QObject*>(root->property("actionButton")));
+    auto* checkBox = qobject_cast<QQuickItem*>(qvariant_cast<QObject*>(root->property("checkBox")));
+    auto* sectionButton = qobject_cast<QQuickItem*>(qvariant_cast<QObject*>(root->property("sectionButton")));
     QVERIFY(actionButton != nullptr);
     QVERIFY(checkBox != nullptr);
     QVERIFY(sectionButton != nullptr);

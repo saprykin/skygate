@@ -1,4 +1,6 @@
 #include "SkyLogging.hpp"
+#include "SkyLoggingConfiguration.hpp"
+#include "time/SkyQtTimeCodec.hpp"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -11,7 +13,6 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <cstdlib>
 #include <memory>
 
 namespace skygate::ui {
@@ -69,6 +70,36 @@ QString severityLabel(const QtMsgType type)
     return QStringLiteral("INFO");
 }
 
+QString outputText(const SkyLogging::Output output)
+{
+    switch (output) {
+    case SkyLogging::Output::Terminal:
+        return QStringLiteral("terminal");
+    case SkyLogging::Output::File:
+        return QStringLiteral("file");
+    case SkyLogging::Output::Both:
+        return QStringLiteral("both");
+    case SkyLogging::Output::None:
+        return QStringLiteral("none");
+    }
+
+    return QStringLiteral("none");
+}
+
+SkyLogging::Output outputFor(const SkyLoggingConfiguration& configuration) noexcept
+{
+    if (configuration.logToTerminal && configuration.logToFile) {
+        return SkyLogging::Output::Both;
+    }
+    if (configuration.logToTerminal) {
+        return SkyLogging::Output::Terminal;
+    }
+    if (configuration.logToFile) {
+        return SkyLogging::Output::File;
+    }
+    return SkyLogging::Output::None;
+}
+
 QString normalizedMessage(QString message)
 {
     message.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
@@ -88,29 +119,16 @@ QString categoryFromContext(const QMessageLogContext& context)
 QString timestampText()
 {
     const QDateTime now = QDateTime::currentDateTime();
-    const int offsetSeconds = now.offsetFromUtc();
-    const QChar sign = offsetSeconds < 0 ? QLatin1Char('-') : QLatin1Char('+');
-    const int absoluteOffsetSeconds = std::abs(offsetSeconds);
-    return QStringLiteral("%1%2%3:%4").arg(
+    return QStringLiteral("%1%2").arg(
         now.toString(QStringLiteral("yyyy-MM-dd'T'HH:mm:ss.zzz")),
-        QString(sign),
-        QStringLiteral("%1").arg(absoluteOffsetSeconds / 3600, 2, 10, QLatin1Char('0')),
-        QStringLiteral("%1").arg((absoluteOffsetSeconds % 3600) / 60, 2, 10, QLatin1Char('0'))
+        SkyQtTimeCodec::formatUtcOffsetText(now.offsetFromUtc())
     );
 }
 
-QString formatLine(
-    const QtMsgType type,
-    const QMessageLogContext& context,
-    const QString& message
-)
+QString formatLine(const QtMsgType type, const QMessageLogContext& context, const QString& message)
 {
-    return QStringLiteral("%1 %2 %3 %4\n").arg(
-        timestampText(),
-        severityLabel(type),
-        categoryFromContext(context),
-        normalizedMessage(message)
-    );
+    return QStringLiteral("%1 %2 %3 %4\n")
+        .arg(timestampText(), severityLabel(type), categoryFromContext(context), normalizedMessage(message));
 }
 
 QString backupPath(const QString& filePath, const int backupIndex)
@@ -118,8 +136,8 @@ QString backupPath(const QString& filePath, const int backupIndex)
     const QFileInfo info(filePath);
     const QString suffix = info.suffix();
     const QString fileName = suffix.isEmpty()
-        ? QStringLiteral("%1.%2").arg(info.fileName()).arg(backupIndex)
-        : QStringLiteral("%1.%2.%3").arg(info.completeBaseName()).arg(backupIndex).arg(suffix);
+                                 ? QStringLiteral("%1.%2").arg(info.fileName()).arg(backupIndex)
+                                 : QStringLiteral("%1.%2.%3").arg(info.completeBaseName()).arg(backupIndex).arg(suffix);
     return QDir(info.absolutePath()).filePath(fileName);
 }
 
@@ -151,9 +169,8 @@ bool openLogFileLocked()
     }
 
     s_fileOpenFailed = false;
-    const QString filePath = s_configuration.logFilePath.isEmpty()
-        ? SkyLogging::defaultLogFilePath()
-        : s_configuration.logFilePath;
+    const QString filePath =
+        s_configuration.logFilePath.isEmpty() ? SkyLogging::defaultLogFilePath() : s_configuration.logFilePath;
     if (filePath.isEmpty()) {
         s_fileOpenFailed = true;
         return false;
@@ -166,11 +183,7 @@ bool openLogFileLocked()
         return false;
     }
 
-    if (
-        info.exists()
-        && s_configuration.maxFileBytes > 0
-        && info.size() >= s_configuration.maxFileBytes
-    ) {
+    if (info.exists() && s_configuration.maxFileBytes > 0 && info.size() >= s_configuration.maxFileBytes) {
         rotateLogFileLocked(filePath, s_configuration.backupFileCount);
     }
 
@@ -204,11 +217,7 @@ void writeTerminalLine(const QString& line)
     std::fflush(stderr);
 }
 
-void messageHandler(
-    const QtMsgType type,
-    const QMessageLogContext& context,
-    const QString& message
-)
+void messageHandler(const QtMsgType type, const QMessageLogContext& context, const QString& message)
 {
     const QString line = formatLine(type, context, message);
     QMutexLocker locker(&s_mutex);
@@ -226,19 +235,16 @@ void messageHandler(
                 s_logFile->flush();
             }
 
-            if (
-                configuration.maxFileBytes > 0
-                && s_logFile->size() >= configuration.maxFileBytes
-            ) {
+            if (configuration.maxFileBytes > 0 && s_logFile->size() >= configuration.maxFileBytes) {
                 closeLogFileLocked();
                 rotateLogFileLocked(configuration.logFilePath, configuration.backupFileCount);
                 (void)openLogFileLocked();
             }
         } else if (!s_fileFailureReported && configuration.logToTerminal) {
             s_fileFailureReported = true;
-            writeTerminalLine(QStringLiteral(
-                "%1 WARN skygate.app Failed to open SkyGate log file\n"
-            ).arg(timestampText()));
+            writeTerminalLine(
+                QStringLiteral("%1 WARN skygate.app Failed to open SkyGate log file\n").arg(timestampText())
+            );
         }
     }
 
@@ -286,20 +292,32 @@ std::optional<QtMsgType> SkyLogging::messageTypeFromLevelText(const QString& lev
     if (normalizedLevel == QStringLiteral("info")) {
         return QtInfoMsg;
     }
-    if (
-        normalizedLevel == QStringLiteral("warning")
-        || normalizedLevel == QStringLiteral("warn")
-    ) {
+    if (normalizedLevel == QStringLiteral("warning") || normalizedLevel == QStringLiteral("warn")) {
         return QtWarningMsg;
     }
-    if (
-        normalizedLevel == QStringLiteral("error")
-        || normalizedLevel == QStringLiteral("critical")
-    ) {
+    if (normalizedLevel == QStringLiteral("error") || normalizedLevel == QStringLiteral("critical")) {
         return QtCriticalMsg;
     }
     if (normalizedLevel == QStringLiteral("fatal")) {
         return QtFatalMsg;
+    }
+    return std::nullopt;
+}
+
+std::optional<SkyLogging::Output> SkyLogging::outputFromText(const QString& text)
+{
+    const QString normalizedText = text.trimmed().toLower();
+    if (normalizedText == outputText(Output::Terminal)) {
+        return Output::Terminal;
+    }
+    if (normalizedText == outputText(Output::File)) {
+        return Output::File;
+    }
+    if (normalizedText == outputText(Output::Both)) {
+        return Output::Both;
+    }
+    if (normalizedText == outputText(Output::None)) {
+        return Output::None;
     }
     return std::nullopt;
 }
@@ -324,41 +342,24 @@ QString SkyLogging::levelSummary(const QtMsgType type)
 
 QString SkyLogging::outputSummary(const SkyLoggingConfiguration& configuration)
 {
-    if (configuration.logToTerminal && configuration.logToFile) {
-        return QStringLiteral("both");
-    }
-    if (configuration.logToTerminal) {
-        return QStringLiteral("terminal");
-    }
-    if (configuration.logToFile) {
-        return QStringLiteral("file");
-    }
-    return QStringLiteral("none");
+    return outputText(outputFor(configuration));
 }
 
 QString SkyLogging::configurationSummary(const SkyLoggingConfiguration& configuration)
 {
     QString summary = QStringLiteral("outputs=%1").arg(outputSummary(configuration));
     if (configuration.logToTerminal) {
-        summary += QStringLiteral(" terminalLevel=%1").arg(
-            levelSummary(configuration.terminalMinimumType)
-        );
+        summary += QStringLiteral(" terminalLevel=%1").arg(levelSummary(configuration.terminalMinimumType));
     }
     if (configuration.logToFile) {
-        summary += QStringLiteral(" fileLevel=%1 logFile=%2").arg(
-            levelSummary(configuration.fileMinimumType),
-            configuration.logFilePath.trimmed().isEmpty()
-                ? defaultLogFilePath()
-                : configuration.logFilePath.trimmed()
-        );
+        summary += QStringLiteral(" fileLevel=%1 logFile=%2")
+                       .arg(
+                           levelSummary(configuration.fileMinimumType),
+                           configuration.logFilePath.trimmed().isEmpty() ? defaultLogFilePath()
+                                                                         : configuration.logFilePath.trimmed()
+                       );
     }
     return summary;
-}
-
-bool SkyLogging::isInstalled()
-{
-    QMutexLocker locker(&s_mutex);
-    return s_installed;
 }
 
 void SkyLogging::install(const SkyLoggingConfiguration& configuration)
@@ -383,10 +384,8 @@ void SkyLogging::configure(const SkyLoggingConfiguration& configuration)
     normalizedConfiguration.maxFileBytes = std::max<qint64>(normalizedConfiguration.maxFileBytes, 0);
     normalizedConfiguration.backupFileCount = std::max(normalizedConfiguration.backupFileCount, 0);
 
-    const bool filePathChanged =
-        normalizedConfiguration.logFilePath != s_configuration.logFilePath;
-    const bool fileOutputChanged =
-        normalizedConfiguration.logToFile != s_configuration.logToFile;
+    const bool filePathChanged = normalizedConfiguration.logFilePath != s_configuration.logFilePath;
+    const bool fileOutputChanged = normalizedConfiguration.logToFile != s_configuration.logToFile;
     s_configuration = normalizedConfiguration;
 
     if (filePathChanged || fileOutputChanged || !s_configuration.logToFile) {
@@ -394,6 +393,12 @@ void SkyLogging::configure(const SkyLoggingConfiguration& configuration)
         s_fileOpenFailed = false;
         s_fileFailureReported = false;
     }
+}
+
+void SkyLogging::applyOutput(SkyLoggingConfiguration& configuration, const Output output)
+{
+    configuration.logToTerminal = output == Output::Terminal || output == Output::Both;
+    configuration.logToFile = output == Output::File || output == Output::Both;
 }
 
 void SkyLogging::uninstall()

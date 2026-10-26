@@ -1,18 +1,16 @@
-#include "SkyContextController.hpp"
-#include "SkySceneModel.hpp"
-#include "SkyViewportItem.hpp"
-#include "QmlObjectTreeTestSupport.hpp"
+#include "app/SkyContextController.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
+#include "render/SkyViewportItem.hpp"
+#include "scene/SkySceneModel.hpp"
+#include "support/QmlObjectTreeTestSupport.hpp"
 
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
-
-#include <QtTest/QtTest>
-
-#include <QGuiApplication>
 #include <QFont>
+#include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QSignalSpy>
+#include <QtTest/QtTest>
 #include <QUrl>
 #include <qqml.h>
 
@@ -33,9 +31,11 @@ void QmlSmokeTests::mainQmlLoadsWithRealContextObjects()
 {
     qmlRegisterType<SkyViewportItem>("com.skygate.app", 1, 0, "SkyViewportItem");
 
-    auto starCatalog = skygate::ephemeris::createBundledStarCatalog();
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(starCatalog != nullptr);
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
+    auto ephemerisEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(*starCatalog);
+    QVERIFY(skygate::ephemeris::EphemerisFactoryCreationStatus::isSuccess(ephemerisEngineResult.status));
+    auto ephemerisEngine = std::move(ephemerisEngineResult.engine);
     QVERIFY(ephemerisEngine != nullptr);
 
     SkyContextController skyContextController(std::move(starCatalog), std::move(ephemerisEngine));
@@ -50,47 +50,23 @@ void QmlSmokeTests::mainQmlLoadsWithRealContextObjects()
     engine.rootContext()->setContextProperty("skygateGitHash", QString("test"));
 
     bool objectCreationFailed = false;
-    QObject::connect(
-        &engine,
-        &QQmlApplicationEngine::objectCreationFailed,
-        &engine,
-        [&objectCreationFailed] {
-            objectCreationFailed = true;
-        }
-    );
+    QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &engine, [&objectCreationFailed] {
+        objectCreationFailed = true;
+    });
 
-    const QUrl mainQmlUrl = QUrl::fromLocalFile(
-        QStringLiteral(SKYGATE_QML_SOURCE_DIR) + QStringLiteral("/Main.qml")
-    );
+    const QUrl mainQmlUrl = QUrl::fromLocalFile(QStringLiteral(SKYGATE_QML_SOURCE_DIR) + QStringLiteral("/Main.qml"));
     engine.load(mainQmlUrl);
     QCoreApplication::processEvents();
 
+    // The smoke test proves that Main.qml instantiates against the real context
+    // objects and that the sky interaction layer is wired into it. The other
+    // object-name spot checks live in the focused QML suites (status footer,
+    // date/time popup, night conditions).
     QVERIFY(!objectCreationFailed);
     QVERIFY(!engine.rootObjects().isEmpty());
     QObject* rootObject = engine.rootObjects().front();
     QVERIFY(
-        skygate::ui::tests::firstObjectWithObjectName(
-            rootObject,
-            QStringLiteral("statusFooter")
-        ) != nullptr
-    );
-    QVERIFY(
-        skygate::ui::tests::firstObjectWithObjectName(
-            rootObject,
-            QStringLiteral("dateTimePopup")
-        ) != nullptr
-    );
-    QVERIFY(
-        skygate::ui::tests::firstObjectWithObjectName(
-            rootObject,
-            QStringLiteral("nightConditionsPopup")
-        ) != nullptr
-    );
-    QVERIFY(
-        skygate::ui::tests::firstObjectWithObjectName(
-            rootObject,
-            QStringLiteral("skyInteractionLayer")
-        ) != nullptr
+        skygate::ui::tests::firstObjectWithObjectName(rootObject, QStringLiteral("skyInteractionLayer")) != nullptr
     );
 }
 

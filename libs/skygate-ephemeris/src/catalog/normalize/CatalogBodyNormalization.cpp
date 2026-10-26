@@ -1,54 +1,19 @@
-#include "catalog/normalize/CatalogBodyNormalization.hpp"
-
+#include "CatalogBodyNormalization.hpp"
 #include "StringUtilities.hpp"
+#include "catalog/CelestialBodyIds.hpp"
 
 namespace skygate::ephemeris {
 
-void CatalogBodyNormalization::apply(CelestialBody& body)
+void CatalogBodyNormalization::apply(OwnGalaxyCelestialBody& body)
 {
-    if (body.fixedEquatorial.has_value()) {
-        body.ephemerisSource = CelestialBodyEphemerisSource::FixedEquatorial;
+    const std::string normalizedId = StringUtilities::normalizedLookupKey(body.id);
+    if (normalizedId == CelestialBodyIds::kSun) {
+        body.kind = BaseCelestialBody::Kind::Sun;
         return;
     }
-
-    const std::string normalizedId = strings::toLowerAscii(body.id);
-    if (normalizedId == "sun") {
-        body.ephemerisSource = CelestialBodyEphemerisSource::Sun;
+    if (normalizedId == CelestialBodyIds::kMoon) {
+        body.kind = BaseCelestialBody::Kind::Moon;
         return;
-    }
-    if (normalizedId == "moon") {
-        body.ephemerisSource = CelestialBodyEphemerisSource::Moon;
-        return;
-    }
-
-    switch (body.type) {
-    case CelestialBodyType::Sun:
-        body.ephemerisSource = CelestialBodyEphemerisSource::Sun;
-        break;
-    case CelestialBodyType::Moon:
-        body.ephemerisSource = CelestialBodyEphemerisSource::Moon;
-        break;
-    case CelestialBodyType::Planet:
-        body.ephemerisSource = CelestialBodyEphemerisSource::Planet;
-        break;
-    case CelestialBodyType::Star:
-        body.ephemerisSource = CelestialBodyEphemerisSource::Unresolved;
-        break;
-    case CelestialBodyType::Constellation:
-        body.ephemerisSource = CelestialBodyEphemerisSource::Unresolved;
-        break;
-    case CelestialBodyType::DeepSkyObject:
-        body.ephemerisSource = body.fixedEquatorial.has_value()
-            ? CelestialBodyEphemerisSource::FixedEquatorial
-            : CelestialBodyEphemerisSource::Unresolved;
-        break;
-    }
-}
-
-void CatalogBodyNormalization::apply(std::vector<CelestialBody>& bodies)
-{
-    for (CelestialBody& body : bodies) {
-        apply(body);
     }
 }
 

@@ -1,68 +1,44 @@
 #include "SkyTimeController.hpp"
 
+#include "SkyQtTimeCodec.hpp"
 #include "TimeZoneCatalogModel.hpp"
 
-#include "skygate/core/ITimeSource.hpp"
-#include "skygate/core/SystemTimeSource.hpp"
+#include "ITimeSource.hpp"
+#include "SystemTimeSource.hpp"
 
-#include <QDate>
-#include <QRegularExpression>
-#include <QTime>
 #include <QTimeZone>
 
-#include <cmath>
-#include <chrono>
+#include <optional>
 
 namespace {
 
-const QRegularExpression& dateInputPattern()
-{
-    static const QRegularExpression pattern(
-        R"(^(\d{4,})-(\d{2})-(\d{2})(?:\s+(BCE|BC))?$)",
-        QRegularExpression::CaseInsensitiveOption
-    );
-    return pattern;
-}
-
-QString formatDateText(const QDate& date)
-{
-    const int year = date.year();
-    const qint64 displayYear = year < 0
-        ? -static_cast<qint64>(year)
-        : static_cast<qint64>(year);
-    const QString yearText = QString::number(displayYear).rightJustified(4, '0');
-    const QString dateText = QString("%1-%2-%3")
-        .arg(yearText)
-        .arg(date.month(), 2, 10, QLatin1Char('0'))
-        .arg(date.day(), 2, 10, QLatin1Char('0'));
-    return year < 0
-        ? QString("%1 BCE").arg(dateText)
-        : dateText;
-}
-
-QString formatUtcOffset(const int offsetSeconds)
-{
-    const QChar sign = offsetSeconds < 0 ? QLatin1Char('-') : QLatin1Char('+');
-    const int absoluteSeconds = std::abs(offsetSeconds);
-    return QString("UTC%1%2:%3")
-        .arg(sign)
-        .arg(absoluteSeconds / 3600, 2, 10, QLatin1Char('0'))
-        .arg((absoluteSeconds % 3600) / 60, 2, 10, QLatin1Char('0'));
-}
-
-QTimeZone validTimeZoneOrFallback(const QString& timeZoneId)
+// Single validation path for persisted and user supplied time zone ids.
+std::optional<QTimeZone> availableTimeZone(const QString& timeZoneId)
 {
     const QByteArray idBytes = timeZoneId.trimmed().toUtf8();
-    if (!idBytes.isEmpty() && QTimeZone::isTimeZoneIdAvailable(idBytes)) {
-        return QTimeZone(idBytes);
+    if (idBytes.isEmpty() || !QTimeZone::isTimeZoneIdAvailable(idBytes)) {
+        return std::nullopt;
     }
 
-    const QByteArray systemId = QTimeZone::systemTimeZoneId();
-    if (!systemId.isEmpty() && QTimeZone::isTimeZoneIdAvailable(systemId)) {
-        return QTimeZone(systemId);
+    return QTimeZone(idBytes);
+}
+
+QTimeZone systemTimeZoneOrUtc()
+{
+    const std::optional<QTimeZone> systemTimeZone = availableTimeZone(QString::fromUtf8(QTimeZone::systemTimeZoneId()));
+    return systemTimeZone.has_value() ? *systemTimeZone : QTimeZone::utc();
+}
+
+// Startup fallback: a missing id follows the system zone, while an id that is
+// present but unavailable falls back to UTC.
+QTimeZone initialTimeZoneOrFallback(const QString& timeZoneId)
+{
+    const std::optional<QTimeZone> timeZone = availableTimeZone(timeZoneId);
+    if (timeZone.has_value()) {
+        return *timeZone;
     }
 
-    return QTimeZone::utc();
+    return timeZoneId.trimmed().isEmpty() ? systemTimeZoneOrUtc() : QTimeZone::utc();
 }
 
 const skygate::core::SystemTimeSource& defaultTimeSource()
@@ -71,50 +47,15 @@ const skygate::core::SystemTimeSource& defaultTimeSource()
     return timeSource;
 }
 
-QDateTime toQDateTimeUtc(const skygate::core::UtcTimePoint& utcTime)
+}  // namespace
+
+SkyTimeController::SkyTimeController(QObject* parent) : SkyTimeController(defaultTimeSource(), parent) {}
+
+SkyTimeController::SkyTimeController(const skygate::core::ITimeSource& timeSource, QObject* parent)
+    : QObject(parent), m_utcTime(timeSource.nowUtc()), m_timeZone(initialTimeZoneOrFallback({})),
+      m_timeZoneCatalogModel(new TimeZoneCatalogModel(this))
 {
-    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
-        utcTime.time_since_epoch()
-    );
-    return QDateTime::fromSecsSinceEpoch(seconds.count(), QTimeZone::UTC);
-}
-
-QString timeZoneLabel(const QTimeZone& timeZone, const QDateTime& zonedDateTime)
-{
-    QString label = timeZone.abbreviation(zonedDateTime).trimmed();
-    if (label.isEmpty()) {
-        label = timeZone.displayName(zonedDateTime, QTimeZone::ShortName).trimmed();
-    }
-
-    const QString offsetText = formatUtcOffset(timeZone.offsetFromUtc(zonedDateTime));
-    if (
-        label.isEmpty()
-        || label.startsWith(QLatin1String("GMT"))
-        || label.startsWith(QLatin1Char('+'))
-        || label.startsWith(QLatin1Char('-'))
-    ) {
-        return offsetText;
-    }
-    return label;
-}
-
-} // namespace
-
-SkyTimeController::SkyTimeController(QObject* parent)
-    : SkyTimeController(defaultTimeSource(), parent)
-{
-}
-
-SkyTimeController::SkyTimeController(
-    const skygate::core::ITimeSource& timeSource,
-    QObject* parent
-)
-    : QObject(parent)
-    , m_utcDateTime(toQDateTimeUtc(timeSource.nowUtc()))
-    , m_timeZone(validTimeZoneOrFallback({}))
-    , m_timeZoneCatalogModel(new TimeZoneCatalogModel(this))
-{
-    m_timeZoneCatalogModel->setReferenceUtcDateTime(m_utcDateTime);
+    m_timeZoneCatalogModel->setReferenceUtcDateTime(utcDateTime());
 }
 
 SkyTimeController::~SkyTimeController() = default;
@@ -136,14 +77,13 @@ QString SkyTimeController::timeZoneId() const
 
 QString SkyTimeController::timeZoneLabel() const
 {
-    return ::timeZoneLabel(m_timeZone, displayDateTime());
+    return SkyQtTimeCodec::timeZoneLabel(displayDateTime());
 }
 
 QString SkyTimeController::timeZoneDetailText() const
 {
-    return m_timeZoneCatalogModel != nullptr
-        ? m_timeZoneCatalogModel->detailTextForTimeZoneId(timeZoneId())
-        : QString();
+    return m_timeZoneCatalogModel != nullptr ? m_timeZoneCatalogModel->detailTextForTimeZoneId(timeZoneId())
+                                             : QString();
 }
 
 QAbstractItemModel* SkyTimeController::timeZoneCatalogModel() const noexcept
@@ -153,12 +93,7 @@ QAbstractItemModel* SkyTimeController::timeZoneCatalogModel() const noexcept
 
 QDateTime SkyTimeController::utcDateTime() const
 {
-    return m_utcDateTime;
-}
-
-skygate::core::UtcTimePoint SkyTimeController::utcTimePoint() const
-{
-    return skygate::core::UtcTimePoint(std::chrono::seconds(m_utcDateTime.toSecsSinceEpoch()));
+    return SkyQtTimeCodec::toQDateTimeUtc(m_utcTime);
 }
 
 void SkyTimeController::setUtcDateTime(const QDateTime& utcDateTime)
@@ -168,46 +103,33 @@ void SkyTimeController::setUtcDateTime(const QDateTime& utcDateTime)
         return;
     }
 
-    const QString previousDateText = formattedDateText();
-    const QString previousTimeText = formattedTimeText();
-    const QString previousTimeZoneLabel = timeZoneLabel();
-    const QString previousTimeZoneDetailText = timeZoneDetailText();
-    if (m_utcDateTime == nextUtc) {
-        return;
-    }
-
-    m_utcDateTime = nextUtc;
-    if (m_timeZoneCatalogModel != nullptr) {
-        m_timeZoneCatalogModel->setReferenceUtcDateTime(m_utcDateTime);
-    }
-
-    emitDisplayTextChanges(previousDateText, previousTimeText);
-    if (
-        previousTimeZoneLabel != timeZoneLabel()
-        || previousTimeZoneDetailText != timeZoneDetailText()
-    ) {
-        emit timeZoneChanged();
-    }
+    setUtcTimePoint(SkyQtTimeCodec::toUtcTimePoint(nextUtc));
 }
 
 void SkyTimeController::setUtcTimePoint(const skygate::core::UtcTimePoint& utcTime)
 {
-    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
-        utcTime.time_since_epoch()
-    );
-    setUtcDateTime(QDateTime::fromSecsSinceEpoch(seconds.count(), QTimeZone::UTC));
+    const QString previousDateText = formattedDateText();
+    const QString previousTimeText = formattedTimeText();
+    const QString previousTimeZoneLabel = timeZoneLabel();
+    const QString previousTimeZoneDetailText = timeZoneDetailText();
+    if (m_utcTime == utcTime) {
+        return;
+    }
+
+    m_utcTime = utcTime;
+    if (m_timeZoneCatalogModel != nullptr) {
+        m_timeZoneCatalogModel->setReferenceUtcDateTime(utcDateTime());
+    }
+
+    emitDisplayTextChanges(previousDateText, previousTimeText);
+    if (previousTimeZoneLabel != timeZoneLabel() || previousTimeZoneDetailText != timeZoneDetailText()) {
+        emit timeZoneChanged();
+    }
 }
 
 bool SkyTimeController::setInitialTimeZoneId(const QString& timeZoneId)
 {
-    const QByteArray idBytes = timeZoneId.trimmed().toUtf8();
-    const QTimeZone nextTimeZone = idBytes.isEmpty()
-        ? validTimeZoneOrFallback({})
-        : (
-            QTimeZone::isTimeZoneIdAvailable(idBytes)
-                ? QTimeZone(idBytes)
-                : QTimeZone::utc()
-        );
+    const QTimeZone nextTimeZone = initialTimeZoneOrFallback(timeZoneId);
     const QString previousDateText = formattedDateText();
     const QString previousTimeText = formattedTimeText();
     const bool changed = m_timeZone != nextTimeZone;
@@ -221,40 +143,38 @@ bool SkyTimeController::setInitialTimeZoneId(const QString& timeZoneId)
     return true;
 }
 
-QString SkyTimeController::validateDateTimeText(
-    const QString& dateText,
-    const QString& timeText
-) const
+QString SkyTimeController::validateDateTimeText(const QString& dateText, const QString& timeText) const
 {
-    return parseDisplayDateTime(dateText, timeText).errorText;
+    return SkyQtTimeCodec::parseZonedDateTime(dateText, timeText, m_timeZone, SkyQtTimeCodec::ErrorScope::LocalDisplay)
+        .errorText;
 }
 
 bool SkyTimeController::setDateTimeText(const QString& dateText, const QString& timeText)
 {
-    const ParseResult parseResult = parseDisplayDateTime(dateText, timeText);
+    const SkyQtTimeCodec::ZonedParseResult parseResult =
+        SkyQtTimeCodec::parseZonedDateTime(dateText, timeText, m_timeZone, SkyQtTimeCodec::ErrorScope::LocalDisplay);
     if (!parseResult.isValid()) {
         return false;
     }
 
-    emit utcDateTimeChangeRequested(parseResult.utcDateTime);
+    emit utcDateTimeChangeRequested(*parseResult.utcDateTime);
     return true;
 }
 
 bool SkyTimeController::setTimeZoneId(const QString& timeZoneId)
 {
-    const QByteArray idBytes = timeZoneId.trimmed().toUtf8();
-    if (idBytes.isEmpty() || !QTimeZone::isTimeZoneIdAvailable(idBytes)) {
+    const std::optional<QTimeZone> nextTimeZone = availableTimeZone(timeZoneId);
+    if (!nextTimeZone.has_value()) {
         return false;
     }
 
-    const QTimeZone nextTimeZone(idBytes);
-    if (m_timeZone == nextTimeZone) {
+    if (m_timeZone == *nextTimeZone) {
         return true;
     }
 
     const QString previousDateText = formattedDateText();
     const QString previousTimeText = formattedTimeText();
-    m_timeZone = nextTimeZone;
+    m_timeZone = *nextTimeZone;
     emitDisplayTextChanges(previousDateText, previousTimeText);
     emit timeZoneChanged();
     return true;
@@ -265,153 +185,37 @@ void SkyTimeController::goLiveNow()
     emit goLiveNowRequested();
 }
 
-QString SkyTimeController::formatUtcTime(
-    const skygate::core::UtcTimePoint& utcTime,
-    const bool includeSeconds
-) const
+QString SkyTimeController::formatUtcTime(const skygate::core::UtcTimePoint& utcTime, const bool includeSeconds) const
 {
-    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
-        utcTime.time_since_epoch()
-    );
-    const QDateTime zonedDateTime = QDateTime::fromSecsSinceEpoch(
-        seconds.count(),
-        QTimeZone::UTC
-    ).toTimeZone(m_timeZone);
-    return includeSeconds
-        ? QString("%1 %2").arg(
-            zonedDateTime.toString("yyyy-MM-dd HH:mm:ss"),
-            ::timeZoneLabel(m_timeZone, zonedDateTime)
-        )
-        : QString("%1 %2").arg(
-            zonedDateTime.toString("HH:mm"),
-            ::timeZoneLabel(m_timeZone, zonedDateTime)
-        );
+    return formatUtcTimeInTimeZone(utcTime, m_timeZone, includeSeconds);
 }
 
-QString SkyTimeController::formatUtcTimeRange(
-    const skygate::core::UtcTimePoint& startUtc,
-    const skygate::core::UtcTimePoint& endUtc
-) const
+QString SkyTimeController::formatUtcTimeInTimeZone(
+    const skygate::core::UtcTimePoint& utcTime, const QTimeZone& timeZone, const bool includeSeconds
+)
 {
-    const auto startSeconds = std::chrono::duration_cast<std::chrono::seconds>(
-        startUtc.time_since_epoch()
-    );
-    const auto endSeconds = std::chrono::duration_cast<std::chrono::seconds>(
-        endUtc.time_since_epoch()
-    );
-    const QDateTime startDateTime = QDateTime::fromSecsSinceEpoch(
-        startSeconds.count(),
-        QTimeZone::UTC
-    ).toTimeZone(m_timeZone);
-    const QDateTime endDateTime = QDateTime::fromSecsSinceEpoch(
-        endSeconds.count(),
-        QTimeZone::UTC
-    ).toTimeZone(m_timeZone);
-    const QString label = ::timeZoneLabel(m_timeZone, startDateTime);
-    if (
-        startDateTime.date() == endDateTime.date()
-        && ::timeZoneLabel(m_timeZone, endDateTime) == label
-    ) {
-        return QString("%1 %2 / %3 %4").arg(
-            startDateTime.toString("yyyy-MM-dd"),
-            startDateTime.toString("HH:mm:ss"),
-            endDateTime.toString("HH:mm:ss"),
-            label
-        );
-    }
-
-    return QString("%1 / %2").arg(formatUtcTime(startUtc), formatUtcTime(endUtc));
-}
-
-bool SkyTimeController::ParseResult::isValid() const noexcept
-{
-    return utcDateTime.isValid() && errorText.isEmpty();
+    const QDateTime zonedDateTime = SkyQtTimeCodec::toQDateTimeUtc(utcTime).toTimeZone(timeZone);
+    const QString timeText = includeSeconds ? SkyQtTimeCodec::formatDateTimeText(zonedDateTime)
+                                            : SkyQtTimeCodec::formatTimeText(zonedDateTime, false);
+    return QString("%1 %2").arg(timeText, SkyQtTimeCodec::timeZoneLabel(zonedDateTime));
 }
 
 QDateTime SkyTimeController::displayDateTime() const
 {
-    return m_utcDateTime.toTimeZone(m_timeZone);
-}
-
-SkyTimeController::ParseResult SkyTimeController::parseDisplayDateTime(
-    const QString& dateText,
-    const QString& timeText
-) const
-{
-    const QRegularExpressionMatch dateMatch = dateInputPattern().match(dateText.trimmed());
-    if (!dateMatch.hasMatch()) {
-        return {
-            .utcDateTime = {},
-            .errorText = "Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates."
-        };
-    }
-
-    bool isValidYear = false;
-    const int yearMagnitude = dateMatch.captured(1).toInt(&isValidYear);
-    if (!isValidYear || yearMagnitude == 0) {
-        return {
-            .utcDateTime = {},
-            .errorText = "Year 0000 is invalid. Use 0001 BCE for the year before 0001 CE."
-        };
-    }
-
-    bool isValidMonth = false;
-    const int month = dateMatch.captured(2).toInt(&isValidMonth);
-    bool isValidDay = false;
-    const int day = dateMatch.captured(3).toInt(&isValidDay);
-    if (!isValidMonth || !isValidDay) {
-        return {
-            .utcDateTime = {},
-            .errorText = "Enter a valid date."
-        };
-    }
-
-    const bool isBce = !dateMatch.captured(4).isEmpty();
-    const int year = isBce ? -yearMagnitude : yearMagnitude;
-    const QDate date(year, month, day);
-    if (!date.isValid()) {
-        return {
-            .utcDateTime = {},
-            .errorText = "Enter a valid date."
-        };
-    }
-
-    const QTime time = QTime::fromString(timeText.trimmed(), "HH:mm:ss");
-    if (!time.isValid()) {
-        return {
-            .utcDateTime = {},
-            .errorText = "Use HH:mm:ss for the time."
-        };
-    }
-
-    const QDateTime zonedDateTime(date, time, m_timeZone);
-    if (!zonedDateTime.isValid()) {
-        return {
-            .utcDateTime = {},
-            .errorText = "Enter a valid date and time."
-        };
-    }
-
-    return {
-        .utcDateTime = zonedDateTime.toUTC(),
-        .errorText = {}
-    };
+    return utcDateTime().toTimeZone(m_timeZone);
 }
 
 QString SkyTimeController::formattedDateText() const
 {
-    return formatDateText(displayDateTime().date());
+    return SkyQtTimeCodec::formatDateText(displayDateTime().date());
 }
 
 QString SkyTimeController::formattedTimeText() const
 {
-    return displayDateTime().toString("HH:mm:ss");
+    return SkyQtTimeCodec::formatTimeText(displayDateTime());
 }
 
-void SkyTimeController::emitDisplayTextChanges(
-    const QString& previousDateText,
-    const QString& previousTimeText
-)
+void SkyTimeController::emitDisplayTextChanges(const QString& previousDateText, const QString& previousTimeText)
 {
     if (previousDateText != formattedDateText()) {
         emit dateTextChanged();

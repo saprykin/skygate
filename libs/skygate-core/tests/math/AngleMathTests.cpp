@@ -1,5 +1,5 @@
-#include "skygate/core/math/AngleMath.hpp"
-#include "skygate/core/math/MathConstants.hpp"
+#include "math/AngleMath.hpp"
+#include "math/MathConstants.hpp"
 
 #include <QtTest/QtTest>
 
@@ -18,22 +18,34 @@ class AngleMathTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void exposesSharedMathConstants();
     void convertsBetweenDegreesAndRadians();
+    void convertsBetweenHoursRadiansAndDegrees();
     void normalizesUnsignedDegreesAtBoundaries();
     void normalizesSignedDegreesAtBoundaries();
     void normalizesHoursAtDayBoundaries();
 };
 
-void AngleMathTests::exposesSharedMathConstants()
-{
-    QVERIFY(isNear(skygate::core::MathConstants::kTwoPi, 2.0 * skygate::core::MathConstants::kPi));
-}
-
 void AngleMathTests::convertsBetweenDegreesAndRadians()
 {
     QVERIFY(isNear(skygate::core::AngleMath::toRadians(180.0), skygate::core::MathConstants::kPi));
     QVERIFY(isNear(skygate::core::AngleMath::toDegrees(skygate::core::MathConstants::kPi), 180.0));
+}
+
+void AngleMathTests::convertsBetweenHoursRadiansAndDegrees()
+{
+    QVERIFY(isNear(skygate::core::AngleMath::hoursToRadians(12.0), skygate::core::MathConstants::kPi));
+    QVERIFY(isNear(skygate::core::AngleMath::radiansToHours(skygate::core::MathConstants::kPi), 12.0));
+    QVERIFY(isNear(skygate::core::AngleMath::hoursToDegrees(6.0), 90.0));
+    QVERIFY(isNear(skygate::core::AngleMath::degreesToHours(90.0), 6.0));
+
+    for (const double hours : {0.0, 1.5, 6.0, 23.75}) {
+        QVERIFY(isNear(
+            skygate::core::AngleMath::radiansToHours(skygate::core::AngleMath::hoursToRadians(hours)), hours, 1e-12
+        ));
+        QVERIFY(isNear(
+            skygate::core::AngleMath::degreesToHours(skygate::core::AngleMath::hoursToDegrees(hours)), hours, 1e-12
+        ));
+    }
 }
 
 void AngleMathTests::normalizesUnsignedDegreesAtBoundaries()

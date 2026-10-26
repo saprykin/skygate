@@ -1,19 +1,18 @@
 #pragma once
 
-#include <QtTest>
-
-#include "SkyContextController.hpp"
+#include "CelestialReferenceCalculator.hpp"
 #include "SkyEphemerisTestSupport.hpp"
-#include "SkyOverlayLayerSettings.hpp"
-#include "SkyRenderBuilders.hpp"
-#include "SkySceneModel.hpp"
 #include "SkySceneModelTestHarness.hpp"
-#include "SkyTimeController.hpp"
-#include "SkyTheme.hpp"
-#include "catalog/SkyActiveCatalogBuilder.hpp"
+#include "app/SkyContextController.hpp"
+#include "math/ViewportMath.hpp"
+#include "render/SkyRenderBuilders.hpp"
+#include "render/SkyRenderLabel.hpp"
+#include "scene/SkySceneModel.hpp"
+#include "theme/SkyOverlayLayerSettings.hpp"
+#include "theme/SkyThemeRepository.hpp"
+#include "time/SkyTimeController.hpp"
 
-#include "skygate/core/math/ViewportMath.hpp"
-#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
+#include <QtTest>
 
 #include <algorithm>
 #include <cmath>
@@ -36,10 +35,7 @@ inline bool overlayItemsContainText(const QVariantList& overlayItems, const QStr
     return false;
 }
 
-inline bool overlayItemsContainText(
-    const std::vector<SkyRenderLabel>& overlayItems,
-    const QString& text
-)
+inline bool overlayItemsContainText(const std::vector<SkyRenderLabel>& overlayItems, const QString& text)
 {
     for (const SkyRenderLabel& overlayItem : overlayItems) {
         if (overlayItem.text == text) {
@@ -75,34 +71,31 @@ inline QString inspectorFieldValue(const QVariantMap& inspector, const QString& 
 }
 
 inline SkyRenderFrame buildDeepSkyRenderFrame(
-    std::vector<skygate::ephemeris::CelestialBody> bodies,
+    std::vector<skygate::ephemeris::DistantCelestialBody> bodies,
     std::vector<skygate::core::HorizontalCoordinate> horizontalCoordinates,
     const double fovDeg
 )
 {
-    skygate::ephemeris::SkySnapshot snapshot;
-    auto catalogBodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>(
-        std::move(bodies)
+    skygate::ephemeris::EphemerisSnapshot snapshot;
+    std::vector<skygate::ephemeris::CelestialBodyCatalog::OrderEntry> order;
+    order.reserve(bodies.size());
+    for (std::uint32_t index = 0U; index < bodies.size(); ++index) {
+        order.push_back({.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = index});
+    }
+    auto catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{}, std::move(bodies), std::move(order)
     );
     snapshot.catalogBodies = catalogBodies;
     for (std::uint32_t index = 0; index < catalogBodies->size(); ++index) {
-        snapshot.states.push_back(skygate::ephemeris::CelestialBodyState {
-            .bodyIndex = index,
-            .horizontal = horizontalCoordinates.at(index)
-        });
+        snapshot.states.push_back(
+            skygate::ephemeris::CelestialBodyState{.bodyIndex = index, .horizontal = horizontalCoordinates.at(index)}
+        );
     }
 
-    const auto projectionParams = skygate::core::ViewportMath::buildProjectionParams(
-        1000.0,
-        700.0,
-        45.0,
-        180.0,
-        fovDeg
-    );
-    const auto projection = skygate::core::PreparedProjection::create(
-        skygate::core::ProjectionType::Stereographic,
-        projectionParams
-    );
+    const auto projectionParams =
+        skygate::core::ViewportMath::buildProjectionParams(1000.0, 700.0, 45.0, 180.0, fovDeg);
+    const auto projection =
+        skygate::core::PreparedProjection::create(skygate::core::ProjectionType::Stereographic, projectionParams);
     Q_ASSERT(projection.has_value());
 
     const skygate::ui::internal::SkyThemeRepository themeRepository;
@@ -116,7 +109,7 @@ inline SkyRenderFrame buildDeepSkyRenderFrame(
         1000.0,
         700.0,
         themeRepository.defaultTheme().render,
-        SkyOverlayLayerVisibility {}
+        SkyOverlayLayerVisibility{}
     );
 }
 

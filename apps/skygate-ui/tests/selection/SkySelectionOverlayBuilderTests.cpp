@@ -1,54 +1,64 @@
-#include "SkySelectionOverlayBuilder.hpp"
-#include "SkyOverlayTestSupport.hpp"
-#include "SkyTimeController.hpp"
+#include "CelestialBodyCatalog.hpp"
+#include "DistantCelestialBody.hpp"
+#include "UtcTimeCodec.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "composition/EphemerisGuidanceComposition.hpp"
+#include "engine/IEphemerisEngine.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
+#include "math/ViewportMath.hpp"
+#include "scene/SkySelectedObjectInspector.hpp"
+#include "scene/SkySelectionMarker.hpp"
+#include "selection/SkyObjectInspectorFormatters.hpp"
+#include "selection/SkySelectionOverlayBuilder.hpp"
+#include "selection/SkySelectionOverlayInput.hpp"
+#include "selection/SkySelectionTargetKind.hpp"
+#include "support/SkyOverlayTestSupport.hpp"
+#include "time/CalendarTime.hpp"
+#include "time/SkyTimeController.hpp"
 
 #include <QtTest/QtTest>
 
-#include "skygate/core/math/ViewportMath.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
-
+#include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+using skygate::ui::tests::overlayInspectorFieldTooltip;
 using skygate::ui::tests::overlayInspectorFieldValue;
 
 namespace {
 
-skygate::ephemeris::CelestialBody makeBody(
+skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
     std::string id,
     std::string displayName,
-    const skygate::ephemeris::CelestialBodyType type =
-        skygate::ephemeris::CelestialBodyType::Star
+    const skygate::ephemeris::BaseCelestialBody::Kind type = skygate::ephemeris::BaseCelestialBody::Kind::Star
 )
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.type = type;
+    body.kind = type;
     body.visualMagnitude = 2.34;
-    body.fixedEquatorial = skygate::core::EquatorialCoordinate {
-        .rightAscensionHours = 23.9998,
-        .declinationDeg = -12.5
-    };
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 23.9998, .declinationDeg = -12.5};
     return body;
 }
 
-skygate::ephemeris::CelestialBody makeDeepSkyBody()
+skygate::ephemeris::DistantCelestialBody makeDeepSkyBody()
 {
-    auto body = makeBody(
-        "messier_031",
-        "M31",
-        skygate::ephemeris::CelestialBodyType::DeepSkyObject
-    );
-    body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
-        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
+    skygate::ephemeris::DistantCelestialBody body;
+    body.id = "messier_031";
+    body.displayName = "M31";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
+    body.visualMagnitude = 2.34;
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 23.9998, .declinationDeg = -12.5};
+    body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo{
+        .kind = skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy,
         .aliases = {"M31", "Andromeda Galaxy", "andromeda galaxy", "NGC 224"},
         .majorAxisArcmin = 190.0,
         .minorAxisArcmin = 60.0
@@ -57,59 +67,302 @@ skygate::ephemeris::CelestialBody makeDeepSkyBody()
 }
 
 struct OverlayFixture final {
-    skygate::ephemeris::SkySnapshot snapshot;
+    skygate::ephemeris::EphemerisSnapshot snapshot;
     QHash<QString, std::size_t> stateIndexByBodyId;
     std::optional<skygate::core::PreparedProjection> projection;
-    std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs;
-    std::vector<std::uint8_t> sourceIds;
-    QStringList sourceLabels;
-    skygate::core::SkyContext skyContext;
+    std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups;
+    std::vector<QString> sourceIds;
+    std::vector<QStringList> sourceContributors;
+    QHash<QString, QString> sourceTitles;
+    skygate::core::ObservationContext skyContext;
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine;
+};
+
+class RequestOnlyObservationEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Request-only observation test engine";
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        skygate::ephemeris::EphemerisSnapshot snapshot;
+        snapshot.context = request.context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
+    {
+        return computeBodyState(request, std::size_t{0U});
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        if (bodyIndex != 0U) {
+            return std::nullopt;
+        }
+
+        ++requestSampleCount;
+        const bool usesLightTime = skygate::ephemeris::EphemerisCorrectionFlags::has(
+            request.options.correctionFlags(), skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
+        );
+        sawLightTimeRequest = sawLightTimeRequest || usesLightTime;
+        const double seconds = skygate::core::UtcTimeCodec::secondsSinceEpochDouble(request.context.utcTime);
+        const double phase = std::fmod(seconds, 86400.0) / 86400.0;
+        return skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
+            .horizontal = {
+                .altitudeDeg = usesLightTime ? 35.0 * std::sin(2.0 * 3.14159265358979323846 * (phase - 0.25)) : -20.0,
+                .azimuthDeg = 180.0
+            }
+        };
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
+    {
+        skygate::ephemeris::EphemerisSnapshot snapshot;
+        snapshot.context = context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
+    {
+        ++contextSampleCount;
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
+    {
+        ++contextSampleCount;
+        return std::nullopt;
+    }
+
+    mutable int requestSampleCount = 0;
+    mutable int contextSampleCount = 0;
+    mutable bool sawLightTimeRequest = false;
+};
+
+class NonFixedObservationProfileEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Non-fixed observation profile test engine";
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine();
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
+    {
+        skygate::ephemeris::EphemerisEngineOptions options;
+        options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+        options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
+        return options;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        skygate::ephemeris::EphemerisSnapshot snapshot;
+        snapshot.context = request.context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
+    {
+        return computeBodyState(request, std::size_t{0U});
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest&, const std::size_t bodyIndex) const override
+    {
+        if (bodyIndex != 0U) {
+            return std::nullopt;
+        }
+
+        ++requestSampleCount;
+        return skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+            .horizontal = {.altitudeDeg = -20.0, .azimuthDeg = 180.0}
+        };
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
+    {
+        skygate::ephemeris::EphemerisSnapshot snapshot;
+        snapshot.context = context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
+    {
+        ++contextSampleCount;
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
+    {
+        ++contextSampleCount;
+        return std::nullopt;
+    }
+
+    mutable int requestSampleCount = 0;
+    mutable int contextSampleCount = 0;
+};
+
+class HighPrecisionInspectorEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "High-precision inspector test engine";
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine();
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        skygate::ephemeris::EphemerisSnapshot snapshot;
+        snapshot.context = request.context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
+    {
+        return computeBodyState(request, std::size_t{0U});
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        if (bodyIndex != 0U) {
+            return std::nullopt;
+        }
+
+        ++requestSampleCount;
+        sawLightTimeRequest =
+            sawLightTimeRequest
+            || skygate::ephemeris::EphemerisCorrectionFlags::has(
+                request.options.correctionFlags(), skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
+            );
+        skygate::ephemeris::EphemerisEngineQueryResult metadata;
+        metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
+        metadata.dataSourceProvenance = "Selected-object precision fixture";
+        metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::lightTime();
+        metadata.finalizeCorrectionTracking(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
+        return skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 6.5, .declinationDeg = 7.5},
+            .horizontal = {.altitudeDeg = 12.3, .azimuthDeg = 234.5},
+            .metadata = metadata
+        };
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
+    {
+        skygate::ephemeris::EphemerisSnapshot snapshot;
+        snapshot.context = context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
+    {
+        ++contextSampleCount;
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
+    {
+        ++contextSampleCount;
+        return std::nullopt;
+    }
+
+    mutable int requestSampleCount = 0;
+    mutable int contextSampleCount = 0;
+    mutable bool sawLightTimeRequest = false;
 };
 
 OverlayFixture makeFixture()
 {
     OverlayFixture fixture;
-    auto bodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>();
-    bodies->push_back(makeBody("selected", "Selected"));
-    bodies->push_back(makeBody("tracked", "Tracked"));
-    bodies->push_back(makeBody("search", "Search"));
-    bodies->push_back(makeDeepSkyBody());
-    bodies->push_back(makeBody("circumpolar", "Circumpolar"));
-    bodies->back().fixedEquatorial = skygate::core::EquatorialCoordinate {
-        .rightAscensionHours = 4.0,
-        .declinationDeg = 80.0
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> ownGalaxyBodies;
+    std::vector<skygate::ephemeris::DistantCelestialBody> distantBodies;
+    std::vector<skygate::ephemeris::CelestialBodyCatalog::OrderEntry> orderedBodyIndexes;
+    ownGalaxyBodies.push_back(makeBody("selected", "Selected"));
+    ownGalaxyBodies.push_back(makeBody("tracked", "Tracked"));
+    ownGalaxyBodies.push_back(makeBody("search", "Search"));
+    distantBodies.push_back(makeDeepSkyBody());
+    ownGalaxyBodies.push_back(makeBody("circumpolar", "Circumpolar"));
+    ownGalaxyBodies.back().fixedEquatorial =
+        skygate::core::EquatorialCoordinate{.rightAscensionHours = 4.0, .declinationDeg = 80.0};
+    orderedBodyIndexes = {
+        {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 0U},
+        {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 1U},
+        {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 2U},
+        {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = 0U},
+        {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 3U},
     };
-    auto catalog = skygate::ephemeris::createStarCatalogFromBodies(*bodies);
+    auto bodyCatalog = skygate::ephemeris::CelestialBodyCatalog(
+        std::move(ownGalaxyBodies), std::move(distantBodies), std::move(orderedBodyIndexes)
+    );
+    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromCatalog(bodyCatalog);
     Q_ASSERT(catalog != nullptr);
-    fixture.ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*catalog);
-    fixture.snapshot.catalogBodies = bodies;
+    fixture.ephemerisEngine = std::move(skygate::ephemeris::EphemerisEngineFactory::create(*catalog).engine);
+    fixture.snapshot.catalogBodies =
+        std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(std::move(bodyCatalog));
     fixture.snapshot.states = {
-        {
-            .bodyIndex = 0U,
-            .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
-            .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.0}
-        },
-        {
-            .bodyIndex = 1U,
-            .equatorial = {.rightAscensionHours = 2.0, .declinationDeg = 3.0},
-            .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 185.0}
-        },
-        {
-            .bodyIndex = 2U,
-            .equatorial = {.rightAscensionHours = 3.0, .declinationDeg = 4.0},
-            .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 190.0}
-        },
-        {
-            .bodyIndex = 3U,
-            .equatorial = {.rightAscensionHours = 23.9998, .declinationDeg = -12.5},
-            .horizontal = {.altitudeDeg = 44.0, .azimuthDeg = 181.0}
-        },
-        {
-            .bodyIndex = 4U,
-            .equatorial = {.rightAscensionHours = 4.0, .declinationDeg = 80.0},
-            .horizontal = {.altitudeDeg = 50.0, .azimuthDeg = 200.0}
-        },
+        {.bodyIndex = 0U,
+         .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+         .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.0}},
+        {.bodyIndex = 1U,
+         .equatorial = {.rightAscensionHours = 2.0, .declinationDeg = 3.0},
+         .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 185.0}},
+        {.bodyIndex = 2U,
+         .equatorial = {.rightAscensionHours = 3.0, .declinationDeg = 4.0},
+         .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 190.0}},
+        {.bodyIndex = 3U,
+         .equatorial = {.rightAscensionHours = 23.9998, .declinationDeg = -12.5},
+         .horizontal = {.altitudeDeg = 44.0, .azimuthDeg = 181.0}},
+        {.bodyIndex = 4U,
+         .equatorial = {.rightAscensionHours = 4.0, .declinationDeg = 80.0},
+         .horizontal = {.altitudeDeg = 50.0, .azimuthDeg = 200.0}},
     };
     fixture.stateIndexByBodyId.insert("selected", 0U);
     fixture.stateIndexByBodyId.insert("tracked", 1U);
@@ -120,31 +373,49 @@ OverlayFixture makeFixture()
         skygate::core::ProjectionType::Stereographic,
         skygate::core::ViewportMath::buildProjectionParams(1000.0, 800.0, 45.0, 180.0, 90.0)
     );
-    fixture.labelRefs = {{"Orion", {"selected", "tracked"}}};
-    fixture.sourceIds = {0U, 0U, 0U, 2U, 0U};
-    fixture.sourceLabels = {"Catalog", "", "Deep Sky"};
-    fixture.skyContext.observer = {
-        .latitudeDeg = 47.0,
-        .longitudeDeg = 8.0,
-        .elevationMeters = 400.0
+    fixture.anchorGroups = {{"Orion", {"selected", "tracked"}}};
+    fixture.sourceIds = {
+        QStringLiteral("primary"),
+        QStringLiteral("primary"),
+        QStringLiteral("primary"),
+        QStringLiteral("deep-sky"),
+        QStringLiteral("primary"),
     };
-    fixture.skyContext.utcTime =
-        skygate::core::UtcTimePoint(std::chrono::seconds(1'717'276'800));
+    fixture.sourceContributors = {
+        {QStringLiteral("primary")},
+        {QStringLiteral("primary")},
+        {QStringLiteral("primary")},
+        {QStringLiteral("deep-sky")},
+        {QStringLiteral("primary")},
+    };
+    fixture.sourceTitles.insert(QStringLiteral("primary"), QStringLiteral("Catalog"));
+    fixture.sourceTitles.insert(QStringLiteral("deep-sky"), QStringLiteral("Deep Sky"));
+    fixture.skyContext.observer = {.latitudeDeg = 47.0, .longitudeDeg = 8.0, .elevationMeters = 400.0};
+    fixture.skyContext.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'717'276'800));
     return fixture;
 }
 
 SkySelectionOverlayInput makeInput(const OverlayFixture& fixture)
 {
-    return SkySelectionOverlayInput {
+    return SkySelectionOverlayInput{
         .snapshot = &fixture.snapshot,
         .ephemerisEngine = fixture.ephemerisEngine.get(),
         .preparedProjection = &*fixture.projection,
         .stateIndexByBodyId = &fixture.stateIndexByBodyId,
         .skyContext = fixture.skyContext,
-        .constellationLabelRefs = fixture.labelRefs,
+        .constellationAnchorGroups = fixture.anchorGroups,
         .catalogSourceIds = fixture.sourceIds,
-        .catalogSourceLabels = fixture.sourceLabels
+        .catalogSourceContributors = &fixture.sourceContributors,
+        .catalogSourceTitles = fixture.sourceTitles
     };
+}
+
+SkySelectionOverlayInput makeConstellationInput(const OverlayFixture& fixture, const QString& targetId)
+{
+    SkySelectionOverlayInput input = makeInput(fixture);
+    input.selectedSearchTargetKind = "constellationLabel";
+    input.selectedSearchTargetId = targetId;
+    return input;
 }
 
 }  // namespace
@@ -153,15 +424,52 @@ class SkySelectionOverlayBuilderTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void markerPriorityPrefersSelectedThenTrackedThenSearch();
-    void constellationLabelMarkerUsesLabelReferences();
+    void markerPrioritySelectedThenTrackedThenSearch();
+    void constellationAnchorMarkerUsesAnchorGroups();
+    void constellationMarkerResolvesMixedCaseIds();
+    void constellationMarkerCountsDuplicateIds();
+    void constellationMarkerSkipsMissingIds();
+    void constellationMarkerSkipsNonFiniteStates();
+    void constellationMarkerKeepsCancelResidue();
     void inspectorFormatsSourceAliasesAndFallbacks();
+    void inspectorRoundsNegativeRightAscensionBeforeWrapping();
+    void inspectorSurfacesEphemerisMetadataAndWarnings();
+    void inspectorFormatsEveryCanonicalEphemerisWarning();
+    void inspectorUsesHighPrecisionStateForSelectedObject();
     void inspectorIncludesObservationEventsAndFallbacks();
+    void inspectorObservationEventsUseRequestOptions();
+    void inspectorAvoidsHighPrecisionSamplingForNonFixed();
     void pinnedInspectorRendersForUnprojectableBody();
     void activeTrailTargetUsesExpectedPriority();
+    void selectionTargetKindTokensMatchContract();
 };
 
-void SkySelectionOverlayBuilderTests::markerPriorityPrefersSelectedThenTrackedThenSearch()
+void SkySelectionOverlayBuilderTests::selectionTargetKindTokensMatchContract()
+{
+    using skygate::ui::internal::SkySelectionTargetKind;
+
+    QCOMPARE(SkySelectionTargetKind::token(SkySelectionTargetKind::Type::Body), QString("body"));
+    QCOMPARE(
+        SkySelectionTargetKind::token(SkySelectionTargetKind::Type::ConstellationLabel), QString("constellationLabel")
+    );
+
+    QVERIFY(SkySelectionTargetKind::fromToken("body") == SkySelectionTargetKind::Type::Body);
+    QVERIFY(
+        SkySelectionTargetKind::fromToken(" constellationLabel ") == SkySelectionTargetKind::Type::ConstellationLabel
+    );
+    QVERIFY(
+        SkySelectionTargetKind::fromToken("constellationlabel") == SkySelectionTargetKind::Type::ConstellationLabel
+    );
+    QVERIFY(!SkySelectionTargetKind::fromToken("unknown").has_value());
+    QVERIFY(!SkySelectionTargetKind::fromToken(QString()).has_value());
+
+    QVERIFY(SkySelectionTargetKind::isBody("body"));
+    QVERIFY(!SkySelectionTargetKind::isBody("constellationLabel"));
+    QVERIFY(SkySelectionTargetKind::isConstellationLabel("constellationlabel"));
+    QVERIFY(!SkySelectionTargetKind::isConstellationLabel("body"));
+}
+
+void SkySelectionOverlayBuilderTests::markerPrioritySelectedThenTrackedThenSearch()
 {
     const SkySelectionOverlayBuilder builder;
     const auto fixture = makeFixture();
@@ -186,7 +494,7 @@ void SkySelectionOverlayBuilderTests::markerPriorityPrefersSelectedThenTrackedTh
     QVERIFY(searchMarker.x != trackedMarker.x);
 }
 
-void SkySelectionOverlayBuilderTests::constellationLabelMarkerUsesLabelReferences()
+void SkySelectionOverlayBuilderTests::constellationAnchorMarkerUsesAnchorGroups()
 {
     const SkySelectionOverlayBuilder builder;
     const auto fixture = makeFixture();
@@ -198,6 +506,113 @@ void SkySelectionOverlayBuilderTests::constellationLabelMarkerUsesLabelReference
 
     input.selectedSearchTargetId = "Missing";
     QVERIFY(!builder.buildSelectionMarkerData(input).visible);
+}
+
+void SkySelectionOverlayBuilderTests::constellationMarkerResolvesMixedCaseIds()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    const SkySelectionMarker baseline = builder.buildSelectionMarkerData(makeConstellationInput(fixture, "orion"));
+    QVERIFY(baseline.visible);
+
+    fixture.anchorGroups = {{"  ORION  ", {" SELECTED ", "Tracked"}}};
+    auto mixedCaseInput = makeConstellationInput(fixture, " Orion ");
+    mixedCaseInput.selectedSearchTargetKind = " constellationLabel ";
+    const SkySelectionMarker mixedCase = builder.buildSelectionMarkerData(mixedCaseInput);
+
+    QVERIFY(mixedCase.visible);
+    QVERIFY(std::abs(mixedCase.x - baseline.x) < 1e-9);
+    QVERIFY(std::abs(mixedCase.y - baseline.y) < 1e-9);
+}
+
+void SkySelectionOverlayBuilderTests::constellationMarkerCountsDuplicateIds()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    fixture.anchorGroups = {{"Orion", {"selected"}}};
+    auto input = makeConstellationInput(fixture, "Orion");
+    const SkySelectionMarker singleAnchor = builder.buildSelectionMarkerData(input);
+    QVERIFY(singleAnchor.visible);
+
+    // Both spellings resolve to the same state, so the anchor contributes
+    // twice and leaves the direction unchanged.
+    fixture.anchorGroups = {{"Orion", {"selected", "SELECTED"}}};
+    input = makeConstellationInput(fixture, "Orion");
+    const SkySelectionMarker duplicateAnchors = builder.buildSelectionMarkerData(input);
+
+    QVERIFY(duplicateAnchors.visible);
+    QVERIFY(std::abs(duplicateAnchors.x - singleAnchor.x) < 1e-9);
+    QVERIFY(std::abs(duplicateAnchors.y - singleAnchor.y) < 1e-9);
+}
+
+void SkySelectionOverlayBuilderTests::constellationMarkerSkipsMissingIds()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    fixture.anchorGroups = {{"Orion", {"selected"}}};
+    auto input = makeConstellationInput(fixture, "Orion");
+    const SkySelectionMarker singleAnchor = builder.buildSelectionMarkerData(input);
+    QVERIFY(singleAnchor.visible);
+
+    fixture.anchorGroups = {{"Orion", {"selected", "hip_missing"}}};
+    input = makeConstellationInput(fixture, "Orion");
+    const SkySelectionMarker withMissingAnchor = builder.buildSelectionMarkerData(input);
+
+    QVERIFY(withMissingAnchor.visible);
+    QVERIFY(std::abs(withMissingAnchor.x - singleAnchor.x) < 1e-9);
+    QVERIFY(std::abs(withMissingAnchor.y - singleAnchor.y) < 1e-9);
+
+    fixture.anchorGroups = {{"Orion", {"hip_missing"}}};
+    input = makeConstellationInput(fixture, "Orion");
+    QVERIFY(!builder.buildSelectionMarkerData(input).visible);
+}
+
+void SkySelectionOverlayBuilderTests::constellationMarkerSkipsNonFiniteStates()
+{
+    const double notANumber = std::numeric_limits<double>::quiet_NaN();
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    fixture.anchorGroups = {{"Orion", {"selected"}}};
+    auto input = makeConstellationInput(fixture, "Orion");
+    const SkySelectionMarker singleAnchor = builder.buildSelectionMarkerData(input);
+    QVERIFY(singleAnchor.visible);
+
+    fixture.anchorGroups = {{"Orion", {"selected", "tracked"}}};
+    fixture.snapshot.states[1].horizontal = {.altitudeDeg = notANumber, .azimuthDeg = notANumber};
+    input = makeConstellationInput(fixture, "Orion");
+    const SkySelectionMarker withNonFiniteAnchor = builder.buildSelectionMarkerData(input);
+
+    QVERIFY(withNonFiniteAnchor.visible);
+    QVERIFY(std::abs(withNonFiniteAnchor.x - singleAnchor.x) < 1e-9);
+    QVERIFY(std::abs(withNonFiniteAnchor.y - singleAnchor.y) < 1e-9);
+
+    fixture.snapshot.states[0].horizontal = {.altitudeDeg = notANumber, .azimuthDeg = notANumber};
+    input = makeConstellationInput(fixture, "Orion");
+    QVERIFY(!builder.buildSelectionMarkerData(input).visible);
+}
+
+void SkySelectionOverlayBuilderTests::constellationMarkerKeepsCancelResidue()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    fixture.snapshot.states[0].horizontal = {.altitudeDeg = 0.0, .azimuthDeg = 0.0};
+    fixture.snapshot.states[1].horizontal = {.altitudeDeg = 0.0, .azimuthDeg = 180.0};
+    fixture.anchorGroups = {{"Orion", {"selected", "tracked"}}};
+    fixture.projection = skygate::core::PreparedProjection::create(
+        skygate::core::ProjectionType::Stereographic,
+        skygate::core::ViewportMath::buildProjectionParams(1000.0, 800.0, 0.0, 90.0, 90.0)
+    );
+    QVERIFY(fixture.projection.has_value());
+
+    const SkySelectionMarker marker = builder.buildSelectionMarkerData(makeConstellationInput(fixture, "Orion"));
+
+    // Opposite horizon anchors leave a floating-point residue that still
+    // normalizes, so the marker keeps a direction instead of disappearing.
+    const skygate::core::ScreenPoint expected = fixture.projection->project({.altitudeDeg = 0.0, .azimuthDeg = 90.0});
+    QVERIFY(expected.isVisible());
+    QVERIFY(marker.visible);
+    QVERIFY(std::abs(marker.x - expected.x) < 1e-6);
+    QVERIFY(std::abs(marker.y - expected.y) < 1e-6);
 }
 
 void SkySelectionOverlayBuilderTests::inspectorFormatsSourceAliasesAndFallbacks()
@@ -217,13 +632,188 @@ void SkySelectionOverlayBuilderTests::inspectorFormatsSourceAliasesAndFallbacks(
     QVERIFY(inspector.aliases.contains("Andromeda Galaxy"));
     QVERIFY(!inspector.aliases.contains("M31"));
 
-    fixture.sourceIds = {0U, 0U, 0U, 99U};
+    fixture.sourceIds = {
+        QStringLiteral("primary"),
+        QStringLiteral("primary"),
+        QStringLiteral("primary"),
+        QStringLiteral("unknown-source"),
+        QStringLiteral("primary"),
+    };
+    fixture.sourceContributors[3] = {QStringLiteral("unknown-source")};
     input = makeInput(fixture);
     input.selectedObjectTargetId = "messier_031";
-    QCOMPARE(
-        overlayInspectorFieldValue(builder.buildSelectedObjectInspectorData(input), "Source"),
-        QString("Catalog")
+    QCOMPARE(overlayInspectorFieldValue(builder.buildSelectedObjectInspectorData(input), "Source"), QString("Catalog"));
+}
+
+void SkySelectionOverlayBuilderTests::inspectorRoundsNegativeRightAscensionBeforeWrapping()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    // Half a second below zero: rounding the whole span first keeps the clock
+    // on 23h 59m 59s instead of folding a whole turn to 0h 00m 00s.
+    fixture.snapshot.states[3].equatorial = {.rightAscensionHours = -0.5 / 3600.0, .declinationDeg = -12.5};
+    auto input = makeInput(fixture);
+    input.selectedObjectTargetId = "messier_031";
+
+    const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
+
+    QCOMPARE(overlayInspectorFieldValue(inspector, "RA / Dec"), QString("23h 59m 59s / -12d 30m 00s"));
+}
+
+void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarnings()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    auto& metadata = fixture.snapshot.states[0].metadata;
+    metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded;
+    metadata.addWarning(skygate::ephemeris::EphemerisEngineWarning::Code::MissingEphemerisData);
+    metadata.addWarning(skygate::ephemeris::EphemerisEngineWarning::Code::DataOutOfRange);
+    metadata.addWarning(skygate::ephemeris::EphemerisEngineWarning::Code::LeapSecondTableStale);
+    metadata.dataSourceProvenance = "JPL DE440s smoke fixture";
+    metadata.effectiveDataValidityRange = skygate::ephemeris::EphemerisDateRange{
+        .displayName = "DE440s short-range kernel",
+        .start = *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+            skygate::core::CivilDateTime{
+                .astronomicalYear = 1849,
+                .month = 12,
+                .day = 26,
+            }
+        ),
+        .end = *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+            skygate::core::CivilDateTime{
+                .astronomicalYear = 2150,
+                .month = 1,
+                .day = 22,
+            }
+        )
+    };
+    metadata.estimatedAngularUncertaintyArcsec = 0.42;
+    metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::lightTime();
+    metadata.addUnavailableCorrection(skygate::ephemeris::EphemerisCorrectionFlags::atmosphericRefraction());
+    metadata.finalizeCorrectionTracking(
+        skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
+        | skygate::ephemeris::EphemerisCorrectionFlags::atmosphericRefraction()
+        | skygate::ephemeris::EphemerisCorrectionFlags::precessionNutation()
     );
+
+    auto input = makeInput(fixture);
+    input.selectedObjectTargetId = "selected";
+    input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
+        .epoch = *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(skygate::core::CivilDateTime{}),
+        .context = fixture.skyContext,
+        .options = []() {
+            skygate::ephemeris::EphemerisEngineOptions opts;
+            opts.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+            return opts;
+        }(),
+    };
+
+    const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
+
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Ephemeris"), QString("Degraded"));
+    const QString ephemerisWarningText = overlayInspectorFieldTooltip(inspector, "Ephemeris");
+    QVERIFY(ephemerisWarningText.contains("Required ephemeris data is unavailable."));
+    QVERIFY(ephemerisWarningText.contains("outside the effective date range"));
+    QVERIFY(ephemerisWarningText.contains("Leap-second table data is stale for this conversion."));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Provenance"), QString("JPL DE440s smoke fixture"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Data range").contains("DE440s short-range kernel"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Uncertainty"), QString("0.42 arcsec"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Applied: light-time"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Unavailable: atmospheric refraction"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Skipped: precession/nutation"));
+}
+
+void SkySelectionOverlayBuilderTests::inspectorFormatsEveryCanonicalEphemerisWarning()
+{
+    using Code = skygate::ephemeris::EphemerisEngineWarning::Code;
+
+    // The nine codes the inspector rendered before the canonical inventory
+    // existed keep their exact order and text.
+    constexpr std::array legacyCodes{
+        Code::AccuracyDegraded,
+        Code::UnsupportedBody,
+        Code::DataOutOfRange,
+        Code::MissingEphemerisData,
+        Code::MissingObserver,
+        Code::TimeScaleDataUnavailable,
+        Code::CorrectionUnavailable,
+        Code::ComputationFailed,
+        Code::BarycenterFallback,
+    };
+
+    skygate::ephemeris::EphemerisEngineQueryResult metadata;
+    for (const Code code : legacyCodes) {
+        metadata.addWarning(code);
+    }
+
+    const QString legacyText = skygate::ui::internal::SkyObjectInspectorFormatters::formatEphemerisWarnings(metadata);
+    QCOMPARE(
+        legacyText,
+        QString(
+            "Result accuracy is degraded for this request.\n"
+            "This body is not supported by the selected ephemeris engine.\n"
+            "The request is outside the effective date range of the available ephemeris data.\n"
+            "Required ephemeris data is unavailable.\n"
+            "Observer information is missing or invalid, so topocentric coordinates are unavailable.\n"
+            "Required time-scale data is unavailable.\n"
+            "One or more requested correction terms could not be applied.\n"
+            "The ephemeris computation failed.\n"
+            "A planetary-system barycenter was used because the requested body center is unavailable."
+        )
+    );
+
+    // Codes added after that list surface too, appended in canonical order.
+    metadata.addWarning(Code::LeapSecondTableStale);
+    metadata.addWarning(Code::EarthOrientationDataPredicted);
+    QCOMPARE(
+        skygate::ui::internal::SkyObjectInspectorFormatters::formatEphemerisWarnings(metadata),
+        legacyText + "\nLeap-second table data is stale for this conversion."
+            + "\nEarth-orientation data uses a prediction for this conversion."
+    );
+
+    // Every canonical code renders on its own, so the formatter inventory
+    // cannot drift away from the enum again.
+    for (const Code code : skygate::ephemeris::EphemerisEngineWarning::allCodes()) {
+        skygate::ephemeris::EphemerisEngineQueryResult singleWarning;
+        singleWarning.addWarning(code);
+        const std::string_view codeText = skygate::ephemeris::EphemerisEngineWarning::text(code);
+        QCOMPARE(
+            skygate::ui::internal::SkyObjectInspectorFormatters::formatEphemerisWarnings(singleWarning),
+            QString::fromUtf8(codeText.data(), static_cast<qsizetype>(codeText.size()))
+        );
+    }
+}
+
+void SkySelectionOverlayBuilderTests::inspectorUsesHighPrecisionStateForSelectedObject()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    auto engine = std::make_unique<HighPrecisionInspectorEngine>();
+    const auto* enginePtr = engine.get();
+    fixture.ephemerisEngine = std::move(engine);
+
+    auto input = makeInput(fixture);
+    input.selectedObjectTargetId = "selected";
+    input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
+        .epoch = *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(skygate::core::CivilDateTime{}),
+        .context = fixture.skyContext,
+        .options = []() {
+            skygate::ephemeris::EphemerisEngineOptions opts;
+            opts.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+            opts.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
+            return opts;
+        }(),
+    };
+
+    const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
+
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Alt / Az"), QString("12.3 / 234.5 deg"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "RA / Dec"), QString("6h 30m 00s / +7d 30m 00s"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Provenance"), QString("Selected-object precision fixture"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Applied: light-time"));
+    QCOMPARE(enginePtr->contextSampleCount, 0);
+    QVERIFY(enginePtr->requestSampleCount > 0);
+    QVERIFY(enginePtr->sawLightTimeRequest);
 }
 
 void SkySelectionOverlayBuilderTests::inspectorIncludesObservationEventsAndFallbacks()
@@ -247,10 +837,105 @@ void SkySelectionOverlayBuilderTests::inspectorIncludesObservationEventsAndFallb
 
     input.selectedObjectTargetId = "circumpolar";
     inspector = builder.buildSelectedObjectInspectorData(input);
-    QCOMPARE(overlayInspectorFieldValue(inspector, "Rise"), QString("Always above"));
-    QCOMPARE(overlayInspectorFieldValue(inspector, "Set"), QString("Always above"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Rise"), QString("Always up"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Set"), QString("Always up"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Culmination").contains("UTC+06:00"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Culmination").contains("deg"));
+}
+
+void SkySelectionOverlayBuilderTests::inspectorObservationEventsUseRequestOptions()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    auto engine = std::make_unique<RequestOnlyObservationEngine>();
+    const auto* enginePtr = engine.get();
+    fixture.ephemerisEngine = std::move(engine);
+    auto selectedBody = makeBody("selected", "Selected");
+    selectedBody.fixedEquatorial.reset();
+    fixture.snapshot.catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{std::move(selectedBody)}
+    );
+    fixture.skyContext.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
+    auto input = makeInput(fixture);
+    input.selectedObjectTargetId = "selected";
+    input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
+        .epoch = *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+            skygate::core::CivilDateTime{
+                .astronomicalYear = 1970,
+                .month = 1,
+                .day = 1,
+                .timeScale = skygate::core::TimeScale::Utc,
+            }
+        ),
+        .context = fixture.skyContext,
+        .options = []() {
+            skygate::ephemeris::EphemerisEngineOptions opts;
+            opts.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+            opts.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
+            return opts;
+        }(),
+    };
+
+    SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
+    QCOMPARE(overlayInspectorFieldValue(inspector, "RA / Dec"), QString("1h 00m 00s / +2d 00m 00s"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Rise"), QString("No event in next 72h"));
+
+    input.ephemerisRequest->options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
+    inspector = builder.buildSelectedObjectInspectorData(input);
+
+    QCOMPARE(enginePtr->contextSampleCount, 0);
+    QVERIFY(enginePtr->requestSampleCount > 0);
+    QVERIFY(overlayInspectorFieldValue(inspector, "Rise").contains("UTC"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Set").contains("UTC"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Culmination").contains("deg"));
+}
+
+void SkySelectionOverlayBuilderTests::inspectorAvoidsHighPrecisionSamplingForNonFixed()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    auto mars = makeBody("mars", "Mars", skygate::ephemeris::BaseCelestialBody::Kind::Planet);
+    mars.fixedEquatorial.reset();
+    fixture.snapshot.catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{std::move(mars)}
+    );
+    fixture.stateIndexByBodyId.clear();
+    fixture.stateIndexByBodyId.insert(QStringLiteral("mars"), 0U);
+
+    auto engine = std::make_unique<NonFixedObservationProfileEngine>();
+    const auto* enginePtr = engine.get();
+    fixture.ephemerisEngine = std::move(engine);
+    auto input = makeInput(fixture);
+    input.guidanceStrategy = skygate::ephemeris::EphemerisGuidanceComposition::defaultGuidanceStrategy();
+    input.selectedObjectTargetId = "mars";
+    input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
+        .epoch = *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+            skygate::core::CivilDateTime{
+                .astronomicalYear = 2024,
+                .month = 6,
+                .day = 1,
+                .timeScale = skygate::core::TimeScale::Utc,
+            }
+        ),
+        .context = fixture.skyContext,
+        .options = enginePtr->options(),
+    };
+
+    const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
+
+    qInfo().noquote() << QStringLiteral(
+                             "profile non-fixed inspector selection: highPrecisionRequestSamples=%1 "
+                             "highPrecisionContextSamples=%2"
+    )
+                             .arg(enginePtr->requestSampleCount)
+                             .arg(enginePtr->contextSampleCount);
+    QCOMPARE(inspector.title, QString("Mars"));
+    QCOMPARE(enginePtr->contextSampleCount, 0);
+    QVERIFY2(
+        enginePtr->requestSampleCount <= 1,
+        qPrintable(QStringLiteral("expected only the detailed inspector state lookup, got %1 selected-engine samples")
+                       .arg(enginePtr->requestSampleCount))
+    );
 }
 
 void SkySelectionOverlayBuilderTests::pinnedInspectorRendersForUnprojectableBody()
@@ -258,8 +943,7 @@ void SkySelectionOverlayBuilderTests::pinnedInspectorRendersForUnprojectableBody
     const SkySelectionOverlayBuilder builder;
     auto fixture = makeFixture();
     fixture.snapshot.states[0].horizontal = {
-        .altitudeDeg = std::numeric_limits<double>::quiet_NaN(),
-        .azimuthDeg = std::numeric_limits<double>::quiet_NaN()
+        .altitudeDeg = std::numeric_limits<double>::quiet_NaN(), .azimuthDeg = std::numeric_limits<double>::quiet_NaN()
     };
     fixture.snapshot.states[0].equatorial = {
         .rightAscensionHours = std::numeric_limits<double>::quiet_NaN(),

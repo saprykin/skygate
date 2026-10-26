@@ -1,7 +1,7 @@
-#include "catalog/io/zip/ZipEntryExtractor.hpp"
-
+#include "ZipEntryExtractor.hpp"
+#include "ZipFieldReader.hpp"
+#include "catalog/io/CatalogContainerSignature.hpp"
 #include "catalog/io/CompressedDataInflater.hpp"
-#include "catalog/io/zip/ZipBinaryUtilities.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -9,40 +9,30 @@
 namespace skygate::ephemeris {
 namespace {
 
-constexpr std::uint32_t kZipLocalFileHeaderSignature = 0x04034b50U;
 constexpr std::size_t kZipLocalFileHeaderSize = 30U;
 
 }  // namespace
 
-std::optional<std::string> ZipEntryExtractor::extract(
-    const std::string_view zipData,
-    const ZipEntryMetadata& entry
-)
+std::optional<std::string> ZipEntryExtractor::extract(const std::string_view zipData, const ZipEntryMetadata& entry)
 {
     if (entry.localHeaderOffset + kZipLocalFileHeaderSize > zipData.size()) {
         return std::nullopt;
     }
 
-    const auto localHeaderSignature = zip_binary::readLe32(zipData, entry.localHeaderOffset);
-    const auto fileNameLength = zip_binary::readLe16(zipData, entry.localHeaderOffset + 26U);
-    const auto extraFieldLength = zip_binary::readLe16(zipData, entry.localHeaderOffset + 28U);
-    if (
-        !localHeaderSignature.has_value()
-        || *localHeaderSignature != kZipLocalFileHeaderSignature
-        || !fileNameLength.has_value()
-        || !extraFieldLength.has_value()
-    ) {
+    ZipFieldReader fields(zipData);
+    if (fields.le32(entry.localHeaderOffset) != CatalogContainerSignature::kZipLocalFileHeaderSignature) {
+        return std::nullopt;
+    }
+    const std::uint16_t fileNameLength = fields.le16(entry.localHeaderOffset + 26U);
+    const std::uint16_t extraFieldLength = fields.le16(entry.localHeaderOffset + 28U);
+    if (!fields.isComplete()) {
         return std::nullopt;
     }
 
-    const std::size_t fileDataOffset = entry.localHeaderOffset
-        + kZipLocalFileHeaderSize
-        + static_cast<std::size_t>(*fileNameLength)
-        + static_cast<std::size_t>(*extraFieldLength);
-    if (
-        fileDataOffset > zipData.size()
-        || entry.compressedSize > (zipData.size() - fileDataOffset)
-    ) {
+    const std::size_t fileDataOffset = entry.localHeaderOffset + kZipLocalFileHeaderSize
+                                       + static_cast<std::size_t>(fileNameLength)
+                                       + static_cast<std::size_t>(extraFieldLength);
+    if (fileDataOffset > zipData.size() || entry.compressedSize > (zipData.size() - fileDataOffset)) {
         return std::nullopt;
     }
 
@@ -60,11 +50,8 @@ std::optional<std::string> ZipEntryExtractor::extract(
     if (entry.compressionMethod == 8U) {
         return CompressedDataInflater::inflate(
             compressedData,
-            CompressedDataFormat::RawDeflate,
-            CompressedDataInflateOptions {
-                .expectedOutputBytes = entry.uncompressedSize,
-                .allowEmptyOutput = false
-            }
+            CompressedDataInflater::Format::RawDeflate,
+            CompressedDataInflateOptions{.expectedOutputBytes = entry.uncompressedSize, .allowEmptyOutput = false}
         );
     }
 

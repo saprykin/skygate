@@ -1,0 +1,335 @@
+#include "CalcephKernelProvider.hpp"
+#include "CalcephKernel.hpp"
+#include "CalcephKernelStatusNames.hpp"
+#include "engine/EphemerisDataFileUtilities.hpp"
+#include "engine/EphemerisDataManifest.hpp"
+#include "engine/EphemerisDataPayloadReader.hpp"
+#include "ICalcephKernel.hpp"
+#include "engine/IEphemerisDataSnapshot.hpp"
+
+#include <QByteArray>
+#include <QByteArrayView>
+#include <QCryptographicHash>
+#include <QFile>
+#include <QFileInfo>
+
+#include <algorithm>
+#include <array>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace skygate::ephemeris::highprecision {
+
+class CalcephKernelProvider::Impl final {
+public:
+    using Status = ICalcephKernel::Status;
+
+    class FailedKernel final : public ICalcephKernel {
+    public:
+        FailedKernel(Status status, std::vector<std::string> diagnostics)
+            : m_status(status == Status::Ready ? Status::OpenFailed : status), m_diagnostics(std::move(diagnostics))
+        {
+        }
+
+        [[nodiscard]] Status status() const noexcept override
+        {
+            return m_status;
+        }
+
+        [[nodiscard]] const std::vector<std::string>& diagnostics() const noexcept override
+        {
+            return m_diagnostics;
+        }
+
+        [[nodiscard]] const std::optional<Info>& kernelInfo() const noexcept override
+        {
+            return m_kernelInfo;
+        }
+
+        [[nodiscard]] Status statusForEpoch(const skygate::core::AstronomicalEpoch& epoch) const noexcept override
+        {
+            Q_UNUSED(epoch)
+            return m_status;
+        }
+
+        [[nodiscard]] ICalcephKernel::StateResult
+        compute(const skygate::core::AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const override
+        {
+            Q_UNUSED(epoch)
+            Q_UNUSED(targetNaifId)
+            Q_UNUSED(centerNaifId)
+
+            ICalcephKernel::StateResult result;
+            result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+            result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
+            return result;
+        }
+
+    private:
+        Status m_status = Status::OpenFailed;
+        std::vector<std::string> m_diagnostics;
+        std::optional<Info> m_kernelInfo;
+    };
+
+    Impl(
+        const IEphemerisDataSnapshot& snapshot,
+        EphemerisDataManifest manifest,
+        Options options,
+        std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService
+    )
+        : m_manifest(std::move(manifest)), m_options(std::move(options)),
+          m_timeScaleService(std::move(timeScaleService)), m_kernelAssets(collectKernelAssets(snapshot))
+    {
+    }
+
+    [[nodiscard]] std::shared_ptr<const ICalcephKernel> openKernel() const
+    {
+#if !defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+        return failedKernel(Status::CalcephUnavailable, "CALCEPH support is not enabled in this build.");
+#else
+        const EphemerisDataManifest::Profile* profile = selectProfile();
+        if (profile == nullptr) {
+            return failedKernel(
+                Status::MissingManifestProfile,
+                "No ephemeris data profile is available for solar-system kernel selection."
+            );
+        }
+
+        const EphemerisDataManifest::Asset* manifestAsset = selectKernelAsset(*profile);
+        if (manifestAsset == nullptr) {
+            return failedKernel(
+                Status::MissingKernelAsset,
+                "Selected ephemeris data profile does not contain a solar-system kernel asset."
+            );
+        }
+        if (manifestAsset->profileId != profile->id || manifestAsset->relativePath.empty()
+            || manifestAsset->checksum.algorithm != EphemerisDataFileUtilities::kSha256Algorithm
+            || manifestAsset->checksum.value.empty()) {
+            return failedKernel(
+                Status::InvalidKernelAsset, "Selected solar-system kernel asset metadata is incomplete or inconsistent."
+            );
+        }
+
+        std::optional<EphemerisKernelDataAsset> snapshotAsset = snapshotKernelForProfile(*manifestAsset, *profile);
+        if (!snapshotAsset.has_value() && !hasExplicitKernelSelection()) {
+            for (const EphemerisDataManifest::Profile& candidateProfile : m_manifest.profiles) {
+                const EphemerisDataManifest::Asset* candidateAsset = selectKernelAsset(candidateProfile);
+                if (candidateAsset == nullptr) {
+                    continue;
+                }
+
+                snapshotAsset = snapshotKernelForProfile(*candidateAsset, candidateProfile);
+                if (snapshotAsset.has_value()) {
+                    profile = &candidateProfile;
+                    manifestAsset = candidateAsset;
+                    break;
+                }
+            }
+        }
+        if (!snapshotAsset.has_value() || snapshotAsset->activePath.empty()) {
+            return failedKernel(
+                Status::MissingKernelFile,
+                "The active ephemeris data snapshot does not expose the selected kernel file."
+            );
+        }
+        if (snapshotAsset->id != manifestAsset->id
+            || (!snapshotAsset->profileId.empty() && snapshotAsset->profileId != profile->id)) {
+            return failedKernel(
+                Status::InvalidKernelAsset,
+                "The active ephemeris data snapshot exposed a different solar-system kernel."
+            );
+        }
+
+        const std::filesystem::path activePath(snapshotAsset->activePath);
+        const QFileInfo activeFileInfo(EphemerisDataFileUtilities::pathToQString(activePath));
+        if (!activeFileInfo.exists() || !activeFileInfo.isFile()) {
+            return failedKernel(Status::MissingKernelFile, "The selected solar-system kernel file does not exist.");
+        }
+        if (manifestAsset->compression.uncompressedSizeBytes.has_value()
+            && activeFileInfo.size() != static_cast<qint64>(*manifestAsset->compression.uncompressedSizeBytes)) {
+            return failedKernel(
+                Status::InvalidKernelAsset,
+                "The selected solar-system kernel file size does not match manifest metadata."
+            );
+        }
+        if (m_options.verifyChecksum && !verifySha256File(activePath, manifestAsset->checksum.value)) {
+            return failedKernel(
+                Status::ChecksumMismatch, "The selected solar-system kernel checksum does not match manifest metadata."
+            );
+        }
+
+        ICalcephKernel::Info kernelInfo{
+            .id = manifestAsset->id,
+            .profileId = profile->id,
+            .version = manifestAsset->version,
+            .sourceUrl = manifestAsset->sourceUrl,
+            .provenance = m_manifest.dataSetInfo.provenance,
+            .activePath = activePath,
+            .validityRange = manifestAsset->validityRange,
+            .optional = manifestAsset->optional,
+            .longRange = profile->longRange,
+        };
+        if (!snapshotAsset->version.empty()) {
+            kernelInfo.version = snapshotAsset->version;
+        }
+        if (!snapshotAsset->provenance.empty()) {
+            kernelInfo.provenance = snapshotAsset->provenance;
+        }
+
+        return std::make_shared<CalcephKernel>(std::move(kernelInfo), m_timeScaleService);
+#endif
+    }
+
+    [[nodiscard]] std::vector<EphemerisKernelDataAsset>
+    collectKernelAssets(const IEphemerisDataSnapshot& snapshot) const
+    {
+        std::vector<EphemerisKernelDataAsset> assets;
+        for (const EphemerisDataManifest::Asset& manifestAsset : m_manifest.assets) {
+            if (manifestAsset.kind != EphemerisDataManifest::AssetKind::SolarSystemKernel) {
+                continue;
+            }
+
+            std::optional<EphemerisKernelDataAsset> snapshotAsset = snapshot.solarSystemKernelAsset(manifestAsset.id);
+            if (snapshotAsset.has_value()) {
+                assets.push_back(std::move(*snapshotAsset));
+            }
+        }
+
+        return assets;
+    }
+
+    [[nodiscard]] bool verifySha256File(const std::filesystem::path& path, const std::string& expectedHexDigest) const
+    {
+        QFile file(EphemerisDataFileUtilities::pathToQString(path));
+        if (!file.open(QIODevice::ReadOnly)) {
+            return false;
+        }
+
+        QCryptographicHash hash(QCryptographicHash::Sha256);
+        std::array<char, EphemerisDataPayloadReader::kIoBufferBytes> buffer{};
+        while (!file.atEnd()) {
+            const qint64 bytesRead = file.read(buffer.data(), static_cast<qint64>(buffer.size()));
+            if (bytesRead < 0) {
+                return false;
+            }
+            hash.addData(QByteArrayView(buffer.data(), bytesRead));
+        }
+
+        const std::string actualHexDigest = hash.result().toHex().toStdString();
+        return EphemerisDataFileUtilities::checksumsMatch(actualHexDigest, expectedHexDigest);
+    }
+
+    [[nodiscard]] const EphemerisDataManifest::Profile* selectProfile() const noexcept
+    {
+        if (!m_options.preferredProfileId.empty()) {
+            return m_manifest.profile(m_options.preferredProfileId);
+        }
+
+        if (m_options.preferLongRange) {
+            const auto match =
+                std::ranges::find_if(m_manifest.profiles, [](const EphemerisDataManifest::Profile& profile) {
+                    return profile.longRange;
+                });
+            if (match != m_manifest.profiles.end()) {
+                return &*match;
+            }
+        }
+
+        const auto bundledShortRange =
+            std::ranges::find_if(m_manifest.profiles, [](const EphemerisDataManifest::Profile& profile) {
+                return profile.bundled && !profile.longRange;
+            });
+        if (bundledShortRange != m_manifest.profiles.end()) {
+            return &*bundledShortRange;
+        }
+
+        return m_manifest.profiles.empty() ? nullptr : &m_manifest.profiles.front();
+    }
+
+    [[nodiscard]] bool hasExplicitKernelSelection() const noexcept
+    {
+        return !m_options.preferredProfileId.empty() || m_options.preferLongRange;
+    }
+
+    [[nodiscard]] const EphemerisDataManifest::Asset*
+    selectKernelAsset(const EphemerisDataManifest::Profile& profile) const noexcept
+    {
+        for (const std::string& assetId : profile.assetIds) {
+            const EphemerisDataManifest::Asset* asset = m_manifest.asset(assetId);
+            if (asset != nullptr && asset->kind == EphemerisDataManifest::AssetKind::SolarSystemKernel) {
+                return asset;
+            }
+        }
+
+        return nullptr;
+    }
+
+    [[nodiscard]] std::optional<EphemerisKernelDataAsset> snapshotKernelForProfile(
+        const EphemerisDataManifest::Asset& asset, const EphemerisDataManifest::Profile& profile
+    ) const
+    {
+        const auto match =
+            std::ranges::find_if(m_kernelAssets, [&asset](const EphemerisKernelDataAsset& snapshotAsset) {
+                return snapshotAsset.id == asset.id;
+            });
+        if (match == m_kernelAssets.end() || match->activePath.empty()) {
+            return std::nullopt;
+        }
+        if (!match->profileId.empty() && match->profileId != profile.id) {
+            return std::nullopt;
+        }
+
+        return *match;
+    }
+
+    [[nodiscard]] std::shared_ptr<const ICalcephKernel> failedKernel(Status status, std::string diagnostic) const
+    {
+        std::vector<std::string> diagnostics;
+        diagnostics.push_back(
+            diagnostic.empty() ? std::string{CalcephKernelStatusNames::displayName(status)} : std::move(diagnostic)
+        );
+        return std::make_shared<FailedKernel>(status, std::move(diagnostics));
+    }
+
+    EphemerisDataManifest m_manifest;
+    Options m_options;
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_timeScaleService;
+    std::vector<EphemerisKernelDataAsset> m_kernelAssets;
+};
+
+CalcephKernelProvider::CalcephKernelProvider(
+    const IEphemerisDataSnapshot& snapshot, const EphemerisDataManifest& manifest
+)
+    : CalcephKernelProvider(snapshot, manifest, Options{}, nullptr)
+{
+}
+
+CalcephKernelProvider::CalcephKernelProvider(
+    const IEphemerisDataSnapshot& snapshot, const EphemerisDataManifest& manifest, Options options
+)
+    : CalcephKernelProvider(snapshot, manifest, std::move(options), nullptr)
+{
+}
+
+CalcephKernelProvider::CalcephKernelProvider(
+    const IEphemerisDataSnapshot& snapshot,
+    const EphemerisDataManifest& manifest,
+    Options options,
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService
+)
+    : m_impl(std::make_unique<Impl>(snapshot, manifest, std::move(options), std::move(timeScaleService)))
+{
+}
+
+CalcephKernelProvider::~CalcephKernelProvider() = default;
+
+std::shared_ptr<const ICalcephKernel> CalcephKernelProvider::openKernel() const
+{
+    return m_impl->openKernel();
+}
+
+}  // namespace skygate::ephemeris::highprecision

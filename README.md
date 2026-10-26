@@ -30,13 +30,17 @@ Quick UI that renders stars, constellations, the horizon, and overlay labels.
   custom coordinates
 - Bundled starter catalog plus support for downloading HYG v4.2 stars,
   OpenNGC deep-sky objects, and Stellarium constellation data
+- Selectable simple and high-precision ephemeris engines when the
+  high-precision feature is enabled
+- Bundled and installed ephemeris-data status for high-precision builds
 - Persistent settings and cached catalog data between launches
 - Configurable terminal/file logging with bounded rotating log files
 
 Ancient dates are intended for exploratory viewing. The date input uses a
-proleptic Gregorian calendar, and the current Sun, Moon, and planet formulas
-are lightweight approximations around J2000 rather than historical-astronomy
-grade ephemerides for the far past.
+proleptic Gregorian calendar. The simple engine uses lightweight formulas
+around J2000; the high-precision engine uses installed ephemeris data when
+available and reports degraded or out-of-range metadata when assumptions
+dominate.
 
 ## Repository Layout
 
@@ -49,16 +53,17 @@ grade ephemerides for the far past.
   Catalog parsing, celestial coordinate calculations, and sky
   snapshot generation
 - `docs/ARCHITECTURE.md`
-  Detailed architecture notes, runtime flow, and extension points
+  Architecture hub that links the per-topic notes under `docs/arch/`
 
 ## Requirements
 
 - CMake 3.24 or newer
 - A C++20 compiler
-- Qt 6.5 or newer with `Core`, `Gui`, `Qml`, `Quick`, `Network`, and `Test`
+- Qt 6.5 or newer with `Core`, `Gui`, `Qml`, `Quick`, and `Network`; add
+  `Test` when building tests
 - `Qt Positioning` (optional, enables the `Current Device` location mode)
 - Zlib
-- vcpkg (recommended on Windows and macOS for the zlib dependency)
+- vcpkg (recommended for release builds and high-precision dependencies)
 
 ## Build
 
@@ -66,24 +71,25 @@ SkyGate uses standard CMake. Qt is resolved from your Qt installation, not from
 vcpkg. If CMake cannot find Qt automatically, point `CMAKE_PREFIX_PATH` at your
 Qt installation root such as `/path/to/Qt/6.x/<platform>`.
 
-On Linux, install zlib from your system package manager. On Windows and macOS,
-the recommended local workflow is to use the checked-in vcpkg presets so zlib is
-provided by `vcpkg.json`:
+On Linux simple-only developer builds can use zlib from your system package
+manager. Release builds and high-precision presets use the checked-in vcpkg
+manifest so zlib, CALCEPH, zstd, and ERFA are resolved consistently:
 
 ```bash
 export VCPKG_ROOT=/path/to/vcpkg
 export CMAKE_PREFIX_PATH=/path/to/Qt/6.x/<platform>
 ```
 
-Use the platform-specific presets below for Windows and macOS when possible.
-The plain `cmake -S` example remains useful for custom setups where zlib is
-already discoverable without vcpkg.
+Use the platform-specific presets below when possible. The plain `cmake -S`
+example remains useful for custom simple-only setups where zlib is already
+discoverable without vcpkg.
 
 ```bash
 cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Debug \
   -DSKYGATE_BUILD_UI=ON \
   -DSKYGATE_BUILD_TESTS=ON \
+  -DSKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF \
   -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x/<platform>
 
 cmake --build build
@@ -96,6 +102,7 @@ cmake -S . -B build-core \
   -DCMAKE_BUILD_TYPE=Debug \
   -DSKYGATE_BUILD_UI=OFF \
   -DSKYGATE_BUILD_TESTS=ON \
+  -DSKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF \
   -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x/<platform>
 
 cmake --build build-core
@@ -154,18 +161,20 @@ ctest --test-dir build --output-on-failure
 
 This covers core projection and math tests, ephemeris numeric regressions,
 catalog parsing and archive handling, catalog download/cache workflow tests,
-UI controller/model tests, and a QML smoke test for the main application module.
+UI controller/model tests, packaged-app smoke checks, and QML component,
+preferences, interaction, rendering, and smoke tests.
 
 With the included `ui-debug` preset build tree, the equivalent command is:
 
 ```bash
-ctest --test-dir build-make/ui-debug --output-on-failure
+ctest --test-dir build-ninja/ui-debug --output-on-failure
 ```
 
-Tests carry CTest labels such as `unit`, `integration`, `qml`, `perf`,
-`platform`, and `slow`. Use `ctest --test-dir build-make/ui-debug -LE slow
+Tests carry CTest labels such as `unit`, `integration`, `qml`,
+`highprecision`, `validation`, `acceptance`, `perf`, `platform`, `advisory`,
+and `slow`. Use `ctest --test-dir build-ninja/ui-debug -LE slow
 --output-on-failure` for the default non-slow suite, or `ctest --test-dir
-build-make/ui-debug -L slow --output-on-failure` for slow guard/rendering
+build-ninja/ui-debug -L slow --output-on-failure` for slow guard/rendering
 coverage.
 
 ### Coverage
@@ -191,8 +200,8 @@ cmake --build --preset core-coverage-codecov
 ```
 
 The text report is written to
-`build-make/core-coverage/coverage/coverage.txt`, and the HTML report starts at
-`build-make/core-coverage/coverage/html/index.html`. The Codecov report target
+`build-ninja/core-coverage/coverage/coverage.txt`, and the HTML report starts at
+`build-ninja/core-coverage/coverage/html/index.html`. The Codecov report target
 writes `coverage.lcov` for LLVM builds or `coverage.xml` for GCC builds under
 the same coverage directory. Coverage reports focus on production sources under
 `libs` and `apps`, excluding tests, build-tree files, and generated Qt sources.
@@ -207,6 +216,7 @@ cmake -S . -B build-coverage \
   -DSKYGATE_BUILD_UI=OFF \
   -DSKYGATE_BUILD_TESTS=ON \
   -DSKYGATE_ENABLE_COVERAGE=ON \
+  -DSKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF \
   -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x/<platform>
 
 cmake --build build-coverage --target skygate-coverage-html
@@ -223,7 +233,24 @@ Codecov report on non-PR coverage runs with GitHub OIDC authentication.
 The repository includes `CMakePresets.json` with `core-debug`, `ui-debug`, and
 `ui-run` presets, plus `core-coverage` report presets for opt-in coverage
 builds. They keep a stable local workflow and use the existing
-`build-make/<preset>` layout.
+`build-ninja/<preset>` layout.
+
+Developer presets keep `SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF` unless
+their name contains `highprecision`. Use the `core-debug-highprecision-*`
+vcpkg presets when you need CALCEPH-backed engine tests:
+
+```bash
+cmake --preset core-debug-highprecision-linux-vcpkg
+cmake --build --preset core-debug-highprecision-linux-vcpkg
+ctest --preset core-debug-highprecision-linux-vcpkg
+```
+
+Release UI vcpkg presets enable high precision. For example, on macOS:
+
+```bash
+cmake --preset ui-release-macos-vcpkg
+cmake --build --preset ui-release-macos-vcpkg
+```
 
 The shared preset file is portable and does not check in developer-specific Qt
 or macOS SDK paths. For UI builds, make Qt discoverable through your local
@@ -249,11 +276,12 @@ cmake --preset ui-debug-windows-vcpkg
 cmake --build --preset ui-debug-windows-vcpkg
 ```
 
-The checked-in `vcpkg.json` manifest declares zlib, which is required for gzip
-and ZIP catalog import. The Windows vcpkg presets use the `x64-windows` triplet
-by default, so runtime DLLs from vcpkg are copied next to the build-tree
-executable for `ui-run-windows-vcpkg` and are also collected during install and
-package deployment.
+The checked-in `vcpkg.json` manifest declares zlib for gzip and ZIP catalog
+import. The `high-precision-ephemeris` manifest feature adds CALCEPH, zstd, and
+ERFA. Windows release presets enable that feature and use the `x64-windows`
+triplet by default, so runtime DLLs from vcpkg are copied next to the
+build-tree executable for `ui-run-windows-vcpkg` and are also collected during
+install and package deployment.
 
 macOS can use vcpkg for zlib the same way while keeping Qt outside vcpkg.
 Install vcpkg, set `VCPKG_ROOT`, and point `CMAKE_PREFIX_PATH` at your normal
@@ -296,14 +324,20 @@ The Windows package output is an `.msi` installer.
 On Linux, build a release AppImage with:
 
 ```bash
+export VCPKG_ROOT=/path/to/vcpkg
 export CMAKE_PREFIX_PATH=/path/to/Qt/6.x/gcc_64
 ./packaging/linux/build-appimage.sh
 ```
 
 The script configures a release UI build, installs it into an AppDir, downloads
 `linuxdeploy` plus the Qt plugin, bundles Qt/QML dependencies, and writes the
-AppImage under `dist/`. It expects CMake, Ninja, curl, zlib development files,
-standard Qt Linux build/runtime dependencies, and a Qt 6.5+ desktop install.
+AppImage under `dist/`. It enables high precision by default; set
+`SKYGATE_APPIMAGE_ENABLE_HIGH_PRECISION=OFF` only for an explicit simple-only
+developer package. That disables the CMake high-precision build gate. When
+`VCPKG_ROOT` is set, the script still enables the high-precision manifest
+feature so vcpkg resolves the release dependency set consistently. It expects
+CMake, Ninja, curl, vcpkg, standard Qt Linux build/runtime dependencies, and a
+Qt 6.5+ desktop install.
 The manual `Package Linux`, `Package macOS`, and `Package Windows` GitHub
 Actions workflows build the same AppImage, DMG, and Windows installer packages
 as downloadable artifacts. Manual runs produce `latest-<sha>` artifacts, and
@@ -315,13 +349,13 @@ On macOS with vcpkg-managed zlib:
 
 ```bash
 cmake --preset ui-release-macos-vcpkg
-cmake --build --preset ui-install-macos-vcpkg
-cmake --build --preset ui-package-macos-vcpkg
+cmake --build --preset ui-release-macos-vcpkg --target package-skygate-ui-dmg
 ```
 
-The install/package flow uses Qt's QML deployment support, so the output
-contains the application executable, Qt runtime files, QML modules/plugins, and
-vcpkg runtime dependencies such as zlib.
+Release vcpkg presets enable high precision. The install/package flow uses
+Qt's QML deployment support, so the output contains the application executable,
+Qt runtime files, QML modules/plugins, and vcpkg runtime dependencies such as
+zlib, CALCEPH, zstd, and ERFA.
 
 Current macOS builds are not notarized. After installing SkyGate from the DMG,
 macOS may block the app until the quarantine attribute is removed:

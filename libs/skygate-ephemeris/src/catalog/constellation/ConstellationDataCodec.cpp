@@ -1,11 +1,14 @@
-#include "skygate/ephemeris/ConstellationDataCodec.hpp"
+#include "ConstellationDataCodec.hpp"
+#include "StringUtilities.hpp"
 
 #include <algorithm>
-#include <cctype>
+#include <optional>
 #include <utility>
 
 namespace skygate::ephemeris {
 namespace {
+
+constexpr char kFieldDelimiter = '|';
 
 void sanitizeLabel(std::string& label)
 {
@@ -13,166 +16,117 @@ void sanitizeLabel(std::string& label)
     std::replace(label.begin(), label.end(), '\n', ' ');
     std::replace(label.begin(), label.end(), '\r', ' ');
 
-    const auto first = std::find_if(label.begin(), label.end(), [](const unsigned char character) {
-        return !std::isspace(character);
-    });
-    const auto last = std::find_if(label.rbegin(), label.rend(), [](const unsigned char character) {
-        return !std::isspace(character);
-    }).base();
+    label = std::string(StringUtilities::trimAsciiWhitespace(label));
+}
 
-    if (first >= last) {
-        label.clear();
+// Every row of the codec is one non-empty left field, the delimiter, one
+// non-empty right field, and a line terminator. Serializers skip a row that
+// carries an empty side instead of writing a frame the parsers would reject.
+void appendRow(std::string& rows, const std::string_view left, const std::string_view right)
+{
+    if (left.empty() || right.empty()) {
         return;
     }
 
-    label = std::string(first, last);
+    rows.append(left);
+    rows += kFieldDelimiter;
+    rows.append(right);
+    rows += '\n';
+}
+
+// The two fields of one framed row, or nothing when the row has no delimiter or
+// an empty side. Both row families are parsed through the same framing rule.
+[[nodiscard]] std::optional<std::pair<std::string_view, std::string_view>> splitRow(const std::string_view line)
+{
+    const std::size_t delimiter = line.find(kFieldDelimiter);
+    if (delimiter == std::string_view::npos) {
+        return std::nullopt;
+    }
+
+    const std::string_view left = line.substr(0U, delimiter);
+    const std::string_view right = line.substr(delimiter + 1U);
+    if (left.empty() || right.empty()) {
+        return std::nullopt;
+    }
+
+    return std::pair{left, right};
 }
 
 }  // namespace
 
-std::string ConstellationDataCodec::serializeLineRows(
-    const std::span<const ConstellationLineRef> lineRefs
-)
+std::string ConstellationDataCodec::serializeLineRows(const std::span<const ConstellationLineRef> lineRefs)
 {
     std::string rows;
     rows.reserve(lineRefs.size() * 24U);
     for (const auto& lineRef : lineRefs) {
-        if (lineRef.first.empty() || lineRef.second.empty()) {
-            continue;
-        }
-
-        rows += lineRef.first;
-        rows += '|';
-        rows += lineRef.second;
-        rows += '\n';
+        appendRow(rows, lineRef.first, lineRef.second);
     }
 
     return rows;
 }
 
-std::vector<ConstellationLineRef> ConstellationDataCodec::parseLineRows(
-    const std::string_view rows
-)
+std::vector<ConstellationLineRef> ConstellationDataCodec::parseLineRows(const std::string_view rows)
 {
     std::vector<ConstellationLineRef> lineRefs;
-    std::size_t cursor = 0;
-    while (cursor < rows.size()) {
-        const std::size_t newline = rows.find('\n', cursor);
-        const std::size_t lineEnd = newline == std::string_view::npos ? rows.size() : newline;
-        const std::string_view line = rows.substr(cursor, lineEnd - cursor);
-
-        if (!line.empty()) {
-            const std::size_t delimiter = line.find('|');
-            if (delimiter != std::string_view::npos) {
-                const std::string_view startId = line.substr(0, delimiter);
-                const std::string_view endId = line.substr(delimiter + 1);
-                if (!startId.empty() && !endId.empty()) {
-                    lineRefs.emplace_back(std::string(startId), std::string(endId));
-                }
-            }
+    for (const std::string_view line : StringUtilities::splitView(rows, '\n')) {
+        const std::optional<std::pair<std::string_view, std::string_view>> fields = splitRow(line);
+        if (!fields.has_value()) {
+            continue;
         }
 
-        if (newline == std::string_view::npos) {
-            break;
-        }
-        cursor = newline + 1U;
+        lineRefs.emplace_back(std::string(fields->first), std::string(fields->second));
     }
 
     return lineRefs;
 }
 
-std::string ConstellationDataCodec::serializeLabelRows(
-    const std::span<const ConstellationLabelRef> labelRefs
-)
+std::string
+ConstellationDataCodec::serializeAnchorGroupRows(const std::span<const ConstellationAnchorGroup> anchorGroups)
 {
     std::string rows;
-    rows.reserve(labelRefs.size() * 48U);
-    for (const auto& labelRef : labelRefs) {
-        if (labelRef.first.empty() || labelRef.second.empty()) {
-            continue;
-        }
-
-        std::string sanitizedLabel = labelRef.first;
+    rows.reserve(anchorGroups.size() * 48U);
+    for (const auto& anchorGroup : anchorGroups) {
+        std::string sanitizedLabel = anchorGroup.first;
         sanitizeLabel(sanitizedLabel);
-        if (sanitizedLabel.empty()) {
-            continue;
-        }
 
-        std::string row = sanitizedLabel;
-        row += '|';
-        bool hasAnyHip = false;
-        for (const std::string& hipId : labelRef.second) {
+        std::string hipList;
+        for (const std::string& hipId : anchorGroup.second) {
             if (hipId.empty()) {
                 continue;
             }
-            if (hasAnyHip) {
-                row += ',';
+            if (!hipList.empty()) {
+                hipList += ',';
             }
-            row += hipId;
-            hasAnyHip = true;
+            hipList += hipId;
         }
 
-        if (!hasAnyHip) {
-            continue;
-        }
-
-        rows += row;
-        rows += '\n';
+        appendRow(rows, sanitizedLabel, hipList);
     }
 
     return rows;
 }
 
-std::vector<ConstellationLabelRef> ConstellationDataCodec::parseLabelRows(
-    const std::string_view rows
-)
+std::vector<ConstellationAnchorGroup> ConstellationDataCodec::parseAnchorGroupRows(const std::string_view rows)
 {
-    std::vector<ConstellationLabelRef> labelRefs;
-    std::size_t cursor = 0;
-    while (cursor < rows.size()) {
-        const std::size_t newline = rows.find('\n', cursor);
-        const std::size_t lineEnd = newline == std::string_view::npos ? rows.size() : newline;
-        const std::string_view line = rows.substr(cursor, lineEnd - cursor);
-
-        if (!line.empty()) {
-            const std::size_t delimiter = line.find('|');
-            if (delimiter != std::string_view::npos) {
-                const std::string_view label = line.substr(0, delimiter);
-                const std::string_view hipList = line.substr(delimiter + 1);
-                if (!label.empty() && !hipList.empty()) {
-                    std::vector<std::string> hipIds;
-                    std::size_t hipCursor = 0;
-                    while (hipCursor < hipList.size()) {
-                        const std::size_t comma = hipList.find(',', hipCursor);
-                        const std::size_t hipEnd =
-                            comma == std::string_view::npos ? hipList.size() : comma;
-                        const std::string_view hipId = hipList.substr(
-                            hipCursor,
-                            hipEnd - hipCursor
-                        );
-                        if (!hipId.empty()) {
-                            hipIds.emplace_back(hipId);
-                        }
-                        if (comma == std::string_view::npos) {
-                            break;
-                        }
-                        hipCursor = comma + 1U;
-                    }
-
-                    if (!hipIds.empty()) {
-                        labelRefs.emplace_back(std::string(label), std::move(hipIds));
-                    }
-                }
-            }
+    std::vector<ConstellationAnchorGroup> anchorGroups;
+    for (const std::string_view line : StringUtilities::splitView(rows, '\n')) {
+        const std::optional<std::pair<std::string_view, std::string_view>> fields = splitRow(line);
+        if (!fields.has_value()) {
+            continue;
         }
 
-        if (newline == std::string_view::npos) {
-            break;
+        std::vector<std::string> hipIds;
+        for (const std::string_view hipId : StringUtilities::splitView(fields->second, ',')) {
+            hipIds.emplace_back(hipId);
         }
-        cursor = newline + 1U;
+        if (hipIds.empty()) {
+            continue;
+        }
+
+        anchorGroups.emplace_back(std::string(fields->first), std::move(hipIds));
     }
 
-    return labelRefs;
+    return anchorGroups;
 }
 
 }  // namespace skygate::ephemeris

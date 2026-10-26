@@ -8,9 +8,6 @@
 #include <QString>
 #include <QVariant>
 
-#include <algorithm>
-#include <initializer_list>
-
 namespace skygate::ui::tests {
 
 inline void collectObjectTree(QObject* object, QList<QObject*>& objects, QSet<QObject*>& visited)
@@ -40,46 +37,10 @@ inline QList<QObject*> objectTree(QObject* root)
     return objects;
 }
 
-inline QObject* firstObjectWithProperty(
-    QObject* root,
-    const char* propertyName,
-    const QVariant& value
-)
+inline QObject* firstObjectWithProperty(QObject* root, const char* propertyName, const QVariant& value)
 {
     for (QObject* object : objectTree(root)) {
         if (object->property(propertyName) == value) {
-            return object;
-        }
-    }
-    return nullptr;
-}
-
-inline QList<QObject*> objectsWithMetaProperty(QObject* root, const char* propertyName)
-{
-    QList<QObject*> matches;
-    for (QObject* object : objectTree(root)) {
-        if (object->metaObject()->indexOfProperty(propertyName) >= 0) {
-            matches.push_back(object);
-        }
-    }
-    return matches;
-}
-
-inline QObject* firstObjectWithMetaProperties(
-    QObject* root,
-    const std::initializer_list<const char*> propertyNames
-)
-{
-    for (QObject* object : objectTree(root)) {
-        const QMetaObject* metaObject = object->metaObject();
-        const bool hasAllProperties = std::all_of(
-            propertyNames.begin(),
-            propertyNames.end(),
-            [metaObject](const char* propertyName) {
-                return metaObject->indexOfProperty(propertyName) >= 0;
-            }
-        );
-        if (hasAllProperties) {
             return object;
         }
     }
@@ -112,31 +73,6 @@ inline QQuickItem* firstQuickItemWithObjectName(QObject* root, const QString& ob
     return qobject_cast<QQuickItem*>(firstObjectWithObjectName(root, objectName));
 }
 
-inline QList<QObject*> invokableButtonsWithText(QObject* root, const QString& text)
-{
-    QList<QObject*> matches;
-    for (QObject* object : objectsWithText(root, text)) {
-        if (object->metaObject()->indexOfSignal("clicked()") >= 0) {
-            matches.push_back(object);
-        }
-    }
-    return matches;
-}
-
-inline QList<QObject*> comboBoxesWithCount(QObject* root, const int count)
-{
-    QList<QObject*> matches;
-    for (QObject* object : objectTree(root)) {
-        if (
-            object->metaObject()->indexOfProperty("currentIndex") >= 0
-            && object->property("count").toInt() == count
-        ) {
-            matches.push_back(object);
-        }
-    }
-    return matches;
-}
-
 inline QQuickItem* firstVisibleItemWithText(QObject* root, const QString& text)
 {
     for (QObject* object : objectsWithText(root, text)) {
@@ -152,11 +88,7 @@ inline QQuickItem* firstVisibleItemContainingText(QObject* root, const QString& 
 {
     for (QObject* object : objectTree(root)) {
         auto* item = qobject_cast<QQuickItem*>(object);
-        if (
-            item != nullptr
-            && item->isVisible()
-            && object->property("text").toString().contains(text)
-        ) {
+        if (item != nullptr && item->isVisible() && object->property("text").toString().contains(text)) {
             return item;
         }
     }
@@ -166,22 +98,6 @@ inline QQuickItem* firstVisibleItemContainingText(QObject* root, const QString& 
 inline QQuickItem* quickItemProperty(QObject* object, const char* propertyName)
 {
     return qobject_cast<QQuickItem*>(qvariant_cast<QObject*>(object->property(propertyName)));
-}
-
-inline QList<QObject*> checkBoxes(QObject* root)
-{
-    QList<QObject*> matches;
-    for (QObject* object : objectTree(root)) {
-        const QMetaObject* metaObject = object->metaObject();
-        if (
-            metaObject->indexOfProperty("checked") >= 0
-            && metaObject->indexOfSignal("toggled()") >= 0
-            && metaObject->indexOfMethod("toggle()") >= 0
-        ) {
-            matches.push_back(object);
-        }
-    }
-    return matches;
 }
 
 inline bool activateControl(QObject* object)

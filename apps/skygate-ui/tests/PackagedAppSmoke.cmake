@@ -14,8 +14,16 @@ if(NOT DEFINED SKYGATE_SMOKE_OUTPUT_FILE)
     set(SKYGATE_SMOKE_OUTPUT_FILE "${SKYGATE_SMOKE_WORK_DIR}/output.log")
 endif()
 
+# Application readiness budget for the packaged Debug app. Measured startup
+# readiness on the development machine: about 5.4s isolated and up to about
+# 6.1s while the full suite runs with ctest -j4 (bundled catalog composition
+# about 2-4s plus ephemeris engine initialization about 1.2-1.5s). 20s keeps
+# roughly 3x margin for cold caches and parallel load while still failing a
+# startup that never reaches the readiness log lines. This is a deadline, not
+# a retry: the captured output must contain both the "SkyGate started:" line
+# and the "Loaded ephemeris data manifest" line.
 if(NOT DEFINED SKYGATE_SMOKE_TIMEOUT_SECONDS)
-    set(SKYGATE_SMOKE_TIMEOUT_SECONDS 6)
+    set(SKYGATE_SMOKE_TIMEOUT_SECONDS 20)
 endif()
 
 file(MAKE_DIRECTORY "${SKYGATE_SMOKE_WORK_DIR}")
@@ -70,6 +78,14 @@ endif()
 
 if(NOT smokeOutput MATCHES "INFO skygate\\.app SkyGate started:")
     skygate_smoke_fail("SkyGate did not reach the application startup log line.")
+endif()
+
+if(NOT smokeOutput MATCHES "INFO skygate\\.app Loaded ephemeris data manifest .*/ephemeris/manifest\\.json")
+    skygate_smoke_fail("SkyGate did not load the packaged ephemeris data manifest.")
+endif()
+
+if(smokeOutput MATCHES "No ephemeris data manifest was found")
+    skygate_smoke_fail("SkyGate reported a missing packaged ephemeris data manifest.")
 endif()
 
 if(

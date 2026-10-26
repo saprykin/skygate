@@ -1,9 +1,11 @@
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyCatalog.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EquatorialCoordinate.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
+#include "search/SkyObjectSearchModel.hpp"
+
 #include <QtTest>
-
-#include "SkyObjectSearchModel.hpp"
-
-#include "skygate/core/Types.hpp"
-#include "skygate/ephemeris/Types.hpp"
 
 #include <optional>
 #include <string>
@@ -11,21 +13,75 @@
 
 namespace {
 
-skygate::ephemeris::CelestialBody makeBody(
+skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
     std::string id,
     std::string displayName,
-    const skygate::ephemeris::CelestialBodyType type,
+    const skygate::ephemeris::BaseCelestialBody::Kind type,
     const double visualMagnitude,
     const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
 )
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.type = type;
+    body.kind = type;
     body.visualMagnitude = visualMagnitude;
     body.fixedEquatorial = fixedEquatorial;
     return body;
+}
+
+skygate::ephemeris::DistantCelestialBody makeDeepSkyBody(
+    std::string id,
+    std::string displayName,
+    const double visualMagnitude,
+    const skygate::ephemeris::DeepSkyObjectInfo::Kind kind,
+    std::vector<std::string> aliases
+)
+{
+    skygate::ephemeris::DistantCelestialBody body;
+    body.id = std::move(id);
+    body.displayName = std::move(displayName);
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
+    body.visualMagnitude = visualMagnitude;
+    body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo{.kind = kind, .aliases = std::move(aliases)};
+    return body;
+}
+
+void setCatalogData(
+    SkyObjectSearchModel& model,
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> ownGalaxyBodies,
+    std::vector<skygate::ephemeris::DistantCelestialBody> distantBodies,
+    std::vector<skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups
+)
+{
+    std::vector<skygate::ephemeris::CelestialBodyCatalog::OrderEntry> order;
+    order.reserve(ownGalaxyBodies.size() + distantBodies.size());
+    for (std::uint32_t index = 0U; index < ownGalaxyBodies.size(); ++index) {
+        order.push_back(
+            {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = index}
+        );
+    }
+    for (std::uint32_t index = 0U; index < distantBodies.size(); ++index) {
+        order.push_back({.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = index});
+    }
+    const skygate::ephemeris::CelestialBodyCatalog catalog(
+        std::move(ownGalaxyBodies), std::move(distantBodies), std::move(order)
+    );
+    model.setCatalogData(catalog.bodies(), std::move(constellationAnchorGroups));
+}
+
+void setCatalogData(
+    SkyObjectSearchModel& model,
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> ownGalaxyBodies,
+    std::vector<skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups
+)
+{
+    setCatalogData(
+        model,
+        std::move(ownGalaxyBodies),
+        std::vector<skygate::ephemeris::DistantCelestialBody>{},
+        std::move(constellationAnchorGroups)
+    );
 }
 
 QString displayTextAt(const SkyObjectSearchModel& model, const int row)
@@ -58,6 +114,7 @@ private slots:
     void filtersPlanetStarHipAndConstellationTargets();
     void normalizesHipQueries();
     void filtersDeepSkyAliases();
+    void resolvesStarAliasesToCanonicalObject();
     void deduplicatesDisplayNamesPreferringBodies();
     void ranksExactPrefixAndContainsMatches();
     void ranksLargerMixedCatalogWithCollisions();
@@ -66,11 +123,12 @@ private slots:
 void SkyObjectSearchModelTests::blankQueryReturnsNoRows()
 {
     SkyObjectSearchModel model;
-    model.setCatalogData(
-        std::vector<skygate::ephemeris::CelestialBody> {
-            makeBody("mars", "Mars", skygate::ephemeris::CelestialBodyType::Planet, -2.0),
+    setCatalogData(
+        model,
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{
+            makeBody("mars", "Mars", skygate::ephemeris::BaseCelestialBody::Kind::Planet, -2.0),
         },
-        std::vector<skygate::ephemeris::ConstellationLabelRef> {}
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{}
     );
 
     QCOMPARE(model.rowCount(), 0);
@@ -81,13 +139,14 @@ void SkyObjectSearchModelTests::blankQueryReturnsNoRows()
 void SkyObjectSearchModelTests::filtersPlanetStarHipAndConstellationTargets()
 {
     SkyObjectSearchModel model;
-    model.setCatalogData(
-        std::vector<skygate::ephemeris::CelestialBody> {
-            makeBody("mars", "Mars", skygate::ephemeris::CelestialBodyType::Planet, -2.0),
-            makeBody("sirius", "Sirius", skygate::ephemeris::CelestialBodyType::Star, -1.46),
-            makeBody("hip_77", "HIP 77", skygate::ephemeris::CelestialBodyType::Star, 4.2),
+    setCatalogData(
+        model,
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{
+            makeBody("mars", "Mars", skygate::ephemeris::BaseCelestialBody::Kind::Planet, -2.0),
+            makeBody("sirius", "Sirius", skygate::ephemeris::BaseCelestialBody::Kind::Star, -1.46),
+            makeBody("hip_77", "HIP 77", skygate::ephemeris::BaseCelestialBody::Kind::Star, 4.2),
         },
-        std::vector<skygate::ephemeris::ConstellationLabelRef> {
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{
             {"Orion", {"hip_77", "hip_88"}},
         }
     );
@@ -117,14 +176,15 @@ void SkyObjectSearchModelTests::filtersPlanetStarHipAndConstellationTargets()
 void SkyObjectSearchModelTests::normalizesHipQueries()
 {
     SkyObjectSearchModel model;
-    model.setCatalogData(
-        std::vector<skygate::ephemeris::CelestialBody> {
-            makeBody("hip_77", "HIP 77", skygate::ephemeris::CelestialBodyType::Star, 4.2),
+    setCatalogData(
+        model,
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{
+            makeBody("hip_77", "HIP 77", skygate::ephemeris::BaseCelestialBody::Kind::Star, 4.2),
         },
-        std::vector<skygate::ephemeris::ConstellationLabelRef> {}
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{}
     );
 
-    const QStringList queries {"hip77", "hip 77", "hip_77"};
+    const QStringList queries{"hip77", "hip 77", "hip_77"};
     for (const QString& query : queries) {
         model.setFilterText(query);
         QCOMPARE(model.rowCount(), 1);
@@ -134,43 +194,69 @@ void SkyObjectSearchModelTests::normalizesHipQueries()
 
 void SkyObjectSearchModelTests::filtersDeepSkyAliases()
 {
-    skygate::ephemeris::CelestialBody m31 = makeBody(
+    skygate::ephemeris::DistantCelestialBody m31 = makeDeepSkyBody(
         "messier_031",
         "M31",
-        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
         3.44,
-        skygate::core::EquatorialCoordinate {
-            .rightAscensionHours = 0.7123,
-            .declinationDeg = 41.269
-        }
+        skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy,
+        {"M31", "NGC 224", "Andromeda Galaxy"}
     );
-    m31.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
-        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
-        .aliases = {"M31", "NGC 224", "Andromeda Galaxy"},
-    };
+    m31.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 0.7123, .declinationDeg = 41.269};
 
     SkyObjectSearchModel model;
-    model.setCatalogData(
-        std::vector<skygate::ephemeris::CelestialBody> {m31},
-        std::vector<skygate::ephemeris::ConstellationLabelRef> {}
+    setCatalogData(
+        model,
+        {},
+        std::vector<skygate::ephemeris::DistantCelestialBody>{m31},
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{}
     );
 
     model.setFilterText("andromeda");
     QCOMPARE(model.rowCount(), 1);
     QCOMPARE(displayTextAt(model, 0), QString("Andromeda Galaxy"));
-    QCOMPARE(detailTextAt(model, 0), QString("Deep sky • Galaxy • messier_031"));
+    QCOMPARE(detailTextAt(model, 0), QString("Deep sky object • Galaxy • messier_031"));
     QCOMPARE(targetKindAt(model, 0), QString("body"));
     QCOMPARE(targetIdAt(model, 0), QString("messier_031"));
+}
+
+void SkyObjectSearchModelTests::resolvesStarAliasesToCanonicalObject()
+{
+    skygate::ephemeris::OwnGalaxyCelestialBody sirius = makeBody(
+        "hip_32349",
+        "Sirius",
+        skygate::ephemeris::BaseCelestialBody::Kind::Star,
+        -1.46,
+        skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.7525, .declinationDeg = -16.7161}
+    );
+    sirius.identity.aliases = {"Alpha Canis Majoris", "Dog Star"};
+
+    SkyObjectSearchModel model;
+    setCatalogData(
+        model,
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{sirius},
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{}
+    );
+
+    model.setFilterText("dog star");
+    QCOMPARE(model.rowCount(), 1);
+    QCOMPARE(displayTextAt(model, 0), QString("Dog Star"));
+    QCOMPARE(targetKindAt(model, 0), QString("body"));
+    QCOMPARE(targetIdAt(model, 0), QString("hip_32349"));
+
+    model.setFilterText("alpha canis");
+    QCOMPARE(model.rowCount(), 1);
+    QCOMPARE(targetIdAt(model, 0), QString("hip_32349"));
 }
 
 void SkyObjectSearchModelTests::deduplicatesDisplayNamesPreferringBodies()
 {
     SkyObjectSearchModel model;
-    model.setCatalogData(
-        std::vector<skygate::ephemeris::CelestialBody> {
-            makeBody("orion_body", "Orion", skygate::ephemeris::CelestialBodyType::Constellation, 1.0),
+    setCatalogData(
+        model,
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{
+            makeBody("orion_body", "Orion", skygate::ephemeris::BaseCelestialBody::Kind::Constellation, 1.0),
         },
-        std::vector<skygate::ephemeris::ConstellationLabelRef> {
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{
             {"Orion", {"hip_77", "hip_88"}},
         }
     );
@@ -185,14 +271,15 @@ void SkyObjectSearchModelTests::deduplicatesDisplayNamesPreferringBodies()
 void SkyObjectSearchModelTests::ranksExactPrefixAndContainsMatches()
 {
     SkyObjectSearchModel model;
-    model.setCatalogData(
-        std::vector<skygate::ephemeris::CelestialBody> {
-            makeBody("mar", "Mar", skygate::ephemeris::CelestialBodyType::Star, 3.0),
-            makeBody("mars", "Mars", skygate::ephemeris::CelestialBodyType::Planet, -2.0),
-            makeBody("mariner", "Scout", skygate::ephemeris::CelestialBodyType::Star, 1.0),
-            makeBody("landmark", "Landmark", skygate::ephemeris::CelestialBodyType::Star, -1.0),
+    setCatalogData(
+        model,
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{
+            makeBody("mar", "Mar", skygate::ephemeris::BaseCelestialBody::Kind::Star, 3.0),
+            makeBody("mars", "Mars", skygate::ephemeris::BaseCelestialBody::Kind::Planet, -2.0),
+            makeBody("mariner", "Scout", skygate::ephemeris::BaseCelestialBody::Kind::Star, 1.0),
+            makeBody("landmark", "Landmark", skygate::ephemeris::BaseCelestialBody::Kind::Star, -1.0),
         },
-        std::vector<skygate::ephemeris::ConstellationLabelRef> {}
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{}
     );
 
     model.setFilterText("mar");
@@ -205,50 +292,44 @@ void SkyObjectSearchModelTests::ranksExactPrefixAndContainsMatches()
 
 void SkyObjectSearchModelTests::ranksLargerMixedCatalogWithCollisions()
 {
-    auto m31 = makeBody(
+    auto m31 = makeDeepSkyBody(
         "messier_031",
         "M31",
-        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
-        3.44
+        3.44,
+        skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy,
+        {"Andromeda", "Andromeda Galaxy", "NGC 224"}
     );
-    m31.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
-        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
-        .aliases = {"Andromeda", "Andromeda Galaxy", "NGC 224"},
-    };
-    auto m57 = makeBody(
+    auto m57 = makeDeepSkyBody(
         "messier_057",
         "M57",
-        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
-        8.8
+        8.8,
+        skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula,
+        {"Ring Nebula", "NGC 6720"}
     );
-    m57.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
-        .kind = skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula,
-        .aliases = {"Ring Nebula", "NGC 6720"},
-    };
-    auto dimRingAlias = makeBody(
+    auto dimRingAlias = makeDeepSkyBody(
         "open_ngc_ring_duplicate",
         "Dim Ring Candidate",
-        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
-        12.0
+        12.0,
+        skygate::ephemeris::DeepSkyObjectInfo::Kind::Nebula,
+        {"Ring Nebula"}
     );
-    dimRingAlias.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
-        .kind = skygate::ephemeris::DeepSkyObjectKind::Nebula,
-        .aliases = {"Ring Nebula"},
-    };
 
     SkyObjectSearchModel model;
-    model.setCatalogData(
-        std::vector<skygate::ephemeris::CelestialBody> {
-            makeBody("mars", "Mars", skygate::ephemeris::CelestialBodyType::Planet, -2.0),
-            makeBody("mercury", "Mercury", skygate::ephemeris::CelestialBodyType::Planet, -1.0),
-            makeBody("hip_24436", "Meissa", skygate::ephemeris::CelestialBodyType::Star, 3.3),
-            makeBody("hip_25930", "Mintaka", skygate::ephemeris::CelestialBodyType::Star, 2.2),
-            makeBody("andromeda_body", "Andromeda", skygate::ephemeris::CelestialBodyType::Constellation, 99.0),
+    setCatalogData(
+        model,
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{
+            makeBody("mars", "Mars", skygate::ephemeris::BaseCelestialBody::Kind::Planet, -2.0),
+            makeBody("mercury", "Mercury", skygate::ephemeris::BaseCelestialBody::Kind::Planet, -1.0),
+            makeBody("hip_24436", "Meissa", skygate::ephemeris::BaseCelestialBody::Kind::Star, 3.3),
+            makeBody("hip_25930", "Mintaka", skygate::ephemeris::BaseCelestialBody::Kind::Star, 2.2),
+            makeBody("andromeda_body", "Andromeda", skygate::ephemeris::BaseCelestialBody::Kind::Constellation, 99.0),
+        },
+        std::vector<skygate::ephemeris::DistantCelestialBody>{
             m31,
             m57,
             dimRingAlias,
         },
-        std::vector<skygate::ephemeris::ConstellationLabelRef> {
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{
             {"Andromeda", {"hip_24436"}},
             {"Orion", {"hip_24436", "hip_25930"}},
             {"Ring Nebula", {"hip_25930"}},
@@ -261,7 +342,7 @@ void SkyObjectSearchModelTests::ranksLargerMixedCatalogWithCollisions()
     QCOMPARE(displayTextAt(model, 0), QString("Andromeda"));
     QCOMPARE(targetKindAt(model, 0), QString("body"));
     QCOMPARE(targetIdAt(model, 0), QString("messier_031"));
-    QCOMPARE(detailTextAt(model, 0), QString("Deep sky • Galaxy • messier_031"));
+    QCOMPARE(detailTextAt(model, 0), QString("Deep sky object • Galaxy • messier_031"));
     QCOMPARE(displayTextAt(model, 1), QString("Andromeda Galaxy"));
     QCOMPARE(targetIdAt(model, 1), QString("messier_031"));
 
@@ -270,10 +351,7 @@ void SkyObjectSearchModelTests::ranksLargerMixedCatalogWithCollisions()
     QCOMPARE(displayTextAt(model, 0), QString("Ring Nebula"));
     QCOMPARE(targetKindAt(model, 0), QString("body"));
     QCOMPARE(targetIdAt(model, 0), QString("messier_057"));
-    QCOMPARE(
-        detailTextAt(model, 0),
-        QString("Deep sky • Planetary nebula • messier_057")
-    );
+    QCOMPARE(detailTextAt(model, 0), QString("Deep sky object • Planetary nebula • messier_057"));
 
     model.setFilterText("orion");
     QCOMPARE(model.rowCount(), 1);

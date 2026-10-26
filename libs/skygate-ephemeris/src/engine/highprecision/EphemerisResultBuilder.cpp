@@ -1,0 +1,108 @@
+#include "EphemerisResultBuilder.hpp"
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
+
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <string_view>
+
+namespace skygate::ephemeris::highprecision {
+namespace {
+
+constexpr std::string_view kHighPrecisionDataSourceProvenance = "High-precision ephemeris facade";
+
+[[nodiscard]] CelestialBodyState makeEmptyState(const std::size_t bodyIndex) noexcept
+{
+    CelestialBodyState state;
+    state.bodyIndex = static_cast<std::uint32_t>(bodyIndex);
+    state.equatorial.rightAscensionHours = std::numeric_limits<double>::quiet_NaN();
+    state.equatorial.declinationDeg = std::numeric_limits<double>::quiet_NaN();
+    state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
+    state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
+    return state;
+}
+
+void applyDefaultProvenance(EphemerisEngineQueryResult& metadata)
+{
+    if (metadata.dataSourceProvenance.empty()) {
+        metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
+    }
+}
+
+void normalizeStatusForAvailableFallback(EphemerisEngineQueryResult& metadata)
+{
+    if (metadata.status == EphemerisEngineQueryStatus::Type::OutOfRange) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
+        metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+    }
+}
+
+void normalizeMissingCoordinateStatus(EphemerisEngineQueryResult& metadata)
+{
+    switch (metadata.status) {
+    case EphemerisEngineQueryStatus::Type::Valid:
+    case EphemerisEngineQueryStatus::Type::Degraded:
+        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+        metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+        break;
+    case EphemerisEngineQueryStatus::Type::OutOfRange:
+        metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+        break;
+    case EphemerisEngineQueryStatus::Type::Unsupported:
+        metadata.addWarning(EphemerisEngineWarning::Code::UnsupportedBody);
+        break;
+    case EphemerisEngineQueryStatus::Type::Failed:
+        metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+        break;
+    case EphemerisEngineQueryStatus::Type::Last:
+        break;
+    }
+}
+
+}  // namespace
+
+CelestialBodyState EphemerisResultBuilder::buildState(
+    const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult
+) const
+{
+    CelestialBodyState state = makeEmptyState(input.bodyIndex);
+    state.metadata = calculatorResult.metadata;
+    applyDefaultProvenance(state.metadata);
+    state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags());
+
+    if (calculatorResult.equatorial.has_value()) {
+        state.equatorial = *calculatorResult.equatorial;
+        normalizeStatusForAvailableFallback(state.metadata);
+    } else {
+        normalizeMissingCoordinateStatus(state.metadata);
+    }
+
+    if (calculatorResult.horizontal.has_value()) {
+        state.horizontal = *calculatorResult.horizontal;
+    }
+
+    return state;
+}
+
+CelestialBodyState EphemerisResultBuilder::buildUnsupportedState(const HighPrecisionComputationInput& input) const
+{
+    CelestialBodyState state = makeEmptyState(input.bodyIndex);
+    state.metadata.status = EphemerisEngineQueryStatus::Type::Unsupported;
+    state.metadata.addWarning(EphemerisEngineWarning::Code::UnsupportedBody);
+    state.metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
+    state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags());
+    return state;
+}
+
+CelestialBodyState EphemerisResultBuilder::buildFailedState(const HighPrecisionComputationInput& input) const
+{
+    CelestialBodyState state = makeEmptyState(input.bodyIndex);
+    state.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+    state.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+    state.metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
+    state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags());
+    return state;
+}
+
+}  // namespace skygate::ephemeris::highprecision

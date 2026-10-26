@@ -1,13 +1,17 @@
 #include "SkyObjectSearchModel.hpp"
+#include "AsciiText.hpp"
+#include "math/NumericTolerance.hpp"
+#include "selection/SkySelectionTargetKind.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace {
 
 QString normalizedKey(const QString& value)
 {
-    return value.trimmed().toCaseFolded();
+    return QString::fromStdString(skygate::core::AsciiText::normalizedLookupKey(value.toStdString()));
 }
 
 QString compactedKey(const QString& value)
@@ -25,27 +29,12 @@ QString compactedKey(const QString& value)
     return compacted;
 }
 
-QString celestialBodyTypeText(const skygate::ephemeris::CelestialBodyType type)
+QString celestialBodyTypeText(const skygate::ephemeris::BaseCelestialBody::Kind type)
 {
-    switch (type) {
-    case skygate::ephemeris::CelestialBodyType::Sun:
-        return "Sun";
-    case skygate::ephemeris::CelestialBodyType::Moon:
-        return "Moon";
-    case skygate::ephemeris::CelestialBodyType::Planet:
-        return "Planet";
-    case skygate::ephemeris::CelestialBodyType::Star:
-        return "Star";
-    case skygate::ephemeris::CelestialBodyType::Constellation:
-        return "Constellation";
-    case skygate::ephemeris::CelestialBodyType::DeepSkyObject:
-        return "Deep sky";
-    }
-
-    return "Object";
+    return QString::fromUtf8(skygate::ephemeris::BaseCelestialBody::kindLabel(type));
 }
 
-bool shouldShowBodyId(const skygate::ephemeris::CelestialBody& body)
+bool shouldShowBodyId(const skygate::ephemeris::BaseCelestialBody& body)
 {
     if (body.id.empty()) {
         return false;
@@ -61,55 +50,28 @@ bool shouldShowBodyId(const skygate::ephemeris::CelestialBody& body)
     return false;
 }
 
-QString bodyDetailText(const skygate::ephemeris::CelestialBody& body)
+QString bodyDetailText(const skygate::ephemeris::BaseCelestialBody& body)
 {
-    const QString typeText = celestialBodyTypeText(body.type);
-    if (body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject) {
-        QString detailText = typeText;
-        if (body.deepSkyObject.has_value()) {
-            switch (body.deepSkyObject->kind) {
-            case skygate::ephemeris::DeepSkyObjectKind::Galaxy:
-                detailText = "Deep sky • Galaxy";
-                break;
-            case skygate::ephemeris::DeepSkyObjectKind::OpenCluster:
-                detailText = "Deep sky • Open cluster";
-                break;
-            case skygate::ephemeris::DeepSkyObjectKind::GlobularCluster:
-                detailText = "Deep sky • Globular cluster";
-                break;
-            case skygate::ephemeris::DeepSkyObjectKind::Nebula:
-                detailText = "Deep sky • Nebula";
-                break;
-            case skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula:
-                detailText = "Deep sky • Planetary nebula";
-                break;
-            case skygate::ephemeris::DeepSkyObjectKind::Asterism:
-                detailText = "Deep sky • Asterism";
-                break;
-            case skygate::ephemeris::DeepSkyObjectKind::Unknown:
-                break;
-            }
+    QString detailText = celestialBodyTypeText(body.kind);
+    if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject) {
+        const std::optional<skygate::ephemeris::DeepSkyObjectInfo>& deepSkyObject = body.deepSkyObjectValue();
+        if (deepSkyObject.has_value() && deepSkyObject->kind != skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown) {
+            const QString objectKindText =
+                QString::fromUtf8(skygate::ephemeris::DeepSkyObjectInfo::kindLabel(deepSkyObject->kind));
+            detailText = QString("%1 • %2").arg(detailText, objectKindText);
         }
-
-        if (!shouldShowBodyId(body)) {
-            return detailText;
-        }
-        return QString("%1 • %2").arg(detailText, QString::fromStdString(body.id));
     }
 
     if (!shouldShowBodyId(body)) {
-        return typeText;
+        return detailText;
     }
 
-    return QString("%1 • %2").arg(typeText, QString::fromStdString(body.id));
+    return QString("%1 • %2").arg(detailText, QString::fromStdString(body.id));
 }
 
 }  // namespace
 
-SkyObjectSearchModel::SkyObjectSearchModel(QObject* parent)
-    : QAbstractListModel(parent)
-{
-}
+SkyObjectSearchModel::SkyObjectSearchModel(QObject* parent) : QAbstractListModel(parent) {}
 
 int SkyObjectSearchModel::rowCount(const QModelIndex& parent) const
 {
@@ -171,8 +133,8 @@ void SkyObjectSearchModel::setFilterText(const QString& filterText)
 }
 
 void SkyObjectSearchModel::setCatalogData(
-    const std::span<const skygate::ephemeris::CelestialBody> bodies,
-    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs
+    const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies,
+    const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups
 )
 {
     beginResetModel();
@@ -182,12 +144,12 @@ void SkyObjectSearchModel::setCatalogData(
 
     QHash<QString, bool> availableBodyIds;
     availableBodyIds.reserve(static_cast<int>(bodies.size()));
-    for (const auto& body : bodies) {
-        if (body.id.empty()) {
+    for (const skygate::ephemeris::BaseCelestialBody* body : bodies) {
+        if (body == nullptr || body->id.empty()) {
             continue;
         }
 
-        availableBodyIds.insert(normalizedKey(QString::fromStdString(body.id)), true);
+        availableBodyIds.insert(normalizedKey(QString::fromStdString(body->id)), true);
     }
 
     QHash<QString, int> sourceIndexByDisplayKey;
@@ -196,23 +158,7 @@ void SkyObjectSearchModel::setCatalogData(
             return candidate.isBody;
         }
 
-        if (candidate.brightnessMagnitude < existing.brightnessMagnitude - 1e-9) {
-            return true;
-        }
-        if (candidate.brightnessMagnitude > existing.brightnessMagnitude + 1e-9) {
-            return false;
-        }
-
-        const int displayCompare = QString::compare(
-            candidate.displayText,
-            existing.displayText,
-            Qt::CaseInsensitive
-        );
-        if (displayCompare != 0) {
-            return displayCompare < 0;
-        }
-
-        return QString::compare(candidate.targetId, existing.targetId, Qt::CaseInsensitive) < 0;
+        return ranksBefore(candidate, existing);
     };
     const auto upsertEntry = [this, &sourceIndexByDisplayKey, &shouldReplaceEntry](SourceEntry entry) {
         entry.displayText = entry.displayText.trimmed();
@@ -238,51 +184,86 @@ void SkyObjectSearchModel::setCatalogData(
         }
     };
 
-    for (const auto& body : bodies) {
+    for (const skygate::ephemeris::BaseCelestialBody* bodyPointer : bodies) {
+        if (bodyPointer == nullptr) {
+            continue;
+        }
+        const skygate::ephemeris::BaseCelestialBody& body = *bodyPointer;
+
         if (body.displayName.empty() || body.id.empty()) {
             continue;
         }
 
         const QString targetId = QString::fromStdString(body.id);
-        upsertEntry(SourceEntry {
-            .displayText = QString::fromStdString(body.displayName),
-            .detailText = bodyDetailText(body),
-            .targetKind = "body",
-            .targetId = targetId,
-            .brightnessMagnitude = body.visualMagnitude,
-            .selectable = true,
-            .isBody = true,
-        });
-
-        if (body.type != skygate::ephemeris::CelestialBodyType::DeepSkyObject
-            || !body.deepSkyObject.has_value()) {
-            continue;
-        }
-
-        for (const std::string& alias : body.deepSkyObject->aliases) {
-            if (alias.empty() || alias == body.displayName) {
-                continue;
-            }
-
-            upsertEntry(SourceEntry {
-                .displayText = QString::fromStdString(alias),
+        upsertEntry(
+            SourceEntry{
+                .displayText = QString::fromStdString(body.displayName),
                 .detailText = bodyDetailText(body),
-                .targetKind = "body",
+                .targetKind = skygate::ui::internal::SkySelectionTargetKind::token(
+                    skygate::ui::internal::SkySelectionTargetKind::Type::Body
+                ),
                 .targetId = targetId,
                 .brightnessMagnitude = body.visualMagnitude,
                 .selectable = true,
                 .isBody = true,
-            });
+            }
+        );
+
+        for (const std::string& alias : body.identity.aliases) {
+            if (alias.empty() || alias == body.displayName) {
+                continue;
+            }
+
+            upsertEntry(
+                SourceEntry{
+                    .displayText = QString::fromStdString(alias),
+                    .detailText = bodyDetailText(body),
+                    .targetKind = skygate::ui::internal::SkySelectionTargetKind::token(
+                        skygate::ui::internal::SkySelectionTargetKind::Type::Body
+                    ),
+                    .targetId = targetId,
+                    .brightnessMagnitude = body.visualMagnitude,
+                    .selectable = true,
+                    .isBody = true,
+                }
+            );
+        }
+
+        // The legacy DSO alias field mirrors the body-level list in production
+        // parsers; keep reading it so DSO-only fixtures and callers remain
+        // searchable without duplicating the aliases in both places.
+        if (body.kind != skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject
+            || !body.deepSkyObjectValue().has_value()) {
+            continue;
+        }
+        for (const std::string& alias : body.deepSkyObjectValue()->aliases) {
+            if (alias.empty() || alias == body.displayName) {
+                continue;
+            }
+
+            upsertEntry(
+                SourceEntry{
+                    .displayText = QString::fromStdString(alias),
+                    .detailText = bodyDetailText(body),
+                    .targetKind = skygate::ui::internal::SkySelectionTargetKind::token(
+                        skygate::ui::internal::SkySelectionTargetKind::Type::Body
+                    ),
+                    .targetId = targetId,
+                    .brightnessMagnitude = body.visualMagnitude,
+                    .selectable = true,
+                    .isBody = true,
+                }
+            );
         }
     }
 
-    for (const auto& labelRef : labelRefs) {
-        if (labelRef.first.empty()) {
+    for (const auto& anchorGroup : anchorGroups) {
+        if (anchorGroup.first.empty()) {
             continue;
         }
 
         bool hasAnyAnchor = false;
-        for (const std::string& hipId : labelRef.second) {
+        for (const std::string& hipId : anchorGroup.second) {
             if (availableBodyIds.contains(normalizedKey(QString::fromStdString(hipId)))) {
                 hasAnyAnchor = true;
                 break;
@@ -292,15 +273,19 @@ void SkyObjectSearchModel::setCatalogData(
             continue;
         }
 
-        upsertEntry(SourceEntry {
-            .displayText = QString::fromStdString(labelRef.first),
-            .detailText = "Constellation",
-            .targetKind = "constellationLabel",
-            .targetId = QString::fromStdString(labelRef.first),
-            .brightnessMagnitude = 99.0,
-            .selectable = true,
-            .isBody = false,
-        });
+        upsertEntry(
+            SourceEntry{
+                .displayText = QString::fromStdString(anchorGroup.first),
+                .detailText = "Constellation",
+                .targetKind = skygate::ui::internal::SkySelectionTargetKind::token(
+                    skygate::ui::internal::SkySelectionTargetKind::Type::ConstellationLabel
+                ),
+                .targetId = QString::fromStdString(anchorGroup.first),
+                .brightnessMagnitude = kUnrankedBrightnessMagnitude,
+                .selectable = true,
+                .isBody = false,
+            }
+        );
     }
 
     endResetModel();
@@ -322,28 +307,23 @@ void SkyObjectSearchModel::rebuildRows()
     for (int sourceIndex = 0; sourceIndex < m_sourceEntries.size(); ++sourceIndex) {
         const SourceEntry& entry = m_sourceEntries.at(sourceIndex);
         int entryMatchRank = -1;
-        const bool matchesExactName =
-            entry.displayKey == filterKey || entry.compactDisplayKey == compactFilterKey;
+        const bool matchesExactName = entry.displayKey == filterKey || entry.compactDisplayKey == compactFilterKey;
         if (matchesExactName) {
             entryMatchRank = 0;
         } else {
             const bool matchesPrefixName =
-                entry.displayKey.startsWith(filterKey)
-                || entry.compactDisplayKey.startsWith(compactFilterKey);
+                entry.displayKey.startsWith(filterKey) || entry.compactDisplayKey.startsWith(compactFilterKey);
             if (matchesPrefixName) {
                 entryMatchRank = 1;
             } else {
                 const bool matchesPrefixId =
-                    entry.targetIdKey.startsWith(filterKey)
-                    || entry.compactTargetIdKey.startsWith(compactFilterKey);
+                    entry.targetIdKey.startsWith(filterKey) || entry.compactTargetIdKey.startsWith(compactFilterKey);
                 if (matchesPrefixId) {
                     entryMatchRank = 2;
                 } else {
                     const bool matchesContains =
-                        entry.displayKey.contains(filterKey)
-                        || entry.compactDisplayKey.contains(compactFilterKey)
-                        || entry.targetIdKey.contains(filterKey)
-                        || entry.compactTargetIdKey.contains(compactFilterKey);
+                        entry.displayKey.contains(filterKey) || entry.compactDisplayKey.contains(compactFilterKey)
+                        || entry.targetIdKey.contains(filterKey) || entry.compactTargetIdKey.contains(compactFilterKey);
                     if (matchesContains) {
                         entryMatchRank = 3;
                     }
@@ -355,10 +335,12 @@ void SkyObjectSearchModel::rebuildRows()
             continue;
         }
 
-        m_rows.push_back(Row {
-            .sourceIndex = sourceIndex,
-            .matchRank = entryMatchRank,
-        });
+        m_rows.push_back(
+            Row{
+                .sourceIndex = sourceIndex,
+                .matchRank = entryMatchRank,
+            }
+        );
     }
 
     std::sort(m_rows.begin(), m_rows.end(), [this](const Row& lhs, const Row& rhs) {
@@ -366,23 +348,22 @@ void SkyObjectSearchModel::rebuildRows()
             return lhs.matchRank < rhs.matchRank;
         }
 
-        const SourceEntry& lhsEntry = m_sourceEntries.at(lhs.sourceIndex);
-        const SourceEntry& rhsEntry = m_sourceEntries.at(rhs.sourceIndex);
-        if (std::abs(lhsEntry.brightnessMagnitude - rhsEntry.brightnessMagnitude) > 1e-9) {
-            return lhsEntry.brightnessMagnitude < rhsEntry.brightnessMagnitude;
-        }
-
-        const int displayCompare = QString::compare(
-            lhsEntry.displayText,
-            rhsEntry.displayText,
-            Qt::CaseInsensitive
-        );
-        if (displayCompare != 0) {
-            return displayCompare < 0;
-        }
-
-        return QString::compare(lhsEntry.targetId, rhsEntry.targetId, Qt::CaseInsensitive) < 0;
+        return ranksBefore(m_sourceEntries.at(lhs.sourceIndex), m_sourceEntries.at(rhs.sourceIndex));
     });
 
     endResetModel();
+}
+
+bool SkyObjectSearchModel::ranksBefore(const SourceEntry& lhs, const SourceEntry& rhs)
+{
+    if (std::abs(lhs.brightnessMagnitude - rhs.brightnessMagnitude) > skygate::core::NumericTolerance::kDisplayChange) {
+        return lhs.brightnessMagnitude < rhs.brightnessMagnitude;
+    }
+
+    const int displayCompare = QString::compare(lhs.displayText, rhs.displayText, Qt::CaseInsensitive);
+    if (displayCompare != 0) {
+        return displayCompare < 0;
+    }
+
+    return QString::compare(lhs.targetId, rhs.targetId, Qt::CaseInsensitive) < 0;
 }

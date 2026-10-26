@@ -1,8 +1,9 @@
 #pragma once
 
-#include "skygate/ephemeris/IStarCatalog.hpp"
-#include "skygate/ephemeris/CatalogLoadResult.hpp"
-#include "skygate/ephemeris/CatalogLoader.hpp"
+#include "CatalogParseOptions.hpp"
+
+#include "catalog/CatalogLoadResult.hpp"
+#include "catalog/IStarCatalog.hpp"
 
 #include <QByteArray>
 
@@ -21,7 +22,7 @@ public:
     void parseAsync(
         QByteArray payload,
         QObject* callbackContext,
-        skygate::ephemeris::CatalogSelectionOptions selectionOptions,
+        CatalogParseOptions parseOptions,
         ProgressHandler progressHandler,
         CompletionHandler completionHandler
     ) const;

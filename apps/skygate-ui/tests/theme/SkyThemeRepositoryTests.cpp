@@ -1,10 +1,10 @@
-#include <QtTest>
-
-#include "SkyTheme.hpp"
+#include "theme/SkyThemeDefinition.hpp"
+#include "theme/SkyThemeRepository.hpp"
 
 #include <QFile>
 #include <QRegularExpression>
 #include <QTemporaryDir>
+#include <QtTest>
 
 using namespace skygate::ui::internal;
 
@@ -14,7 +14,7 @@ class SkyThemeRepositoryTests final : public QObject {
 private slots:
     void loadsBundledThemes();
     void missingThemeIdFallsBackToDefaultTheme();
-    void malformedThemeDefinitionFallsBackToBuiltInDefault();
+    void malformedThemeFallsBackToBuiltInDefault();
 };
 
 void SkyThemeRepositoryTests::loadsBundledThemes()
@@ -38,17 +38,14 @@ void SkyThemeRepositoryTests::missingThemeIdFallsBackToDefaultTheme()
 {
     const SkyThemeRepository repository;
     const SkyThemeDefinition& defaultTheme = repository.defaultTheme();
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "Unknown theme id missing-theme - using default theme"
-    );
+    QTest::ignoreMessage(QtWarningMsg, "Unknown theme id missing-theme - using default theme");
     const SkyThemeDefinition& resolvedTheme = repository.themeById("missing-theme");
 
     QCOMPARE(resolvedTheme.id, defaultTheme.id);
     QCOMPARE(resolvedTheme.ui.windowBackground, defaultTheme.ui.windowBackground);
 }
 
-void SkyThemeRepositoryTests::malformedThemeDefinitionFallsBackToBuiltInDefault()
+void SkyThemeRepositoryTests::malformedThemeFallsBackToBuiltInDefault()
 {
     QTemporaryDir tempDir;
     QVERIFY(tempDir.isValid());
@@ -85,8 +82,7 @@ void SkyThemeRepositoryTests::malformedThemeDefinitionFallsBackToBuiltInDefault(
     manifestFile.close();
 
     QTest::ignoreMessage(
-        QtWarningMsg,
-        QRegularExpression("Theme .*broken-theme\\.json has invalid color for key windowBackground")
+        QtWarningMsg, QRegularExpression("Theme .*broken-theme\\.json has invalid color for key windowBackground")
     );
     const SkyThemeRepository repository(manifestPath);
     const SkyThemeDefinition& fallbackTheme = repository.defaultTheme();

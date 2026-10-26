@@ -1,5 +1,5 @@
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/ProjectionFactory.hpp"
+#include "PreparedProjection.hpp"
+#include "projections/ProjectionAlgorithms.hpp"
 #include "skygate/testsupport/DeterministicFuzz.hpp"
 
 #include <QtTest/QtTest>
@@ -10,30 +10,25 @@
 
 namespace {
 
-constexpr std::array<skygate::core::ProjectionType, 3> kProjectionTypes {
+constexpr std::array<skygate::core::ProjectionType, 3> kProjectionTypes{
     skygate::core::ProjectionType::Stereographic,
     skygate::core::ProjectionType::AzimuthalEquidistant,
     skygate::core::ProjectionType::Perspective,
 };
 
-[[nodiscard]] bool isNear(
-    const double actual,
-    const double expected,
-    const double tolerance = 1e-6
-)
+[[nodiscard]] bool isNear(const double actual, const double expected, const double tolerance = 1e-6)
 {
     return std::abs(actual - expected) <= tolerance;
 }
 
-[[nodiscard]] skygate::core::ProjectionParams generatedParams(
-    skygate::testsupport::DeterministicRng& rng
-)
+[[nodiscard]] skygate::core::ProjectionParams generatedParams(skygate::testsupport::DeterministicRng& rng)
 {
-    return skygate::core::ProjectionParams {
-        .center = {
-            .altitudeDeg = rng.realInRange(-75.0, 75.0),
-            .azimuthDeg = rng.realInRange(-720.0, 720.0),
-        },
+    return skygate::core::ProjectionParams{
+        .center =
+            {
+                .altitudeDeg = rng.realInRange(-75.0, 75.0),
+                .azimuthDeg = rng.realInRange(-720.0, 720.0),
+            },
         .fovDeg = rng.realInRange(25.0, 135.0),
         .rollDeg = rng.realInRange(-720.0, 720.0),
         .viewportWidth = rng.realInRange(240.0, 2600.0),
@@ -47,23 +42,16 @@ constexpr std::array<skygate::core::ProjectionType, 3> kProjectionTypes {
     const double radiusDeg
 )
 {
-    return skygate::core::HorizontalCoordinate {
-        .altitudeDeg = std::clamp(
-            center.altitudeDeg + rng.realInRange(-radiusDeg, radiusDeg),
-            -90.0,
-            90.0
-        ),
+    return skygate::core::HorizontalCoordinate{
+        .altitudeDeg = std::clamp(center.altitudeDeg + rng.realInRange(-radiusDeg, radiusDeg), -90.0, 90.0),
         .azimuthDeg = center.azimuthDeg + rng.realInRange(-radiusDeg, radiusDeg),
     };
 }
 
-void verifyEquivalentPoints(
-    const skygate::core::ScreenPoint& actual,
-    const skygate::core::ScreenPoint& expected
-)
+void verifyEquivalentPoints(const skygate::core::ScreenPoint& actual, const skygate::core::ScreenPoint& expected)
 {
     QCOMPARE(actual.status, expected.status);
-    QCOMPARE(actual.isVisible, expected.isVisible);
+    QCOMPARE(actual.isVisible(), expected.isVisible());
     if (actual.status == skygate::core::ProjectionStatus::Visible) {
         QVERIFY(actual.isFinite());
         QVERIFY(expected.isFinite());
@@ -72,37 +60,46 @@ void verifyEquivalentPoints(
     }
 }
 
+[[nodiscard]] skygate::core::ScreenPoint directProjection(
+    const skygate::core::ProjectionType projectionType,
+    const skygate::core::HorizontalCoordinate& coordinate,
+    const skygate::core::ProjectionParams& params
+)
+{
+    skygate::core::ProjectionFrame frame;
+    if (!skygate::core::ProjectionAlgorithms::prepareFrame(projectionType, params, frame)) {
+        return skygate::core::ScreenPoint::invalidParameters();
+    }
+
+    return skygate::core::ProjectionAlgorithms::project(frame, coordinate);
+}
+
 }  // namespace
 
 class ProjectionPropertyTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void generatedPreparedProjectionsMatchDirectProjection();
+    void preparedProjectionsMatchDirectProjection();
     void generatedVisiblePointsAreFiniteAndWithinViewport();
     void addingFullAzimuthTurnsDoesNotChangeProjection();
     void invalidGeneratedCoordinatesNeverBecomeVisible();
 };
 
-void ProjectionPropertyTests::generatedPreparedProjectionsMatchDirectProjection()
+void ProjectionPropertyTests::preparedProjectionsMatchDirectProjection()
 {
     skygate::testsupport::DeterministicRng rng(0x9a700001U);
 
     for (const auto projectionType : kProjectionTypes) {
-        const auto projection = skygate::core::createProjection(projectionType);
-        QVERIFY(projection != nullptr);
-
         for (int sample = 0; sample < 180; ++sample) {
             const auto params = generatedParams(rng);
-            const auto preparedProjection =
-                skygate::core::PreparedProjection::create(projectionType, params);
+            const auto preparedProjection = skygate::core::PreparedProjection::create(projectionType, params);
             QVERIFY(preparedProjection.has_value());
 
             for (int coordinateIndex = 0; coordinateIndex < 6; ++coordinateIndex) {
                 const auto coordinate = generatedCoordinateNear(rng, params.center, params.fovDeg);
                 verifyEquivalentPoints(
-                    preparedProjection->project(coordinate),
-                    projection->project(coordinate, params)
+                    preparedProjection->project(coordinate), directProjection(projectionType, coordinate, params)
                 );
             }
         }
@@ -114,23 +111,20 @@ void ProjectionPropertyTests::generatedVisiblePointsAreFiniteAndWithinViewport()
     skygate::testsupport::DeterministicRng rng(0x9a700002U);
 
     for (const auto projectionType : kProjectionTypes) {
-        const auto projection = skygate::core::createProjection(projectionType);
-        QVERIFY(projection != nullptr);
-
         for (int sample = 0; sample < 240; ++sample) {
             const auto params = generatedParams(rng);
             const auto coordinate = generatedCoordinateNear(rng, params.center, params.fovDeg * 0.45);
-            const auto point = projection->project(coordinate, params);
+            const auto point = directProjection(projectionType, coordinate, params);
 
             if (point.status == skygate::core::ProjectionStatus::Visible) {
-                QVERIFY(point.isVisible);
+                QVERIFY(point.isVisible());
                 QVERIFY(point.isFinite());
                 QVERIFY(point.x >= -1e-6);
                 QVERIFY(point.x <= params.viewportWidth + 1e-6);
                 QVERIFY(point.y >= -1e-6);
                 QVERIFY(point.y <= params.viewportHeight + 1e-6);
             } else {
-                QVERIFY(!point.isVisible);
+                QVERIFY(!point.isVisible());
             }
         }
     }
@@ -141,9 +135,6 @@ void ProjectionPropertyTests::addingFullAzimuthTurnsDoesNotChangeProjection()
     skygate::testsupport::DeterministicRng rng(0x9a700003U);
 
     for (const auto projectionType : kProjectionTypes) {
-        const auto projection = skygate::core::createProjection(projectionType);
-        QVERIFY(projection != nullptr);
-
         for (int sample = 0; sample < 180; ++sample) {
             auto params = generatedParams(rng);
             auto shiftedParams = params;
@@ -154,8 +145,8 @@ void ProjectionPropertyTests::addingFullAzimuthTurnsDoesNotChangeProjection()
             shiftedCoordinate.azimuthDeg += 360.0 * static_cast<double>(rng.intInRange(-4, 4));
 
             verifyEquivalentPoints(
-                projection->project(shiftedCoordinate, shiftedParams),
-                projection->project(coordinate, params)
+                directProjection(projectionType, shiftedCoordinate, shiftedParams),
+                directProjection(projectionType, coordinate, params)
             );
         }
     }
@@ -166,21 +157,16 @@ void ProjectionPropertyTests::invalidGeneratedCoordinatesNeverBecomeVisible()
     skygate::testsupport::DeterministicRng rng(0x9a700004U);
 
     for (const auto projectionType : kProjectionTypes) {
-        const auto projection = skygate::core::createProjection(projectionType);
-        QVERIFY(projection != nullptr);
-
         for (int sample = 0; sample < 96; ++sample) {
             const auto params = generatedParams(rng);
-            const skygate::core::HorizontalCoordinate invalidCoordinate {
-                .altitudeDeg = rng.chance(1U, 2U)
-                    ? rng.realInRange(90.01, 720.0)
-                    : rng.realInRange(-720.0, -90.01),
+            const skygate::core::HorizontalCoordinate invalidCoordinate{
+                .altitudeDeg = rng.chance(1U, 2U) ? rng.realInRange(90.01, 720.0) : rng.realInRange(-720.0, -90.01),
                 .azimuthDeg = rng.realInRange(-720.0, 720.0),
             };
-            const auto point = projection->project(invalidCoordinate, params);
+            const auto point = directProjection(projectionType, invalidCoordinate, params);
 
             QCOMPARE(point.status, skygate::core::ProjectionStatus::InvalidCoordinate);
-            QVERIFY(!point.isVisible);
+            QVERIFY(!point.isVisible());
         }
     }
 }

@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/StellariumConstellationParser.hpp"
+#include "catalog/stellarium/StellariumConstellationParser.hpp"
 
 #include <QtTest/QtTest>
 
@@ -30,19 +30,19 @@ void StellariumConstellationParserTests::rejectsLegacyRowsPayload()
 
     QVERIFY(result.constellationCount == 0U);
     QVERIFY(result.lineRefs.empty());
-    QVERIFY(result.labelRefs.empty());
+    QVERIFY(result.anchorGroups.empty());
 }
 
 void StellariumConstellationParserTests::rejectsEmptyWhitespaceAndMalformedJsonPayloads()
 {
     const skygate::ephemeris::StellariumConstellationParser parser;
 
-    for (const std::string_view payload : {"", "   \n\t  ", "[1, 2, 3]", "{ not json" }) {
+    for (const std::string_view payload : {"", "   \n\t  ", "[1, 2, 3]", "{ not json"}) {
         const auto result = parser.parse(payload);
 
         QVERIFY(result.constellationCount == 0U);
         QVERIFY(result.lineRefs.empty());
-        QVERIFY(result.labelRefs.empty());
+        QVERIFY(result.anchorGroups.empty());
     }
 }
 
@@ -63,9 +63,9 @@ void StellariumConstellationParserTests::parsesIndexJsonPayload()
 
     QVERIFY(result.constellationCount == 1U);
     QVERIFY(result.lineRefs.size() == 2U);
-    QVERIFY(result.labelRefs.size() == 1U);
-    QVERIFY(result.labelRefs[0].first == "Orion");
-    QVERIFY(result.labelRefs[0].second.size() == 3U);
+    QVERIFY(result.anchorGroups.size() == 1U);
+    QVERIFY(result.anchorGroups[0].first == "Orion");
+    QVERIFY(result.anchorGroups[0].second.size() == 3U);
 }
 
 void StellariumConstellationParserTests::parsesObjectRootWithoutConstellationArray()
@@ -82,7 +82,7 @@ void StellariumConstellationParserTests::parsesObjectRootWithoutConstellationArr
 
     QVERIFY(result.constellationCount == 0U);
     QVERIFY(result.lineRefs.size() == 3U);
-    QVERIFY(result.labelRefs.empty());
+    QVERIFY(result.anchorGroups.empty());
 }
 
 QTEST_APPLESS_MAIN(StellariumConstellationParserTests)

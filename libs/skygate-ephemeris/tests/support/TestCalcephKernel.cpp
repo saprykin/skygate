@@ -1,0 +1,155 @@
+#include "TestCalcephKernel.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
+
+#include <cstddef>
+#include <utility>
+
+namespace skygate::ephemeris::tests {
+
+TestCalcephKernel::TestCalcephKernel(Info info) : m_kernelInfo(std::move(info)) {}
+
+TestCalcephKernel::Status TestCalcephKernel::status() const noexcept
+{
+    return Status::Ready;
+}
+
+const std::vector<std::string>& TestCalcephKernel::diagnostics() const noexcept
+{
+    return m_diagnostics;
+}
+
+const std::optional<TestCalcephKernel::Info>& TestCalcephKernel::kernelInfo() const noexcept
+{
+    return m_kernelInfo;
+}
+
+TestCalcephKernel::Status
+TestCalcephKernel::statusForEpoch(const skygate::core::AstronomicalEpoch& epoch) const noexcept
+{
+    if (!m_kernelInfo.has_value()) {
+        return Status::Ready;
+    }
+    if (!epoch.isFinite() || epoch.sortKey() < m_kernelInfo->validityRange.start.sortKey()
+        || epoch.sortKey() > m_kernelInfo->validityRange.end.sortKey()) {
+        return Status::OutOfRange;
+    }
+
+    return Status::Ready;
+}
+
+skygate::ephemeris::highprecision::ICalcephKernel::StateResult TestCalcephKernel::compute(
+    const skygate::core::AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId
+) const
+{
+    ++m_callCount;
+    m_lastEpoch = epoch;
+    m_lastTargetNaifId = targetNaifId;
+    m_lastCenterNaifId = centerNaifId;
+    m_calls.push_back({
+        .epoch = epoch,
+        .targetNaifId = targetNaifId,
+        .centerNaifId = centerNaifId,
+    });
+    if (m_requiredTimeScale.has_value() && epoch.timeScale != *m_requiredTimeScale) {
+        skygate::ephemeris::highprecision::ICalcephKernel::StateResult result;
+        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
+        result.metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
+        return result;
+    }
+
+    const ResponseKey key = responseKey(targetNaifId, centerNaifId);
+    if (const auto sequence = m_responseSequences.find(key); sequence != m_responseSequences.end()) {
+        const std::size_t index = m_responseSequenceIndexes[key]++;
+        if (index < sequence->second.size()) {
+            return sequence->second[index];
+        }
+        return sequence->second.back();
+    }
+    if (const auto match = m_responses.find(key); match != m_responses.end()) {
+        return match->second;
+    }
+    return m_defaultResult;
+}
+
+void TestCalcephKernel::setDiagnostics(std::vector<std::string> diagnostics)
+{
+    m_diagnostics = std::move(diagnostics);
+}
+
+void TestCalcephKernel::setRequiredTimeScale(const skygate::core::TimeScale timeScale)
+{
+    m_requiredTimeScale = timeScale;
+}
+
+void TestCalcephKernel::setDefaultResult(skygate::ephemeris::highprecision::ICalcephKernel::StateResult result)
+{
+    m_defaultResult = std::move(result);
+}
+
+skygate::ephemeris::highprecision::ICalcephKernel::StateResult& TestCalcephKernel::defaultResult() noexcept
+{
+    return m_defaultResult;
+}
+
+skygate::ephemeris::highprecision::ICalcephKernel::StateResult&
+TestCalcephKernel::response(const int targetNaifId, const int centerNaifId)
+{
+    return m_responses[responseKey(targetNaifId, centerNaifId)];
+}
+
+std::vector<skygate::ephemeris::highprecision::ICalcephKernel::StateResult>&
+TestCalcephKernel::responseSequence(const int targetNaifId, const int centerNaifId)
+{
+    return m_responseSequences[responseKey(targetNaifId, centerNaifId)];
+}
+
+void TestCalcephKernel::setResponse(
+    const int targetNaifId,
+    const int centerNaifId,
+    skygate::ephemeris::highprecision::ICalcephKernel::StateResult result
+)
+{
+    m_responses[responseKey(targetNaifId, centerNaifId)] = std::move(result);
+}
+
+void TestCalcephKernel::appendResponse(
+    const int targetNaifId,
+    const int centerNaifId,
+    skygate::ephemeris::highprecision::ICalcephKernel::StateResult result
+)
+{
+    m_responseSequences[responseKey(targetNaifId, centerNaifId)].push_back(std::move(result));
+}
+
+int TestCalcephKernel::callCount() const noexcept
+{
+    return m_callCount;
+}
+
+const skygate::core::AstronomicalEpoch& TestCalcephKernel::lastEpoch() const noexcept
+{
+    return m_lastEpoch;
+}
+
+int TestCalcephKernel::lastTargetNaifId() const noexcept
+{
+    return m_lastTargetNaifId;
+}
+
+int TestCalcephKernel::lastCenterNaifId() const noexcept
+{
+    return m_lastCenterNaifId;
+}
+
+const std::vector<TestCalcephKernel::Call>& TestCalcephKernel::calls() const noexcept
+{
+    return m_calls;
+}
+
+TestCalcephKernel::ResponseKey
+TestCalcephKernel::responseKey(const int targetNaifId, const int centerNaifId) const noexcept
+{
+    return {targetNaifId, centerNaifId};
+}
+
+}  // namespace skygate::ephemeris::tests

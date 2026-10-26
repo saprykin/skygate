@@ -4,7 +4,7 @@ namespace skygate::ui::internal {
 
 SkyRenderHorizontalLookup::SkyRenderHorizontalLookup(
     const std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs,
-    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs
+    const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups
 )
 {
     for (const auto& lineRef : lineRefs) {
@@ -12,8 +12,8 @@ SkyRenderHorizontalLookup::SkyRenderHorizontalLookup(
         trackBodyId(lineRef.second);
     }
 
-    for (const auto& labelRef : labelRefs) {
-        for (const std::string& hipId : labelRef.second) {
+    for (const auto& anchorGroup : anchorGroups) {
+        for (const std::string& hipId : anchorGroup.second) {
             trackBodyId(hipId);
         }
     }
@@ -22,8 +22,7 @@ SkyRenderHorizontalLookup::SkyRenderHorizontalLookup(
 }
 
 void SkyRenderHorizontalLookup::capture(
-    const skygate::ephemeris::CelestialBody& body,
-    const skygate::core::HorizontalCoordinate& horizontal
+    const skygate::ephemeris::BaseCelestialBody& body, const skygate::core::HorizontalCoordinate& horizontal
 )
 {
     if (!m_requiredBodyIds.empty() && m_requiredBodyIds.contains(body.id)) {
@@ -31,9 +30,8 @@ void SkyRenderHorizontalLookup::capture(
     }
 }
 
-const skygate::core::HorizontalCoordinate* SkyRenderHorizontalLookup::findHorizontal(
-    const std::string_view bodyId
-) const
+const skygate::core::HorizontalCoordinate*
+SkyRenderHorizontalLookup::findHorizontal(const std::string_view bodyId) const
 {
     if (const auto idIt = m_horizontalByBodyId.find(bodyId); idIt != m_horizontalByBodyId.end()) {
         return &idIt->second;

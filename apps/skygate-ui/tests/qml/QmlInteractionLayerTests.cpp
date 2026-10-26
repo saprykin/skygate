@@ -1,4 +1,4 @@
-#include "QmlTestSupport.hpp"
+#include "support/QmlTestSupport.hpp"
 
 using namespace skygate::ui::tests;
 
@@ -34,7 +34,9 @@ void QmlInteractionLayerTests::hoverClickDragAndWheelReachSceneAndController()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -95,7 +97,9 @@ void QmlInteractionLayerTests::hoverClickDragAndWheelReachSceneAndController()
                 skySceneModel: fakeScene
             }
         }
-    )"), QStringLiteral("SkyInteractionLayerBehaviorTest.qml"));
+    )"),
+        QStringLiteral("SkyInteractionLayerBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -146,10 +150,21 @@ void QmlInteractionLayerTests::hoverClickDragAndWheelReachSceneAndController()
         false
     );
     QCoreApplication::sendEvent(exposed.window(), &wheelEvent);
+    QWheelEvent secondWheelEvent(
+        QPointF(162.0, 172.0),
+        exposed.window()->mapToGlobal(QPoint(162, 172)),
+        QPoint(),
+        QPoint(0, 120),
+        Qt::NoButton,
+        Qt::NoModifier,
+        Qt::NoScrollPhase,
+        false
+    );
+    QCoreApplication::sendEvent(exposed.window(), &secondWheelEvent);
     QCoreApplication::processEvents();
     QTRY_COMPARE(fakeController->property("zoomWheelCalls").toInt(), 1);
-    QCOMPARE(fakeController->property("lastWheelDelta").toInt(), 120);
-    QCOMPARE(interaction->property("hoveredObjectLabel").toString(), QString("label-160-170"));
+    QCOMPARE(fakeController->property("lastWheelDelta").toInt(), 240);
+    QCOMPARE(interaction->property("hoveredObjectLabel").toString(), QString("label-162-172"));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
@@ -162,7 +177,9 @@ void QmlInteractionLayerTests::pinchScaleHandlerZoomsAndClearsHover()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -199,16 +216,15 @@ void QmlInteractionLayerTests::pinchScaleHandlerZoomsAndClearsHover()
                 hoveredObjectLabel: "before-pinch"
             }
         }
-    )"), QStringLiteral("SkyInteractionLayerPinchBehaviorTest.qml"));
+    )"),
+        QStringLiteral("SkyInteractionLayerPinchBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
     QObject* fakeController = qvariant_cast<QObject*>(root->property("fakeController"));
     QObject* interaction = qvariant_cast<QObject*>(root->property("interaction"));
-    QObject* handler = firstObjectWithObjectName(
-        root,
-        QStringLiteral("skyInteractionPinchHandler")
-    );
+    QObject* handler = firstObjectWithObjectName(root, QStringLiteral("skyInteractionPinchHandler"));
     QVERIFY(fakeController != nullptr);
     QVERIFY(interaction != nullptr);
     QVERIFY(handler != nullptr);

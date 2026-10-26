@@ -1,8 +1,16 @@
-#include "catalog/io/CsvRowTokenizer.hpp"
+#include "CsvRowTokenizer.hpp"
+#include "StringUtilities.hpp"
 
 #include <QtGlobal>
 
+#include <string_view>
+
 namespace skygate::ephemeris {
+
+std::string_view CsvRowTokenizer::takeLine(std::string_view& remaining) noexcept
+{
+    return StringUtilities::takeLine(remaining);
+}
 
 QVector<QStringView> CsvRowTokenizer::splitColumns(const QStringView line)
 {
@@ -62,6 +70,16 @@ QString CsvRowTokenizer::decodeField(QStringView field)
     }
 
     return decoded;
+}
+
+QString CsvRowTokenizer::decodeTrimmedField(const QStringView field)
+{
+    return decodeField(field).trimmed();
+}
+
+QString CsvRowTokenizer::decodeTrimmedLine(const std::string_view line)
+{
+    return StringUtilities::fromUtf8(line).trimmed();
 }
 
 }  // namespace skygate::ephemeris

@@ -1,47 +1,21 @@
-#include "catalog/io/DelimitedCatalogReader.hpp"
-
-#include "catalog/io/CsvRowTokenizer.hpp"
+#include "DelimitedCatalogReader.hpp"
+#include "CatalogHeaderPolicy.hpp"
+#include "CsvRowTokenizer.hpp"
 
 #include <algorithm>
 #include <utility>
 
 namespace skygate::ephemeris {
 
-DelimitedCatalogReader::Row::Row(QVector<QStringView> columns, const QHash<QString, qsizetype>& headerIndex) noexcept
-    : m_columns(std::move(columns)), m_headerIndex(headerIndex)
-{
-}
-
-QString DelimitedCatalogReader::Row::decodeColumn(const QString& name) const
-{
-    return decodeColumn(columnIndex(name));
-}
-
-QString DelimitedCatalogReader::Row::decodeColumn(const qsizetype columnIndex) const
-{
-    if (columnIndex < 0 || columnIndex >= m_columns.size()) {
-        return {};
-    }
-
-    return CsvRowTokenizer::decodeField(m_columns.at(columnIndex)).trimmed();
-}
-
-qsizetype DelimitedCatalogReader::Row::columnIndex(const QString& name) const
-{
-    const auto it = m_headerIndex.constFind(name.toLower());
-    if (it == m_headerIndex.cend()) {
-        return -1;
-    }
-    return *it;
-}
-
 CatalogBodyParseResult DelimitedCatalogReader::read(
-    const std::string_view payload, const DelimitedCatalogReaderOptions& options, const RowHandler& rowHandler
+    const std::string_view payload,
+    const DelimitedCatalogReaderOptions& options,
+    const DelimitedCatalogRowHandler& rowHandler
 )
 {
     CatalogBodyParseResult result;
     if (payload.empty()) {
-        result.errorCode = CatalogLoadErrorCode::EmptyInput;
+        result.errorCode = CatalogLoadResult::ErrorCode::EmptyInput;
         result.errorDetail = options.emptyInputDetail;
         return result;
     }
@@ -50,69 +24,45 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
     const std::size_t maxAllowedRowCount =
         std::max(options.rowCountLimitFloor, (payload.size() / expectedBytesPerDataRow) + 1U);
 
-    std::size_t cursor = 0;
     std::size_t processedRowCount = 0;
-    bool hasHeader = false;
-    QHash<QString, qsizetype> headerIndex;
+    std::string_view remaining = payload;
+    const std::string_view headerLine = CatalogHeaderPolicy::findHeaderLine(remaining);
+    if (headerLine.empty()) {
+        result.errorCode = CatalogLoadResult::ErrorCode::EmptyInput;
+        result.errorDetail = options.emptyInputDetail;
+        return result;
+    }
 
-    while (cursor < payload.size()) {
-        const std::size_t newline = payload.find('\n', cursor);
-        const std::size_t lineEnd = newline == std::string_view::npos ? payload.size() : newline;
-        const std::string_view rawLine = payload.substr(cursor, lineEnd - cursor);
-        const QString line = QString::fromUtf8(rawLine.data(), static_cast<qsizetype>(rawLine.size())).trimmed();
+    const QHash<QString, qsizetype> headerIndex = CatalogHeaderPolicy::decodeHeaderLine(headerLine, options.separator);
+    if (!CatalogHeaderPolicy::hasRequiredColumns(headerIndex, options.requiredColumns)) {
+        result.errorCode = CatalogLoadResult::ErrorCode::MissingRequiredColumns;
+        result.errorDetail = options.missingColumnsDetail;
+        return result;
+    }
 
-        if (!line.isEmpty()) {
-            QVector<QStringView> columns = CsvRowTokenizer::splitColumns(QStringView{line}, options.separator);
-            if (!hasHeader) {
-                for (qsizetype i = 0; i < columns.size(); ++i) {
-                    QString header = CsvRowTokenizer::decodeField(columns.at(i)).trimmed();
-                    if (i == 0 && header.startsWith(QChar(0xfeff))) {
-                        header.remove(0, 1);
-                    }
-                    header = header.toLower();
-                    if (!header.isEmpty()) {
-                        headerIndex.insert(header, i);
-                    }
-                }
-
-                const bool hasRequiredColumns = std::all_of(
-                    options.requiredColumns.begin(),
-                    options.requiredColumns.end(),
-                    [&headerIndex](const QString& columnName) { return headerIndex.contains(columnName.toLower()); }
-                );
-                if (!hasRequiredColumns) {
-                    result.errorCode = CatalogLoadErrorCode::MissingRequiredColumns;
-                    result.errorDetail = options.missingColumnsDetail;
-                    return result;
-                }
-                hasHeader = true;
-            } else {
-                ++processedRowCount;
-                if (processedRowCount > maxAllowedRowCount) {
-                    result.errorCode = options.invalidErrorCode;
-                    result.errorDetail = options.rowLimitDetail;
-                    return result;
-                }
-
-                Row row(std::move(columns), headerIndex);
-                if (rowHandler && !rowHandler(row, result)) {
-                    return result;
-                }
-            }
+    // Data rows use the same line policy as the header probe, so a CRLF payload
+    // reads the same in both passes.
+    while (!remaining.empty()) {
+        const std::string_view rawLine = CsvRowTokenizer::takeLine(remaining);
+        const QString line = CsvRowTokenizer::decodeTrimmedLine(rawLine);
+        if (line.isEmpty()) {
+            continue;
         }
 
-        if (newline == std::string_view::npos) {
-            break;
+        if (++processedRowCount > maxAllowedRowCount) {
+            result.errorCode = options.invalidErrorCode;
+            result.errorDetail = options.rowLimitDetail;
+            return result;
         }
-        cursor = newline + 1U;
+
+        QVector<QStringView> columns = CsvRowTokenizer::splitColumns(QStringView{line}, options.separator);
+        DelimitedCatalogRow row(std::move(columns), headerIndex);
+        if (rowHandler && !rowHandler(row, result)) {
+            return result;
+        }
     }
 
     result.diagnostics.processedRowCount = processedRowCount;
-    if (!hasHeader) {
-        result.errorCode = CatalogLoadErrorCode::EmptyInput;
-        result.errorDetail = options.emptyInputDetail;
-    }
-
     return result;
 }
 

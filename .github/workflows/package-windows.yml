@@ -184,6 +184,14 @@ jobs:
           if (-not $zlib) {
             throw "MSI package does not contain a zlib runtime DLL."
           }
+          foreach ($dependency in @("calceph", "zstd", "erfa")) {
+            $runtime = Get-ChildItem -Path $extractDir -Recurse -File |
+              Where-Object { $_.Name -match $dependency } |
+              Select-Object -First 1
+            if (-not $runtime) {
+              throw "MSI package does not contain a $dependency runtime DLL."
+            }
+          }
           $versionStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
           $versionStartInfo.FileName = $executable.FullName
           $versionStartInfo.ArgumentList.Add("--version")

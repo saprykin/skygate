@@ -6,6 +6,7 @@ import com.skygate.app 1.0
 Item {
     id: root
     required property var preferencesDraft
+    required property var theme
 
     GridLayout {
         anchors.left: parent.left
@@ -16,19 +17,18 @@ Item {
         columnSpacing: 6
 
         PreferencesGroupTitle {
+            theme: root.theme
             columnSpan: 4
             text: "Location"
         }
 
-        Label {
+        PreferencesFieldLabel {
+            theme: root.theme
             text: "Location Source"
-            color: skyContext.theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 11
-            Layout.alignment: Qt.AlignVCenter
         }
 
         PreferencesComboBox {
+            theme: root.theme
             id: locationSourceCombo
             objectName: "locationSourceCombo"
             Layout.fillWidth: true
@@ -45,16 +45,14 @@ Item {
             onActivated: root.preferencesDraft.setLocationSource(currentText)
         }
 
-        Label {
-            text: "City"
-            color: skyContext.theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 11
-            Layout.alignment: Qt.AlignVCenter
+        PreferencesFieldLabel {
+            theme: root.theme
             visible: root.preferencesDraft.locationSourceText === "City"
+            text: "City"
         }
 
         PreferencesCityPicker {
+            theme: root.theme
             objectName: "cityPicker"
             Layout.fillWidth: true
             Layout.columnSpan: 3
@@ -69,15 +67,13 @@ Item {
             }
         }
 
-        Label {
+        PreferencesFieldLabel {
+            theme: root.theme
             text: "Timezone"
-            color: skyContext.theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 11
-            Layout.alignment: Qt.AlignVCenter
         }
 
         PreferencesTimeZonePicker {
+            theme: root.theme
             objectName: "timeZonePicker"
             Layout.fillWidth: true
             Layout.columnSpan: 3
@@ -90,15 +86,13 @@ Item {
             }
         }
 
-        Label {
+        PreferencesFieldLabel {
+            theme: root.theme
             text: "Latitude"
-            color: skyContext.theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 11
-            Layout.alignment: Qt.AlignVCenter
         }
 
         PreferencesTextField {
+            theme: root.theme
             id: latitudeInput
             objectName: "latitudeInput"
             Layout.fillWidth: true
@@ -122,15 +116,13 @@ Item {
             }
         }
 
-        Label {
+        PreferencesFieldLabel {
+            theme: root.theme
             text: "Longitude"
-            color: skyContext.theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 11
-            Layout.alignment: Qt.AlignVCenter
         }
 
         PreferencesTextField {
+            theme: root.theme
             id: longitudeInput
             objectName: "longitudeInput"
             Layout.fillWidth: true
@@ -154,15 +146,14 @@ Item {
             }
         }
 
-        Label {
+        PreferencesFieldLabel {
+            theme: root.theme
             text: "Elevation (m)"
-            color: skyContext.theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 10
-            Layout.alignment: Qt.AlignVCenter
+            textPixelSize: 10
         }
 
         PreferencesTextField {
+            theme: root.theme
             id: elevationInput
             objectName: "elevationInput"
             Layout.fillWidth: true
@@ -182,25 +173,25 @@ Item {
         }
 
         PreferencesGroupTitle {
+            theme: root.theme
             columnSpan: 4
             Layout.topMargin: 8
             text: "View"
         }
 
-        Label {
+        PreferencesFieldLabel {
+            theme: root.theme
             text: "Projection"
-            color: skyContext.theme.formLabelText
-            font.family: "Avenir Next"
-            font.pixelSize: 10
-            Layout.alignment: Qt.AlignVCenter
+            textPixelSize: 10
         }
 
         PreferencesComboBox {
+            theme: root.theme
             id: projectionCombo
             objectName: "projectionCombo"
             Layout.fillWidth: true
             Layout.columnSpan: 3
-            model: ["Stereographic", "AzimuthalEquidistant", "Perspective"]
+            model: root.preferencesDraft.skyContextController.projectionTypeOptions
 
             Binding on currentIndex {
                 value: Math.max(0, projectionCombo.model.indexOf(root.preferencesDraft.projectionTypeText))

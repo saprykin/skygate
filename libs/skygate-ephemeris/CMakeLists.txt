@@ -8,115 +8,462 @@ if(NOT ZLIB_FOUND)
     )
 endif()
 
+if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    find_package(calceph CONFIG REQUIRED GLOBAL)
+    find_package(zstd CONFIG REQUIRED GLOBAL)
+    find_package(ERFA REQUIRED)
+endif()
+
+set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
+    src/engine/simple/SimpleEphemerisEngine.hpp
+    src/engine/simple/SimpleEphemerisEngine.cpp
+    src/engine/simple/SimpleEphemerisFallbackStrategy.hpp
+    src/engine/simple/SimpleEphemerisFallbackStrategy.cpp
+)
+
+set(SKYGATE_EPHEMERIS_REFERENCE_SOURCES
+    src/reference/EclipticToEquatorialCalculator.hpp
+    src/reference/EclipticToEquatorialCalculator.cpp
+    src/reference/EquatorialToHorizontalCalculator.hpp
+    src/reference/EquatorialToHorizontalCalculator.cpp
+    src/reference/MoonEquatorialCalculator.hpp
+    src/reference/MoonEquatorialCalculator.cpp
+    src/reference/PlanetEquatorialCalculator.hpp
+    src/reference/PlanetEquatorialCalculator.cpp
+    src/reference/ReferenceEpochElements.hpp
+    src/reference/ReferenceEpochElements.cpp
+    src/reference/SunEquatorialCalculator.hpp
+    src/reference/SunEquatorialCalculator.cpp
+    src/reference/SimpleBodyStateCalculator.hpp
+    src/reference/SimpleBodyStateCalculator.cpp
+)
+
+set(SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES)
+list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
+    src/engine/highprecision/ApparentPlaceCalculator.hpp
+    src/engine/highprecision/ApparentPlaceCalculator.cpp
+    src/engine/highprecision/ApparentPlaceOutputFinalizer.hpp
+    src/engine/highprecision/ApparentPlaceOutputFinalizer.cpp
+    src/engine/highprecision/ApparentPlaceRequestPolicy.hpp
+    src/engine/highprecision/AtmosphericRefractionCalculator.hpp
+    src/engine/highprecision/AtmosphericRefractionCalculator.cpp
+    src/engine/highprecision/CatalogStarAstrometryArrays.hpp
+    src/engine/highprecision/CatalogStarAstrometryArrays.cpp
+    src/engine/highprecision/CalcephKernel.hpp
+    src/engine/highprecision/CalcephKernel.cpp
+    src/engine/highprecision/CalcephKernelProvider.hpp
+    src/engine/highprecision/CalcephKernelProvider.cpp
+    src/engine/highprecision/CalcephKernelStatusNames.hpp
+    src/engine/highprecision/CelestialFrameTransformRequest.hpp
+    src/engine/highprecision/CelestialFrameTransformResult.hpp
+    src/engine/highprecision/CelestialFrameTransformResult.cpp
+    src/engine/highprecision/CelestialReferenceFrame.hpp
+    src/engine/highprecision/CelestialReferenceFrame.cpp
+    src/engine/highprecision/CelestialFrameMath.hpp
+    src/engine/highprecision/CelestialFrameMath.cpp
+    src/engine/highprecision/EpochScaleResolver.hpp
+    src/engine/highprecision/EpochScaleResolver.cpp
+    src/engine/highprecision/HighPrecisionEphemerisEngine.hpp
+    src/engine/highprecision/HighPrecisionEphemerisEngine.cpp
+    src/engine/highprecision/HighPrecisionComputationInput.hpp
+    src/engine/highprecision/HighPrecisionCalculatorResult.hpp
+    src/engine/highprecision/PreparedEphemerisRequestState.hpp
+    src/engine/highprecision/PreparedRequestStateBuilder.hpp
+    src/engine/highprecision/PreparedRequestStateBuilder.cpp
+    src/engine/highprecision/StarAstrometryBatchResult.hpp
+    src/engine/highprecision/IApparentPlaceCalculator.hpp
+    src/engine/highprecision/IAtmosphericRefractionCalculator.hpp
+    src/engine/highprecision/ICalcephKernel.hpp
+    src/engine/highprecision/ICalcephKernelProvider.hpp
+    src/engine/highprecision/IEphemerisComputationCache.hpp
+    src/engine/highprecision/IEphemerisResultBuilder.hpp
+    src/engine/highprecision/IFrameTransformer.hpp
+    src/engine/highprecision/IStarAstrometryCalculator.hpp
+    src/engine/highprecision/ISolarSystemStateCalculator.hpp
+    src/engine/DeltaTDataLoader.cpp
+    src/engine/DeltaTDataParser.hpp
+    src/engine/DeltaTDataParser.cpp
+    src/engine/EphemerisEpochParsing.hpp
+    src/engine/EphemerisTableLoading.hpp
+    src/engine/EphemerisTableParsing.hpp
+    src/engine/TableBackedEarthOrientationProvider.cpp
+    src/engine/EarthOrientationDataParser.cpp
+    src/engine/EarthOrientationDataLoader.cpp
+    src/engine/EarthOrientationSampler.cpp
+    src/engine/EphemerisDataActivation.cpp
+    src/engine/EphemerisDataActivationResult.cpp
+    src/engine/EphemerisDataFileUtilities.hpp
+    src/engine/EphemerisDataFileUtilities.cpp
+    src/engine/EphemerisDataStaleness.hpp
+    src/engine/EphemerisDataStaleness.cpp
+    src/engine/EphemerisTableDataInfo.hpp
+    src/engine/EphemerisTableDataStatus.hpp
+    src/engine/EphemerisTableMetadata.hpp
+    src/engine/EphemerisTableMetadata.cpp
+    src/engine/EphemerisDataPayloadReader.cpp
+    src/engine/EphemerisStagedUpdateVerification.cpp
+    src/engine/EphemerisStagedUpdateVerificationResult.cpp
+    src/engine/EphemerisDataManifest.cpp
+    src/engine/EphemerisAssetMetadataPolicy.hpp
+    src/engine/EphemerisManifestJsonReader.cpp
+    src/engine/highprecision/EphemerisCacheGateway.hpp
+    src/engine/highprecision/EphemerisCacheGateway.cpp
+    src/engine/highprecision/EphemerisComputationCache.hpp
+    src/engine/highprecision/EphemerisComputationCache.cpp
+    src/engine/highprecision/EphemerisMetadataMerger.hpp
+    src/engine/highprecision/EphemerisMetadataMerger.cpp
+    src/engine/highprecision/EphemerisResultBuilder.hpp
+    src/engine/highprecision/EphemerisResultBuilder.cpp
+    src/engine/highprecision/ErfaFrameTransformer.hpp
+    src/engine/highprecision/ErfaFrameTransformer.cpp
+    src/engine/highprecision/ErfaAstrometry.hpp
+    src/engine/highprecision/ErfaAstrometry.cpp
+    src/engine/highprecision/FrameTransformBatcher.hpp
+    src/engine/highprecision/FrameTransformBatcher.cpp
+    src/engine/highprecision/FrameTransformMatrixCache.hpp
+    src/engine/highprecision/FrameTransformMatrixCache.cpp
+    src/engine/highprecision/FrameTransformStageCatalog.hpp
+    src/engine/ILeapSecondProvider.hpp
+    src/engine/LeapSecondTableLoader.hpp
+    src/engine/LeapSecondTableLoader.cpp
+    src/engine/LeapSecondTableParser.hpp
+    src/engine/LeapSecondTableParser.cpp
+    src/engine/LeapSecondTableScan.hpp
+    src/engine/LeapSecondTableScan.cpp
+    src/engine/highprecision/ObserverGeodesy.hpp
+    src/engine/highprecision/ObserverGeodesy.cpp
+    src/engine/highprecision/SolarSystemCorrectionPipeline.hpp
+    src/engine/highprecision/SolarSystemCorrectionPipeline.cpp
+    src/engine/highprecision/SolarSystemStateCalculator.hpp
+    src/engine/highprecision/SolarSystemStateCalculator.cpp
+    src/engine/highprecision/StarAstrometryCalculator.hpp
+    src/engine/highprecision/StarAstrometryCalculator.cpp
+    src/engine/TableBackedDeltaTProvider.hpp
+    src/engine/TableBackedDeltaTProvider.cpp
+    src/engine/TableBackedLeapSecondProvider.hpp
+    src/engine/TableBackedLeapSecondProvider.cpp
+    src/engine/TableIntervalLookup.hpp
+    src/engine/TableInterpolation.hpp
+    src/engine/TableInterpolation.cpp
+    src/engine/TimeScaleConversionStatus.hpp
+    src/engine/TimeScaleConversionWarningCode.hpp
+    src/engine/TimeScaleOffsetLookup.hpp
+    src/engine/TimeScaleConversionDiagnostics.hpp
+    src/engine/TimeScaleConversionResult.hpp
+    src/engine/TimeScaleConversionResult.cpp
+    src/engine/TimeScaleProviderLoader.hpp
+    src/engine/TimeScaleProviderLoader.cpp
+    src/engine/TimeScaleServiceOptions.hpp
+    src/engine/ITimeScaleService.hpp
+    src/engine/LeapSecondTimeScaleService.hpp
+    src/engine/LeapSecondTimeScaleService.cpp
+    src/engine/LeapSecondOffsetResolver.hpp
+    src/engine/LeapSecondOffsetResolver.cpp
+    src/engine/TdbTtConverter.hpp
+    src/engine/TdbTtConverter.cpp
+    src/engine/Ut1OffsetResolver.hpp
+    src/engine/Ut1OffsetResolver.cpp
+    src/engine/highprecision/EphemerisMetadataStatusMergePolicy.hpp
+    src/engine/highprecision/EphemerisMetadataFailurePolicy.hpp
+    src/engine/highprecision/EphemerisMetadataMergeOptions.hpp
+    src/engine/EphemerisTextDataAsset.hpp
+    src/engine/EphemerisKernelDataAsset.hpp
+    src/engine/IEphemerisDataSnapshot.hpp
+)
+
+if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    add_library(skygate-ephemeris-highprecision-dependencies INTERFACE)
+    target_link_libraries(skygate-ephemeris-highprecision-dependencies
+        INTERFACE
+            calceph
+            zstd::libzstd
+            ERFA::ERFA
+    )
+    add_library(
+        skygate::ephemeris-highprecision-dependencies
+        ALIAS skygate-ephemeris-highprecision-dependencies
+    )
+endif()
+
 add_library(skygate-ephemeris STATIC
-    include/skygate/ephemeris/CatalogLoadResult.hpp
-    include/skygate/ephemeris/BodyTrailCalculator.hpp
-    include/skygate/ephemeris/CatalogComposer.hpp
-    include/skygate/ephemeris/CatalogFactory.hpp
-    include/skygate/ephemeris/CatalogLoader.hpp
-    include/skygate/ephemeris/CatalogPayloadParser.hpp
-    include/skygate/ephemeris/CelestialReferenceCalculator.hpp
-    include/skygate/ephemeris/ConstellationData.hpp
-    include/skygate/ephemeris/ConstellationDataCodec.hpp
-    include/skygate/ephemeris/ConstellationReferenceCalculator.hpp
-    include/skygate/ephemeris/EphemerisEngineFactory.hpp
-    include/skygate/ephemeris/EphemerisEngineQueries.hpp
-    include/skygate/ephemeris/IEphemerisEngine.hpp
-    include/skygate/ephemeris/NightConditionsCalculator.hpp
-    include/skygate/ephemeris/IStarCatalog.hpp
-    include/skygate/ephemeris/ObservationEventCalculator.hpp
-    include/skygate/ephemeris/StellariumConstellationParser.hpp
-    include/skygate/ephemeris/Types.hpp
+    ${SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES}
+    ${SKYGATE_EPHEMERIS_REFERENCE_SOURCES}
+    ${SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES}
+    src/catalog/CatalogCompositionLogging.hpp
+    src/catalog/CatalogParsingLogging.hpp
+    src/catalog/CatalogCompositionPolicy.hpp
+    src/catalog/CatalogCompositionPolicyRules.hpp
+    src/catalog/CatalogCompositionSourceEntry.hpp
+    src/catalog/CatalogCompositionRequest.hpp
+    src/catalog/CatalogCompositionResult.hpp
+    src/catalog/CatalogCompositionMergeResult.hpp
+    src/catalog/CatalogCompositionMerger.hpp
+    src/catalog/CatalogCoordinateMerge.hpp
+    src/catalog/CatalogFieldOrigins.hpp
+    src/catalog/CatalogIdentityAbsorption.hpp
+    src/catalog/CatalogLoadDiagnostics.hpp
+    src/catalog/CatalogLoadResult.hpp
+    src/catalog/CatalogMergeAccumulator.hpp
+    src/catalog/CatalogSchemaDescriptor.hpp
+    src/catalog/CatalogSchemaRegistry.hpp
+    src/catalog/CatalogSourcePrecedence.hpp
+    src/catalog/CatalogSourceRequest.hpp
+    src/catalog/CatalogSourceType.hpp
+    src/trail/BodyTrailCalculator.hpp
+    src/trail/BodyTrailOptions.hpp
+    src/trail/BodyTrailSample.hpp
+    src/catalog/CatalogBinaryCodec.hpp
+    src/catalog/CatalogComposer.hpp
+    src/catalog/CatalogFactory.hpp
+    src/catalog/CatalogLoader.hpp
+    src/catalog/CatalogParseRequest.hpp
+    src/catalog/CatalogPayloadParser.hpp
+    src/composition/EphemerisBackendResourceCache.hpp
+    src/composition/EphemerisGuidanceComposition.hpp
+    src/CelestialReferenceCalculator.hpp
+    src/catalog/constellation/ConstellationData.hpp
+    src/catalog/constellation/ConstellationDataCodec.hpp
+    src/catalog/constellation/ConstellationReferenceResolver.hpp
+    src/ConstellationReferenceCalculator.hpp
+    src/engine/DeltaTDataLoader.hpp
+    src/engine/IEarthOrientationProvider.hpp
+    src/engine/EarthOrientationDataParser.hpp
+    src/engine/EarthOrientationDataLoader.hpp
+    src/engine/EarthOrientationSampler.hpp
+    src/engine/TableBackedEarthOrientationProvider.hpp
+    src/engine/EphemerisDataActivation.hpp
+    src/engine/EphemerisDataActivationRequest.hpp
+    src/engine/EphemerisDataActivationResult.hpp
+    src/engine/EphemerisDataActivationStatus.hpp
+    src/engine/EphemerisDataPayloadReader.hpp
+    src/engine/EphemerisPayloadDiagnostics.hpp
+    src/engine/EphemerisStagedUpdateVerification.hpp
+    src/engine/EphemerisStagedUpdateVerificationRequest.hpp
+    src/engine/EphemerisStagedUpdateVerificationResult.hpp
+    src/engine/EphemerisStagedUpdateVerificationStatus.hpp
+    src/engine/EphemerisDataManifest.hpp
+    src/engine/EphemerisManifestJsonReader.hpp
+    src/engine/IDeltaTProvider.hpp
+    src/factory/EphemerisEngineFactory.hpp
+    src/factory/EphemerisFactoryCreationDiagnosticSeverity.hpp
+    src/factory/EphemerisFactoryCreationStatus.hpp
+    src/factory/EphemerisFactoryFallbackPolicy.hpp
+    src/factory/EphemerisEngineFactoryRequest.hpp
+    src/factory/EphemerisEngineFactoryResult.hpp
+    src/factory/EphemerisEngineReplacementPolicy.hpp
+    src/factory/EphemerisFactoryCreationDiagnostic.hpp
+    src/factory/EphemerisFactoryDiagnostics.hpp
+    src/factory/HighPrecisionEngineAssembly.hpp
+    src/factory/IEphemerisDiagnosticsSink.hpp
+    src/engine/EphemerisEngineQueries.hpp
+    src/engine/EphemerisPrecisionPolicy.hpp
+    src/engine/EphemerisTimePolicy.hpp
+    src/engine/BitFlagSet.hpp
+    src/engine/EphemerisCapabilities.hpp
+    src/engine/EphemerisCapability.hpp
+    src/engine/EphemerisCorrectionFlag.hpp
+    src/engine/EphemerisCorrectionFlags.hpp
+    src/engine/EphemerisDataSourceProvenance.hpp
+    src/time/EphemerisDateRange.hpp
+    src/engine/EphemerisDatasetInfo.hpp
+    src/engine/EphemerisEngineKind.hpp
+    src/engine/EphemerisEngineDescriptor.hpp
+    src/engine/EphemerisEngineDescriptorRegistry.hpp
+    src/engine/EphemerisEngineOptions.hpp
+    src/engine/EphemerisEngineTraits.hpp
+    src/engine/EphemerisComputationPolicy.hpp
+    src/engine/EphemerisEngineQueryResult.hpp
+    src/engine/EphemerisEngineWarning.hpp
+    src/engine/EphemerisEngineQueryStatus.hpp
+    src/EphemerisRequest.hpp
+    src/EphemerisRequestFactory.hpp
+    src/engine/IEphemerisEngine.hpp
+    src/engine/IEphemerisFallbackStrategy.hpp
+    src/engine/IEphemerisGuidanceStrategy.hpp
+    src/engine/SimpleEphemerisGuidanceStrategy.hpp
+    src/engine/SimpleEphemerisGuidanceStrategy.cpp
+    src/MoonPhase.hpp
+    src/MoonPhaseCalculator.hpp
+    src/NightConditions.hpp
+    src/NightConditionsCalculator.hpp
+    src/SolarAltitudeThresholds.hpp
+    src/catalog/ICatalogParser.hpp
+    src/catalog/IStarCatalog.hpp
+    src/ObservationEvent.hpp
+    src/ObservationEventCalculator.hpp
+    src/ObservationEventSearch.hpp
+    src/ObservationEventSearchPolicy.hpp
+    src/ObservationEventStatus.hpp
+    src/ObservationEventSummary.hpp
+    src/catalog/stellarium/StellariumConstellationParser.hpp
+    src/BaseCelestialBody.hpp
+    src/CelestialBodyCatalog.hpp
+    src/CelestialBodyState.hpp
+    src/DeepSkyObjectInfo.hpp
+    src/DistantCelestialBody.hpp
+    src/EphemerisSnapshot.hpp
+    src/FixedBodyAltitudeRange.hpp
+    src/OwnGalaxyCelestialBody.hpp
     src/StringUtilities.hpp
+    src/NumericParsingUtilities.hpp
+    src/TextParsingUtilities.hpp
+    src/PlanetIdentity.hpp
+    src/catalog/CatalogStarAstrometry.hpp
+    src/catalog/CelestialBodyIds.hpp
+    src/catalog/CatalogCoordinateModel.hpp
     src/catalog/normalize/CatalogBodyNormalization.hpp
-    src/catalog/model/CatalogBodyParseResult.hpp
+    src/catalog/normalize/CatalogSnapshotValidator.hpp
+    src/catalog/CatalogBodyParseResult.hpp
+    src/catalog/bundled/BundledCatalogData.hpp
     src/catalog/bundled/BundledCatalogParser.hpp
-    src/catalog/model/CatalogIdentity.hpp
-    src/catalog/normalize/CatalogParsingUtilities.hpp
+    src/catalog/CatalogIdentifier.hpp
+    src/catalog/CatalogIdentity.hpp
+    src/catalog/CatalogIdentityIndex.hpp
+    src/catalog/CatalogObjectIdentity.hpp
+    src/catalog/io/CatalogParsingUtilities.hpp
+    src/catalog/io/CatalogHeaderPolicy.hpp
+    src/catalog/io/CatalogContainerSignature.hpp
     src/catalog/io/CatalogPayloadFormatDetector.hpp
+    src/catalog/io/CatalogZipEntrySelection.hpp
     src/catalog/io/CatalogZipEntrySelector.hpp
     src/catalog/io/CompressedDataInflater.hpp
+    src/catalog/io/CompressedDataInflateOptions.hpp
     src/catalog/composition/CoreBodyCatalogAugmenter.hpp
-    src/catalog/composition/DeepSkyCatalogMerger.hpp
+    src/catalog/io/DelimitedCatalogParser.hpp
+    src/catalog/io/DelimitedCatalogParserOptions.hpp
     src/catalog/io/DelimitedCatalogReader.hpp
+    src/catalog/io/RowParseOutcome.hpp
+    src/catalog/io/DelimitedCatalogReaderOptions.hpp
+    src/catalog/io/DelimitedCatalogRow.hpp
+    src/catalog/io/DelimitedSchemaOptions.hpp
     src/catalog/opengc/OpenNgcObjectMapper.hpp
+    src/catalog/opengc/OpenNgcObjectMapping.hpp
     src/catalog/stellarium/StellariumHipParser.hpp
-    src/catalog/stellarium/StellariumLabelRefExtractor.hpp
+    src/catalog/stellarium/StellariumAnchorGroupExtractor.hpp
     src/catalog/stellarium/StellariumLineRefExtractor.hpp
     src/catalog/io/zip/ZipBinaryUtilities.hpp
+    src/catalog/io/zip/ZipFieldReader.hpp
+    src/catalog/io/zip/ZipEntryMetadata.hpp
     src/StringUtilities.cpp
+    src/NumericParsingUtilities.cpp
+    src/TextParsingUtilities.cpp
+    src/PlanetIdentity.cpp
+    src/BaseCelestialBody.cpp
+    src/CelestialBodyCatalog.cpp
+    src/DistantCelestialBody.cpp
+    src/EphemerisSnapshot.cpp
+    src/OwnGalaxyCelestialBody.cpp
+    src/catalog/CatalogStarAstrometry.cpp
+    src/catalog/CatalogCoordinateModel.cpp
+    src/catalog/CatalogBodyParseResult.cpp
     src/catalog/normalize/CatalogBodyNormalization.cpp
-    src/catalog/model/CatalogIdentity.cpp
+    src/catalog/normalize/CatalogSnapshotValidator.cpp
+    src/catalog/CatalogIdentifier.cpp
+    src/catalog/CatalogIdentity.cpp
+    src/catalog/CatalogIdentityIndex.cpp
     src/catalog/CatalogComposer.cpp
-    src/catalog/normalize/CatalogParsingUtilities.cpp
+    src/catalog/CatalogCompositionLogging.cpp
+    src/catalog/CatalogParsingLogging.cpp
+    src/catalog/CatalogCompositionPolicyRules.cpp
+    src/catalog/CatalogCompositionResult.cpp
+    src/catalog/CatalogCompositionMerger.cpp
+    src/catalog/CatalogCoordinateMerge.cpp
+    src/catalog/CatalogFieldOrigins.cpp
+    src/catalog/CatalogIdentityAbsorption.cpp
+    src/catalog/CatalogLoadResult.cpp
+    src/catalog/CatalogSchemaRegistry.cpp
+    src/catalog/io/CatalogParsingUtilities.cpp
+    src/catalog/CatalogBinaryCodec.cpp
     src/catalog/CatalogFactory.cpp
     src/catalog/CatalogLoader.cpp
+    src/catalog/io/CatalogHeaderPolicy.cpp
     src/catalog/io/CatalogPayloadFormatDetector.cpp
     src/catalog/CatalogPayloadParser.cpp
+    src/catalog/io/CatalogZipEntrySelection.cpp
     src/catalog/io/CatalogZipEntrySelector.cpp
     src/catalog/io/CompressedDataInflater.cpp
+    src/catalog/io/DelimitedCatalogParser.cpp
     src/catalog/constellation/ConstellationDataCodec.cpp
+    src/catalog/constellation/ConstellationReferenceResolver.cpp
     src/catalog/composition/CoreBodyCatalogAugmenter.cpp
-    src/catalog/composition/DeepSkyCatalogMerger.cpp
     src/catalog/io/DelimitedCatalogReader.cpp
+    src/catalog/io/DelimitedCatalogRow.cpp
+    src/catalog/io/DelimitedSchemaOptions.cpp
     src/catalog/io/CsvRowTokenizer.hpp
+    src/catalog/io/CatalogColumnValueReader.hpp
     src/catalog/hyg/HygCatalogParser.hpp
-    src/catalog/hyg/HygGzipCatalogParser.hpp
-    src/catalog/model/InMemoryStarCatalog.hpp
+    src/catalog/InMemoryStarCatalog.hpp
     src/catalog/opengc/OpenNgcObjectMapper.cpp
     src/catalog/opengc/OpenNgcCatalogParser.hpp
-    src/catalog/io/zip/ZipCodec.hpp
     src/catalog/io/zip/ZipDirectoryReader.cpp
     src/catalog/io/zip/ZipDirectoryReader.hpp
     src/catalog/io/zip/ZipEntryExtractor.cpp
     src/catalog/io/zip/ZipEntryExtractor.hpp
+    src/catalog/io/zip/ZipBinaryUtilities.cpp
+    src/catalog/io/zip/ZipFieldReader.cpp
+    src/catalog/io/zip/ZipEntryMetadata.cpp
     src/catalog/stellarium/StellariumConstellationParser.cpp
     src/catalog/stellarium/StellariumHipParser.cpp
-    src/catalog/stellarium/StellariumLabelRefExtractor.cpp
+    src/catalog/stellarium/StellariumAnchorGroupExtractor.cpp
     src/catalog/stellarium/StellariumLineRefExtractor.cpp
-    src/engine/AstronomicalTime.hpp
-    src/engine/EclipticToEquatorialCalculator.hpp
-    src/engine/EquatorialToHorizontalCalculator.hpp
-    src/engine/MoonEquatorialCalculator.hpp
-    src/engine/PlanetEquatorialCalculator.hpp
-    src/engine/SunEquatorialCalculator.hpp
     src/CelestialReferenceCalculator.cpp
+    src/composition/EphemerisBackendResourceCache.cpp
+    src/composition/EphemerisGuidanceComposition.cpp
     src/ConstellationReferenceCalculator.cpp
-    src/EphemerisEngineQueries.cpp
+    src/factory/EphemerisEngineFactory.cpp
+    src/factory/EphemerisEngineFactoryResult.cpp
+    src/factory/EphemerisEngineReplacementPolicy.cpp
+    src/factory/EphemerisFactoryCreationDiagnostic.cpp
+    src/factory/EphemerisFactoryDiagnostics.cpp
+    src/factory/HighPrecisionEngineAssembly.cpp
+    src/engine/EphemerisEngineQueries.cpp
+    src/time/EphemerisDateRange.cpp
+    src/engine/EphemerisEngineDescriptorRegistry.cpp
+    src/engine/EphemerisEngineOptions.cpp
+    src/engine/EphemerisComputationPolicy.cpp
+    src/engine/EphemerisLogging.hpp
+    src/engine/EphemerisLogging.cpp
+    src/EphemerisRequest.cpp
+    src/EphemerisRequestFactory.cpp
+    src/FixedBodyAltitudeRange.cpp
+    src/MoonPhaseCalculator.cpp
     src/NightConditionsCalculator.cpp
     src/ObservationEventCalculator.cpp
-    src/SimpleEphemerisEngine.cpp
+    src/ObservationEventSearch.cpp
+    src/catalog/bundled/BundledCatalogData.cpp
     src/catalog/bundled/BundledCatalogParser.cpp
     src/catalog/io/CsvRowTokenizer.cpp
+    src/catalog/io/CatalogColumnValueReader.cpp
     src/catalog/hyg/HygCatalogParser.cpp
-    src/catalog/hyg/HygGzipCatalogParser.cpp
-    src/catalog/model/InMemoryStarCatalog.cpp
+    src/catalog/InMemoryStarCatalog.cpp
     src/catalog/opengc/OpenNgcCatalogParser.cpp
-    src/catalog/io/zip/ZipCodec.cpp
-    src/engine/AstronomicalTime.cpp
-    src/engine/EclipticToEquatorialCalculator.cpp
-    src/engine/EquatorialToHorizontalCalculator.cpp
-    src/engine/MoonEquatorialCalculator.cpp
-    src/engine/PlanetEquatorialCalculator.cpp
-    src/engine/SunEquatorialCalculator.cpp
-    src/BodyTrailCalculator.cpp
+    src/trail/BodyTrailCalculator.cpp
 )
 
 target_include_directories(skygate-ephemeris
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_link_libraries(skygate-ephemeris
     PUBLIC
+        Qt6::Core
         skygate::core
     PRIVATE
-        Qt6::Core
         ZLIB::ZLIB
 )
 
+if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    target_link_libraries(skygate-ephemeris
+        PRIVATE
+            skygate::ephemeris-highprecision-dependencies
+    )
+endif()
+
 target_compile_features(skygate-ephemeris PUBLIC cxx_std_20)
+target_compile_definitions(skygate-ephemeris
+    PRIVATE
+        $<$<BOOL:${SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS}>:SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=1>
+)
 
 add_library(skygate::ephemeris ALIAS skygate-ephemeris)

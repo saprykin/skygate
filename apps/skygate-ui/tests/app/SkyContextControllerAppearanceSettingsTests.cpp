@@ -1,4 +1,5 @@
-#include "SkyContextControllerTestSupport.hpp"
+#include "settings/SkySettingsStore.hpp"
+#include "support/SkyContextControllerTestSupport.hpp"
 
 class SkyContextControllerAppearanceSettingsTests final : public QObject {
     Q_OBJECT
@@ -33,38 +34,29 @@ void SkyContextControllerAppearanceSettingsTests::defaultsThemeToBundledDefault(
     const auto controller = createController(true);
 
     QCOMPARE(controller->themeId(), QString("default"));
-    QCOMPARE(
-        controller->theme()->property("windowBackground").value<QColor>(),
-        QColor("#171b30")
-    );
+    QCOMPARE(controller->theme()->property("windowBackground").value<QColor>(), QColor("#171b30"));
 }
 
 void SkyContextControllerAppearanceSettingsTests::restoresSavedThemeId()
 {
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.themeId = "night-vision";
     QVERIFY(store.saveState(snapshot));
 
     const auto controller = createController(true);
     QCOMPARE(controller->themeId(), QString("night-vision"));
-    QCOMPARE(
-        controller->theme()->property("windowBackground").value<QColor>(),
-        QColor("#150707")
-    );
+    QCOMPARE(controller->theme()->property("windowBackground").value<QColor>(), QColor("#150707"));
 }
 
 void SkyContextControllerAppearanceSettingsTests::invalidSavedThemeFallsBackToDefault()
 {
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.themeId = "missing-theme";
     QVERIFY(store.saveState(snapshot));
 
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "Unknown theme id missing-theme - using default theme"
-    );
+    QTest::ignoreMessage(QtWarningMsg, "Unknown theme id missing-theme - using default theme");
     const auto controller = createController(true);
     QCOMPARE(controller->themeId(), QString("default"));
 }
@@ -82,10 +74,7 @@ void SkyContextControllerAppearanceSettingsTests::setThemeIdUpdatesPaletteAndEmi
     QCOMPARE(controllerThemeSpy.count(), 1);
     QCOMPARE(themePaletteSpy.count(), 1);
     QCOMPARE(skyContextChangedSpy.count(), 1);
-    QCOMPARE(
-        controller->theme()->property("windowBackground").value<QColor>(),
-        QColor("#150707")
-    );
+    QCOMPARE(controller->theme()->property("windowBackground").value<QColor>(), QColor("#150707"));
 }
 
 void SkyContextControllerAppearanceSettingsTests::loggingSettingsApplyAndPersist()
@@ -123,7 +112,7 @@ void SkyContextControllerAppearanceSettingsTests::loggingSettingsApplyAndPersist
 void SkyContextControllerAppearanceSettingsTests::invalidSavedTimeZoneFallsBackToUtc()
 {
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.displayTimeZoneId = QStringLiteral("Skygate/InvalidZone");
     QVERIFY(store.saveState(snapshot));
 
@@ -135,7 +124,7 @@ void SkyContextControllerAppearanceSettingsTests::invalidSavedTimeZoneFallsBackT
 void SkyContextControllerAppearanceSettingsTests::restoresSavedOverlayLayerVisibility()
 {
     SkySettingsStore store;
-    SkySettingsStore::StateSnapshot snapshot;
+    SkyPersistedStateSnapshot snapshot;
     snapshot.overlayLayers.horizon = false;
     snapshot.overlayLayers.altAzGrid = false;
     snapshot.overlayLayers.constellationLines = false;

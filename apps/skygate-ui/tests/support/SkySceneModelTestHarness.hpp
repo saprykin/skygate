@@ -1,9 +1,10 @@
 #pragma once
 
 #include "SkyEphemerisTestSupport.hpp"
-#include "SkySceneModel.hpp"
-
-#include "skygate/ephemeris/CatalogFactory.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "render/SkyRenderGlyph.hpp"
+#include "render/SkyRenderPoint.hpp"
+#include "scene/SkySceneModel.hpp"
 
 #include <QtGlobal>
 
@@ -25,7 +26,7 @@ struct TestViewport {
 class SkySceneModelTestHarness final {
 public:
     explicit SkySceneModelTestHarness(
-        std::vector<ephemeris::CelestialBody> bodies,
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies,
         const TestSkyContextConfig& contextConfig = {},
         const TestViewport& viewport = {}
     )
@@ -37,21 +38,27 @@ public:
         initialize(std::move(starCatalog), std::move(ephemerisEngine), contextConfig, viewport);
     }
 
-    static SkySceneModelTestHarness fromBundledCatalog(
+    explicit SkySceneModelTestHarness(
+        std::vector<skygate::ephemeris::DistantCelestialBody> bodies,
         const TestSkyContextConfig& contextConfig = {},
         const TestViewport& viewport = {}
     )
     {
-        auto starCatalog = ephemeris::createBundledStarCatalog();
+        auto starCatalog = createTestCatalog(std::move(bodies));
         Q_ASSERT(starCatalog != nullptr);
         auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
         Q_ASSERT(ephemerisEngine != nullptr);
-        return SkySceneModelTestHarness(
-            std::move(starCatalog),
-            std::move(ephemerisEngine),
-            contextConfig,
-            viewport
-        );
+        initialize(std::move(starCatalog), std::move(ephemerisEngine), contextConfig, viewport);
+    }
+
+    static SkySceneModelTestHarness
+    fromBundledCatalog(const TestSkyContextConfig& contextConfig = {}, const TestViewport& viewport = {})
+    {
+        auto starCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
+        Q_ASSERT(starCatalog != nullptr);
+        auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
+        Q_ASSERT(ephemerisEngine != nullptr);
+        return SkySceneModelTestHarness(std::move(starCatalog), std::move(ephemerisEngine), contextConfig, viewport);
     }
 
     [[nodiscard]] SkyContextController& controller() noexcept
@@ -79,37 +86,29 @@ public:
         return m_controller != nullptr && m_contextConfigured;
     }
 
-    [[nodiscard]] ephemeris::SkySnapshot computeSnapshot() const
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot computeSnapshot() const
     {
         return m_controller->ephemerisEngine()->compute(m_controller->skyContext());
     }
 
-    [[nodiscard]] std::optional<ephemeris::CelestialBodyState> bodyStateById(
-        const std::string& bodyId
-    ) const
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> bodyStateById(const std::string& bodyId) const
     {
         return findBodyStateById(computeSnapshot(), bodyId);
     }
 
     [[nodiscard]] bool centerOnBody(const std::string& bodyId)
     {
-        const std::optional<ephemeris::CelestialBodyState> state = bodyStateById(bodyId);
-        if (!state.has_value()
-            || !std::isfinite(state->horizontal.altitudeDeg)
+        const std::optional<skygate::ephemeris::CelestialBodyState> state = bodyStateById(bodyId);
+        if (!state.has_value() || !std::isfinite(state->horizontal.altitudeDeg)
             || !std::isfinite(state->horizontal.azimuthDeg)) {
             return false;
         }
 
-        m_controller->setViewCenter(
-            state->horizontal.altitudeDeg,
-            state->horizontal.azimuthDeg
-        );
+        m_controller->setViewCenter(state->horizontal.altitudeDeg, state->horizontal.azimuthDeg);
         return true;
     }
 
-    [[nodiscard]] const SkyRenderPoint* renderPointForBodyIndex(
-        const std::uint32_t bodyIndex
-    ) const
+    [[nodiscard]] const SkyRenderPoint* renderPointForBodyIndex(const std::uint32_t bodyIndex) const
     {
         for (const SkyRenderPoint& point : m_sceneModel.renderPointSpan()) {
             if (point.bodyIndex == bodyIndex) {
@@ -122,7 +121,7 @@ public:
 
     [[nodiscard]] const SkyRenderPoint* renderPointForBodyId(const std::string& bodyId) const
     {
-        const std::optional<ephemeris::CelestialBodyState> state = bodyStateById(bodyId);
+        const std::optional<skygate::ephemeris::CelestialBodyState> state = bodyStateById(bodyId);
         if (!state.has_value()) {
             return nullptr;
         }
@@ -143,8 +142,8 @@ public:
 
 private:
     SkySceneModelTestHarness(
-        std::unique_ptr<ephemeris::IStarCatalog> starCatalog,
-        std::unique_ptr<ephemeris::IEphemerisEngine> ephemerisEngine,
+        std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
+        std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine,
         const TestSkyContextConfig& contextConfig,
         const TestViewport& viewport
     )
@@ -153,8 +152,8 @@ private:
     }
 
     void initialize(
-        std::unique_ptr<ephemeris::IStarCatalog> starCatalog,
-        std::unique_ptr<ephemeris::IEphemerisEngine> ephemerisEngine,
+        std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
+        std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine,
         const TestSkyContextConfig& contextConfig,
         const TestViewport& viewport
     )

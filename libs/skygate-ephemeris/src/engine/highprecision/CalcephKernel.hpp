@@ -1,0 +1,39 @@
+#pragma once
+
+#include "ICalcephKernel.hpp"
+
+#include <memory>
+#include <optional>
+
+namespace skygate::ephemeris {
+class ITimeScaleService;
+}  // namespace skygate::ephemeris
+
+namespace skygate::ephemeris::highprecision {
+
+class CalcephKernel final : public ICalcephKernel {
+public:
+    explicit CalcephKernel(
+        Info info, std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService = nullptr
+    );
+    ~CalcephKernel() override;
+
+    CalcephKernel(const CalcephKernel&) = delete;
+    CalcephKernel& operator=(const CalcephKernel&) = delete;
+    CalcephKernel(CalcephKernel&& other) noexcept = delete;
+    CalcephKernel& operator=(CalcephKernel&& other) noexcept = delete;
+
+    [[nodiscard]] Status status() const noexcept override;
+    [[nodiscard]] const std::vector<std::string>& diagnostics() const noexcept override;
+    [[nodiscard]] const std::optional<Info>& kernelInfo() const noexcept override;
+    [[nodiscard]] Status statusForEpoch(const skygate::core::AstronomicalEpoch& epoch) const noexcept override;
+    [[nodiscard]] ICalcephKernel::StateResult
+    compute(const skygate::core::AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const override;
+
+private:
+    class Impl;
+
+    std::unique_ptr<Impl> m_impl;
+};
+
+}  // namespace skygate::ephemeris::highprecision

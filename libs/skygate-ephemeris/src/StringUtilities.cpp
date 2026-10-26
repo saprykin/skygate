@@ -1,76 +1,105 @@
 #include "StringUtilities.hpp"
+#include "AsciiText.hpp"
+
+#include <QByteArray>
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
+#include <utility>
 
-namespace skygate::ephemeris::strings {
+namespace skygate::ephemeris {
+namespace {
 
-char toLowerAscii(const char character) noexcept
+template <typename SameValue>
+bool appendUniqueValue(std::vector<std::string>& values, std::string value, SameValue sameValue)
 {
-    return character >= 'A' && character <= 'Z'
-        ? static_cast<char>(character - 'A' + 'a')
-        : character;
-}
-
-std::string toLowerAscii(const std::string_view value)
-{
-    std::string lowered(value);
-    std::transform(
-        lowered.begin(),
-        lowered.end(),
-        lowered.begin(),
-        [](const char character) {
-            return toLowerAscii(character);
-        }
-    );
-    return lowered;
-}
-
-std::string_view trimAsciiWhitespace(std::string_view value) noexcept
-{
-    while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front())) != 0) {
-        value.remove_prefix(1);
-    }
-
-    while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back())) != 0) {
-        value.remove_suffix(1);
-    }
-
-    return value;
-}
-
-bool equalsIgnoreAsciiCase(
-    const std::string_view lhs,
-    const std::string_view rhs
-) noexcept
-{
-    if (lhs.size() != rhs.size()) {
+    if (value.empty()) {
         return false;
     }
 
-    for (std::size_t index = 0; index < lhs.size(); ++index) {
-        if (toLowerAscii(lhs[index]) != toLowerAscii(rhs[index])) {
-            return false;
-        }
+    const bool alreadyPresent =
+        std::any_of(values.begin(), values.end(), [&value, &sameValue](const std::string& existing) {
+            return sameValue(existing, value);
+        });
+    if (alreadyPresent) {
+        return false;
     }
 
+    values.push_back(std::move(value));
     return true;
 }
 
-bool containsIgnoreAsciiCase(
-    const std::string_view value,
-    const std::string_view token
-)
+}  // namespace
+
+bool StringUtilities::isAsciiWhitespace(const char character) noexcept
+{
+    return skygate::core::AsciiText::isWhitespace(character);
+}
+
+bool StringUtilities::isAsciiDigit(const char character) noexcept
+{
+    return skygate::core::AsciiText::isDigit(character);
+}
+
+bool StringUtilities::isAsciiLetter(const char character) noexcept
+{
+    return skygate::core::AsciiText::isLetter(character);
+}
+
+char StringUtilities::toLowerAscii(const char character) noexcept
+{
+    return skygate::core::AsciiText::toLower(character);
+}
+
+std::string StringUtilities::toLowerAscii(const std::string_view value)
+{
+    return skygate::core::AsciiText::toLower(value);
+}
+
+std::string_view StringUtilities::trimAsciiWhitespace(const std::string_view value) noexcept
+{
+    return skygate::core::AsciiText::trimWhitespace(value);
+}
+
+std::string_view StringUtilities::takeLine(std::string_view& remaining) noexcept
+{
+    const std::size_t newline = remaining.find('\n');
+    std::string_view line = newline == std::string_view::npos ? remaining : remaining.substr(0U, newline);
+    remaining = newline == std::string_view::npos ? std::string_view{} : remaining.substr(newline + 1U);
+    if (!line.empty() && line.back() == '\r') {
+        line.remove_suffix(1U);
+    }
+    return line;
+}
+
+bool StringUtilities::equalsIgnoreAsciiCase(const std::string_view lhs, const std::string_view rhs) noexcept
+{
+    return skygate::core::AsciiText::equalsIgnoreCase(lhs, rhs);
+}
+
+bool StringUtilities::containsIgnoreAsciiCase(const std::string_view value, const std::string_view token)
 {
     return toLowerAscii(value).find(toLowerAscii(token)) != std::string::npos;
 }
 
-std::string normalizedLookupKey(const std::string_view value)
+std::string StringUtilities::toUtf8(const QString& text)
 {
-    return toLowerAscii(trimAsciiWhitespace(value));
+    const QByteArray utf8 = text.toUtf8();
+    return std::string(utf8.constData(), static_cast<std::size_t>(utf8.size()));
 }
 
-std::string normalizedAlnumKey(const std::string_view value)
+QString StringUtilities::fromUtf8(const std::string_view text)
+{
+    return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
+}
+
+std::string StringUtilities::normalizedLookupKey(const std::string_view value)
+{
+    return skygate::core::AsciiText::normalizedLookupKey(value);
+}
+
+std::string StringUtilities::normalizedAlnumKey(const std::string_view value)
 {
     std::string key;
     key.reserve(value.size());
@@ -82,35 +111,49 @@ std::string normalizedAlnumKey(const std::string_view value)
     return key;
 }
 
-bool appendUnique(std::vector<std::string>& values, std::string value)
+QString StringUtilities::normalizedLabelText(QString text)
 {
-    if (value.empty() || std::find(values.begin(), values.end(), value) != values.end()) {
-        return false;
+    text = text.trimmed();
+    if (text.isEmpty()) {
+        return {};
     }
 
-    values.push_back(std::move(value));
-    return true;
+    text.replace('_', ' ');
+    text.replace('-', ' ');
+    return text.simplified();
 }
 
-bool appendUniqueIgnoreAsciiCase(std::vector<std::string>& values, std::string value)
+std::vector<std::string_view> StringUtilities::splitView(const std::string_view text, const char delimiter)
 {
-    if (value.empty()) {
-        return false;
-    }
-
-    const auto existingIt = std::find_if(
-        values.begin(),
-        values.end(),
-        [&value](const std::string& existing) {
-            return equalsIgnoreAsciiCase(existing, value);
+    std::vector<std::string_view> tokens;
+    std::size_t cursor = 0;
+    while (cursor < text.size()) {
+        const std::size_t next = text.find(delimiter, cursor);
+        const std::size_t end = (next == std::string_view::npos) ? text.size() : next;
+        const std::string_view token = text.substr(cursor, end - cursor);
+        if (!token.empty()) {
+            tokens.push_back(token);
         }
-    );
-    if (existingIt != values.end()) {
-        return false;
+        if (next == std::string_view::npos) {
+            break;
+        }
+        cursor = next + 1U;
     }
-
-    values.push_back(std::move(value));
-    return true;
+    return tokens;
 }
 
-}  // namespace skygate::ephemeris::strings
+bool StringUtilities::appendUnique(std::vector<std::string>& values, std::string value)
+{
+    return appendUniqueValue(values, std::move(value), [](const std::string& existing, const std::string& candidate) {
+        return existing == candidate;
+    });
+}
+
+bool StringUtilities::appendUniqueIgnoreAsciiCase(std::vector<std::string>& values, std::string value)
+{
+    return appendUniqueValue(values, std::move(value), [](const std::string& existing, const std::string& candidate) {
+        return skygate::core::AsciiText::equalsIgnoreCase(existing, candidate);
+    });
+}
+
+}  // namespace skygate::ephemeris

@@ -1,5 +1,6 @@
-#include "QmlTestSupport.hpp"
-#include "SkyTimeController.hpp"
+#include "support/QmlTestSupport.hpp"
+#include "support/SkyContextTimeTestSupport.hpp"
+#include "time/SkyTimeController.hpp"
 
 using namespace skygate::ui::tests;
 
@@ -31,7 +32,7 @@ void QmlNightConditionsPopupTests::nightConditionsPopupOpensClosesAndRendersRows
     auto controller = makeController();
     QVERIFY(controller != nullptr);
     QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("Asia/Bishkek")));
-    QVERIFY(controller->setUtcDateTimeText("2024-03-21", "12:00:00"));
+    QVERIFY(setControllerUtcDateTime(*controller, "2024-03-21", "12:00:00"));
     controller->setLatitudeText("47.3769");
     controller->setLongitudeText("8.5417");
     controller->setElevationText("408.0");
@@ -40,7 +41,9 @@ void QmlNightConditionsPopupTests::nightConditionsPopupOpensClosesAndRendersRows
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             width: 920
@@ -54,7 +57,9 @@ void QmlNightConditionsPopupTests::nightConditionsPopupOpensClosesAndRendersRows
             }
             property alias popup: nightPopup
         }
-    )"), QStringLiteral("NightConditionsPopupBehaviorTest.qml"));
+    )"),
+        QStringLiteral("NightConditionsPopupBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -65,40 +70,18 @@ void QmlNightConditionsPopupTests::nightConditionsPopupOpensClosesAndRendersRows
 
     QVERIFY(QMetaObject::invokeMethod(popup, "open"));
     QTRY_VERIFY(popup->property("opened").toBool());
-    QTRY_VERIFY(
-        firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsPopupTitle")) != nullptr
-    );
-    QTRY_VERIFY(
-        firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsSunHeader")) != nullptr
-    );
-    QTRY_VERIFY(
-        firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsMoonHeader")) != nullptr
-    );
-    auto* moonRiseRow = firstQuickItemWithObjectName(
-        root,
-        QStringLiteral("nightConditionsMoonRiseRow")
-    );
-    auto* moonSetRow = firstQuickItemWithObjectName(
-        root,
-        QStringLiteral("nightConditionsMoonSetRow")
-    );
+    QTRY_VERIFY(firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsPopupTitle")) != nullptr);
+    QTRY_VERIFY(firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsSunHeader")) != nullptr);
+    QTRY_VERIFY(firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsMoonHeader")) != nullptr);
+    auto* moonRiseRow = firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsMoonRiseRow"));
+    auto* moonSetRow = firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsMoonSetRow"));
     QVERIFY(moonRiseRow != nullptr);
     QVERIFY(moonSetRow != nullptr);
     QVERIFY(moonSetRow->y() > moonRiseRow->y());
-    QTRY_VERIFY(
-        firstQuickItemWithObjectName(
-            root,
-            QStringLiteral("nightConditionsSunRowLabel_Sunset")
-        ) != nullptr
-    );
-    auto* locationLabel = firstQuickItemWithObjectName(
-        root,
-        QStringLiteral("nightConditionsLocationLabel")
-    );
+    QTRY_VERIFY(firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsSunRowLabel_Sunset")) != nullptr);
+    auto* locationLabel = firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsLocationLabel"));
     QVERIFY(locationLabel != nullptr);
-    QTRY_VERIFY(
-        locationLabel->property("text").toString().contains(QStringLiteral("UTC+06:00"))
-    );
+    QTRY_VERIFY(locationLabel->property("text").toString().contains(QStringLiteral("UTC+06:00")));
     QVERIFY(controller->nightConditions().value("locationText").toString().contains("UTC+06:00"));
     QVERIFY(controller->nightConditions().value("valid").toBool());
 
@@ -121,7 +104,9 @@ void QmlNightConditionsPopupTests::footerNightAndDateTimePopupsAreMutuallyExclus
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -187,7 +172,9 @@ void QmlNightConditionsPopupTests::footerNightAndDateTimePopupsAreMutuallyExclus
                 popupBottomMargin: 8
             }
         }
-    )"), QStringLiteral("NightConditionsMainInteractionTest.qml"));
+    )"),
+        QStringLiteral("NightConditionsMainInteractionTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);

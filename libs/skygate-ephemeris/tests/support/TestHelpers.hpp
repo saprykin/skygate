@@ -1,39 +1,40 @@
 #pragma once
 
-#include "skygate/ephemeris/Types.hpp"
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
+#include "time/AstronomicalEpoch.hpp"
+#include "time/CalendarTime.hpp"
+#include "time/CivilDateTime.hpp"
+#include "time/TimeScale.hpp"
 
+#include <cassert>
 #include <cmath>
 #include <span>
 #include <string_view>
 
 namespace skygate::ephemeris::tests {
 
-[[nodiscard]] inline bool isNear(
-    const double value,
-    const double expected,
-    const double tolerance
-) noexcept
+[[nodiscard]] inline bool isNear(const double value, const double expected, const double tolerance) noexcept
 {
     return std::abs(value - expected) <= tolerance;
 }
 
-[[nodiscard]] inline const CelestialBody* findBodyById(
-    const std::span<const CelestialBody> bodies,
-    const std::string_view id
-)
+[[nodiscard]] inline const BaseCelestialBody*
+findBodyById(const std::span<const BaseCelestialBody* const> bodies, const std::string_view id)
 {
-    for (const CelestialBody& body : bodies) {
-        if (body.id == id) {
-            return &body;
+    for (const BaseCelestialBody* body : bodies) {
+        if (body != nullptr && body->id == id) {
+            return body;
         }
     }
     return nullptr;
 }
 
-[[nodiscard]] inline const CelestialBodyState* findStateById(
-    const SkySnapshot& snapshot,
-    const std::string_view id
-)
+[[nodiscard]] inline const CelestialBodyState*
+findStateById(const EphemerisSnapshot& snapshot, const std::string_view id)
 {
     for (const CelestialBodyState& state : snapshot.states) {
         if (snapshot.bodyAt(state.bodyIndex).id == id) {
@@ -41,6 +42,22 @@ namespace skygate::ephemeris::tests {
         }
     }
     return nullptr;
+}
+
+[[nodiscard]] inline OwnGalaxyCelestialBody makeSunBody()
+{
+    OwnGalaxyCelestialBody body;
+    body.id = "sun";
+    body.displayName = "Sun";
+    body.kind = BaseCelestialBody::Kind::Sun;
+    return body;
+}
+
+[[nodiscard]] inline skygate::core::CivilDateTime dateFromEpoch(const skygate::core::AstronomicalEpoch& epoch)
+{
+    const auto date = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
+    assert(date.has_value());
+    return *date;
 }
 
 }  // namespace skygate::ephemeris::tests

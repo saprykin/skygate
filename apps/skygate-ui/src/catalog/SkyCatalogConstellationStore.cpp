@@ -4,35 +4,39 @@
 
 namespace skygate::ui::internal {
 
-void SkyCatalogConstellationStore::clear()
-{
-    m_lineRefs.clear();
-    m_labelRefs.clear();
-    m_count = 0;
-}
-
-void SkyCatalogConstellationStore::setLineRefs(
-    std::vector<ConstellationLineRef> lineRefs
+bool SkyCatalogConstellationStore::setDataset(
+    std::vector<ConstellationLineRef> lineRefs,
+    std::vector<ConstellationAnchorGroup> anchorGroups,
+    const std::size_t count
 )
 {
-    if (lineRefs.empty()) {
-        clear();
-        return;
+    if (m_lineRefs == lineRefs && m_anchorGroups == anchorGroups && m_count == count) {
+        return false;
     }
 
     m_lineRefs = std::move(lineRefs);
-}
-
-void SkyCatalogConstellationStore::setLabelRefs(
-    std::vector<ConstellationLabelRef> labelRefs
-)
-{
-    m_labelRefs = std::move(labelRefs);
-}
-
-void SkyCatalogConstellationStore::setCount(const std::size_t count) noexcept
-{
+    m_anchorGroups = std::move(anchorGroups);
     m_count = count;
+    ++m_revision;
+    return true;
+}
+
+bool SkyCatalogConstellationStore::clear()
+{
+    if (m_lineRefs.empty() && m_anchorGroups.empty() && m_count == 0U) {
+        return false;
+    }
+
+    m_lineRefs.clear();
+    m_anchorGroups.clear();
+    m_count = 0U;
+    ++m_revision;
+    return true;
+}
+
+std::uint64_t SkyCatalogConstellationStore::revision() const noexcept
+{
+    return m_revision;
 }
 
 std::size_t SkyCatalogConstellationStore::count() const noexcept
@@ -46,10 +50,10 @@ SkyCatalogConstellationStore::lineRefs() const noexcept
     return std::span<const ConstellationLineRef>(m_lineRefs);
 }
 
-std::span<const SkyCatalogConstellationStore::ConstellationLabelRef>
-SkyCatalogConstellationStore::labelRefs() const noexcept
+std::span<const SkyCatalogConstellationStore::ConstellationAnchorGroup>
+SkyCatalogConstellationStore::anchorGroups() const noexcept
 {
-    return std::span<const ConstellationLabelRef>(m_labelRefs);
+    return std::span<const ConstellationAnchorGroup>(m_anchorGroups);
 }
 
 const std::vector<SkyCatalogConstellationStore::ConstellationLineRef>&
@@ -58,10 +62,10 @@ SkyCatalogConstellationStore::lineRefVector() const noexcept
     return m_lineRefs;
 }
 
-const std::vector<SkyCatalogConstellationStore::ConstellationLabelRef>&
-SkyCatalogConstellationStore::labelRefVector() const noexcept
+const std::vector<SkyCatalogConstellationStore::ConstellationAnchorGroup>&
+SkyCatalogConstellationStore::anchorGroupVector() const noexcept
 {
-    return m_labelRefs;
+    return m_anchorGroups;
 }
 
 }  // namespace skygate::ui::internal

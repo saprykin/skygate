@@ -1,14 +1,14 @@
 #pragma once
 
+#include "BaseCelestialBody.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
+
 #include <QAbstractListModel>
 #include <QByteArray>
 #include <QHash>
 #include <QString>
 #include <QVariant>
 #include <QVector>
-
-#include "skygate/ephemeris/ConstellationData.hpp"
-#include "skygate/ephemeris/Types.hpp"
 
 #include <span>
 
@@ -34,14 +34,18 @@ public:
     [[nodiscard]] QString filterText() const;
     void setFilterText(const QString& filterText);
     void setCatalogData(
-        std::span<const skygate::ephemeris::CelestialBody> bodies,
-        std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs
+        std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies,
+        std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups
     );
 
 signals:
     void filterTextChanged();
 
 private:
+    // Magnitude for entries without a measured brightness, such as
+    // constellation labels. They sort after real bodies of the same rank.
+    static constexpr double kUnrankedBrightnessMagnitude = 99.0;
+
     struct SourceEntry final {
         QString displayText;
         QString detailText;
@@ -51,7 +55,7 @@ private:
         QString compactDisplayKey;
         QString targetIdKey;
         QString compactTargetIdKey;
-        double brightnessMagnitude = 99.0;
+        double brightnessMagnitude = kUnrankedBrightnessMagnitude;
         bool selectable = true;
         bool isBody = false;
     };
@@ -63,6 +67,7 @@ private:
 
 private:
     void rebuildRows();
+    [[nodiscard]] static bool ranksBefore(const SourceEntry& lhs, const SourceEntry& rhs);
 
 private:
     QVector<SourceEntry> m_sourceEntries;

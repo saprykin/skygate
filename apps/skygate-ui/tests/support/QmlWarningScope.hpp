@@ -1,15 +1,17 @@
 #pragma once
 
-#include <skygate/testsupport/MessageLogDispatcher.hpp>
+#include <skygate/testsupport/LogCapture.hpp>
 
-#include <QMessageLogContext>
-#include <QMutex>
-#include <QMutexLocker>
 #include <QStringList>
 #include <QtGlobal>
 
+#include <utility>
+
 namespace skygate::ui::tests {
 
+/// Collects the warning-level and more severe messages emitted while the scope
+/// is alive. Collection is delegated to LogCapture so test support keeps one
+/// message dispatcher client.
 class QmlWarningScope final {
 public:
     enum class Forwarding {
@@ -17,13 +19,24 @@ public:
         Disabled
     };
 
-    explicit QmlWarningScope(const Forwarding forwarding = Forwarding::Enabled) :
-        m_forwarding(forwarding)
+    /// Warnings from these logging categories describe the application state a
+    /// test happens to run against rather than a QML problem, so the scope does
+    /// not collect them.
+    using IgnoredCategories = QStringList;
+
+    explicit QmlWarningScope(
+        const Forwarding forwarding = Forwarding::Enabled, IgnoredCategories ignoredCategories = {}
+    )
+        : m_capture(
+              skygate::testsupport::LogCapture::Options{
+                  .minimumType = QtWarningMsg,
+                  .ignoredCategories = std::move(ignoredCategories),
+                  .prefixCategory = false,
+                  .forwardToPreviousHandler = forwarding == Forwarding::Enabled,
+                  .suppressOuterCaptures = forwarding == Forwarding::Disabled,
+              }
+          )
     {
-        testsupport::detail::MessageLogDispatcher::subscribe(
-            this,
-            &QmlWarningScope::messageHandler
-        );
     }
 
     QmlWarningScope(const QmlWarningScope&) = delete;
@@ -31,45 +44,13 @@ public:
     QmlWarningScope(QmlWarningScope&&) = delete;
     QmlWarningScope& operator=(QmlWarningScope&&) = delete;
 
-    ~QmlWarningScope()
-    {
-        testsupport::detail::MessageLogDispatcher::unsubscribe(
-            this,
-            &QmlWarningScope::messageHandler
-        );
-    }
-
     [[nodiscard]] QStringList messages() const
     {
-        QMutexLocker lock(&m_mutex);
-        return m_messages;
+        return m_capture.messages();
     }
 
 private:
-    static testsupport::detail::MessageLogDispatcher::Result messageHandler(
-        void* owner,
-        const QtMsgType type,
-        const QMessageLogContext& /*context*/,
-        const QString& message
-    )
-    {
-        QmlWarningScope* scope = static_cast<QmlWarningScope*>(owner);
-
-        QMutexLocker lock(&scope->m_mutex);
-        if (type == QtWarningMsg) {
-            scope->m_messages.push_back(message);
-        }
-
-        if (scope->m_forwarding == Forwarding::Disabled) {
-            return testsupport::detail::MessageLogDispatcher::Result::Stop;
-        }
-        return testsupport::detail::MessageLogDispatcher::Result::Continue;
-    }
-
-private:
-    Forwarding m_forwarding = Forwarding::Enabled;
-    QStringList m_messages;
-    mutable QMutex m_mutex;
+    skygate::testsupport::LogCapture m_capture;
 };
 
 }  // namespace skygate::ui::tests

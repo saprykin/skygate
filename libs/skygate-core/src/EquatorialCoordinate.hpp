@@ -1,0 +1,21 @@
+#pragma once
+
+#include "math/MathConstants.hpp"
+
+namespace skygate::core {
+
+struct EquatorialCoordinate {
+    static constexpr double kRightAscensionMinHours = 0.0;
+    // The upper bound is exclusive: 24.0 hours wraps to 0.0 hours.
+    static constexpr double kRightAscensionMaxHours = MathConstants::kHoursPerTurn;
+    static constexpr double kDeclinationMinDeg = -MathConstants::kPolarAngleDeg;
+    static constexpr double kDeclinationMaxDeg = MathConstants::kPolarAngleDeg;
+
+    double rightAscensionHours = 0.0;
+    double declinationDeg = 0.0;
+
+    [[nodiscard]] bool isFinite() const noexcept;
+    [[nodiscard]] bool isValid() const noexcept;
+};
+
+}  // namespace skygate::core

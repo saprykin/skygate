@@ -1,3 +1,5 @@
+#include "CatalogHeaderCorpus.hpp"
+#include "catalog/CatalogSourceType.hpp"
 #include "catalog/io/CatalogPayloadFormatDetector.hpp"
 
 #include <QtTest/QtTest>
@@ -10,44 +12,69 @@ class CatalogPayloadFormatDetectorTests final : public QObject {
 
 private slots:
     void detectsTextPayloadFormats();
-    void detectsCompressedPayloadFormats();
+    void detectsLeadingCommentAndBomPayloads();
+    void preservesHashInsideQuotedHeaderFields();
+    void rejectsSubstringLookalikeHeaders();
+    void returnsUnknownForContainerPayloads();
     void returnsUnknownForUnrecognizedPayloads();
 };
 
 void CatalogPayloadFormatDetectorTests::detectsTextPayloadFormats()
 {
     using namespace skygate::ephemeris;
+    using namespace skygate::ephemeris::tests;
 
+    QCOMPARE(CatalogPayloadFormatDetector::detect("id,ra,dec,mag\n"), CatalogSourceType::HygCsv);
+    QCOMPARE(CatalogPayloadFormatDetector::detect("Name;Type;RA;Dec\n"), CatalogSourceType::OpenNgcCsv);
+    QCOMPARE(CatalogPayloadFormatDetector::detect(CatalogHeaderCorpus::kHygLeadingComment), CatalogSourceType::HygCsv);
     QCOMPARE(
-        CatalogPayloadFormatDetector::detect("# comment\nid,ra,dec,mag\n"),
-        CatalogPayloadFormat::HygCsv
-    );
-    QCOMPARE(
-        CatalogPayloadFormatDetector::detect("Name;Type;RA;Dec\n"),
-        CatalogPayloadFormat::OpenNgcCsv
+        CatalogPayloadFormatDetector::detect(CatalogHeaderCorpus::kOpenNgcLeadingComment), CatalogSourceType::OpenNgcCsv
     );
 }
 
-void CatalogPayloadFormatDetectorTests::detectsCompressedPayloadFormats()
+void CatalogPayloadFormatDetectorTests::detectsLeadingCommentAndBomPayloads()
+{
+    using namespace skygate::ephemeris;
+    using namespace skygate::ephemeris::tests;
+
+    QCOMPARE(CatalogPayloadFormatDetector::detect("# comment\nid,ra,dec,mag\n"), CatalogSourceType::HygCsv);
+    QCOMPARE(CatalogPayloadFormatDetector::detect(CatalogHeaderCorpus::kHygBom), CatalogSourceType::HygCsv);
+}
+
+void CatalogPayloadFormatDetectorTests::preservesHashInsideQuotedHeaderFields()
+{
+    using namespace skygate::ephemeris;
+    using namespace skygate::ephemeris::tests;
+
+    QCOMPARE(CatalogPayloadFormatDetector::detect(CatalogHeaderCorpus::kHygQuotedHash), CatalogSourceType::HygCsv);
+}
+
+void CatalogPayloadFormatDetectorTests::rejectsSubstringLookalikeHeaders()
+{
+    using namespace skygate::ephemeris;
+    using namespace skygate::ephemeris::tests;
+
+    QCOMPARE(
+        CatalogPayloadFormatDetector::detect(CatalogHeaderCorpus::kHygLookalikeHeader), CatalogSourceType::Unknown
+    );
+}
+
+void CatalogPayloadFormatDetectorTests::returnsUnknownForContainerPayloads()
 {
     using namespace skygate::ephemeris;
 
-    constexpr std::array<unsigned char, 2> kGzip {{0x1f, 0x8b}};
+    constexpr std::array<unsigned char, 2> kGzip{{0x1f, 0x8b}};
     QCOMPARE(
-        CatalogPayloadFormatDetector::detect(std::string_view(
-            reinterpret_cast<const char*>(kGzip.data()),
-            kGzip.size()
-        )),
-        CatalogPayloadFormat::HygCsvGzip
+        CatalogPayloadFormatDetector::detect(
+            std::string_view(reinterpret_cast<const char*>(kGzip.data()), kGzip.size())
+        ),
+        CatalogSourceType::Unknown
     );
 
-    constexpr std::array<unsigned char, 4> kZip {{0x50, 0x4b, 0x03, 0x04}};
+    constexpr std::array<unsigned char, 4> kZip{{0x50, 0x4b, 0x03, 0x04}};
     QCOMPARE(
-        CatalogPayloadFormatDetector::detect(std::string_view(
-            reinterpret_cast<const char*>(kZip.data()),
-            kZip.size()
-        )),
-        CatalogPayloadFormat::HygCsvZip
+        CatalogPayloadFormatDetector::detect(std::string_view(reinterpret_cast<const char*>(kZip.data()), kZip.size())),
+        CatalogSourceType::Unknown
     );
 }
 
@@ -55,7 +82,7 @@ void CatalogPayloadFormatDetectorTests::returnsUnknownForUnrecognizedPayloads()
 {
     QCOMPARE(
         skygate::ephemeris::CatalogPayloadFormatDetector::detect("not a catalog"),
-        skygate::ephemeris::CatalogPayloadFormat::Unknown
+        skygate::ephemeris::CatalogSourceType::Unknown
     );
 }
 

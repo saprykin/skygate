@@ -1,127 +1,80 @@
 #include "SkySelectionMarkerBuilder.hpp"
-
-#include "SkySceneShared.hpp"
-
-#include "skygate/core/math/AngleMath.hpp"
-#include "skygate/core/math/SphericalGeometry.hpp"
+#include "ConstellationReferenceCalculator.hpp"
+#include "SkySelectionOverlayInput.hpp"
+#include "SkySelectionTargetKind.hpp"
+#include "SkyTrailTargetResolver.hpp"
+#include "scene/SkySceneLookupKey.hpp"
+#include "scene/SkySelectionMarker.hpp"
 
 #include <QPointF>
 
 #include <algorithm>
-#include <cmath>
+#include <array>
 #include <optional>
+#include <string>
 
 namespace {
 
 SkySelectionMarker selectionMarkerEntry(const double x, const double y)
 {
-    return SkySelectionMarker {
-        .visible = true,
-        .kind = "searchSelection",
-        .x = x,
-        .y = y
-    };
+    return SkySelectionMarker{.visible = true, .kind = "searchSelection", .x = x, .y = y};
 }
 
-bool hasSelectionInputs(const SkySelectionOverlayInput& input)
+std::optional<QPointF> selectedBodyPoint(const SkySelectionOverlayInput& input, const QString& targetId)
 {
-    return input.snapshot != nullptr
-        && input.preparedProjection != nullptr
-        && input.stateIndexByBodyId != nullptr;
-}
-
-std::optional<QPointF> selectedBodyPoint(
-    const skygate::ephemeris::SkySnapshot& snapshot,
-    const QHash<QString, std::size_t>& stateIndexByBodyId,
-    const skygate::core::PreparedProjection& preparedProjection,
-    const QString& targetId
-)
-{
-    const auto stateIndexIt = stateIndexByBodyId.constFind(normalizedSceneLookupKey(targetId));
-    if (stateIndexIt == stateIndexByBodyId.cend()) {
+    const auto stateIndex = input.stateIndexForBodyId(targetId);
+    if (!stateIndex.has_value()) {
         return std::nullopt;
     }
 
-    const auto& state = snapshot.states.at(*stateIndexIt);
+    const auto& state = input.snapshot->states.at(*stateIndex);
     if (!state.horizontal.isFinite()) {
         return std::nullopt;
     }
 
-    const auto projected = preparedProjection.project(state.horizontal);
-    if (!projected.isVisible) {
+    const auto projected = input.preparedProjection->project(state.horizontal);
+    if (!projected.isVisible()) {
         return std::nullopt;
     }
 
     return QPointF(projected.x, projected.y);
 }
 
-std::optional<QPointF> selectedConstellationPoint(
-    const skygate::ephemeris::SkySnapshot& snapshot,
-    const QHash<QString, std::size_t>& stateIndexByBodyId,
-    const skygate::core::PreparedProjection& preparedProjection,
-    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
-    const QString& targetId
-)
+std::optional<QPointF> selectedConstellationPoint(const SkySelectionOverlayInput& input, const QString& targetId)
 {
-    const QString normalizedTargetId = normalizedSceneLookupKey(targetId);
+    const QString normalizedTargetId = skygate::ui::internal::SkySceneLookupKey::normalized(targetId);
     if (normalizedTargetId.isEmpty()) {
         return std::nullopt;
     }
 
-    const auto labelRefIt = std::find_if(
-        labelRefs.begin(),
-        labelRefs.end(),
-        [&normalizedTargetId](const skygate::ephemeris::ConstellationLabelRef& labelRef) {
-            return normalizedSceneLookupKey(labelRef.first) == normalizedTargetId;
+    const auto anchorGroupIt = std::find_if(
+        input.constellationAnchorGroups.begin(),
+        input.constellationAnchorGroups.end(),
+        [&normalizedTargetId](const skygate::ephemeris::ConstellationAnchorGroup& anchorGroup) {
+            return skygate::ui::internal::SkySceneLookupKey::normalized(anchorGroup.first) == normalizedTargetId;
         }
     );
-    if (labelRefIt == labelRefs.end()) {
+    if (anchorGroupIt == input.constellationAnchorGroups.end()) {
         return std::nullopt;
     }
 
-    skygate::core::SphericalGeometry::Vector3d sum {0.0, 0.0, 0.0};
-    int validAnchorCount = 0;
-    for (const std::string& hipId : labelRefIt->second) {
-        const auto stateIndexIt = stateIndexByBodyId.constFind(normalizedSceneLookupKey(hipId));
-        if (stateIndexIt == stateIndexByBodyId.cend()) {
+    skygate::ephemeris::ConstellationReferenceCalculator::AnchorCentroidAccumulator accumulator;
+    for (const std::string& hipId : anchorGroupIt->second) {
+        const auto stateIndex = input.stateIndexForBodyId(QString::fromStdString(hipId));
+        if (!stateIndex.has_value()) {
             continue;
         }
 
-        const auto& horizontal = snapshot.states.at(*stateIndexIt).horizontal;
-        if (!horizontal.isFinite()) {
-            continue;
-        }
-
-        const auto vector = skygate::core::SphericalGeometry::horizontalToUnitVector(horizontal);
-        sum[0] += vector[0];
-        sum[1] += vector[1];
-        sum[2] += vector[2];
-        ++validAnchorCount;
+        accumulator.addAnchor(input.snapshot->states.at(*stateIndex).horizontal);
     }
 
-    if (validAnchorCount == 0) {
+    const auto center = accumulator.centroid();
+    if (!center.has_value()) {
         return std::nullopt;
     }
 
-    const auto normalizedVector = skygate::core::SphericalGeometry::normalize(sum);
-    if (skygate::core::SphericalGeometry::length(normalizedVector) <= 0.0) {
-        return std::nullopt;
-    }
-
-    const skygate::core::HorizontalCoordinate center {
-        .altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(std::clamp(
-            normalizedVector[2],
-            -1.0,
-            1.0
-        ))),
-        .azimuthDeg = skygate::core::AngleMath::normalizeDegrees(
-            skygate::core::AngleMath::toDegrees(
-                std::atan2(normalizedVector[0], normalizedVector[1])
-            )
-        )
-    };
-    const auto projected = preparedProjection.project(center);
-    if (!projected.isVisible) {
+    const auto projected = input.preparedProjection->project(*center);
+    if (!projected.isVisible()) {
         return std::nullopt;
     }
 
@@ -130,46 +83,37 @@ std::optional<QPointF> selectedConstellationPoint(
 
 }  // namespace
 
-SkySelectionMarker SkySelectionMarkerBuilder::build(
-    const SkySelectionOverlayInput& input
-) const
+SkySelectionMarker SkySelectionMarkerBuilder::build(const SkySelectionOverlayInput& input) const
 {
-    if (!hasSelectionInputs(input)) {
+    if (!input.hasRequiredSnapshotInputs()) {
         return {};
     }
 
-    QString targetKind;
-    QString targetId;
-    if (!input.selectedObjectTargetId.isEmpty()) {
-        targetKind = "body";
-        targetId = input.selectedObjectTargetId;
-    } else if (!input.trackedTargetId.trimmed().isEmpty()) {
-        targetKind = input.trackedTargetKind;
-        targetId = input.trackedTargetId;
-    } else {
-        targetKind = input.selectedSearchTargetKind;
-        targetId = input.selectedSearchTargetId;
+    // The marker follows the target precedence of the trail resolver and keeps
+    // the target kind, so it can place both bodies and constellation labels.
+    const SkyTrailTargetResolver targetResolver;
+    const std::array<SkyTrailTargetResolver::Target, SkyTrailTargetResolver::kTargetCount> targetCandidates =
+        targetResolver.targetCandidates(input);
+    const auto targetIt = std::find_if(
+        targetCandidates.begin(), targetCandidates.end(), [](const SkyTrailTargetResolver::Target& candidate) {
+            return !candidate.id.isEmpty();
+        }
+    );
+    if (targetIt == targetCandidates.end()) {
+        return {};
     }
+
+    const QString targetKind = targetIt->kind;
+    const QString targetId = targetIt->id;
     if (targetKind.trimmed().isEmpty() || targetId.trimmed().isEmpty()) {
         return {};
     }
 
     std::optional<QPointF> markerPoint;
-    if (normalizedSceneLookupKey(targetKind) == "body") {
-        markerPoint = selectedBodyPoint(
-            *input.snapshot,
-            *input.stateIndexByBodyId,
-            *input.preparedProjection,
-            targetId
-        );
-    } else if (normalizedSceneLookupKey(targetKind) == "constellationlabel") {
-        markerPoint = selectedConstellationPoint(
-            *input.snapshot,
-            *input.stateIndexByBodyId,
-            *input.preparedProjection,
-            input.constellationLabelRefs,
-            targetId
-        );
+    if (skygate::ui::internal::SkySelectionTargetKind::isBody(targetKind)) {
+        markerPoint = selectedBodyPoint(input, targetId);
+    } else if (skygate::ui::internal::SkySelectionTargetKind::isConstellationLabel(targetKind)) {
+        markerPoint = selectedConstellationPoint(input, targetId);
     }
 
     if (!markerPoint.has_value()) {

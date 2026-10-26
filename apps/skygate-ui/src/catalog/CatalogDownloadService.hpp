@@ -5,7 +5,9 @@
 #include <QStringList>
 
 #include <functional>
+#include <memory>
 
+class CatalogDownloadCancellation;
 class QNetworkAccessManager;
 class QObject;
 
@@ -23,7 +25,13 @@ public:
 public:
     explicit CatalogDownloadService(QNetworkAccessManager* networkAccessManager);
 
+    // Starts the first candidate that succeeds. The caller supplies the
+    // cancellation handle so the owning operation can hold it before the
+    // first status callback runs. An explicit cancellation stops the
+    // candidate chain without completing; an ordinary transfer failure still
+    // moves to the next candidate.
     void downloadFirstSuccessfulFromUrls(
+        const std::shared_ptr<CatalogDownloadCancellation>& cancellation,
         const QStringList& urlTexts,
         QObject* callbackContext,
         StatusHandler statusHandler,

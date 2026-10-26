@@ -1,20 +1,20 @@
 #pragma once
 
-#include "SkySceneOverlayData.hpp"
-
-#include <QtTest/QtTest>
+#include "scene/SkyInspectorField.hpp"
+#include "scene/SkyOverlayItem.hpp"
+#include "scene/SkySelectedObjectInspector.hpp"
+#include "scene/SkySelectionMarker.hpp"
 
 #include <QVariantList>
 #include <QVariantMap>
+#include <QtTest/QtTest>
 
 #include <cstddef>
 
 namespace skygate::ui::tests {
 
-[[nodiscard]] inline QString overlayInspectorFieldValue(
-    const SkySelectedObjectInspector& inspector,
-    const QString& label
-)
+[[nodiscard]] inline QString
+overlayInspectorFieldValue(const SkySelectedObjectInspector& inspector, const QString& label)
 {
     for (const SkyInspectorField& field : inspector.fields) {
         if (field.label == label) {
@@ -24,10 +24,18 @@ namespace skygate::ui::tests {
     return {};
 }
 
-inline void verifyOverlayItemPayload(
-    const QVariant& payload,
-    const SkyOverlayItem& expected
-)
+[[nodiscard]] inline QString
+overlayInspectorFieldTooltip(const SkySelectedObjectInspector& inspector, const QString& label)
+{
+    for (const SkyInspectorField& field : inspector.fields) {
+        if (field.label == label) {
+            return field.tooltip;
+        }
+    }
+    return {};
+}
+
+inline void verifyOverlayItemPayload(const QVariant& payload, const SkyOverlayItem& expected)
 {
     const QVariantMap map = payload.toMap();
     QVERIFY2(!map.isEmpty(), "overlay item payload must be a QVariantMap");
@@ -42,10 +50,7 @@ inline void verifyOverlayItemPayload(
     QCOMPARE(map.value(QStringLiteral("color")).value<QColor>(), expected.color);
 }
 
-inline void verifySelectionMarkerPayload(
-    const QVariantMap& payload,
-    const SkySelectionMarker& expected
-)
+inline void verifySelectionMarkerPayload(const QVariantMap& payload, const SkySelectionMarker& expected)
 {
     if (!expected.visible) {
         QVERIFY(payload.isEmpty());
@@ -58,10 +63,7 @@ inline void verifySelectionMarkerPayload(
     QCOMPARE(payload.value(QStringLiteral("y")).toDouble(), expected.y);
 }
 
-inline void verifySelectedObjectInspectorPayload(
-    const QVariantMap& payload,
-    const SkySelectedObjectInspector& expected
-)
+inline void verifySelectedObjectInspectorPayload(const QVariantMap& payload, const SkySelectedObjectInspector& expected)
 {
     if (!expected.visible) {
         QVERIFY(payload.isEmpty());
@@ -83,11 +85,10 @@ inline void verifySelectedObjectInspectorPayload(
     for (qsizetype index = 0; index < fields.size(); ++index) {
         const QVariantMap fieldMap = fields.at(index).toMap();
         QVERIFY2(!fieldMap.isEmpty(), "inspector field payload must be a QVariantMap");
-        const SkyInspectorField& expectedField = expected.fields.at(
-            static_cast<std::size_t>(index)
-        );
+        const SkyInspectorField& expectedField = expected.fields.at(static_cast<std::size_t>(index));
         QCOMPARE(fieldMap.value(QStringLiteral("label")).toString(), expectedField.label);
         QCOMPARE(fieldMap.value(QStringLiteral("value")).toString(), expectedField.value);
+        QCOMPARE(fieldMap.value(QStringLiteral("tooltip")).toString(), expectedField.tooltip);
     }
 }
 

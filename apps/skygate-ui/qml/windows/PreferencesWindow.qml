@@ -13,39 +13,59 @@ Window {
     minimumWidth: 502
     minimumHeight: 400
     visible: false
-    color: skyContext.theme.windowBackground
+    color: theme.windowBackground
     required property var skyContextController
+    readonly property var theme: skyContextController.theme
     property Window transientParentWindow
     readonly property bool useAttachedDialog: Qt.platform.os !== "linux"
     transientParent: useAttachedDialog ? transientParentWindow : null
     flags: (useAttachedDialog ? Qt.Dialog : Qt.Window) | Qt.FramelessWindowHint
     modality: useAttachedDialog ? Qt.WindowModal : Qt.NonModal
 
-    property color cardBackground: skyContext.theme.cardBackground
-    property color cardBackgroundBottom: skyContext.theme.cardBackgroundBottom
-    property color cardBorder: skyContext.theme.cardBorder
-    property color dividerColor: skyContext.theme.dividerColor
-    property color textPrimary: skyContext.theme.textPrimary
-    property color textSecondary: skyContext.theme.textSecondary
-    property color textMuted: skyContext.theme.textMuted
-    property int selectedPage: 0
+    property color cardBackground: theme.cardBackground
+    property color cardBackgroundBottom: theme.cardBackgroundBottom
+    property color cardBorder: theme.cardBorder
+    property color dividerColor: theme.dividerColor
+    property color textPrimary: theme.textPrimary
+    property color textSecondary: theme.textSecondary
+    // Section identities follow the preferencesSectionStack child order.
+    readonly property int generalSection: 0
+    readonly property int skySection: 1
+    readonly property int engineSection: 2
+    readonly property int appearanceSection: 3
+    readonly property int catalogSection: 4
+    property int selectedPage: generalSection
     readonly property bool catalogBusy: skyContextController !== null
                                         && (skyContextController.downloadingCatalog
                                             || skyContextController.catalogProcessing)
-    readonly property bool applyEnabled: !(selectedPage === 1
+    readonly property bool ephemerisBusy: skyContextController !== null
+                                           && skyContextController.ephemerisDataUpdateInProgress
+    readonly property bool footerBusy: (selectedPage === engineSection && ephemerisBusy)
+                                       || (selectedPage === catalogSection && catalogBusy)
+    readonly property bool footerEngineStatusVisible: selectedPage === engineSection
+        && skyContextController !== null
+        && skyContextController.ephemerisDataStatusText !== ""
+    readonly property bool footerCancelable: (selectedPage === engineSection && ephemerisBusy)
+                                             || (selectedPage === catalogSection
+                                                 && skyContextController !== null
+                                                 && skyContextController.downloadingCatalog)
+    readonly property bool applyEnabled: !(selectedPage === skySection
                                            && preferencesDraft.locationSourceText === "City"
                                            && preferencesDraft.selectedCityId === "")
     readonly property string currentSectionDescription: {
-        if (selectedPage === 0) {
+        if (selectedPage === generalSection) {
             return "Application behavior and diagnostics"
         }
-        if (selectedPage === 1) {
+        if (selectedPage === skySection) {
             return "Observer location and projection"
         }
-        if (selectedPage === 2) {
+        if (selectedPage === engineSection) {
+            return "Ephemeris engine and data settings"
+        }
+        if (selectedPage === appearanceSection) {
             return "Theme and visual presentation"
         }
-        return "Catalog source and download settings"
+        return "Star and deep-sky catalog management"
     }
 
     PreferencesDraft {
@@ -117,8 +137,8 @@ Window {
             height: 82
             color: "transparent"
             gradient: Gradient {
-                GradientStop { position: 0.0; color: skyContext.theme.headerGradientStart }
-                GradientStop { position: 1.0; color: skyContext.theme.headerGradientEnd }
+                GradientStop { position: 0.0; color: theme.headerGradientStart }
+                GradientStop { position: 1.0; color: theme.headerGradientEnd }
             }
         }
 
@@ -178,7 +198,7 @@ Window {
 
                     contentItem: Text {
                         text: closeIconButton.text
-                        color: skyContext.theme.closeButtonText
+                        color: theme.closeButtonText
                         font: closeIconButton.font
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -187,12 +207,12 @@ Window {
                     background: Rectangle {
                         radius: 15
                         color: closeIconButton.down
-                            ? skyContext.theme.closeButtonBackgroundPressed
+                            ? theme.closeButtonBackgroundPressed
                             : (closeIconButton.hovered
-                                   ? skyContext.theme.closeButtonBackgroundHover
-                                   : skyContext.theme.closeButtonBackground)
+                                   ? theme.closeButtonBackgroundHover
+                                   : theme.closeButtonBackground)
                         border.width: 1
-                        border.color: skyContext.theme.closeButtonBorder
+                        border.color: theme.closeButtonBorder
                     }
                 }
             }
@@ -222,38 +242,50 @@ Window {
 
                         Label {
                             text: "Sections"
-                            color: skyContext.theme.sectionTitleText
+                            color: theme.sectionTitleText
                             font.family: "Avenir Next"
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
                         }
 
                         PreferencesSectionButton {
+                            theme: preferencesWindow.theme
                             objectName: "preferencesGeneralSectionButton"
                             label: "General"
-                            active: preferencesWindow.selectedPage === 0
-                            onClicked: preferencesWindow.selectedPage = 0
+                            active: preferencesWindow.selectedPage === preferencesWindow.generalSection
+                            onClicked: preferencesWindow.selectedPage = preferencesWindow.generalSection
                         }
 
                         PreferencesSectionButton {
+                            theme: preferencesWindow.theme
                             objectName: "preferencesSkySectionButton"
                             label: "Sky"
-                            active: preferencesWindow.selectedPage === 1
-                            onClicked: preferencesWindow.selectedPage = 1
+                            active: preferencesWindow.selectedPage === preferencesWindow.skySection
+                            onClicked: preferencesWindow.selectedPage = preferencesWindow.skySection
                         }
 
                         PreferencesSectionButton {
+                            theme: preferencesWindow.theme
+                            objectName: "preferencesEngineSectionButton"
+                            label: "Engine"
+                            active: preferencesWindow.selectedPage === preferencesWindow.engineSection
+                            onClicked: preferencesWindow.selectedPage = preferencesWindow.engineSection
+                        }
+
+                        PreferencesSectionButton {
+                            theme: preferencesWindow.theme
                             objectName: "preferencesAppearanceSectionButton"
                             label: "Appearance"
-                            active: preferencesWindow.selectedPage === 2
-                            onClicked: preferencesWindow.selectedPage = 2
+                            active: preferencesWindow.selectedPage === preferencesWindow.appearanceSection
+                            onClicked: preferencesWindow.selectedPage = preferencesWindow.appearanceSection
                         }
 
                         PreferencesSectionButton {
+                            theme: preferencesWindow.theme
                             objectName: "preferencesCatalogSectionButton"
                             label: "Catalog"
-                            active: preferencesWindow.selectedPage === 3
-                            onClicked: preferencesWindow.selectedPage = 3
+                            active: preferencesWindow.selectedPage === preferencesWindow.catalogSection
+                            onClicked: preferencesWindow.selectedPage = preferencesWindow.catalogSection
                         }
 
                         Item {
@@ -287,18 +319,28 @@ Window {
                             Layout.fillHeight: true
 
                             PreferencesGeneralSection {
+                                theme: preferencesWindow.theme
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 preferencesDraft: preferencesDraft
                             }
 
                             PreferencesSkySection {
+                                theme: preferencesWindow.theme
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 preferencesDraft: preferencesDraft
                             }
 
+                            PreferencesEngineSection {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                skyContextController: preferencesWindow.skyContextController
+                                preferencesDraft: preferencesDraft
+                            }
+
                             PreferencesAppearanceSection {
+                                theme: preferencesWindow.theme
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 preferencesDraft: preferencesDraft
@@ -308,7 +350,6 @@ Window {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 skyContextController: preferencesWindow.skyContextController
-                                preferencesDraft: preferencesDraft
                             }
                         }
                     }
@@ -336,15 +377,24 @@ Window {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 3
-                        visible: preferencesWindow.selectedPage === 3 && preferencesWindow.catalogBusy
+                        visible: preferencesWindow.footerBusy || preferencesWindow.footerEngineStatusVisible
 
                         Label {
                             Layout.fillWidth: true
+                            objectName: "preferencesFooterStatusLabel"
+                            visible: preferencesWindow.footerBusy || preferencesWindow.footerEngineStatusVisible
                             text: {
-                                const statusText = preferencesWindow.skyContextController.catalogStatusText || ""
-                                return statusText.startsWith("Catalog: ")
-                                    ? statusText.substring(9)
-                                    : statusText
+                                const controller = preferencesWindow.skyContextController
+                                const statusText = preferencesWindow.selectedPage === preferencesWindow.engineSection
+                                    ? (controller.ephemerisDataStatusText || "")
+                                    : (controller.catalogStatusText || "")
+                                const catalogPrefix = controller.catalogStatusTextPrefix
+                                const ephemerisPrefix = controller.ephemerisDataStatusTextPrefix
+                                return statusText.startsWith(catalogPrefix)
+                                    ? statusText.substring(catalogPrefix.length)
+                                    : (statusText.startsWith(ephemerisPrefix)
+                                       ? statusText.substring(ephemerisPrefix.length)
+                                       : statusText)
                             }
                             color: preferencesWindow.textSecondary
                             font.family: "Avenir Next"
@@ -352,61 +402,117 @@ Window {
                             elide: Text.ElideRight
                         }
 
-                        ProgressBar {
-                            id: footerCatalogProgressBar
+                        RowLayout {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 6
-                            from: 0
-                            to: 1
-                            value: 0
-                            indeterminate: true
+                            spacing: 6
+                            visible: preferencesWindow.footerBusy
 
-                            background: Rectangle {
-                                radius: 3
-                                color: skyContext.theme.progressBarTrack
-                                border.width: 1
-                                border.color: skyContext.theme.progressBarTrackBorder
-                            }
+                            ProgressBar {
+                                id: footerCatalogProgressBar
+                                objectName: "preferencesFooterProgressBar"
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 6
+                                Layout.alignment: Qt.AlignVCenter
+                                from: 0
+                                to: 1
+                                value: preferencesWindow.ephemerisBusy
+                                       ? preferencesWindow.skyContextController.ephemerisDataUpdateProgress
+                                       : 0
+                                indeterminate: !preferencesWindow.ephemerisBusy
 
-                            contentItem: Item {
-                                id: footerProgressContent
-                                clip: true
+                                background: Rectangle {
+                                    radius: 3
+                                    color: theme.progressBarTrack
+                                    border.width: 1
+                                    border.color: theme.progressBarTrackBorder
+                                }
 
-                                Rectangle {
-                                    id: footerProgressSweep
-                                    width: Math.max(48, footerProgressContent.width * 0.24)
-                                    height: footerProgressContent.height
-                                    radius: height * 0.5
-                                    x: -width
-                                    gradient: Gradient {
-                                        GradientStop { position: 0.0; color: skyContext.theme.progressBarSweepStart }
-                                        GradientStop { position: 0.5; color: skyContext.theme.progressBarSweepMid }
-                                        GradientStop { position: 1.0; color: skyContext.theme.progressBarSweepEnd }
+                                contentItem: Item {
+                                    id: footerProgressContent
+                                    clip: true
+
+                                    Rectangle {
+                                        visible: !footerCatalogProgressBar.indeterminate
+                                        width: footerProgressContent.width * footerCatalogProgressBar.visualPosition
+                                        height: footerProgressContent.height
+                                        radius: height * 0.5
+                                        color: theme.progressBarSweepMid
                                     }
 
-                                    SequentialAnimation on x {
-                                        running: footerCatalogProgressBar.visible
-                                        loops: Animation.Infinite
-                                        NumberAnimation {
-                                            from: -footerProgressSweep.width
-                                            to: footerProgressContent.width
-                                            duration: 1050
-                                            easing.type: Easing.InOutCubic
+                                    Rectangle {
+                                        id: footerProgressSweep
+                                        visible: footerCatalogProgressBar.indeterminate
+                                        width: Math.max(48, footerProgressContent.width * 0.24)
+                                        height: footerProgressContent.height
+                                        radius: height * 0.5
+                                        x: -width
+                                        gradient: Gradient {
+                                            GradientStop { position: 0.0; color: theme.progressBarSweepStart }
+                                            GradientStop { position: 0.5; color: theme.progressBarSweepMid }
+                                            GradientStop { position: 1.0; color: theme.progressBarSweepEnd }
+                                        }
+
+                                        SequentialAnimation on x {
+                                            running: footerCatalogProgressBar.visible
+                                                     && footerCatalogProgressBar.indeterminate
+                                            loops: Animation.Infinite
+                                            NumberAnimation {
+                                                from: -footerProgressSweep.width
+                                                to: footerProgressContent.width
+                                                duration: 1050
+                                                easing.type: Easing.InOutCubic
+                                            }
                                         }
                                     }
+                                }
+                            }
+
+                            Rectangle {
+                                id: footerCancelButton
+                                objectName: "preferencesFooterCancelDownloadButton"
+                                visible: preferencesWindow.footerCancelable
+                                Layout.preferredWidth: 16
+                                Layout.preferredHeight: 16
+                                Layout.alignment: Qt.AlignVCenter
+                                radius: width * 0.5
+                                color: footerCancelMouse.pressed
+                                       ? theme.actionButtonSecondaryBottomPressed
+                                       : (footerCancelMouse.containsMouse
+                                          ? theme.actionButtonSecondaryTopHover
+                                          : theme.actionButtonSecondaryTop)
+                                border.width: 1
+                                border.color: theme.actionButtonSecondaryBorder
+                                ToolTip.visible: footerCancelMouse.containsMouse
+                                ToolTip.text: "Cancel download"
+                                ToolTip.delay: 450
+
+                                Label {
+                                    anchors.centerIn: parent
+                                    text: "x"
+                                    color: theme.actionButtonText
+                                    font.family: "Avenir Next"
+                                    font.pixelSize: 9
+                                    font.weight: Font.DemiBold
+                                }
+
+                                MouseArea {
+                                    id: footerCancelMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: preferencesWindow.skyContextController.cancelActiveDownload()
                                 }
                             }
                         }
                     }
 
                     Item {
-                        Layout.preferredWidth: preferencesWindow.selectedPage === 3
-                                               && preferencesWindow.catalogBusy ? 0 : 1
-                        Layout.fillWidth: !(preferencesWindow.selectedPage === 3
-                                            && preferencesWindow.catalogBusy)
+                        Layout.preferredWidth: preferencesWindow.footerBusy ? 0 : 1
+                        Layout.fillWidth: !preferencesWindow.footerBusy
                     }
 
                     PreferencesActionButton {
+                        theme: preferencesWindow.theme
                         objectName: "preferencesApplyButton"
                         Layout.preferredWidth: 116
                         Layout.preferredHeight: 32

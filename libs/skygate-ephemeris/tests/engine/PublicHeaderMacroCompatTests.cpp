@@ -1,0 +1,14 @@
+#define None 0L
+
+#include "catalog/CatalogLoadResult.hpp"
+#include "catalog/CatalogLoader.hpp"
+#include "engine/IEphemerisEngine.hpp"
+
+#include <cstdint>
+
+int main()
+{
+    static_assert(None == 0L);
+    static_assert(static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections()) == 0U);
+    static_assert(static_cast<std::uint8_t>(skygate::ephemeris::CatalogLoadResult::ErrorCode::NoError) == 0U);
+}

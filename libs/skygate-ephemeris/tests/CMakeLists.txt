@@ -1,5 +1,38 @@
 find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 
+add_library(skygate-ephemeris-test-support STATIC
+    support/ApparentPlaceTestFixture.cpp
+    support/EphemerisEngineTestDoubles.cpp
+    support/CatalogMergeTestSupport.cpp
+    support/CatalogSemanticFixtureAdapter.cpp
+    support/CatalogSemanticFixtureCorpus.cpp
+    support/HighPrecisionEngineFixture.cpp
+    support/MarkerGuidanceEngine.cpp
+    support/MarkerGuidanceStrategy.cpp
+    support/PassThroughApparentPlaceCalculator.cpp
+    support/PassThroughFrameTransformer.cpp
+    support/RecordingFrameTransformer.cpp
+    support/ShortBatchFrameTransformer.cpp
+    support/StaticCalcephKernelProvider.cpp
+    support/StaticSolarSystemCalculator.cpp
+    support/TdbApproximationTimeScaleService.cpp
+    support/TestCalcephKernel.cpp
+    support/ValidUtcTimeScaleService.cpp
+)
+add_library(skygate::ephemeris-test-support ALIAS skygate-ephemeris-test-support)
+
+target_link_libraries(skygate-ephemeris-test-support
+    PUBLIC
+        skygate::ephemeris
+)
+
+target_include_directories(skygate-ephemeris-test-support
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+)
+
+target_compile_features(skygate-ephemeris-test-support PUBLIC cxx_std_20)
+
 function(add_skygate_ephemeris_qtest target_name source_file)
     cmake_parse_arguments(
         TEST
@@ -18,14 +51,12 @@ function(add_skygate_ephemeris_qtest target_name source_file)
     target_link_libraries(${target_name}
         PRIVATE
             Qt6::Test
-            skygate::ephemeris
-            skygate::core
+            skygate::ephemeris-test-support
             skygate::test-support
     )
 
     target_include_directories(${target_name}
         PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../src
             ${CMAKE_CURRENT_SOURCE_DIR}/support
     )
 
@@ -33,6 +64,7 @@ function(add_skygate_ephemeris_qtest target_name source_file)
     target_compile_definitions(${target_name}
         PRIVATE
             SKYGATE_EPHEMERIS_TESTDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+            $<$<BOOL:${SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS}>:SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=1>
     )
 
     add_test(
@@ -60,9 +92,106 @@ function(add_skygate_ephemeris_qtest target_name source_file)
     endif()
 endfunction()
 
+set(SKYGATE_SIMPLE_ENGINE_ISOLATION_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/engine/simple/SimpleEphemerisEngine.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/engine/simple/SimpleEphemerisEngine.cpp"
+)
+add_test(
+    NAME skygate-ephemeris-simple-engine-isolation-test
+    COMMAND
+        "${CMAKE_COMMAND}"
+        "-DSIMPLE_ENGINE_FILES=${SKYGATE_SIMPLE_ENGINE_ISOLATION_FILES}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/SimpleEngineIsolationTest.cmake"
+)
+set_tests_properties(skygate-ephemeris-simple-engine-isolation-test
+    PROPERTIES
+        LABELS "unit;architecture"
+        TIMEOUT 30
+)
+
+# Scan application and non-engine ephemeris sources for includes of concrete
+# engine implementation headers. Concrete headers are the engine/simple/ and
+# engine/highprecision/ implementation directories plus the concrete guidance
+# strategy engine/SimpleEphemerisGuidanceStrategy.hpp, which lives directly
+# under engine/. The descriptor registry is allowed to reach the simple engine
+# so the registry and the engine share one default-options definition.
+set(SKYGATE_ENGINE_HEADER_ISOLATION_SCAN_ROOTS
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src"
+    "${CMAKE_SOURCE_DIR}/apps/skygate-ui/src"
+)
+set(SKYGATE_ENGINE_HEADER_ISOLATION_ALLOWLIST
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/factory/"
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/composition/"
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/simple/"
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/highprecision/"
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/EphemerisEngineDescriptorRegistry.cpp"
+    # The provider bootstrap loader composes the CALCEPH kernel provider for
+    # both the engine factory and the backend resource cache.
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/TimeScaleProviderLoader.cpp"
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/TdbTtConverter.cpp"
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/tests/support/"
+    "${CMAKE_SOURCE_DIR}/apps/skygate-ui/tests/support/"
+)
+add_test(
+    NAME skygate-ephemeris-engine-header-isolation-test
+    COMMAND
+        "${CMAKE_COMMAND}"
+        "-DSCAN_ROOTS=${SKYGATE_ENGINE_HEADER_ISOLATION_SCAN_ROOTS}"
+        "-DALLOWLIST_PREFIXES=${SKYGATE_ENGINE_HEADER_ISOLATION_ALLOWLIST}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EngineHeaderIsolationTest.cmake"
+)
+set_tests_properties(skygate-ephemeris-engine-header-isolation-test
+    PROPERTIES
+        LABELS "unit;architecture"
+        TIMEOUT 30
+)
+
+if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    add_executable(skygate-ephemeris-highprecision-dependency-smoke-tests
+        highprecision/HighPrecisionDependencySmokeTests.cpp
+    )
+    set_target_properties(skygate-ephemeris-highprecision-dependency-smoke-tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(skygate-ephemeris-highprecision-dependency-smoke-tests
+        PRIVATE
+            Qt6::Test
+            skygate::ephemeris-highprecision-dependencies
+    )
+    target_compile_features(skygate-ephemeris-highprecision-dependency-smoke-tests PRIVATE cxx_std_20)
+    add_test(
+        NAME skygate-ephemeris-highprecision-dependency-smoke-tests
+        COMMAND $<TARGET_FILE:skygate-ephemeris-highprecision-dependency-smoke-tests>
+    )
+    set_tests_properties(skygate-ephemeris-highprecision-dependency-smoke-tests
+        PROPERTIES
+            LABELS "unit;highprecision"
+            TIMEOUT 30
+    )
+
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-highprecision-erfa-smoke-tests
+        highprecision/HighPrecisionErfaSmokeTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-erfa-frame-transformer-tests
+        highprecision/ErfaFrameTransformerTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-metadata-merge-tests
+        highprecision/EphemerisMetadataMergeTests.cpp
+        LABELS "unit;highprecision"
+    )
+endif()
+
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-payload-parser-tests
     catalog/CatalogPayloadParserTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-container-decoding-tests
+    catalog/CatalogContainerDecodingTests.cpp
+    TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-property-tests
@@ -72,6 +201,12 @@ add_skygate_ephemeris_qtest(
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-fixture-corpus-tests
     catalog/CatalogFixtureCorpusTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-interchangeability-tests
+    catalog/CatalogInterchangeabilityTests.cpp
     LABELS integration
     TIMEOUT 45
 )
@@ -86,8 +221,250 @@ add_skygate_ephemeris_qtest(
     catalog/io/CatalogDelimitedReaderTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-text-parsing-utilities-tests
+    engine/TextParsingUtilitiesTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-string-utilities-tests
     engine/StringUtilitiesTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-numeric-parsing-utilities-tests
+    engine/NumericParsingUtilitiesTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-planet-identity-tests
+    reference/PlanetIdentityTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-data-file-utilities-tests
+    engine/EphemerisDataFileUtilitiesTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-date-range-tests
+    engine/EphemerisDateRangeTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-fixed-body-altitude-range-tests
+    engine/FixedBodyAltitudeRangeTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-data-staleness-tests
+    engine/EphemerisDataStalenessTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-data-manifest-tests
+    engine/data/EphemerisDataManifestTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-data-activation-tests
+    engine/data/EphemerisDataActivationTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-delta-t-provider-tests
+    engine/data/DeltaTProviderTests.cpp
+    LABELS "unit;validation;time-eop"
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-earth-orientation-provider-tests
+    engine/data/EarthOrientationProviderTests.cpp
+    LABELS "unit;validation;time-eop"
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-earth-orientation-sampler-tests
+    engine/EarthOrientationSamplerTests.cpp
+    LABELS "unit;validation;time-eop"
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-leap-second-provider-tests
+    engine/data/LeapSecondProviderTests.cpp
+    LABELS "unit;validation;time-eop"
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-leap-second-time-scale-service-tests
+    engine/data/LeapSecondTimeScaleServiceTests.cpp
+    LABELS "unit;validation;time-eop"
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-table-interpolation-tests
+    engine/TableInterpolationTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-api-model-tests
+    engine/EphemerisApiModelTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-interface-migration-tests
+    engine/EphemerisEngineInterfaceMigrationTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-contract-tests
+    engine/EphemerisEngineContractTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-factory-selection-tests
+    engine/EphemerisEngineFactorySelectionTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-factory-result-tests
+    engine/EphemerisEngineFactoryResultTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-factory-behavior-tests
+    engine/EphemerisEngineFactoryBehaviorTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-factory-model-tests
+    engine/EphemerisEngineFactoryModelTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-time-scale-provider-loader-tests
+    engine/TimeScaleProviderLoaderTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-time-scale-conversion-result-tests
+    engine/TimeScaleConversionResultTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-time-scale-offset-resolver-tests
+    engine/TimeScaleOffsetResolverTests.cpp
+    LABELS "unit;validation;time-eop"
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-bit-flag-set-tests
+    engine/BitFlagSetTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-backend-resource-cache-tests
+    engine/EphemerisBackendResourceCacheTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-replacement-policy-tests
+    engine/EphemerisEngineReplacementPolicyTests.cpp
+)
+
+if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-celestial-frame-math-tests
+        highprecision/CelestialFrameMathTests.cpp
+        LABELS "unit;highprecision"
+    )
+
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-highprecision-engine-dispatch-tests
+        highprecision/HighPrecisionEngineDispatchTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-highprecision-engine-cache-tests
+        highprecision/HighPrecisionEngineCacheTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-highprecision-result-builder-tests
+        highprecision/HighPrecisionResultBuilderTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-runtime-fallback-time-contract-tests
+        highprecision/EphemerisRuntimeFallbackTimeContractTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-prepared-request-state-builder-tests
+        highprecision/PreparedRequestStateBuilderTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-apparent-place-correction-routing-tests
+        highprecision/ApparentPlaceCorrectionRoutingTests.cpp
+        LABELS "unit;highprecision;apparent;corrections"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-apparent-place-topocentric-tests
+        highprecision/ApparentPlaceTopocentricTests.cpp
+        LABELS "unit;highprecision;apparent;topocentric;corrections"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-apparent-place-horizons-validation-tests
+        highprecision/ApparentPlaceHorizonsValidationTests.cpp
+        LABELS "unit;highprecision;validation;apparent;topocentric"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-atmospheric-refraction-calculator-tests
+        highprecision/AtmosphericRefractionCalculatorTests.cpp
+        LABELS "unit;highprecision;validation;apparent;topocentric;refraction"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-apparent-radec-validation-tests
+        highprecision/ApparentRaDecValidationTests.cpp
+        LABELS "unit;highprecision;validation;apparent"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-fallback-validation-tests
+        highprecision/EphemerisFallbackValidationTests.cpp
+        LABELS "unit;highprecision;validation;fallback"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-acceptance-matrix-tests
+        highprecision/EphemerisAcceptanceMatrixTests.cpp
+        LABELS "unit;highprecision;validation;acceptance"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-real-kernel-horizons-acceptance-tests
+        highprecision/RealKernelHorizonsAcceptanceTests.cpp
+        LABELS "unit;highprecision;validation;acceptance;kernel"
+        TIMEOUT 60
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-star-astrometry-calculator-tests
+        highprecision/StarAstrometryCalculatorTests.cpp
+        LABELS "unit;highprecision;validation;stellar-astrometry"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-catalog-star-astrometry-arrays-tests
+        highprecision/CatalogStarAstrometryArraysTests.cpp
+        LABELS "unit;highprecision;stellar-astrometry;performance"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-calceph-kernel-provider-tests
+        highprecision/CalcephKernelProviderTests.cpp
+        LABELS "unit;highprecision;validation;kernel"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-solar-system-state-calculator-tests
+        highprecision/SolarSystemStateCalculatorTests.cpp
+        LABELS "unit;highprecision;validation;geometric"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-fixture-support-tests
+        highprecision/EphemerisFixtureSupportTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-observer-geodesy-tests
+        highprecision/ObserverGeodesyTests.cpp
+        LABELS "unit;highprecision"
+    )
+endif()
+
+add_executable(skygate-ephemeris-public-header-macro-compat-tests
+    engine/PublicHeaderMacroCompatTests.cpp
+    engine/PublicHeaderLegacyAliasTests.cpp
+)
+target_link_libraries(skygate-ephemeris-public-header-macro-compat-tests
+    PRIVATE
+        skygate::ephemeris
+)
+target_compile_features(skygate-ephemeris-public-header-macro-compat-tests PRIVATE cxx_std_20)
+add_test(
+    NAME skygate-ephemeris-public-header-macro-compat-tests
+    COMMAND $<TARGET_FILE:skygate-ephemeris-public-header-macro-compat-tests>
+)
+set_tests_properties(skygate-ephemeris-public-header-macro-compat-tests
+    PROPERTIES
+        LABELS unit
+        TIMEOUT 30
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-parsing-utilities-tests
@@ -96,6 +473,10 @@ add_skygate_ephemeris_qtest(
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-payload-format-detector-tests
     catalog/CatalogPayloadFormatDetectorTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-schema-registry-tests
+    catalog/CatalogSchemaRegistryTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-archive-codec-tests
@@ -110,6 +491,11 @@ add_skygate_ephemeris_qtest(
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-archive-zip-directory-tests
     catalog/io/CatalogArchiveZipDirectoryTests.cpp
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-zip-entry-selector-tests
+    catalog/io/CatalogZipEntrySelectorTests.cpp
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
@@ -135,6 +521,10 @@ add_skygate_ephemeris_qtest(
     catalog/opengc/OpenNgcParserEdgeTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-bundled-catalog-parser-tests
+    catalog/bundled/BundledCatalogParserTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-hyg-catalog-tests
     catalog/hyg/HygCatalogParserTests.cpp
 )
@@ -152,14 +542,94 @@ add_skygate_ephemeris_qtest(
     catalog/CatalogFactoryTests.cpp
 )
 add_skygate_ephemeris_qtest(
-    skygate-ephemeris-catalog-composer-tests
-    catalog/CatalogComposerTests.cpp
+    skygate-ephemeris-catalog-binary-codec-tests
+    catalog/CatalogBinaryCodecTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-load-result-tests
+    catalog/CatalogLoadResultTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-celestial-body-catalog-tests
+    catalog/CelestialBodyCatalogTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-object-identity-tests
+    catalog/CatalogObjectIdentityTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-identity-index-tests
+    catalog/CatalogIdentityIndexTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-identity-match-tests
+    catalog/CatalogIdentityMatchTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-bridge-retention-tests
+    catalog/CatalogBridgeRetentionTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-source-precedence-tests
+    catalog/CatalogSourcePrecedenceTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-row-origin-tests
+    catalog/CatalogRowOriginTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-magnitude-precedence-tests
+    catalog/CatalogMagnitudePrecedenceTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-model-selection-tests
+    catalog/CatalogModelSelectionTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-model-replacement-tests
+    catalog/CatalogModelReplacementTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-source-local-identity-tests
+    catalog/CatalogSourceLocalIdentityTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-snapshot-boundary-tests
+    catalog/CatalogSnapshotBoundaryTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-snapshot-validator-tests
+    catalog/CatalogSnapshotValidatorTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-composition-collection-tests
+    catalog/CatalogCompositionCollectionTests.cpp
     LABELS integration
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-constellation-data-codec-tests
     catalog/constellation/ConstellationDataCodecTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-constellation-reference-resolver-tests
+    catalog/constellation/ConstellationReferenceResolverTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-body-trail-calculator-tests
@@ -170,8 +640,28 @@ add_skygate_ephemeris_qtest(
     engine/CelestialReferenceCalculatorTests.cpp
 )
 add_skygate_ephemeris_qtest(
-    skygate-ephemeris-observation-event-calculator-tests
-    events/ObservationEventCalculatorTests.cpp
+    skygate-ephemeris-precision-policy-tests
+    engine/EphemerisPrecisionPolicyTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-computation-policy-tests
+    engine/EphemerisComputationPolicyTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-observation-event-direct-search-tests
+    events/ObservationEventDirectSearchTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-observation-event-guidance-tests
+    events/ObservationEventGuidanceTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-observation-event-primary-engine-tests
+    events/ObservationEventPrimaryEngineTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-moon-phase-calculator-tests
+    engine/MoonPhaseCalculatorTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-night-conditions-calculator-tests
@@ -182,6 +672,10 @@ add_skygate_ephemeris_qtest(
     engine/EphemerisEngineBaselineTests.cpp
     LABELS integration
     TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-request-time-contract-tests
+    engine/EphemerisRequestTimeContractTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-engine-fallback-tests

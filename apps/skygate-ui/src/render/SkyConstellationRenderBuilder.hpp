@@ -1,12 +1,11 @@
 #pragma once
 
+#include "PreparedProjection.hpp"
 #include "SkyRenderFrame.hpp"
 #include "SkyRenderHorizontalLookup.hpp"
-#include "SkyTheme.hpp"
-
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/math/SpatialIndex2d.hpp"
-#include "skygate/ephemeris/ConstellationData.hpp"
+#include "math/RectOccupancyGrid.hpp"
+#include "theme/SkyThemeRenderPalette.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
 
 #include <span>
 #include <string_view>
@@ -30,7 +29,7 @@ public:
         SkyRenderFrame& frame,
         const SkyRenderHorizontalLookup& horizontalLookup,
         const skygate::core::PreparedProjection& projection,
-        std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
+        std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups,
         double viewportWidth,
         double viewportHeight,
         const SkyThemeRenderPalette& renderTheme,

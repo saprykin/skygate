@@ -1,4 +1,4 @@
-#include "catalog/io/CompressedDataInflater.hpp"
+#include "CompressedDataInflater.hpp"
 
 #include <array>
 #include <limits>
@@ -9,12 +9,12 @@ namespace {
 
 constexpr std::size_t kMaxInflatedCatalogBytes = 768U << 20;
 
-int windowBitsForFormat(const CompressedDataFormat format)
+int windowBitsForFormat(const CompressedDataInflater::Format format)
 {
     switch (format) {
-    case CompressedDataFormat::Gzip:
+    case CompressedDataInflater::Format::Gzip:
         return 16 + MAX_WBITS;
-    case CompressedDataFormat::RawDeflate:
+    case CompressedDataInflater::Format::RawDeflate:
         return -MAX_WBITS;
     }
 
@@ -24,9 +24,7 @@ int windowBitsForFormat(const CompressedDataFormat format)
 }  // namespace
 
 std::optional<std::string> CompressedDataInflater::inflate(
-    const std::string_view compressedData,
-    const CompressedDataFormat format,
-    const CompressedDataInflateOptions& options
+    const std::string_view compressedData, const Format format, const CompressedDataInflateOptions& options
 )
 {
     if (compressedData.empty()) {
@@ -39,7 +37,7 @@ std::optional<std::string> CompressedDataInflater::inflate(
         return std::nullopt;
     }
 
-    z_stream stream {};
+    z_stream stream{};
     stream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(compressedData.data()));
     stream.avail_in = static_cast<uInt>(compressedData.size());
 
@@ -54,7 +52,7 @@ std::optional<std::string> CompressedDataInflater::inflate(
         output.reserve(compressedData.size() * 3U);
     }
 
-    std::array<char, 1 << 14> buffer {};
+    std::array<char, 1 << 14> buffer{};
     int status = Z_OK;
     while (status == Z_OK) {
         stream.next_out = reinterpret_cast<Bytef*>(buffer.data());
@@ -78,10 +76,7 @@ std::optional<std::string> CompressedDataInflater::inflate(
     if (status != Z_STREAM_END || (!options.allowEmptyOutput && output.empty())) {
         return std::nullopt;
     }
-    if (
-        options.expectedOutputBytes > 0U
-        && output.size() != options.expectedOutputBytes
-    ) {
+    if (options.expectedOutputBytes > 0U && output.size() != options.expectedOutputBytes) {
         return std::nullopt;
     }
 
