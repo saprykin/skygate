@@ -326,9 +326,11 @@ void EphemerisDataActivationTests::activatesLiveAssetWithoutIntegrityPins()
         static_cast<std::uint8_t>(firstResult.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::Activated)
     );
-    QFile activeFile(QString::fromStdString(firstResult.activePath.generic_string()));
-    QVERIFY(activeFile.open(QIODevice::ReadOnly));
-    QCOMPARE(activeFile.readAll(), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size())));
+    {
+        QFile activeFile(QString::fromStdString(firstResult.activePath.generic_string()));
+        QVERIFY(activeFile.open(QIODevice::ReadOnly));
+        QCOMPARE(activeFile.readAll(), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size())));
+    }
 
     const skygate::ephemeris::EphemerisDataActivationResult secondResult =
         skygate::ephemeris::EphemerisDataActivation::activate(request);
@@ -490,17 +492,17 @@ void EphemerisDataActivationTests::preservesExistingCacheWhenReplacementFails()
     const QByteArray previousActivePayload("previous active cache");
     writeFile(activePath, previousActivePayload);
 
-    const QString activeDirectoryPath = QFileInfo(activePath).absolutePath();
-    const QFileDevice::Permissions originalPermissions = QFileInfo(activeDirectoryPath).permissions();
-    const QFileDevice::Permissions readOnlyPermissions =
-        originalPermissions
-        & ~(QFileDevice::WriteOwner | QFileDevice::WriteUser | QFileDevice::WriteGroup | QFileDevice::WriteOther);
-    QVERIFY(QFile::setPermissions(activeDirectoryPath, readOnlyPermissions));
+    // Block the target directory with a plain file so the replacement cannot
+    // stage its temporary file. The directory swap keeps the test portable:
+    // Windows ignores the read-only attribute on directories.
+    QVERIFY(QDir(cacheRoot.path()).rename(QStringLiteral("modern"), QStringLiteral("modern-parked")));
+    writeFile(cacheRoot.path() + QStringLiteral("/modern"), QByteArray("directory blocker"));
 
     const skygate::ephemeris::EphemerisDataActivationResult result =
         skygate::ephemeris::EphemerisDataActivation::activate(makeRequest(asset, bundledRoot, cacheRoot));
 
-    QVERIFY(QFile::setPermissions(activeDirectoryPath, originalPermissions));
+    QVERIFY(QFile::remove(cacheRoot.path() + QStringLiteral("/modern")));
+    QVERIFY(QDir(cacheRoot.path()).rename(QStringLiteral("modern-parked"), QStringLiteral("modern")));
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::IoError)
