@@ -22,7 +22,7 @@ QString EphemerisDataFileUtilities::stringToQString(const std::string& value)
 
 bool EphemerisDataFileUtilities::hasUnsafePathComponent(const std::filesystem::path& path)
 {
-    if (path.empty() || path.is_absolute()) {
+    if (path.empty() || path.has_root_name() || path.has_root_directory()) {
         return true;
     }
 
