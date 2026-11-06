@@ -37,7 +37,7 @@ Window {
     readonly property int catalogSection: 4
     readonly property var sectionDisplayOrder: [skySection, engineSection, catalogSection,
                                                appearanceSection, generalSection]
-    property int selectedPage: generalSection
+    property int selectedPage: skySection
     readonly property int currentStackIndex: sectionDisplayOrder.indexOf(selectedPage)
     readonly property bool catalogBusy: skyContextController !== null
                                         && (skyContextController.downloadingCatalog
