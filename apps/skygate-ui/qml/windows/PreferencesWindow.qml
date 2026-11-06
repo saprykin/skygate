@@ -28,13 +28,17 @@ Window {
     property color dividerColor: theme.dividerColor
     property color textPrimary: theme.textPrimary
     property color textSecondary: theme.textSecondary
-    // Section identities follow the preferencesSectionStack child order.
+    // Section identifiers are stable values; sectionDisplayOrder lists the
+    // preferencesSectionStack pages in the order they are presented.
     readonly property int generalSection: 0
     readonly property int skySection: 1
     readonly property int engineSection: 2
     readonly property int appearanceSection: 3
     readonly property int catalogSection: 4
+    readonly property var sectionDisplayOrder: [skySection, engineSection, catalogSection,
+                                               appearanceSection, generalSection]
     property int selectedPage: generalSection
+    readonly property int currentStackIndex: sectionDisplayOrder.indexOf(selectedPage)
     readonly property bool catalogBusy: skyContextController !== null
                                         && (skyContextController.downloadingCatalog
                                             || skyContextController.catalogProcessing)
@@ -250,14 +254,6 @@ Window {
 
                         PreferencesSectionButton {
                             theme: preferencesWindow.theme
-                            objectName: "preferencesGeneralSectionButton"
-                            label: "General"
-                            active: preferencesWindow.selectedPage === preferencesWindow.generalSection
-                            onClicked: preferencesWindow.selectedPage = preferencesWindow.generalSection
-                        }
-
-                        PreferencesSectionButton {
-                            theme: preferencesWindow.theme
                             objectName: "preferencesSkySectionButton"
                             label: "Sky"
                             active: preferencesWindow.selectedPage === preferencesWindow.skySection
@@ -274,6 +270,14 @@ Window {
 
                         PreferencesSectionButton {
                             theme: preferencesWindow.theme
+                            objectName: "preferencesCatalogSectionButton"
+                            label: "Catalog"
+                            active: preferencesWindow.selectedPage === preferencesWindow.catalogSection
+                            onClicked: preferencesWindow.selectedPage = preferencesWindow.catalogSection
+                        }
+
+                        PreferencesSectionButton {
+                            theme: preferencesWindow.theme
                             objectName: "preferencesAppearanceSectionButton"
                             label: "Appearance"
                             active: preferencesWindow.selectedPage === preferencesWindow.appearanceSection
@@ -282,10 +286,10 @@ Window {
 
                         PreferencesSectionButton {
                             theme: preferencesWindow.theme
-                            objectName: "preferencesCatalogSectionButton"
-                            label: "Catalog"
-                            active: preferencesWindow.selectedPage === preferencesWindow.catalogSection
-                            onClicked: preferencesWindow.selectedPage = preferencesWindow.catalogSection
+                            objectName: "preferencesGeneralSectionButton"
+                            label: "Other"
+                            active: preferencesWindow.selectedPage === preferencesWindow.generalSection
+                            onClicked: preferencesWindow.selectedPage = preferencesWindow.generalSection
                         }
 
                         Item {
@@ -314,16 +318,9 @@ Window {
 
                         StackLayout {
                             objectName: "preferencesSectionStack"
-                            currentIndex: preferencesWindow.selectedPage
+                            currentIndex: preferencesWindow.currentStackIndex
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-
-                            PreferencesGeneralSection {
-                                theme: preferencesWindow.theme
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                preferencesDraft: preferencesDraft
-                            }
 
                             PreferencesSkySection {
                                 theme: preferencesWindow.theme
@@ -339,6 +336,12 @@ Window {
                                 preferencesDraft: preferencesDraft
                             }
 
+                            PreferencesCatalogSection {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                skyContextController: preferencesWindow.skyContextController
+                            }
+
                             PreferencesAppearanceSection {
                                 theme: preferencesWindow.theme
                                 Layout.fillWidth: true
@@ -346,10 +349,11 @@ Window {
                                 preferencesDraft: preferencesDraft
                             }
 
-                            PreferencesCatalogSection {
+                            PreferencesGeneralSection {
+                                theme: preferencesWindow.theme
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
-                                skyContextController: preferencesWindow.skyContextController
+                                preferencesDraft: preferencesDraft
                             }
                         }
                     }
