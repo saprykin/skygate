@@ -1,6 +1,8 @@
 #include "support/QmlTestSupport.hpp"
 #include "support/SkyContextTimeTestSupport.hpp"
 
+#include <QKeySequence>
+
 using namespace skygate::ui::tests;
 
 class QmlMainWindowTests final : public QObject {
@@ -14,6 +16,9 @@ private slots:
     void footerPopupToggleClosesPopupAndTogglesToolbar();
     void nativeMenuActionsOpenSharedAboutAndPreferences();
     void compactAppMenuOpensAboutAndPreferencesWindows();
+    void appMenuFullscreenItemTogglesFullScreenState();
+    void nativeFullscreenMenuItemTogglesWindowState();
+    void fullScreenShortcutIsPlatformGated();
     void mainWindowPreferenceSearchAndTrackingJourney();
 
 private:
@@ -316,6 +321,120 @@ void QmlMainWindowTests::compactAppMenuOpensAboutAndPreferencesWindows()
     QStringList unexpectedWarnings = warnings.messages();
     unexpectedWarnings.removeAll(QStringLiteral("This plugin does not support raise()"));
     QVERIFY2(unexpectedWarnings.isEmpty(), qPrintable(unexpectedWarnings.join('\n')));
+}
+
+void QmlMainWindowTests::appMenuFullscreenItemTogglesFullScreenState()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    auto sceneModel = makeSceneModel(*controller);
+    QVERIFY(sceneModel != nullptr);
+
+    QQmlApplicationEngine engine;
+    const QmlWarningScope warnings;
+    auto* rootWindow = loadMainWindow(engine, *controller, *sceneModel);
+    QVERIFY(rootWindow != nullptr);
+
+    auto* appMenuButton = firstQuickItemWithObjectName(rootWindow, QStringLiteral("appMenuButton"));
+    QObject* appMenuPopup = firstObjectWithObjectName(rootWindow, QStringLiteral("appMenuPopup"));
+    QVERIFY(appMenuButton != nullptr);
+    QVERIFY(appMenuPopup != nullptr);
+    QCOMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
+    QVERIFY(!rootWindow->property("fullScreenActive").toBool());
+
+    QVERIFY(activateControl(appMenuButton));
+    QTRY_VERIFY(appMenuPopup->property("opened").toBool());
+
+    auto* preferencesItem = firstQuickItemWithObjectName(rootWindow, QStringLiteral("appMenuPreferencesItem"));
+    auto* fullscreenItem = firstQuickItemWithObjectName(rootWindow, QStringLiteral("appMenuFullscreenItem"));
+    auto* aboutItem = firstQuickItemWithObjectName(rootWindow, QStringLiteral("appMenuAboutItem"));
+    QVERIFY(preferencesItem != nullptr);
+    QVERIFY(fullscreenItem != nullptr);
+    QVERIFY(aboutItem != nullptr);
+    QCOMPARE(fullscreenItem->property("text").toString(), QStringLiteral("Enter Full Screen"));
+    QTRY_VERIFY(fullscreenItem->y() > preferencesItem->y());
+    QTRY_VERIFY(aboutItem->y() > fullscreenItem->y());
+
+    QVERIFY(activateControl(fullscreenItem));
+    QTRY_VERIFY(!appMenuPopup->property("opened").toBool());
+    QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::FullScreen));
+    QTRY_VERIFY(rootWindow->property("fullScreenActive").toBool());
+    QTRY_COMPARE(fullscreenItem->property("text").toString(), QStringLiteral("Exit Full Screen"));
+
+    QVERIFY(activateControl(appMenuButton));
+    QTRY_VERIFY(appMenuPopup->property("opened").toBool());
+    QCOMPARE(fullscreenItem->property("text").toString(), QStringLiteral("Exit Full Screen"));
+    QVERIFY(activateControl(fullscreenItem));
+    QTRY_VERIFY(!appMenuPopup->property("opened").toBool());
+    QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
+    QTRY_VERIFY(!rootWindow->property("fullScreenActive").toBool());
+    QTRY_COMPARE(fullscreenItem->property("text").toString(), QStringLiteral("Enter Full Screen"));
+
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlMainWindowTests::nativeFullscreenMenuItemTogglesWindowState()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    auto sceneModel = makeSceneModel(*controller);
+    QVERIFY(sceneModel != nullptr);
+
+    QQmlApplicationEngine engine;
+    const QmlWarningScope warnings;
+    auto* rootWindow = loadMainWindow(engine, *controller, *sceneModel);
+    QVERIFY(rootWindow != nullptr);
+
+    QObject* fullscreenMenuItem = firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuItem"));
+    QVERIFY(fullscreenMenuItem != nullptr);
+    QCOMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Toggle Full Screen"));
+    QCOMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
+
+    QVERIFY(triggerMenuItem(fullscreenMenuItem));
+    QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::FullScreen));
+    QTRY_VERIFY(rootWindow->property("fullScreenActive").toBool());
+
+    QVERIFY(triggerMenuItem(fullscreenMenuItem));
+    QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
+    QTRY_VERIFY(!rootWindow->property("fullScreenActive").toBool());
+
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlMainWindowTests::fullScreenShortcutIsPlatformGated()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    auto sceneModel = makeSceneModel(*controller);
+    QVERIFY(sceneModel != nullptr);
+
+    QQmlApplicationEngine engine;
+    const QmlWarningScope warnings;
+    auto* rootWindow = loadMainWindow(engine, *controller, *sceneModel);
+    QVERIFY(rootWindow != nullptr);
+
+    QObject* fullscreenShortcut = firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenShortcut"));
+    QVERIFY(fullscreenShortcut != nullptr);
+    const QString fullScreenPortableText = QKeySequence(QKeySequence::FullScreen).toString(QKeySequence::PortableText);
+    QCOMPARE(fullscreenShortcut->property("portableText").toString(), fullScreenPortableText);
+
+    QObject* menuShortcut = firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuShortcut"));
+    QVERIFY(menuShortcut != nullptr);
+    QCOMPARE(menuShortcut->property("portableText").toString(), fullScreenPortableText);
+#ifdef Q_OS_MACOS
+    // macOS routes the sequence through the native menu item instead.
+    QVERIFY(!fullscreenShortcut->property("enabled").toBool());
+    QVERIFY(menuShortcut->property("enabled").toBool());
+#else
+    QVERIFY(fullscreenShortcut->property("enabled").toBool());
+    QVERIFY(!menuShortcut->property("enabled").toBool());
+    QVERIFY(QMetaObject::invokeMethod(fullscreenShortcut, "activated"));
+    QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::FullScreen));
+    QVERIFY(QMetaObject::invokeMethod(fullscreenShortcut, "activated"));
+    QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
+#endif
+
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
 void QmlMainWindowTests::mainWindowPreferenceSearchAndTrackingJourney()

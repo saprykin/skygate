@@ -8,9 +8,11 @@ ToolButton {
     required property var theme
     property bool closingFromMenuItem: false
     property bool suppressTooltip: false
+    property bool fullScreenActive: false
     property real lastPopupClosedAt: 0
     signal aboutRequested()
     signal preferencesRequested()
+    signal fullscreenRequested()
 
     width: 30
     height: 44
@@ -110,6 +112,16 @@ ToolButton {
                     appMenuButton.closingFromMenuItem = true
                     appMenuPopup.close()
                     appMenuButton.preferencesRequested()
+                }
+            }
+
+            AppMenuItem {
+                objectName: "appMenuFullscreenItem"
+                text: appMenuButton.fullScreenActive ? "Exit Full Screen" : "Enter Full Screen"
+                onClicked: {
+                    appMenuButton.closingFromMenuItem = true
+                    appMenuPopup.close()
+                    appMenuButton.fullscreenRequested()
                 }
             }
 

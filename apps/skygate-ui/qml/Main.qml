@@ -13,6 +13,7 @@ ApplicationWindow {
     visible: true
     title: "SkyGate"
     readonly property bool nativeMenuBarVisible: Qt.platform.os === "osx"
+    readonly property bool fullScreenActive: visibility === Window.FullScreen
 
     menuBar: MenuBar {
         objectName: "nativeMenuBar"
@@ -35,7 +36,29 @@ ApplicationWindow {
                 text: "&Preferences..."
                 onTriggered: root.openPreferencesWindow()
             }
+
+            MenuSeparator {}
+
+            MenuItem {
+                objectName: "fullscreenMenuItem"
+                text: "Toggle Full Screen"
+                onTriggered: root.toggleFullScreen()
+
+                Shortcut {
+                    objectName: "fullscreenMenuShortcut"
+                    sequences: [StandardKey.FullScreen]
+                    enabled: Qt.platform.os === "osx"
+                    onActivated: root.toggleFullScreen()
+                }
+            }
         }
+    }
+
+    Shortcut {
+        objectName: "fullscreenShortcut"
+        sequences: [StandardKey.FullScreen]
+        enabled: Qt.platform.os !== "osx"
+        onActivated: root.toggleFullScreen()
     }
 
     AboutWindow {
@@ -99,6 +122,10 @@ ApplicationWindow {
 
     function openPreferencesWindow() {
         preferencesWindow.openWindow()
+    }
+
+    function toggleFullScreen() {
+        visibility = fullScreenActive ? Window.Windowed : Window.FullScreen
     }
 
     function toolbarItemRight(toolbar, item) {
@@ -207,8 +234,10 @@ ApplicationWindow {
             anchors.topMargin: 18
             anchors.leftMargin: 14
             theme: skyContext.theme
+            fullScreenActive: root.fullScreenActive
             onPreferencesRequested: root.openPreferencesWindow()
             onAboutRequested: root.openAboutWindow()
+            onFullscreenRequested: root.toggleFullScreen()
         }
 
         SearchToolbar {
