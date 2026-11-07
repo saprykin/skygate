@@ -173,9 +173,10 @@ Full screen is available on every platform. `SkyAppMenuButton` carries an
 `Enter Full Screen` or `Exit Full Screen` item between `Preferences` and
 `About`, derives the label from the main window `fullScreenActive` flag,
 and emits `fullscreenRequested`; the window owns the state change. macOS
-also gets a `Toggle Full Screen` item in the native menu bar, which takes
-the platform full screen sequence `Control+Command+F`, while other
-platforms bind `F11` as a window shortcut. `Main.qml` derives
+also gets the standard `Enter Full Screen` item (switching to `Exit Full
+Screen` while active) in the native `View` menu, which takes the platform
+full screen sequence `Control+Command+F`, while other platforms bind
+`F11` as a window shortcut. `Main.qml` derives
 `fullScreenActive` from `visibility === Window.FullScreen`, and
 `toggleFullScreen()` flips `visibility` between `Windowed` and
 `FullScreen`. The native macOS full screen button is unchanged and drives

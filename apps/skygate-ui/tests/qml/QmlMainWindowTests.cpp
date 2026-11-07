@@ -385,18 +385,24 @@ void QmlMainWindowTests::nativeFullscreenMenuItemTogglesWindowState()
     auto* rootWindow = loadMainWindow(engine, *controller, *sceneModel);
     QVERIFY(rootWindow != nullptr);
 
+    QObject* viewMenu = firstObjectWithObjectName(rootWindow, QStringLiteral("viewMenu"));
+    QVERIFY(viewMenu != nullptr);
+    QCOMPARE(viewMenu->property("title").toString(), QStringLiteral("&View"));
+
     QObject* fullscreenMenuItem = firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuItem"));
     QVERIFY(fullscreenMenuItem != nullptr);
-    QCOMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Toggle Full Screen"));
+    QCOMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Enter Full Screen"));
     QCOMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
 
     QVERIFY(triggerMenuItem(fullscreenMenuItem));
     QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::FullScreen));
     QTRY_VERIFY(rootWindow->property("fullScreenActive").toBool());
+    QTRY_COMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Exit Full Screen"));
 
     QVERIFY(triggerMenuItem(fullscreenMenuItem));
     QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
     QTRY_VERIFY(!rootWindow->property("fullScreenActive").toBool());
+    QTRY_COMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Enter Full Screen"));
 
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }

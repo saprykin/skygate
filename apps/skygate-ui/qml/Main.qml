@@ -36,12 +36,15 @@ ApplicationWindow {
                 text: "&Preferences..."
                 onTriggered: root.openPreferencesWindow()
             }
+        }
 
-            MenuSeparator {}
+        Menu {
+            objectName: "viewMenu"
+            title: "&View"
 
             MenuItem {
                 objectName: "fullscreenMenuItem"
-                text: "Toggle Full Screen"
+                text: root.fullScreenActive ? "Exit Full Screen" : "Enter Full Screen"
                 onTriggered: root.toggleFullScreen()
 
                 Shortcut {
