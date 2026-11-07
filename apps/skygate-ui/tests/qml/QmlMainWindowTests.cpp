@@ -17,7 +17,7 @@ private slots:
     void nativeMenuActionsOpenSharedAboutAndPreferences();
     void compactAppMenuOpensAboutAndPreferencesWindows();
     void appMenuFullscreenItemTogglesFullScreenState();
-    void nativeFullscreenMenuItemTogglesWindowState();
+    void macOsViewMenuHasNoDuplicateFullScreenItem();
     void fullScreenShortcutIsPlatformGated();
     void mainWindowPreferenceSearchAndTrackingJourney();
 
@@ -373,7 +373,7 @@ void QmlMainWindowTests::appMenuFullscreenItemTogglesFullScreenState()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlMainWindowTests::nativeFullscreenMenuItemTogglesWindowState()
+void QmlMainWindowTests::macOsViewMenuHasNoDuplicateFullScreenItem()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -389,20 +389,10 @@ void QmlMainWindowTests::nativeFullscreenMenuItemTogglesWindowState()
     QVERIFY(viewMenu != nullptr);
     QCOMPARE(viewMenu->property("title").toString(), QStringLiteral("&View"));
 
-    QObject* fullscreenMenuItem = firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuItem"));
-    QVERIFY(fullscreenMenuItem != nullptr);
-    QCOMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Enter Full Screen"));
-    QCOMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
-
-    QVERIFY(triggerMenuItem(fullscreenMenuItem));
-    QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::FullScreen));
-    QTRY_VERIFY(rootWindow->property("fullScreenActive").toBool());
-    QTRY_COMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Exit Full Screen"));
-
-    QVERIFY(triggerMenuItem(fullscreenMenuItem));
-    QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
-    QTRY_VERIFY(!rootWindow->property("fullScreenActive").toBool());
-    QTRY_COMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Enter Full Screen"));
+    // AppKit manages the full screen action for fullscreen-capable
+    // windows; the QML must not add its own item or a duplicate appears.
+    QVERIFY(firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuItem")) == nullptr);
+    QVERIFY(firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuShortcut")) == nullptr);
 
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
@@ -424,13 +414,10 @@ void QmlMainWindowTests::fullScreenShortcutIsPlatformGated()
     const QString fullScreenPortableText = QKeySequence(QKeySequence::FullScreen).toString(QKeySequence::PortableText);
     QCOMPARE(fullscreenShortcut->property("portableText").toString(), fullScreenPortableText);
 
-    QObject* menuShortcut = firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuShortcut"));
-    QVERIFY(menuShortcut != nullptr);
-    QCOMPARE(menuShortcut->property("portableText").toString(), fullScreenPortableText);
 #ifdef Q_OS_MACOS
-    // macOS routes the sequence through the native menu item instead.
+    // macOS routes the full screen sequence through AppKit's system item
+    // in the View menu instead.
     QVERIFY(!fullscreenShortcut->property("enabled").toBool());
-    QVERIFY(menuShortcut->property("enabled").toBool());
 #else
     QVERIFY(fullscreenShortcut->property("enabled").toBool());
     QVERIFY(!menuShortcut->property("enabled").toBool());
