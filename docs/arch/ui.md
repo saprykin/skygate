@@ -172,13 +172,14 @@ transient UI and chrome stay in QML.
 Full screen is available on every platform. `SkyAppMenuButton` carries an
 `Enter Full Screen` or `Exit Full Screen` item between `Preferences` and
 `About`, derives the label from the main window `fullScreenActive` flag,
-and emits `fullscreenRequested`; the window owns the state change. On
-macOS the `View` menu in `Main.qml` is defined empty and the platform
-inserts its own `Enter Full Screen` action (flipping to `Exit Full
-Screen` while active, sequence `Control+Command+F`) for
-fullscreen-capable windows; the QML deliberately adds no item so the
-system action stays the only one. Other platforms bind `F11` as a window
-shortcut. `Main.qml` derives
+and emits `fullscreenRequested`; the window owns the state change. The
+macOS `View` menu carries its own `Enter Full Screen` item with a fixed
+label: the platform hides the menu bar while full screen is active, and
+Qt 6.12 crashes when native menu content changes during the menu re-sync
+that follows a full screen transition. The `Control+Command+F` sequence
+is delivered by the window shortcut (`F11` on other platforms) rather
+than being attached to the native menu item for the same reason.
+`Main.qml` derives
 `fullScreenActive` from `visibility === Window.FullScreen`, and
 `toggleFullScreen()` flips `visibility` between `Windowed` and
 `FullScreen`. The native macOS full screen button is unchanged and drives

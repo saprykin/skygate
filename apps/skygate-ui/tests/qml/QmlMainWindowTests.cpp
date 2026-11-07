@@ -17,8 +17,8 @@ private slots:
     void nativeMenuActionsOpenSharedAboutAndPreferences();
     void compactAppMenuOpensAboutAndPreferencesWindows();
     void appMenuFullscreenItemTogglesFullScreenState();
-    void macOsViewMenuHasNoDuplicateFullScreenItem();
-    void fullScreenShortcutIsPlatformGated();
+    void viewMenuFullscreenItemTogglesWindowState();
+    void fullScreenShortcutTogglesWindowState();
     void mainWindowPreferenceSearchAndTrackingJourney();
 
 private:
@@ -373,7 +373,7 @@ void QmlMainWindowTests::appMenuFullscreenItemTogglesFullScreenState()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlMainWindowTests::macOsViewMenuHasNoDuplicateFullScreenItem()
+void QmlMainWindowTests::viewMenuFullscreenItemTogglesWindowState()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -389,15 +389,27 @@ void QmlMainWindowTests::macOsViewMenuHasNoDuplicateFullScreenItem()
     QVERIFY(viewMenu != nullptr);
     QCOMPARE(viewMenu->property("title").toString(), QStringLiteral("&View"));
 
-    // AppKit manages the full screen action for fullscreen-capable
-    // windows; the QML must not add its own item or a duplicate appears.
-    QVERIFY(firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuItem")) == nullptr);
-    QVERIFY(firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuShortcut")) == nullptr);
+    QObject* fullscreenMenuItem = firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuItem"));
+    QVERIFY(fullscreenMenuItem != nullptr);
+    // The label stays fixed: macOS hides the menu bar during full
+    // screen, and Qt 6.12 crashes when native menu content changes
+    // while the menu re-syncs across full screen transitions.
+    QCOMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Enter Full Screen"));
+    QCOMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
+
+    QVERIFY(triggerMenuItem(fullscreenMenuItem));
+    QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::FullScreen));
+    QTRY_VERIFY(rootWindow->property("fullScreenActive").toBool());
+
+    QVERIFY(triggerMenuItem(fullscreenMenuItem));
+    QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
+    QTRY_VERIFY(!rootWindow->property("fullScreenActive").toBool());
+    QCOMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Enter Full Screen"));
 
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlMainWindowTests::fullScreenShortcutIsPlatformGated()
+void QmlMainWindowTests::fullScreenShortcutTogglesWindowState()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -414,18 +426,15 @@ void QmlMainWindowTests::fullScreenShortcutIsPlatformGated()
     const QString fullScreenPortableText = QKeySequence(QKeySequence::FullScreen).toString(QKeySequence::PortableText);
     QCOMPARE(fullscreenShortcut->property("portableText").toString(), fullScreenPortableText);
 
-#ifdef Q_OS_MACOS
-    // macOS routes the full screen sequence through AppKit's system item
-    // in the View menu instead.
-    QVERIFY(!fullscreenShortcut->property("enabled").toBool());
-#else
+    // The same sequence on every platform: Control+Command+F on macOS,
+    // F11 elsewhere. The platform sequence is not attached to the
+    // native menu item because Qt 6.12 crashes re-syncing that shortcut
+    // across full screen transitions on macOS.
     QVERIFY(fullscreenShortcut->property("enabled").toBool());
-    QVERIFY(!menuShortcut->property("enabled").toBool());
     QVERIFY(QMetaObject::invokeMethod(fullscreenShortcut, "activated"));
     QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::FullScreen));
     QVERIFY(QMetaObject::invokeMethod(fullscreenShortcut, "activated"));
     QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
-#endif
 
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }

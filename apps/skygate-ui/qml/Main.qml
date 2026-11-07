@@ -39,18 +39,21 @@ ApplicationWindow {
         }
 
         Menu {
-            // macOS inserts its own Enter Full Screen / Exit Full Screen
-            // action here (same as the green button); the QML must not add
-            // a duplicate.
             objectName: "viewMenu"
             title: "&View"
+
+            MenuItem {
+                objectName: "fullscreenMenuItem"
+                text: "Enter Full Screen"
+                onTriggered: root.toggleFullScreen()
+            }
         }
     }
 
     Shortcut {
         objectName: "fullscreenShortcut"
         sequences: [StandardKey.FullScreen]
-        enabled: Qt.platform.os !== "osx"
+        enabled: true
         onActivated: root.toggleFullScreen()
     }
 
