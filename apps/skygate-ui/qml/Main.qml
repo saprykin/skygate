@@ -44,8 +44,15 @@ ApplicationWindow {
 
             MenuItem {
                 objectName: "fullscreenMenuItem"
-                text: "Enter Full Screen"
+                text: root.fullScreenActive ? "Exit Full Screen" : "Enter Full Screen"
                 onTriggered: root.toggleFullScreen()
+
+                Shortcut {
+                    objectName: "fullscreenMenuShortcut"
+                    sequences: [StandardKey.FullScreen]
+                    enabled: Qt.platform.os === "osx"
+                    onActivated: root.toggleFullScreen()
+                }
             }
         }
     }
@@ -53,7 +60,7 @@ ApplicationWindow {
     Shortcut {
         objectName: "fullscreenShortcut"
         sequences: [StandardKey.FullScreen]
-        enabled: true
+        enabled: Qt.platform.os !== "osx"
         onActivated: root.toggleFullScreen()
     }
 
