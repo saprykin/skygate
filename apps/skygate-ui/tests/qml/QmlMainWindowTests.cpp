@@ -51,6 +51,17 @@ bool triggerMenuItem(QObject* menuItem)
     return false;
 }
 
+QKeySequence shortcutFromAction(const QObject* action)
+{
+    // QML passes StandardKey values as ints; mirror QQuickAction's own
+    // conversion instead of letting QVariant coerce the int into a key.
+    const QVariant variant = action->property("shortcut");
+    if (variant.metaType().id() == QMetaType::Int) {
+        return QKeySequence(static_cast<QKeySequence::StandardKey>(variant.toInt()));
+    }
+    return variant.value<QKeySequence>();
+}
+
 QQuickWindow* loadMainWindow(QQmlApplicationEngine& engine, SkyContextController& controller, SkySceneModel& sceneModel)
 {
     setupEngine(engine, controller, &sceneModel);
@@ -392,14 +403,24 @@ void QmlMainWindowTests::viewMenuFullscreenItemTogglesWindowState()
     QObject* fullscreenMenuItem = firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuItem"));
     QVERIFY(fullscreenMenuItem != nullptr);
     QCOMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Enter Full Screen"));
+
+    // The sequence rides the item's Action so the native menu shows the
+    // shortcut and handles the key.
+    auto* action = fullscreenMenuItem->property("action").value<QObject*>();
+    QVERIFY(action != nullptr);
+    const QString fullScreenPortableText = QKeySequence(QKeySequence::FullScreen).toString(QKeySequence::PortableText);
+    QCOMPARE(shortcutFromAction(action).toString(QKeySequence::PortableText), fullScreenPortableText);
+
     QCOMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
 
-    QVERIFY(triggerMenuItem(fullscreenMenuItem));
+    // Qt 6.12 MenuItem has no invokable trigger(); drive the action the
+    // way a native menu click does.
+    QVERIFY(QMetaObject::invokeMethod(action, "trigger"));
     QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::FullScreen));
     QTRY_VERIFY(rootWindow->property("fullScreenActive").toBool());
-    QTRY_COMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Exit Full Screen"));
+    QTRY_COMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Leave Full Screen"));
 
-    QVERIFY(triggerMenuItem(fullscreenMenuItem));
+    QVERIFY(QMetaObject::invokeMethod(action, "trigger"));
     QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
     QTRY_VERIFY(!rootWindow->property("fullScreenActive").toBool());
     QCOMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Enter Full Screen"));
@@ -421,21 +442,23 @@ void QmlMainWindowTests::fullScreenShortcutIsPlatformGated()
 
     const QString fullScreenPortableText = QKeySequence(QKeySequence::FullScreen).toString(QKeySequence::PortableText);
 
-    // One handler per platform: the sequence rides the native menu item
-    // on macOS and a window shortcut everywhere else.
-    QObject* menuShortcut = firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuShortcut"));
-    QVERIFY(menuShortcut != nullptr);
-    QCOMPARE(menuShortcut->property("portableText").toString(), fullScreenPortableText);
+    // One handler per platform: the sequence rides the View menu Action on
+    // macOS and a window shortcut everywhere else.
+    QObject* fullscreenMenuItem = firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenMenuItem"));
+    QVERIFY(fullscreenMenuItem != nullptr);
+    auto* action = fullscreenMenuItem->property("action").value<QObject*>();
+    QVERIFY(action != nullptr);
+    QCOMPARE(shortcutFromAction(action).toString(QKeySequence::PortableText), fullScreenPortableText);
 
     QObject* fullscreenShortcut = firstObjectWithObjectName(rootWindow, QStringLiteral("fullscreenShortcut"));
     QVERIFY(fullscreenShortcut != nullptr);
     QCOMPARE(fullscreenShortcut->property("portableText").toString(), fullScreenPortableText);
 
 #ifdef Q_OS_MACOS
-    QVERIFY(menuShortcut->property("enabled").toBool());
+    QVERIFY(action->property("enabled").toBool());
     QVERIFY(!fullscreenShortcut->property("enabled").toBool());
 #else
-    QVERIFY(!menuShortcut->property("enabled").toBool());
+    QVERIFY(!action->property("enabled").toBool());
     QVERIFY(fullscreenShortcut->property("enabled").toBool());
     QVERIFY(QMetaObject::invokeMethod(fullscreenShortcut, "activated"));
     QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::FullScreen));

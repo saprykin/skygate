@@ -44,14 +44,14 @@ ApplicationWindow {
 
             MenuItem {
                 objectName: "fullscreenMenuItem"
-                text: root.fullScreenActive ? "Exit Full Screen" : "Enter Full Screen"
-                onTriggered: root.toggleFullScreen()
-
-                Shortcut {
-                    objectName: "fullscreenMenuShortcut"
-                    sequences: [StandardKey.FullScreen]
+                action: Action {
+                    // "Leave" instead of "Exit": Qt merges native menu items
+                    // starting with "Exit" into the Quit action, which drops
+                    // the item from the View menu during full screen sync.
+                    text: root.fullScreenActive ? "Leave Full Screen" : "Enter Full Screen"
+                    shortcut: StandardKey.FullScreen
                     enabled: Qt.platform.os === "osx"
-                    onActivated: root.toggleFullScreen()
+                    onTriggered: root.toggleFullScreen()
                 }
             }
         }

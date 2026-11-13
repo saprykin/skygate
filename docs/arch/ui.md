@@ -173,12 +173,16 @@ Full screen is available on every platform. `SkyAppMenuButton` carries an
 `Enter Full Screen` or `Exit Full Screen` item between `Preferences` and
 `About`, derives the label from the main window `fullScreenActive` flag,
 and emits `fullscreenRequested`; the window owns the state change. The
-macOS `View` menu carries the same state-aware item with the
-`Control+Command+F` platform sequence attached to it, while other
-platforms bind `F11` as a window shortcut. AppKit would also append its
-own full screen item to that menu after launch, so
-`MacFullScreenMenuPolicy` sets the `NSFullScreenMenuItemEverywhere` user
-default at startup and the menu keeps a single entry. `Main.qml` derives
+macOS `View` menu carries the same state-aware item through an `Action`
+whose `Control+Command+F` shortcut shows in the native menu, while other
+platforms bind `F11` as a window shortcut. While active, the item reads
+`Leave Full Screen` instead of `Exit Full Screen`: Qt's native menu role
+heuristic merges items whose text starts with "Exit" into the Quit
+action, which drops the item from the `View` menu during full screen
+transitions. AppKit would also append its own full screen item to that
+menu after launch, so `MacFullScreenMenuPolicy` sets the
+`NSFullScreenMenuItemEverywhere` user default at startup and the menu
+keeps a single entry. `Main.qml` derives
 `fullScreenActive` from `visibility === Window.FullScreen`, and
 `toggleFullScreen()` flips `visibility` between `Windowed` and
 `FullScreen`. The native macOS full screen button is unchanged and drives
