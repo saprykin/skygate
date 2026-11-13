@@ -7,6 +7,7 @@
 #include "ephemeris/SkyEphemerisSettingsPolicy.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "platform/MacDockIcon.hpp"
+#include "platform/MacFullScreenMenuPolicy.hpp"
 #include "render/SkyViewportItem.hpp"
 #include "scene/SkySceneModel.hpp"
 #include "settings/SkySettingsStore.hpp"
@@ -255,6 +256,12 @@ int main(int argc, char* argv[])
         writeVersionOutput(SKYGATE_APP_VERSION, SKYGATE_GIT_HASH, qVersion());
         return EXIT_SUCCESS;
     }
+
+#if defined(Q_OS_MACOS)
+    // AppKit would append its own full screen item to the View menu
+    // after launch; suppress it so the QML item stays the only one.
+    skygate::ui::MacFullScreenMenuPolicy::suppressAppKitItem();
+#endif
 
     // Prevent stale cached QML artifacts from surfacing outdated warnings at launch.
 #if !defined(NDEBUG)

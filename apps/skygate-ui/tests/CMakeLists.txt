@@ -634,3 +634,10 @@ foreach(qml_test_target IN ITEMS
             SKYGATE_QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../qml"
     )
 endforeach()
+
+if(APPLE)
+    add_skygate_ui_qtest(
+        skygate-ui-mac-full-screen-menu-policy-tests
+        platform/MacFullScreenMenuPolicyTests.mm
+    )
+endif()

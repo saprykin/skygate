@@ -176,7 +176,10 @@ and emits `fullscreenRequested`; the window owns the state change. The
 macOS `View` menu carries its own `Enter Full Screen` item with a fixed
 label: the platform hides the menu bar while full screen is active, and
 Qt 6.12 crashes when native menu content changes during the menu re-sync
-that follows a full screen transition. The `Control+Command+F` sequence
+that follows a full screen transition. AppKit would also append its own
+full screen item to that menu after launch, so `MacFullScreenMenuPolicy`
+sets the `NSFullScreenMenuItemEverywhere` user default at startup and the
+`View` menu keeps a single entry. The `Control+Command+F` sequence
 is delivered by the window shortcut (`F11` on other platforms) rather
 than being attached to the native menu item for the same reason.
 `Main.qml` derives

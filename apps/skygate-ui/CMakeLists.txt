@@ -313,6 +313,8 @@ if(APPLE)
     target_sources(skygate-ui-lib PRIVATE
         src/platform/MacDockIcon.hpp
         src/platform/MacDockIcon.mm
+        src/platform/MacFullScreenMenuPolicy.hpp
+        src/platform/MacFullScreenMenuPolicy.mm
     )
     set_source_files_properties(
         resources/icons/Skygate.icns
