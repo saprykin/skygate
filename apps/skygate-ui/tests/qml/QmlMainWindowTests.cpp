@@ -411,6 +411,7 @@ void QmlMainWindowTests::viewMenuFullscreenItemTogglesWindowState()
     const QString fullScreenPortableText = QKeySequence(QKeySequence::FullScreen).toString(QKeySequence::PortableText);
     QCOMPARE(shortcutFromAction(action).toString(QKeySequence::PortableText), fullScreenPortableText);
 
+#ifdef Q_OS_MACOS
     QCOMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
 
     // Qt 6.12 MenuItem has no invokable trigger(); drive the action the
@@ -424,6 +425,11 @@ void QmlMainWindowTests::viewMenuFullscreenItemTogglesWindowState()
     QTRY_COMPARE(int(rootWindow->visibility()), int(QWindow::Windowed));
     QTRY_VERIFY(!rootWindow->property("fullScreenActive").toBool());
     QCOMPARE(fullscreenMenuItem->property("text").toString(), QStringLiteral("Enter Full Screen"));
+#else
+    // The native menu bar does not exist off macOS; the disabled action
+    // must not drive the window state or register its shortcut.
+    QVERIFY(!action->property("enabled").toBool());
+#endif
 
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
