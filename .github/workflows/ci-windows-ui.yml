@@ -1,0 +1,91 @@
+name: Windows UI verification
+
+on:
+  workflow_dispatch:
+
+jobs:
+  windows-ui:
+    name: Windows UI (Qt 6.10, offscreen)
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      QML_DISABLE_DISK_CACHE: 1
+      QT_QUICK_CONTROLS_STYLE: Basic
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Set up MSVC
+        uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: x64
+
+      - name: Install Qt
+        timeout-minutes: 20
+        shell: pwsh
+        run: |
+          pip install aqtinstall
+          aqt install-qt windows desktop 6.10.3 win64_msvc2022_64 -m qtshadertools qtpositioning --outputdir D:\Qt
+          New-Item -ItemType Directory -Force "D:\Qt\6.10.3\msvc2022_64\lib\fonts"
+          curl.exe -L --fail --retry 3 -o dejavu.zip "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip"
+          Expand-Archive dejavu.zip -DestinationPath dejavu
+          Copy-Item dejavu\dejavu-fonts-ttf-2.37\ttf\*.ttf "D:\Qt\6.10.3\msvc2022_64\lib\fonts\"
+          "QT_PREFIX=D:\Qt\6.10.3\msvc2022_64" >> $env:GITHUB_ENV
+          "D:\Qt\6.10.3\msvc2022_64\bin" >> $env:GITHUB_PATH
+
+      - name: Configure vcpkg
+        shell: pwsh
+        run: |
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          if (-not $vcpkgRoot -and (Test-Path "C:\vcpkg")) {
+            $vcpkgRoot = "C:\vcpkg"
+          }
+          if (-not $vcpkgRoot) {
+            throw "Could not find vcpkg on the Windows runner."
+          }
+          "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
+
+      - name: Verify test fixtures
+        run: git lfs fsck
+
+      - name: Configure
+        run: >
+          cmake --preset core-debug-windows-vcpkg
+          -DSKYGATE_BUILD_UI=ON
+          -DCMAKE_PREFIX_PATH="$env:QT_PREFIX"
+          -DCMAKE_POLICY_DEFAULT_CMP0141=NEW
+          -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
+
+      - name: Build QML test suites
+        run: >
+          cmake --build --preset core-debug-windows-vcpkg --parallel 4
+          --target
+          skygate-ui-qml-main-window-tests
+          skygate-ui-qml-component-load-tests
+          skygate-ui-qml-smoke-tests
+          skygate-ui-qml-toolbar-tests
+          skygate-ui-qml-preferences-window-tests
+
+      - name: Test QML suites
+        shell: pwsh
+        run: |
+          $vcpkgDebugBin = "$PWD\build-ninja\core-debug-windows-vcpkg\vcpkg_installed\x64-windows\debug\bin"
+          $vcpkgReleaseBin = "$PWD\build-ninja\core-debug-windows-vcpkg\vcpkg_installed\x64-windows\bin"
+          $env:PATH = "$vcpkgDebugBin;$vcpkgReleaseBin;$env:PATH"
+          $failed = @()
+          foreach ($suite in @('component-load', 'main-window', 'preferences-window', 'smoke', 'toolbar')) {
+            Write-Host "=== running skygate-ui-qml-$suite-tests ==="
+            & "$PWD\build-ninja\core-debug-windows-vcpkg\apps\skygate-ui\tests\skygate-ui-qml-$suite-tests.exe" "-o" "suite-$suite.txt,txt" 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              $failed += $suite
+              if (Test-Path "suite-$suite.txt") { Get-Content "suite-$suite.txt" -Tail 60 }
+            }
+          }
+          if ($failed.Count -gt 0) {
+            Write-Host "Failed suites: $($failed -join ', ')"
+            exit 1
+          }
